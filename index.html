@@ -199,7 +199,7 @@ input,select,textarea{font-family:var(--fn)}
 .copy-btn:hover{color:var(--g);border-color:var(--g)}
 .preview-txt{padding:11px;font-size:12px;line-height:1.7;color:var(--t);white-space:pre-wrap;font-family:var(--mo)}
 .preview-ph{color:var(--sb);font-family:var(--fn)}
-.wa-bar{padding:10px 14px;border-top:1px solid var(--b);background:var(--bg);flex-shrink:0;display:flex;gap:7px;padding-bottom:calc(10px + env(safe-area-inset-bottom,0px))}
+.wa-bar{padding:10px 14px;border-top:1px solid var(--b);background:var(--bg);flex-shrink:0;display:flex;gap:7px;padding-bottom:calc(70px + env(safe-area-inset-bottom,0px));position:sticky;bottom:0;z-index:50}
 .wa-mini{flex:1;padding:10px;background:var(--card);border:1px solid var(--b);border-radius:var(--r2);color:var(--m);font-size:11px;font-weight:700;cursor:pointer;transition:var(--tr);text-align:center}
 .wa-mini:hover{border-color:var(--g);color:var(--g)}
 .note-area{width:100%;padding:9px 11px;background:var(--card);border:1px solid var(--b);border-radius:var(--r2);color:var(--t);font-size:13px;outline:none;transition:var(--tr);resize:none;min-height:60px;line-height:1.5}
@@ -437,7 +437,7 @@ input,select,textarea{font-family:var(--fn)}
     </div>
     <button class="filter-btn" id="filterUsed">⭐ Usados</button>
   </div>
-  <div class="scroll" id="provScroll" style="padding-bottom:140px">
+  <div class="scroll" id="provScroll" style="padding-bottom:220px">
     <div style="padding:10px 14px 0" id="prodCardList"></div>
 
     <div class="extras-section" style="margin-top:10px">
@@ -562,8 +562,8 @@ input,select,textarea{font-family:var(--fn)}
 </div>
 
 <!-- ═══ CONFIG ═══ -->
-<div class="view" id="view-config">
-  <div class="scroll">
+<div class="view" id="view-config" style="padding-bottom:80px">
+  <div class="scroll" style="padding-bottom:120px">
     <div class="sec">
 
       <div class="config-section">
