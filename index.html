@@ -44,11 +44,11 @@ input,select,textarea{font-family:var(--fn)}
 .saved-txt.show{opacity:1}
 .view{display:none;flex:1;overflow:hidden;padding-bottom:0}
 .view.active{display:flex;flex-direction:column}
-.nav-bottom{display:flex;background:rgba(8,8,8,.97);backdrop-filter:blur(20px);border-top:1px solid var(--b);flex-shrink:0;position:fixed;bottom:0;left:0;right:0;z-index:200}
+.nav-bottom{display:flex;background:rgba(8,8,8,.97);backdrop-filter:blur(20px);border-top:1px solid var(--b);flex-shrink:0;position:fixed;bottom:0;left:0;right:0;z-index:200;padding-bottom:env(safe-area-inset-bottom,0px)}
 .nav-btn{flex:1;padding:10px 4px 12px;display:flex;flex-direction:column;align-items:center;gap:3px;font-size:9px;font-weight:700;color:var(--m);background:none;border:none;letter-spacing:.4px;text-transform:uppercase;transition:var(--tr);-webkit-tap-highlight-color:transparent}
 .nav-btn .ico{font-size:20px}
 .nav-btn.active{color:var(--g)}
-@supports(padding-bottom:env(safe-area-inset-bottom)){.nav-bottom{padding-bottom:env(safe-area-inset-bottom)}#globalSearchBar{padding-bottom:calc(8px + env(safe-area-inset-bottom))}}
+@supports(padding-bottom:env(safe-area-inset-bottom)){.nav-bottom{padding-bottom:env(safe-area-inset-bottom)}#homeSearchBar{padding-bottom:calc(8px + env(safe-area-inset-bottom))}}
 .scroll{flex:1;overflow-y:auto;overflow-x:hidden;-webkit-overflow-scrolling:touch}
 .sec{padding:14px 16px}
 .sec-lbl{font-size:10px;font-weight:700;letter-spacing:1.1px;text-transform:uppercase;color:var(--m);margin-bottom:10px}
@@ -187,7 +187,7 @@ input,select,textarea{font-family:var(--fn)}
 .copy-btn:hover{color:var(--g);border-color:var(--g)}
 .preview-txt{padding:11px;font-size:12px;line-height:1.7;color:var(--t);white-space:pre-wrap;font-family:var(--mo)}
 .preview-ph{color:var(--sb);font-family:var(--fn)}
-.wa-bar{padding:10px 14px;border-top:1px solid var(--b);background:var(--bg);flex-shrink:0;display:flex;gap:7px}
+.wa-bar{padding:10px 14px;border-top:1px solid var(--b);background:var(--bg);flex-shrink:0;display:flex;gap:7px;padding-bottom:calc(10px + env(safe-area-inset-bottom,0px))}
 .wa-mini{flex:1;padding:10px;background:var(--card);border:1px solid var(--b);border-radius:var(--r2);color:var(--m);font-size:11px;font-weight:700;cursor:pointer;transition:var(--tr);text-align:center}
 .wa-mini:hover{border-color:var(--g);color:var(--g)}
 .note-area{width:100%;padding:9px 11px;background:var(--card);border:1px solid var(--b);border-radius:var(--r2);color:var(--t);font-size:13px;outline:none;transition:var(--tr);resize:none;min-height:60px;line-height:1.5}
@@ -379,11 +379,19 @@ input,select,textarea{font-family:var(--fn)}
     <span class="saved-txt" id="savedMob">✓</span>
   </div>
 </div>
+<!-- BUSCADOR GLOBAL — solo visible en Inicio -->
+<div id="homeSearchBar" style="background:var(--s);border-bottom:1px solid var(--b);padding:8px 14px">
+  <div style="position:relative">
+    <span style="position:absolute;left:10px;top:50%;transform:translateY(-50%);font-size:14px;color:var(--m);pointer-events:none">🔍</span>
+    <input type="text" id="globalSearch" placeholder="Buscar producto en todos los proveedores..." autocomplete="off"
+      style="width:100%;padding:9px 36px 9px 32px;background:var(--card);border:1px solid var(--b);border-radius:var(--r2);color:var(--t);font-size:14px;outline:none;-webkit-appearance:none">
+  </div>
+</div>
 <!-- BUSCADOR GLOBAL: debajo del nav bottom para no tapar cámara iPhone -->
 <div id="globalSearchResults" style="display:none;position:fixed;bottom:130px;left:0;right:0;z-index:500;background:var(--s);border:1px solid var(--b2);border-radius:var(--r1) var(--r1) 0 0;max-height:55vh;overflow-y:auto;box-shadow:0 -4px 24px rgba(0,0,0,.7)"></div>
 
 <!-- ═══ HOME ═══ -->
-<div class="view active" id="view-home">
+<div class="view active" id="view-home" style="padding-bottom:70px">
   <div class="scroll">
     <div style="padding:12px 16px 0">
       <div class="metric-grid c3" id="homeMetrics"></div>
@@ -417,7 +425,7 @@ input,select,textarea{font-family:var(--fn)}
     </div>
     <button class="filter-btn" id="filterUsed">⭐ Usados</button>
   </div>
-  <div class="scroll" id="provScroll">
+  <div class="scroll" id="provScroll" style="padding-bottom:80px">
     <div style="padding:10px 14px 0">
       <div class="prod-table-wrap">
         <table class="prod-table">
@@ -611,20 +619,12 @@ input,select,textarea{font-family:var(--fn)}
 </div><!-- /desktop-main -->
 </div><!-- /app -->
 
-<div id="globalSearchBar" style="background:rgba(8,8,8,.97);backdrop-filter:blur(20px);border-top:1px solid var(--b);padding:8px 14px;display:none">
-  <div style="position:relative">
-    <span style="position:absolute;left:10px;top:50%;transform:translateY(-50%);font-size:14px;color:var(--m);pointer-events:none">🔍</span>
-    <input type="text" id="globalSearch" placeholder="Buscar producto en todos los proveedores..." autocomplete="off"
-      style="width:100%;padding:9px 36px 9px 32px;background:var(--card);border:1px solid var(--b);border-radius:var(--r2);color:var(--t);font-size:14px;outline:none">
-    <button onclick="closeGlobalSearch()" style="position:absolute;right:10px;top:50%;transform:translateY(-50%);background:none;border:none;color:var(--m);font-size:18px;cursor:pointer;padding:2px">×</button>
-  </div>
-</div>
+
 <nav class="nav-bottom">
   <button class="nav-btn active" data-view="home"><span class="ico">🏠</span>Inicio</button>
   <button class="nav-btn" data-view="mercado"><span class="ico">🧾</span>Mercado</button>
   <button class="nav-btn" data-view="resumen"><span class="ico">📊</span>Resumen</button>
   <button class="nav-btn" data-view="stats"><span class="ico">📈</span>Stats</button>
-  <button class="nav-btn" onclick="toggleGlobalSearch()"><span class="ico">🔍</span>Buscar</button>
   <button class="nav-btn" data-view="config"><span class="ico">⚙️</span>Config</button>
 </nav>
 
@@ -824,18 +824,44 @@ let preciosLoaded = false;
 async function loadPreciosFromSupabase(){
   try {
     const { data, error } = await supa.from('precios').select('*');
-    if(error) throw error;
+    if(error){
+      // Mostrar error legible
+      console.warn('Supabase error:', error?.message || JSON.stringify(error));
+      preciosCache = LS.get('aramo_prices', {});
+      preciosLoaded = true;
+      return;
+    }
     preciosCache = {};
     (data||[]).forEach(row=>{
-      preciosCache[row.proveedor+'_'+row.producto_id] = row.precio?.toString()||'';
+      if(row.proveedor && row.producto_id)
+        preciosCache[row.proveedor+'_'+row.producto_id] = row.precio?.toString()||'';
     });
     preciosLoaded = true;
-    // Actualizar UI si hay proveedor abierto
+    // Sincronizar precios de caché local a Supabase si hay datos locales y Supabase está vacío
+    if(Object.keys(preciosCache).length === 0){
+      const localPrices = LS.get('aramo_prices', {});
+      if(Object.keys(localPrices).length > 0){
+        preciosCache = localPrices;
+        // Subir precios locales a Supabase
+        const rows = Object.entries(localPrices)
+          .filter(([k,v])=>v&&+v>0)
+          .map(([k,v])=>{
+            const parts = k.split('_');
+            const prov = parts[0];
+            const pid = parts.slice(1).join('_');
+            return {proveedor:prov, producto_id:pid, precio:parseFloat(v), updated_at:new Date().toISOString()};
+          });
+        if(rows.length > 0){
+          supa.from('precios').upsert(rows, {onConflict:'proveedor,producto_id'}).then(({error})=>{
+            if(!error) console.log('Precios locales sincronizados a Supabase:', rows.length);
+          });
+        }
+      }
+    }
     if(S.currentProv) renderProdTable();
-    console.log('Precios cargados desde Supabase:', Object.keys(preciosCache).length);
+    console.log('✅ Precios cargados:', Object.keys(preciosCache).length);
   } catch(e) {
-    console.warn('Error cargando precios:', e);
-    // Fallback a localStorage
+    console.warn('Error cargando precios:', e?.message || e);
     preciosCache = LS.get('aramo_prices', {});
     preciosLoaded = true;
   }
@@ -947,6 +973,11 @@ function switchView(name){
   document.querySelectorAll('.view').forEach(v=>v.classList.remove('active'));
   document.querySelectorAll('.nav-btn,.desktop-nav-btn').forEach(b=>b.classList.toggle('active',b.dataset.view===name));
   document.getElementById('view-'+name).classList.add('active');
+  // Mostrar buscador solo en home
+  const searchBar=document.getElementById('homeSearchBar');
+  if(searchBar) searchBar.style.display=(name==='home')?'block':'none';
+  // Limpiar búsqueda al salir
+  if(name!=='home'){const inp=document.getElementById('globalSearch');if(inp)inp.value='';const res=document.getElementById('globalSearchResults');if(res)res.style.display='none';}
   if(name==='home')renderHome();
   if(name==='resumen')renderResumen();
   if(name==='stats')renderStats();
@@ -1805,25 +1836,11 @@ function toast(msg,type=''){
 // BÚSQUEDA GLOBAL
 // ══════════════════════════════════════════
 // ── BÚSQUEDA GLOBAL ──
-function toggleGlobalSearch(){
-  const bar=document.getElementById('globalSearchBar');
-  const inp=document.getElementById('globalSearch');
-  const results=document.getElementById('globalSearchResults');
-  const isOpen=bar.style.display==='block';
-  if(isOpen){
-    bar.style.display='none';
-    results.style.display='none';
-    inp.value='';
-  } else {
-    bar.style.display='block';
-    setTimeout(()=>inp.focus(),100);
-  }
-}
-
 function closeGlobalSearch(){
-  document.getElementById('globalSearchBar').style.display='none';
-  document.getElementById('globalSearchResults').style.display='none';
-  document.getElementById('globalSearch').value='';
+  const res=document.getElementById('globalSearchResults');
+  if(res)res.style.display='none';
+  const inp=document.getElementById('globalSearch');
+  if(inp)inp.value='';
 }
 
 (function initGlobalSearch(){
