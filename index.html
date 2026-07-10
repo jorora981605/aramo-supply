@@ -58,7 +58,8 @@ input,select,textarea{font-family:var(--fn)}
 .saved-txt.show{opacity:1}
 .view{display:none;flex:1;overflow:hidden;padding-bottom:0}
 .view.active{display:flex;flex-direction:column}
-.nav-bottom{display:flex;background:var(--chrome-bar);backdrop-filter:blur(20px);border-top:1px solid var(--b);flex-shrink:0;position:fixed;bottom:0;left:0;right:0;z-index:200;padding-bottom:env(safe-area-inset-bottom,0px)}
+.nav-bottom{display:flex;background:var(--chrome-bar);backdrop-filter:blur(20px);border-top:1px solid var(--b);flex-shrink:0;position:fixed;bottom:0;left:0;right:0;z-index:200;padding-bottom:env(safe-area-inset-bottom,0px);transition:transform .25s ease}
+.nav-bottom.collapsed{transform:translateY(100%)}
 .nav-bottom::before{content:'';position:absolute;left:0;right:0;top:0;height:2px;background:var(--grad);opacity:.85}
 .nav-btn{flex:1;padding:9px 4px 8px;margin:6px 4px;border-radius:14px;display:flex;flex-direction:column;align-items:center;gap:4px;font-size:11px;font-weight:700;color:var(--m);background:none;border:none;letter-spacing:.4px;text-transform:uppercase;transition:var(--tr);-webkit-tap-highlight-color:transparent}
 .nav-btn .ico{font-size:23px}
@@ -1116,6 +1117,7 @@ function switchView(name){
   document.querySelectorAll('.view').forEach(v=>v.classList.remove('active'));
   document.querySelectorAll('.nav-btn').forEach(b=>b.classList.toggle('active',b.dataset.view===name));
   document.getElementById('view-'+name).classList.add('active');
+  document.querySelector('.nav-bottom').classList.remove('collapsed');
   // Mostrar buscador solo en home
   const searchBar=document.getElementById('homeSearchBar');
   if(searchBar) searchBar.style.display=(name==='home')?'block':'none';
@@ -1129,6 +1131,21 @@ function switchView(name){
 document.querySelectorAll('.nav-btn').forEach(b=>{
   if(b.dataset.view)b.addEventListener('click',()=>switchView(b.dataset.view));
 });
+
+// Contraer la barra inferior al bajar el scroll, mostrarla de nuevo al subir.
+// La página entera es la que scrollea (los .scroll internos no tienen altura
+// propia fija), así que escuchamos scroll en window, no en cada .scroll.
+(function initNavAutoHide(){
+  const navBar=document.querySelector('.nav-bottom');
+  let lastTop=0;
+  function onScroll(){
+    const st=window.scrollY||document.documentElement.scrollTop||0;
+    if(st>lastTop&&st>40)navBar.classList.add('collapsed');
+    else if(st<lastTop)navBar.classList.remove('collapsed');
+    lastTop=st<=0?0:st;
+  }
+  window.addEventListener('scroll',onScroll,{passive:true});
+})();
 
 // ══════════════════════════════════════════
 // HOME
