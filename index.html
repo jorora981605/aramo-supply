@@ -906,6 +906,13 @@ async function loadPreciosFromSupabase(){
   }
 }
 
+// Evita que la sincronización en tiempo real le "haga eco" a lo que el usuario
+// está escribiendo justo en este momento (pisaría el texto y perdería el foco).
+function isTypingActively(){
+  const el=document.activeElement;
+  return!!el&&(el.tagName==='INPUT'||el.tagName==='TEXTAREA');
+}
+
 // Suscripción en tiempo real — si alguien cambia un precio, todos lo ven
 function initRealtimePrices(){
   supa.channel('precios-changes')
@@ -918,8 +925,9 @@ function initRealtimePrices(){
       } else {
         preciosCache[key] = row.precio?.toString()||'';
       }
-      // Actualizar UI si ese proveedor está abierto
-      if(S.currentProv === row.proveedor) renderProdTable();
+      // Actualizar UI si ese proveedor está abierto — salvo que el usuario esté
+      // escribiendo justo ahora (para no pisarle el texto a medio escribir)
+      if(S.currentProv === row.proveedor && !isTypingActively()) renderProdTable();
       showPriceSyncDot();
     })
     .subscribe();
@@ -934,24 +942,31 @@ function getPrice(prov, pid){
   return preciosCache[prov+'_'+pid] || LS.get('aramo_prices',{})[prov+'_'+pid] || '';
 }
 
-async function setPrice(prov, pid, val){
-  // Guardar local inmediatamente
+const _priceSaveTimers={};
+function setPrice(prov, pid, val){
+  // Guardar local inmediatamente (esto es lo que ve la pantalla mientras escribís)
   preciosCache[prov+'_'+pid] = val;
   const p = LS.get('aramo_prices',{});
   p[prov+'_'+pid] = val;
   LS.set('aramo_prices', p);
-  
-  // Sincronizar con Supabase en background
-  if(!val || +val === 0) {
-    supa.from('precios').delete().eq('proveedor',prov).eq('producto_id',pid).then(()=>{});
-  } else {
-    supa.from('precios').upsert({
-      proveedor: prov,
-      producto_id: pid,
-      precio: parseFloat(val),
-      updated_at: new Date().toISOString()
-    }, { onConflict: 'proveedor,producto_id' }).then(()=>{});
-  }
+
+  // Sincronizar con Supabase recién cuando dejás de escribir (evita mandar
+  // un cambio por cada letra, y evita que el eco de tu propio cambio te
+  // interrumpa mientras seguís tecleando)
+  const key=prov+'_'+pid;
+  clearTimeout(_priceSaveTimers[key]);
+  _priceSaveTimers[key]=setTimeout(()=>{
+    if(!val || +val === 0) {
+      supa.from('precios').delete().eq('proveedor',prov).eq('producto_id',pid).then(()=>{});
+    } else {
+      supa.from('precios').upsert({
+        proveedor: prov,
+        producto_id: pid,
+        precio: parseFloat(val),
+        updated_at: new Date().toISOString()
+      }, { onConflict: 'proveedor,producto_id' }).then(()=>{});
+    }
+  },500);
 }
 
 // ══════════════════════════════════════════
@@ -1002,6 +1017,10 @@ function initRealtimePedidos(){
     .on('postgres_changes',{event:'*',schema:'public',table:'pedidos'},payload=>{
       const row=payload.new||payload.old;
       if(!row?.proveedor)return;
+      // Si es el proveedor que tenés abierto y estás escribiendo ahí mismo,
+      // no lo pisamos — tu propio guardado ya va a dejar todo sincronizado
+      // apenas dejes de tipear.
+      if(row.proveedor===S.currentProv&&isTypingActively())return;
       if(payload.eventType==='DELETE')delete S.pedidos[row.proveedor];
       else S.pedidos[row.proveedor]=pedidoRowToLocal(row);
       saveLocalState();
@@ -1051,6 +1070,9 @@ function initRealtimeConfig(){
   supa.channel('config-changes')
     .on('postgres_changes',{event:'*',schema:'public',table:'app_config'},payload=>{
       if(!payload.new)return;
+      // Si estás escribiendo en algún campo ahora mismo (config, nota, precio,
+      // lo que sea), no lo pisamos — tu propio guardado ya sincroniza solo.
+      if(isTypingActively())return;
       configRowToLocal(payload.new);
       saveLocalState();
       renderHome();
