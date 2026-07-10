@@ -157,7 +157,7 @@ input,select,textarea{font-family:var(--fn)}
 .qty-block-lbl.m{color:var(--g)}
 .qty-block-lbl.a{color:var(--o)}
 .qty-controls{display:flex;align-items:center;gap:5px;justify-content:center}
-.qty-pm{width:48px;height:54px;background:var(--chrome-flat);box-shadow:var(--chrome-hi-sm);border:1px solid var(--b);border-radius:var(--r3);font-size:29px;color:var(--m);cursor:pointer;display:flex;align-items:center;justify-content:center;transition:var(--tr);flex-shrink:0;user-select:none;-webkit-tap-highlight-color:transparent;font-weight:300}
+.qty-pm{width:48px;height:54px;background:var(--chrome-flat);box-shadow:var(--chrome-hi-sm);border:1px solid var(--b);border-radius:var(--r3);font-size:29px;color:var(--m);cursor:pointer;display:flex;align-items:center;justify-content:center;transition:var(--tr);flex-shrink:0;user-select:none;-webkit-tap-highlight-color:transparent;font-weight:300;touch-action:manipulation}
 .qty-pm:active{background:var(--g);border-color:var(--g);color:#000;transform:scale(.9)}
 .tbl-qty{width:68px;height:54px;background:var(--s);border:1px solid var(--b);border-radius:var(--r3);text-align:center;font-size:21px;font-weight:700;color:var(--t);font-family:var(--fn);outline:none;transition:var(--tr);-moz-appearance:textfield}
 .tbl-qty::-webkit-inner-spin-button,.tbl-qty::-webkit-outer-spin-button{-webkit-appearance:none}
@@ -1372,8 +1372,10 @@ function renderProdTable(){
     });
 
     card.querySelectorAll('.qty-pm').forEach(btn=>{
-      let handledByPointer=false;
-      const doStep=()=>{
+      // Un solo evento (pointerdown) maneja el toque — nada de combinarlo con
+      // click, para que dos toques rápidos no se pisen ni se dupliquen entre sí.
+      btn.addEventListener('pointerdown',e=>{
+        e.preventDefault();
         const side=btn.dataset.side;
         const inp=side==='moravia'?inpM:inpA;
         const cur=+inp.value||0;
@@ -1381,17 +1383,6 @@ function renderProdTable(){
         if(btn.dataset.op==='plus')inp.value=+(cur+step).toFixed(1);
         else inp.value=Math.max(0,+(cur-step).toFixed(1))||'';
         sync(side,inp);
-      };
-      // pointerdown responde al instante (sin esperar el ciclo completo de click);
-      // el listener de click queda como respaldo para navegadores sin Pointer Events.
-      btn.addEventListener('pointerdown',e=>{
-        e.preventDefault();
-        handledByPointer=true;
-        doStep();
-      });
-      btn.addEventListener('click',()=>{
-        if(handledByPointer){handledByPointer=false;return;}
-        doStep();
       });
     });
 
