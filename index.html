@@ -2198,6 +2198,28 @@ function renderCfgProveedores(){
         persist();renderCfgProveedores();
       });
       body.appendChild(addBtn);
+
+      const bulkWrap=document.createElement('div');
+      bulkWrap.style.marginTop='10px';
+      bulkWrap.innerHTML=`
+        <div class="cfg-lbl" style="width:auto;white-space:normal;margin-bottom:5px">O pegá varios de una vez (uno por línea):</div>
+        <textarea class="modal-inp" id="bulkAddTa" placeholder="Tomate&#10;Cebolla&#10;Papa..." rows="4" style="resize:vertical;width:100%"></textarea>
+        <button class="btn btn-g btn-full btn-sm">+ Agregar todos estos</button>
+      `;
+      bulkWrap.querySelector('button').addEventListener('click',()=>{
+        const ta=document.getElementById('bulkAddTa');
+        const lines=ta.value.split('\n').map(l=>l.trim()).filter(Boolean);
+        if(!lines.length){toast('Pegá al menos un producto','err');return;}
+        ensureCustomProv(name);
+        lines.forEach((line,i)=>{
+          const newId='prod_'+Date.now()+'_'+i+'_'+Math.random().toString(36).slice(2,6);
+          const niceName=line.toLowerCase().replace(/(^|\s)\S/g,c=>c.toUpperCase());
+          S.customProviders[name].products.push({id:newId,name:niceName,emoji:'🌿',unit:'kg'});
+        });
+        persist();renderCfgProveedores();
+        toast(`✓ ${lines.length} producto${lines.length>1?'s':''} agregado${lines.length>1?'s':''}`,'ok');
+      });
+      body.appendChild(bulkWrap);
     }
 
     container.appendChild(item);
