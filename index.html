@@ -2475,19 +2475,17 @@ function inp_globalGoTo(provName, prodId){
 
 <script>
 // ── SERVICE WORKER ──
+// Esta app necesita internet sí o sí (sincroniza en vivo con Supabase), así que
+// no vale la pena guardar una copia offline — y hacerlo tiene el riesgo de que
+// el celular quede pegado en una versión vieja para siempre. Por eso NO se
+// registra ningún Service Worker, y además se elimina cualquiera que haya
+// quedado de una versión anterior de la app (para que el celular vuelva a
+// pedir siempre la versión más nueva).
 if('serviceWorker' in navigator){
-  window.addEventListener('load',()=>{
-    const swCode=`
-const CACHE='aramo-v1';
-const ASSETS=['/'];
-self.addEventListener('install',e=>{e.waitUntil(caches.open(CACHE).then(c=>c.addAll(ASSETS)));self.skipWaiting();});
-self.addEventListener('activate',e=>{e.waitUntil(caches.keys().then(keys=>Promise.all(keys.filter(k=>k!==CACHE).map(k=>caches.delete(k)))));self.clients.claim();});
-self.addEventListener('fetch',e=>{e.respondWith(caches.match(e.request).then(r=>r||fetch(e.request).catch(()=>caches.match('/'))));});
-    `;
-    const blob=new Blob([swCode],{type:'application/javascript'});
-    const swUrl=URL.createObjectURL(blob);
-    navigator.serviceWorker.register(swUrl).catch(()=>{});
-  });
+  navigator.serviceWorker.getRegistrations().then(regs=>regs.forEach(reg=>reg.unregister()));
+}
+if('caches' in window){
+  caches.keys().then(keys=>keys.forEach(k=>caches.delete(k)));
 }
 
 // ── BANNER INSTALACIÓN (iPhone Safari) ──
