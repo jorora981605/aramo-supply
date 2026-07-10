@@ -310,6 +310,8 @@ input,select,textarea{font-family:var(--fn)}
 .prod-cfg-unit:focus{border-color:var(--g)}
 .prod-cfg-rm{width:30px;height:30px;background:none;border:none;color:var(--sb);font-size:18px;cursor:pointer;display:flex;align-items:center;justify-content:center;transition:var(--tr);border-radius:var(--r3);flex-shrink:0}
 .prod-cfg-rm:hover{color:var(--o);background:var(--od)}
+.prod-cfg-rm.armed{color:var(--o);background:var(--od);font-size:13px;font-weight:800}
+.del-prov-btn.armed{background:var(--o);color:#000;border-color:var(--o)}
 .add-prod-btn{display:flex;align-items:center;gap:5px;padding:8px 12px;background:transparent;border:1px dashed var(--b2);border-radius:var(--r3);color:var(--m);font-size:13px;font-weight:600;cursor:pointer;transition:var(--tr);font-family:var(--fn);margin-top:4px}
 .add-prod-btn:hover{border-color:var(--g);color:var(--g)}
 .add-prod-btn:active{transform:scale(.97)}
@@ -345,8 +347,6 @@ input,select,textarea{font-family:var(--fn)}
 .modal-inp:focus{border-color:var(--g)}
 .empty{text-align:center;padding:24px 16px;color:var(--m)}
 .empty-ico{font-size:32px;margin-bottom:7px;opacity:.5}
-@keyframes pop{0%{transform:scale(1)}45%{transform:scale(1.15)}100%{transform:scale(1)}}
-.anim-pop{animation:pop .2s ease}
 
 /* VOZ */
 .voice-review-row{display:flex;flex-wrap:wrap;gap:6px;align-items:center;background:var(--card);border:1px solid var(--b);border-radius:var(--r3);padding:9px;margin-bottom:6px}
@@ -1373,7 +1373,8 @@ function renderProdTable(){
     });
 
     card.querySelectorAll('.qty-pm').forEach(btn=>{
-      btn.addEventListener('click',()=>{
+      let handledByPointer=false;
+      const doStep=()=>{
         const side=btn.dataset.side;
         const inp=side==='moravia'?inpM:inpA;
         const cur=+inp.value||0;
@@ -1381,7 +1382,17 @@ function renderProdTable(){
         if(btn.dataset.op==='plus')inp.value=+(cur+step).toFixed(1);
         else inp.value=Math.max(0,+(cur-step).toFixed(1))||'';
         sync(side,inp);
-        btn.classList.add('anim-pop');setTimeout(()=>btn.classList.remove('anim-pop'),200);
+      };
+      // pointerdown responde al instante (sin esperar el ciclo completo de click);
+      // el listener de click queda como respaldo para navegadores sin Pointer Events.
+      btn.addEventListener('pointerdown',e=>{
+        e.preventDefault();
+        handledByPointer=true;
+        doStep();
+      });
+      btn.addEventListener('click',()=>{
+        if(handledByPointer){handledByPointer=false;return;}
+        doStep();
       });
     });
 
@@ -2153,7 +2164,7 @@ function renderCfgProveedores(){
             onchange="renameProveedor('${name}',this.value)">` :
           `<span class="prov-cfg-name">${name}</span>`
         }
-        ${isCustom?`<button class="btn btn-r btn-sm" onclick="deleteProveedor('${name}',event)" style="padding:4px 8px;font-size:10px">Eliminar</button>`:''}
+        ${isCustom?`<button class="btn btn-r btn-sm del-prov-btn" title="Tocá dos veces para eliminar" style="padding:4px 8px;font-size:10px">Eliminar</button>`:''}
         <span class="prov-cfg-toggle">${isOpen?'▲':'▼'}</span>
       </div>
       <div class="prov-cfg-body${isOpen?' open':''}" id="cfg-body-${name}"></div>
@@ -2165,6 +2176,24 @@ function renderCfgProveedores(){
       renderCfgProveedores();
     });
 
+    const delProvBtn=item.querySelector('.del-prov-btn');
+    if(delProvBtn)delProvBtn.addEventListener('click',e=>{
+      e.stopPropagation();
+      if(delProvBtn.classList.contains('armed')){
+        clearTimeout(delProvBtn._armTimer);
+        delete S.customProviders[name];
+        S.providerOrder=S.providerOrder.filter(n=>n!==name);
+        delete S.pedidos[name];
+        persist();renderConfig();
+        supa.from('pedidos').delete().eq('proveedor',name).then(()=>{});
+        toast(`${name} eliminado`);
+        return;
+      }
+      delProvBtn.classList.add('armed');
+      delProvBtn.textContent='¿Seguro?';
+      delProvBtn._armTimer=setTimeout(()=>{delProvBtn.classList.remove('armed');delProvBtn.textContent='Eliminar';},2500);
+    });
+
     if(isOpen){
       const body=item.querySelector('.prov-cfg-body');
       const products=provData.products||[];
@@ -2174,7 +2203,7 @@ function renderCfgProveedores(){
         row.innerHTML=`
           <input class="prod-cfg-name" type="text" value="${prod.name}" placeholder="Nombre producto">
           <select class="prod-cfg-unit">${UNITS.map(u=>`<option value="${u}"${u===prod.unit?' selected':''}>${u}</option>`).join('')}</select>
-          <button class="prod-cfg-rm" onclick="deleteProd('${name}',${idx},event)">×</button>
+          <button class="prod-cfg-rm" title="Tocá dos veces para eliminar">×</button>
         `;
         row.querySelector('.prod-cfg-name').addEventListener('input',e=>{
           ensureCustomProv(name);
@@ -2185,6 +2214,20 @@ function renderCfgProveedores(){
           ensureCustomProv(name);
           S.customProviders[name].products[idx].unit=e.target.value;
           persist();
+        });
+        const rmBtn=row.querySelector('.prod-cfg-rm');
+        rmBtn.addEventListener('click',e=>{
+          e.stopPropagation();
+          if(rmBtn.classList.contains('armed')){
+            clearTimeout(rmBtn._armTimer);
+            ensureCustomProv(name);
+            S.customProviders[name].products.splice(idx,1);
+            persist();renderCfgProveedores();
+            return;
+          }
+          rmBtn.classList.add('armed');
+          rmBtn.textContent='✓';
+          rmBtn._armTimer=setTimeout(()=>{rmBtn.classList.remove('armed');rmBtn.textContent='×';},2500);
         });
         body.appendChild(row);
       });
@@ -2231,25 +2274,6 @@ function ensureCustomProv(name){
     const base=DEFAULT_PROVIDERS[name]||{color:'#666',products:[]};
     S.customProviders[name]=JSON.parse(JSON.stringify(base));
   }
-}
-
-function deleteProd(provName,idx,e){
-  e.stopPropagation();
-  if(!confirm('¿Eliminar este producto?'))return;
-  ensureCustomProv(provName);
-  S.customProviders[provName].products.splice(idx,1);
-  persist();renderCfgProveedores();
-}
-
-function deleteProveedor(name,e){
-  e.stopPropagation();
-  if(!confirm(`¿Eliminar el proveedor "${name}"? Se perderán sus productos y pedidos guardados.`))return;
-  delete S.customProviders[name];
-  S.providerOrder=S.providerOrder.filter(n=>n!==name);
-  delete S.pedidos[name];
-  persist();renderConfig();
-  supa.from('pedidos').delete().eq('proveedor',name).then(()=>{});
-  toast(`${name} eliminado`);
 }
 
 function renameProveedor(oldName, newName){
