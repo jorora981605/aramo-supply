@@ -279,17 +279,27 @@ input,select,textarea{font-family:var(--fn)}
 .budget-inp{width:100%;margin-top:9px;padding:9px 10px;background:var(--s);border:1px solid var(--b);border-radius:var(--r3);color:var(--t);font-size:15px;font-family:var(--mo);outline:none}
 .budget-inp:focus{border-color:var(--g)}
 
-/* CONFIG */
+/* CONFIG — acordeón compacto */
 .config-section{margin-bottom:20px}
 .config-section h3{font-size:11px;font-weight:700;letter-spacing:1px;text-transform:uppercase;color:var(--m);margin-bottom:9px}
-.cfg-row{display:flex;align-items:center;gap:7px;margin-bottom:7px}
-.cfg-lbl{font-size:14px;font-weight:600;width:76px;flex-shrink:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-.cfg-inp{flex:1;padding:9px 10px;background:var(--card);border:1px solid var(--b);border-radius:var(--r3);color:var(--t);font-size:14px;font-family:var(--fn);outline:none;transition:var(--tr)}
+.cfg-acc{background:var(--chrome);border:1px solid var(--b);border-radius:var(--r2);margin-bottom:8px;overflow:hidden;box-shadow:var(--chrome-hi-sm)}
+.cfg-acc-hdr{width:100%;display:flex;align-items:center;gap:8px;padding:12px 13px;background:none;border:none;color:var(--t);font-size:13px;font-weight:800;letter-spacing:.3px;text-align:left;cursor:pointer;-webkit-tap-highlight-color:transparent;transition:var(--tr)}
+.cfg-acc-hdr:active{transform:scale(.99)}
+.cfg-acc-count{font-size:10px;font-weight:700;color:var(--m);background:var(--s);border:1px solid var(--b);border-radius:20px;padding:2px 8px;margin-left:auto}
+.cfg-acc-arrow{color:var(--m);font-size:12px;transition:transform .25s ease;flex-shrink:0}
+.cfg-acc.open .cfg-acc-arrow{transform:rotate(180deg)}
+.cfg-acc-body{display:none;padding:8px 12px 12px;border-top:1px solid var(--b)}
+.cfg-acc.open .cfg-acc-body{display:block;animation:cfgBodyIn .2s ease}
+@keyframes cfgBodyIn{from{opacity:0;transform:translateY(-4px)}to{opacity:1;transform:translateY(0)}}
+.cfg-acc-sub{font-size:11px;color:var(--m);margin-bottom:8px}
+.cfg-row{display:flex;align-items:center;gap:7px;margin-bottom:5px}
+.cfg-lbl{font-size:13px;font-weight:600;width:76px;flex-shrink:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.cfg-inp{flex:1;padding:7px 9px;background:var(--card);border:1px solid var(--b);border-radius:var(--r3);color:var(--t);font-size:13px;font-family:var(--fn);outline:none;transition:var(--tr)}
 .cfg-inp:focus{border-color:var(--g)}
 .cfg-inp::placeholder{color:var(--sb)}
-.masivo-slot{display:flex;gap:7px;margin-bottom:7px;align-items:center}
+.masivo-slot{display:flex;gap:7px;margin-bottom:5px;align-items:center}
 .masivo-slot-num{font-size:12px;font-weight:700;color:var(--m);width:18px;text-align:center;flex-shrink:0}
-.masivo-name{flex:1;padding:8px 9px;background:var(--card);border:1px solid var(--b);border-radius:var(--r3);color:var(--t);font-size:14px;outline:none}
+.masivo-name{flex:1;padding:7px 9px;background:var(--card);border:1px solid var(--b);border-radius:var(--r3);color:var(--t);font-size:13px;outline:none}
 .masivo-name:focus{border-color:var(--g)}
 .masivo-tel{width:145px;padding:8px 9px;background:var(--card);border:1px solid var(--b);border-radius:var(--r3);color:var(--t);font-size:14px;font-family:var(--mo);outline:none}
 .masivo-tel:focus{border-color:var(--g)}
@@ -382,6 +392,29 @@ input,select,textarea{font-family:var(--fn)}
   100%{box-shadow:var(--chrome-hi),0 0 0 0 rgba(255,143,36,0)}
 }
 
+/* Chips en vivo mientras dictás — cada producto reconocido aparece al instante */
+.voice-live-chips{display:flex;flex-wrap:wrap;gap:5px;margin-top:7px}
+.voice-live-chip{display:inline-flex;align-items:center;gap:4px;padding:5px 10px;border-radius:20px;font-size:12px;font-weight:700;border:1px solid var(--gg);background:var(--gd);color:var(--g);animation:chipPop .28s cubic-bezier(.34,1.56,.64,1)}
+.voice-live-chip.pend{border-color:var(--b2);background:var(--chrome-flat);color:var(--m);font-style:italic}
+.voice-live-chip .chip-note{color:var(--o);font-weight:600;font-style:italic}
+@keyframes chipPop{from{transform:scale(.5);opacity:0}to{transform:scale(1);opacity:1}}
+
+/* VIDA — saludo, progreso del día, animaciones */
+.home-hero{padding:14px 16px 0;display:flex;align-items:baseline;gap:8px;flex-wrap:wrap}
+.home-hero-saludo{font-size:20px;font-weight:800;letter-spacing:-.3px}
+.home-hero-fecha{font-size:12px;color:var(--m);text-transform:capitalize}
+.day-progress-wrap{margin:10px 16px 0}
+.day-progress-lbl{display:flex;justify-content:space-between;font-size:11px;color:var(--m);font-weight:700;margin-bottom:5px}
+.day-progress-lbl .dp-done{color:var(--g)}
+.day-progress{height:7px;background:var(--sb);border-radius:4px;overflow:hidden}
+.day-progress-fill{height:100%;border-radius:4px;background:var(--grad);transition:width .8s cubic-bezier(.22,1,.36,1);box-shadow:0 0 8px rgba(0,214,122,.4)}
+.prov-card.card-anim{animation:cardIn .4s cubic-bezier(.22,1,.36,1) backwards}
+@keyframes cardIn{from{opacity:0;transform:translateY(12px) scale(.96)}to{opacity:1;transform:translateY(0) scale(1)}}
+#syncDot.live{opacity:.4!important;animation:syncBreath 3s ease-in-out infinite}
+#syncDot.flash{opacity:1!important;box-shadow:0 0 10px var(--g);animation:none}
+@keyframes syncBreath{0%,100%{transform:scale(1)}50%{transform:scale(1.4)}}
+.metric-val{transition:color .3s}
+
 /* PDF STYLES (solo al imprimir) */
 @media print {
   body{background:#fff;color:#000;font-family:Arial,sans-serif;font-size:11px}
@@ -436,8 +469,13 @@ input,select,textarea{font-family:var(--fn)}
 <!-- ═══ HOME ═══ -->
 <div class="view active" id="view-home" style="padding-bottom:70px">
   <div class="scroll">
+    <div class="home-hero" id="homeHero"></div>
     <div style="padding:12px 16px 0">
       <div class="metric-grid c3" id="homeMetrics"></div>
+    </div>
+    <div class="day-progress-wrap" id="dayProgressWrap" style="display:none">
+      <div class="day-progress-lbl"><span id="dpTxt"></span><span class="dp-done" id="dpPct"></span></div>
+      <div class="day-progress"><div class="day-progress-fill" id="dpFill" style="width:0%"></div></div>
     </div>
     <div style="padding:10px 16px 0">
       <div class="sec-lbl" style="margin-bottom:8px">🎤 Pedido completo por voz</div>
@@ -445,6 +483,7 @@ input,select,textarea{font-family:var(--fn)}
         <button class="voice-branch-btn m" id="btnVoiceGlobalM">🎤 Moravia</button>
         <button class="voice-branch-btn a" id="btnVoiceGlobalA">🎤 Los Ángeles</button>
       </div>
+      <div style="font-size:11px;color:var(--m);margin-top:6px;text-align:center">Decí seguido: "20 kilos de papa amarilla gruesa, 10 cajas de tomate..." — se agrega solo al proveedor correcto, con la nota incluida.</div>
     </div>
     <div class="voice-float" id="voiceFloatGlobal" style="margin:10px 16px 0">
       <div class="voice-float-row">
@@ -453,6 +492,7 @@ input,select,textarea{font-family:var(--fn)}
       </div>
       <div class="voice-float-status" id="voiceFloatGlobalStatus">Escuchando...</div>
       <div class="voice-float-transcript" id="voiceFloatGlobalTranscript"></div>
+      <div class="voice-live-chips" id="voiceLiveChipsGlobal"></div>
     </div>
     <div class="home-grid" id="homeGrid"></div>
 
@@ -514,6 +554,7 @@ input,select,textarea{font-family:var(--fn)}
       </div>
       <div class="voice-float-status" id="voiceFloatProvStatus">Escuchando...</div>
       <div class="voice-float-transcript" id="voiceFloatProvTranscript"></div>
+      <div class="voice-live-chips" id="voiceLiveChipsProv"></div>
     </div>
     <div style="padding:10px 14px 0" id="prodCardList"></div>
 
@@ -589,39 +630,47 @@ input,select,textarea{font-family:var(--fn)}
   <div class="scroll" style="padding-bottom:120px">
     <div class="sec">
 
-      <div class="config-section">
-        <h3>WhatsApp por proveedor</h3>
-        <div id="cfgPhones"></div>
+      <div class="cfg-acc" data-acc="phones">
+        <button class="cfg-acc-hdr">📱 WhatsApp por proveedor <span class="cfg-acc-count" id="accCountPhones"></span><span class="cfg-acc-arrow">▾</span></button>
+        <div class="cfg-acc-body"><div id="cfgPhones"></div></div>
       </div>
 
-      <div class="config-section">
-        <h3>📋 Lista PDF — WhatsApp (hasta 5 contactos)</h3>
-        <div style="font-size:12px;color:var(--m);margin-bottom:9px">Reciben la lista completa del día al imprimir</div>
-        <div id="cfgPdfWa"></div>
-      </div>
-
-      <div class="config-section">
-        <h3>Proveedores y productos</h3>
-        <div id="cfgProveedores"></div>
-        <div class="new-prov-row">
-          <input class="new-prov-inp" id="newProvName" placeholder="Nombre del nuevo proveedor...">
-          <button class="btn btn-g btn-sm" onclick="addProveedor()">+ Agregar</button>
+      <div class="cfg-acc" data-acc="pdfwa">
+        <button class="cfg-acc-hdr">📋 Lista WA — contactos <span class="cfg-acc-count" id="accCountPdfWa"></span><span class="cfg-acc-arrow">▾</span></button>
+        <div class="cfg-acc-body">
+          <div class="cfg-acc-sub">Reciben la lista completa del día (hasta 5 contactos)</div>
+          <div id="cfgPdfWa"></div>
         </div>
       </div>
 
-      <div class="config-section">
-        <h3>Precios</h3>
-        <div style="display:flex;flex-direction:column;gap:7px">
-          <button class="btn btn-o btn-full" onclick="resetPreciosAll()">🗑 Reiniciar todos los precios</button>
-          <button class="btn btn-o btn-full" onclick="resetPreciosProv()">🗑 Reiniciar precios del proveedor actual</button>
+      <div class="cfg-acc" data-acc="provs">
+        <button class="cfg-acc-hdr">🏪 Proveedores y productos <span class="cfg-acc-count" id="accCountProvs"></span><span class="cfg-acc-arrow">▾</span></button>
+        <div class="cfg-acc-body">
+          <div id="cfgProveedores"></div>
+          <div class="new-prov-row">
+            <input class="new-prov-inp" id="newProvName" placeholder="Nombre del nuevo proveedor...">
+            <button class="btn btn-g btn-sm" onclick="addProveedor()">+ Agregar</button>
+          </div>
         </div>
       </div>
 
-      <div class="config-section">
-        <h3>Datos</h3>
-        <div style="display:flex;flex-direction:column;gap:7px">
-          <button class="btn btn-o btn-full" onclick="exportData()">⬇️ Exportar backup JSON</button>
-          <button class="btn btn-r btn-full" onclick="resetAll()">⚠️ Reiniciar todo</button>
+      <div class="cfg-acc" data-acc="precios">
+        <button class="cfg-acc-hdr">💰 Precios <span class="cfg-acc-arrow">▾</span></button>
+        <div class="cfg-acc-body">
+          <div style="display:flex;flex-direction:column;gap:7px">
+            <button class="btn btn-o btn-full btn-sm" onclick="resetPreciosAll()">🗑 Reiniciar todos los precios</button>
+            <button class="btn btn-o btn-full btn-sm" onclick="resetPreciosProv()">🗑 Reiniciar precios del proveedor actual</button>
+          </div>
+        </div>
+      </div>
+
+      <div class="cfg-acc" data-acc="datos">
+        <button class="cfg-acc-hdr">💾 Datos <span class="cfg-acc-arrow">▾</span></button>
+        <div class="cfg-acc-body">
+          <div style="display:flex;flex-direction:column;gap:7px">
+            <button class="btn btn-o btn-full btn-sm" onclick="exportData()">⬇️ Exportar backup JSON</button>
+            <button class="btn btn-r btn-full btn-sm" onclick="resetAll()">⚠️ Reiniciar todo</button>
+          </div>
         </div>
       </div>
 
@@ -654,7 +703,8 @@ input,select,textarea{font-family:var(--fn)}
 <div class="overlay" id="modalVoice">
   <div class="modal">
     <div class="modal-handle"></div>
-    <div class="modal-title">🎤 Revisá antes de aplicar</div>
+    <div class="modal-title">🎤 Esto no se entendió del todo</div>
+    <div style="font-size:11px;color:var(--m);margin-bottom:10px">Lo demás ya se agregó solo al pedido ✓ — completá estos y aplicá.</div>
     <div id="voiceReviewWrap" style="margin-bottom:14px">
       <div id="voiceReviewList"></div>
       <button class="btn btn-g btn-full" id="voiceApplyBtn" style="margin-top:10px">✓ Aplicar al pedido</button>
@@ -666,8 +716,8 @@ input,select,textarea{font-family:var(--fn)}
 <div class="overlay" id="modalVoiceGlobal">
   <div class="modal">
     <div class="modal-handle"></div>
-    <div class="modal-title">🎤 Revisá antes de aplicar</div>
-    <div style="font-size:11px;color:var(--m);margin-bottom:10px">Elegí el proveedor donde haga falta — quedan marcados en naranja.</div>
+    <div class="modal-title">🎤 Esto no se entendió del todo</div>
+    <div style="font-size:11px;color:var(--m);margin-bottom:10px">Lo demás ya se agregó solo ✓ — acá solo falta elegir proveedor o producto en lo dudoso.</div>
     <div id="voiceGReviewWrap" style="margin-bottom:14px">
       <div id="voiceGReviewList"></div>
       <button class="btn btn-g btn-full" id="voiceGApplyBtn" style="margin-top:10px">✓ Aplicar a los pedidos</button>
@@ -933,9 +983,18 @@ function initRealtimePrices(){
     .subscribe();
 }
 
+// El punto verde queda siempre "respirando" (conexión viva) y destella al sincronizar
+function markSyncLive(){
+  const dot=document.getElementById('syncDot');
+  if(dot){dot.classList.add('live');dot.title='Sincronización en vivo';}
+}
+let _flashT;
 function showPriceSyncDot(){
   const dot = document.getElementById('syncDot');
-  if(dot){ dot.style.opacity='1'; setTimeout(()=>dot.style.opacity='0', 2000); }
+  if(!dot)return;
+  dot.classList.add('flash');
+  clearTimeout(_flashT);
+  _flashT=setTimeout(()=>dot.classList.remove('flash'), 1600);
 }
 
 function getPrice(prov, pid){
@@ -1171,7 +1230,32 @@ document.querySelectorAll('.nav-btn').forEach(b=>{
 // ══════════════════════════════════════════
 // HOME
 // ══════════════════════════════════════════
+let _homeAnimated=false;
+function renderHomeHero(){
+  const now=new Date();
+  const h=now.getHours();
+  const saludo=h<12?'Buenos días':h<19?'Buenas tardes':'Buenas noches';
+  const emoji=h<12?'🌅':h<19?'☀️':'🌙';
+  const fecha=now.toLocaleDateString('es-CR',{weekday:'long',day:'numeric',month:'long'});
+  const hero=document.getElementById('homeHero');
+  if(hero)hero.innerHTML=`<span class="home-hero-saludo">${emoji} ${saludo}</span><span class="home-hero-fecha">${fecha}</span>`;
+}
+
+function renderDayProgress(){
+  const wrap=document.getElementById('dayProgressWrap');
+  if(!wrap)return;
+  const withData=getProvNames().filter(p=>hasData(p));
+  const sent=withData.filter(p=>isSent(p)).length;
+  if(!withData.length){wrap.style.display='none';return;}
+  wrap.style.display='block';
+  const pct=Math.round((sent/withData.length)*100);
+  document.getElementById('dpTxt').textContent=sent===withData.length?'🎉 ¡Todos los pedidos enviados!':`${sent} de ${withData.length} pedidos enviados`;
+  document.getElementById('dpPct').textContent=pct+'%';
+  document.getElementById('dpFill').style.width=pct+'%';
+}
+
 function renderHome(){
+  renderHomeHero();
   const all=calcAllProvs();
   const sent=getProvNames().filter(p=>isSent(p)).length;
   const pending=getProvNames().filter(p=>hasData(p)&&!isSent(p)).length;
@@ -1180,8 +1264,12 @@ function renderHome(){
     <div class="metric-card"><div class="metric-lbl">Enviados ✅</div><div class="metric-val green">${sent}</div></div>
     <div class="metric-card"><div class="metric-lbl">Pendientes ⚠️</div><div class="metric-val orange">${pending}</div></div>
   `;
+  renderDayProgress();
   const grid=document.getElementById('homeGrid');
   grid.innerHTML='';
+  const animate=!_homeAnimated;
+  _homeAnimated=true;
+  let cardIdx=0;
   getProvNames().forEach(name=>{
     const data=hasData(name);
     const sent=isSent(name);
@@ -1190,6 +1278,8 @@ function renderHome(){
     const count=countItems(name);
     const card=document.createElement('div');
     card.className='prov-card '+(sent?'sent':data?'has-data':'');
+    if(animate){card.classList.add('card-anim');card.style.animationDelay=(cardIdx*35)+'ms';}
+    cardIdx++;
     card.innerHTML=`
       <div class="prov-av">${name[0]}</div>
       <div class="prov-card-name">${name}</div>
@@ -1477,6 +1567,21 @@ function updateProvTotals(){
   document.getElementById('provTotalQuick').textContent='₡'+fmt(total);
 }
 
+// Contador animado — el número "corre" hasta el valor nuevo en vez de saltar
+const _numAnim={};
+function animateNumber(el,to,key){
+  const from=_numAnim[key]??to;
+  _numAnim[key]=to;
+  if(from===to){el.textContent='₡'+fmt(to);return;}
+  const t0=performance.now(),dur=500;
+  (function step(t){
+    const k=Math.min(1,(t-t0)/dur);
+    const v=Math.round(from+(to-from)*(1-Math.pow(1-k,3)));
+    el.textContent='₡'+fmt(v);
+    if(k<1)requestAnimationFrame(step);
+  })(t0);
+}
+
 // "Llevar al mercado" — total agregado de todos los proveedores, vive en Inicio
 function updateHomeDinero(){
   const el=document.getElementById('dineroAmt');
@@ -1484,7 +1589,7 @@ function updateHomeDinero(){
   const all=calcAllProvs();
   const margen=all.total*(S.margen/100);
   const llevar=all.total+margen;
-  el.textContent='₡'+fmt(llevar);
+  animateNumber(el,Math.round(llevar),'dinero');
   document.getElementById('dbM').textContent='₡'+fmt(all.moravia);
   document.getElementById('dbA').textContent='₡'+fmt(all.angeles);
   document.getElementById('dbSub').textContent='₡'+fmt(all.total);
@@ -1563,6 +1668,59 @@ const VOICE_UNIT_SYNONYMS={
 
 const VOICE_STOP_WORDS=new Set(['de','del','la','el','los','las','en','y','para','con','moravia','angeles',...Object.values(VOICE_UNIT_SYNONYMS).flat()]);
 
+// Palabras de relleno que la gente dice al dictar pero no aportan nada
+const VOICE_FILLER=new Set(['y','tambien','ademas','luego','despues','quiero','ponme','pone','poneme','agrega','agregame','anota','anotame','manda','mandame','ocupo','necesito','por','favor','este','eh','mas','sucursal','tienda']);
+
+// Corta el dictado en items SIN necesidad de decir "siguiente":
+// cada vez que aparece un número nuevo empieza otro producto.
+// "20 kilos de papa amarilla 10 cajas de tomate" → 2 segmentos.
+// (decir "siguiente" sigue funcionando igual que antes)
+function segmentVoiceTranscript(raw){
+  const parts=String(raw||'').split(/\bsiguientes?\b/i);
+  const segs=[];
+  parts.forEach(part=>{
+    const words=part.trim().split(/\s+/).filter(Boolean);
+    let cur=[],curHasNum=false;
+    words.forEach(w=>{
+      const isNum=/^\d/.test(normalizeVoice(w));
+      if(isNum&&curHasNum){segs.push(cur.join(' '));cur=[];curHasNum=false;}
+      cur.push(w);
+      if(isNum)curHasNum=true;
+    });
+    if(cur.length)segs.push(cur.join(' '));
+  });
+  return segs.map(s=>s.trim()).filter(s=>/\S/.test(s));
+}
+
+// Lo que sobra del segmento (sin número, unidad, relleno ni el nombre del
+// producto) es la nota: "20kg de papa amarilla gruesa" → nota "amarilla gruesa"
+function extractVoiceNote(seg,product){
+  if(!product)return'';
+  const pwords=new Set(normalizeVoice(product.name).split(/\s+/));
+  const out=[];
+  String(seg||'').split(/\s+/).forEach(w=>{
+    const nw=normalizeVoice(w).replace(/[.,;:!?]+$/,'');
+    if(!nw)return;
+    if(/\d/.test(nw))return;
+    if(VOICE_STOP_WORDS.has(nw))return;
+    if(VOICE_FILLER.has(nw))return;
+    if(pwords.has(nw))return;
+    out.push(w.replace(/[.,;:!?]+$/,''));
+  });
+  return out.join(' ').trim();
+}
+
+// Mete un item directo al pedido (cantidad + unidad + nota automática)
+function applyVoiceItem(provider,product,side,qty,unit,note){
+  const p=getPedido(provider);
+  side=side==='angeles'?'angeles':'moravia';
+  if(!p.qtys[side])p.qtys[side]={};
+  const u=unit||p.qtys[side][product.id]?.unit||product.unit;
+  p.qtys[side][product.id]={qty:String(qty),unit:u};
+  if(note)p.notes[product.id]=note;
+  markUnsent(provider);
+}
+
 function detectVoiceUnit(norm){
   for(const unit in VOICE_UNIT_SYNONYMS){
     if(VOICE_UNIT_SYNONYMS[unit].some(w=>norm.includes(w)))return unit;
@@ -1625,6 +1783,27 @@ function findVoiceProductAcrossProviders(norm,allProviders){
   return dedupeBest(fallback);
 }
 
+// Si el mismo producto lo venden varios proveedores, la app decide sola
+// usando lo que ya sabe de vos: 1) a quién ya le pediste ese producto hoy,
+// 2) a quién se lo pediste la última vez (historial de envíos),
+// 3) cuál está en favoritos. Solo si nada desempata, pregunta.
+function pickBestVoiceCandidate(candidates){
+  if(!candidates||!candidates.length)return null;
+  if(candidates.length===1)return candidates[0];
+  let hit=candidates.filter(c=>{
+    const p=S.pedidos[c.prov];
+    return p&&((+p.qtys?.moravia?.[c.product.id]?.qty>0)||(+p.qtys?.angeles?.[c.product.id]?.qty>0));
+  });
+  if(hit.length===1)return hit[0];
+  for(const h of histGet()){
+    const m=candidates.find(c=>c.prov===h.provider&&((+h.qtys?.moravia?.[c.product.id]?.qty>0)||(+h.qtys?.angeles?.[c.product.id]?.qty>0)));
+    if(m)return m;
+  }
+  hit=candidates.filter(c=>S.favs.includes(c.product.id));
+  if(hit.length===1)return hit[0];
+  return null;
+}
+
 const VOICE_ERROR_MSG={
   'not-allowed':'El micrófono está bloqueado. Habilitá el permiso de micrófono para este sitio en tu navegador.',
   'service-not-allowed':'El micrófono está bloqueado. Habilitá el permiso de micrófono para este sitio en tu navegador.',
@@ -1661,8 +1840,10 @@ function createVoiceEngine(opts){
           if(r.isFinal)st.finalTranscript+=r[0].transcript+' ';
           else interim+=r[0].transcript;
         }
-        opts.transcriptEl().textContent=(st.finalTranscript+interim).trim()||'…';
+        const full=(st.finalTranscript+interim).trim();
+        opts.transcriptEl().textContent=full||'…';
         opts.statusEl().textContent='Escuchando... tocá de nuevo para terminar';
+        if(opts.onLive)opts.onLive(full);
       };
       st.recognition.onerror=e=>{
         if(e.error==='no-speech')return;
@@ -1693,6 +1874,25 @@ function createVoiceEngine(opts){
   return{state:st,start,stop,toggle,reset};
 }
 
+// Chips en vivo: mientras hablás, cada producto reconocido aparece al instante
+// como chip verde (✓ entendido) o gris (todavía sin match) — la app se ve viva.
+function renderLiveChips(el,transcript,matchFn){
+  if(!el)return;
+  const segs=segmentVoiceTranscript(transcript);
+  el.innerHTML=segs.map(seg=>{
+    const norm=normalizeVoice(seg);
+    const qtyMatch=norm.match(/(\d+(?:[.,]\d+)?)/);
+    const qty=qtyMatch?qtyMatch[1].replace(',','.'):'';
+    const unit=detectVoiceUnit(norm);
+    const m=matchFn(norm);
+    if(m&&qty&&+qty>0){
+      const note=extractVoiceNote(seg,m.product);
+      return `<span class="voice-live-chip">${m.product.emoji||'✓'} ${m.product.name} · ${qty}${unit?' '+unit:''}${m.prov?' → '+m.prov:''}${note?` <span class="chip-note">${note}</span>`:''}</span>`;
+    }
+    return `<span class="voice-live-chip pend">${seg}…</span>`;
+  }).join('');
+}
+
 // ── Modal por proveedor (escaneado a una sucursal: Moravia o Los Ángeles) ──
 let voiceScopedSide='moravia';
 let voiceReviewRows=[];
@@ -1701,10 +1901,17 @@ const voiceEngineProv=createVoiceEngine({
   statusEl:()=>document.getElementById('voiceFloatProvStatus'),
   transcriptEl:()=>document.getElementById('voiceFloatProvTranscript'),
   recBtnEl:()=>document.getElementById('voiceFloatProv'),
+  onLive:full=>{
+    const products=getAllProviders()[S.currentProv]?.products||[];
+    renderLiveChips(document.getElementById('voiceLiveChipsProv'),full,norm=>{
+      const product=findVoiceProduct(norm,products);
+      return product?{product,prov:null}:null;
+    });
+  },
   onFinal:transcript=>{
-    processVoiceTranscript(transcript);
-    if(voiceReviewRows.length)document.getElementById('modalVoice').classList.add('open');
-    else toast('No se entendió nada, intentá de nuevo','err');
+    const res=processVoiceTranscript(transcript);
+    if(res.pending)document.getElementById('modalVoice').classList.add('open');
+    else if(!res.applied)toast('No se entendió nada, intentá de nuevo','err');
   },
 });
 
@@ -1720,6 +1927,7 @@ function startProviderVoice(side){
   ctx.textContent='🎤 '+sideLbl;
   ctx.style.color=side==='angeles'?'var(--o)':'var(--g)';
   document.getElementById('voiceFloatProvTranscript').textContent='';
+  document.getElementById('voiceLiveChipsProv').innerHTML='';
   voiceEngineProv.start();
 }
 
@@ -1727,20 +1935,36 @@ function closeVoiceModal(){
   document.getElementById('modalVoice').classList.remove('open');
 }
 
+// Todo lo que se entiende bien (producto + cantidad) se aplica SOLO al pedido,
+// con la nota automática. Al modal de revisión solo va lo dudoso.
 function processVoiceTranscript(transcript){
   const prov=S.currentProv;
   const provData=getAllProviders()[prov];
   const products=provData?.products||[];
-  const segments=transcript.split(/\bsiguientes?\b/i).map(s=>s.trim()).filter(Boolean);
-  voiceReviewRows=segments.map(seg=>{
+  const segments=segmentVoiceTranscript(transcript);
+  const pending=[];
+  let applied=0;
+  segments.forEach(seg=>{
     const norm=normalizeVoice(seg);
     const qtyMatch=norm.match(/(\d+(?:[.,]\d+)?)/);
     const qty=qtyMatch?qtyMatch[1].replace(',','.'):'';
     const unit=detectVoiceUnit(norm);
     const product=findVoiceProduct(norm,products);
-    return{segment:seg,product,side:voiceScopedSide,qty,unit};
+    const side=detectVoiceSide(norm)||voiceScopedSide;
+    if(product&&qty&&+qty>0){
+      applyVoiceItem(prov,product,side,qty,unit,extractVoiceNote(seg,product));
+      applied++;
+    }else{
+      pending.push({segment:seg,product,side,qty,unit});
+    }
   });
+  if(applied){
+    renderProdTable();updateProvTotals();updatePreview();renderProvStatus();persist();
+    toast(`🎤 ${applied} producto${applied>1?'s':''} agregado${applied>1?'s':''} solo${applied>1?'s':''}`,'ok');
+  }
+  voiceReviewRows=pending;
   renderVoiceReview();
+  return{applied,pending:pending.length};
 }
 
 function renderVoiceReview(){
@@ -1799,10 +2023,7 @@ function applyVoiceReview(){
   let applied=0;
   voiceReviewRows.forEach(row=>{
     if(!row.product||!row.qty||+row.qty<=0)return;
-    const side=row.side==='angeles'?'angeles':'moravia';
-    if(!p.qtys[side])p.qtys[side]={};
-    const unit=row.unit||p.qtys[side][row.product.id]?.unit||row.product.unit;
-    p.qtys[side][row.product.id]={qty:row.qty,unit};
+    applyVoiceItem(prov,row.product,row.side,row.qty,row.unit,extractVoiceNote(row.segment,row.product));
     applied++;
   });
   if(!applied){toast('No se aplicó ningún producto — revisá los campos','err');return;}
@@ -1827,10 +2048,16 @@ const voiceEngineGlobal=createVoiceEngine({
   statusEl:()=>document.getElementById('voiceFloatGlobalStatus'),
   transcriptEl:()=>document.getElementById('voiceFloatGlobalTranscript'),
   recBtnEl:()=>document.getElementById('voiceFloatGlobal'),
+  onLive:full=>{
+    const allProviders=getAllProviders();
+    renderLiveChips(document.getElementById('voiceLiveChipsGlobal'),full,norm=>{
+      return pickBestVoiceCandidate(findVoiceProductAcrossProviders(norm,allProviders));
+    });
+  },
   onFinal:transcript=>{
-    processGlobalVoiceTranscript(transcript);
-    if(voiceGlobalReviewRows.length)document.getElementById('modalVoiceGlobal').classList.add('open');
-    else toast('No se entendió nada, intentá de nuevo','err');
+    const res=processGlobalVoiceTranscript(transcript);
+    if(res.pending)document.getElementById('modalVoiceGlobal').classList.add('open');
+    else if(!res.applied)toast('No se entendió nada, intentá de nuevo','err');
   },
 });
 
@@ -1845,6 +2072,7 @@ function startGlobalVoice(side){
   ctx.textContent='🎤 Pedido completo — '+sideLbl;
   ctx.style.color=side==='angeles'?'var(--o)':'var(--g)';
   document.getElementById('voiceFloatGlobalTranscript').textContent='';
+  document.getElementById('voiceLiveChipsGlobal').innerHTML='';
   voiceEngineGlobal.start();
 }
 
@@ -1852,19 +2080,43 @@ function closeVoiceGlobalModal(){
   document.getElementById('modalVoiceGlobal').classList.remove('open');
 }
 
+// Cada item entendido se aplica SOLO: busca el producto entre TODOS los
+// proveedores, lo agrega al proveedor correcto con su cantidad y pone lo que
+// sobra del dictado ("amarilla gruesa") como nota automática del producto.
+// Al modal de revisión solo va lo ambiguo (mismo producto en 2+ proveedores)
+// o lo que no se entendió.
 function processGlobalVoiceTranscript(transcript){
   const allProviders=getAllProviders();
-  const segments=transcript.split(/\bsiguientes?\b/i).map(s=>s.trim()).filter(Boolean);
-  voiceGlobalReviewRows=segments.map(seg=>{
+  const segments=segmentVoiceTranscript(transcript);
+  const pending=[];
+  const affected=new Set();
+  let applied=0;
+  segments.forEach(seg=>{
     const norm=normalizeVoice(seg);
     const qtyMatch=norm.match(/(\d+(?:[.,]\d+)?)/);
     const qty=qtyMatch?qtyMatch[1].replace(',','.'):'';
     const unit=detectVoiceUnit(norm);
+    const side=detectVoiceSide(norm)||voiceGlobalScopedSide;
     const candidates=findVoiceProductAcrossProviders(norm,allProviders);
-    const single=candidates.length===1?candidates[0]:null;
-    return{segment:seg,side:voiceGlobalScopedSide,qty,unit,candidates,provider:single?single.prov:null,product:single?single.product:null};
+    const single=pickBestVoiceCandidate(candidates);
+    if(single&&qty&&+qty>0){
+      applyVoiceItem(single.prov,single.product,side,qty,unit,extractVoiceNote(seg,single.product));
+      affected.add(single.prov);
+      applied++;
+    }else{
+      pending.push({segment:seg,side,qty,unit,candidates,provider:single?single.prov:null,product:single?single.product:null});
+    }
   });
+  if(applied){
+    persist();
+    affected.forEach(pushPedidoToSupabase);
+    renderHome();
+    if(S.currentProv&&affected.has(S.currentProv)){renderProdTable();updateProvTotals();updatePreview();renderProvStatus();}
+    toast(`🎤 ${applied} producto${applied>1?'s':''} en ${affected.size} proveedor${affected.size>1?'es':''} — agregado${applied>1?'s':''} solo${applied>1?'s':''}`,'ok');
+  }
+  voiceGlobalReviewRows=pending;
   renderGlobalVoiceReview();
+  return{applied,pending:pending.length};
 }
 
 function renderGlobalVoiceReview(){
@@ -1939,12 +2191,7 @@ function applyGlobalVoiceReview(){
   const provincesAffected=new Set();
   voiceGlobalReviewRows.forEach(row=>{
     if(!row.provider||!row.product||!row.qty||+row.qty<=0)return;
-    const p=getPedido(row.provider);
-    const side=row.side==='angeles'?'angeles':'moravia';
-    if(!p.qtys[side])p.qtys[side]={};
-    const unit=row.unit||p.qtys[side][row.product.id]?.unit||row.product.unit;
-    p.qtys[side][row.product.id]={qty:row.qty,unit};
-    markUnsent(row.provider);
+    applyVoiceItem(row.provider,row.product,row.side,row.qty,row.unit,extractVoiceNote(row.segment,row.product));
     provincesAffected.add(row.provider);
     applied++;
   });
@@ -2134,7 +2381,18 @@ function saveBudget(){S.budget=+document.getElementById('budgetInp').value||0;pe
 // ══════════════════════════════════════════
 // CONFIG
 // ══════════════════════════════════════════
+// Acordeón: cada sección se abre/cierra tocando el título (todo queda compacto)
+document.querySelectorAll('.cfg-acc-hdr').forEach(hdr=>{
+  hdr.addEventListener('click',()=>hdr.parentElement.classList.toggle('open'));
+});
+
 function renderConfig(){
+  // Contadores en los títulos — se ve el estado sin abrir nada
+  const phonesSet=getProvNames().filter(n=>(S.phones[n]||'').trim()).length;
+  const waSet=(S.pdfWa||[]).filter(c=>(c.tel||'').trim()).length;
+  const elP=document.getElementById('accCountPhones');if(elP)elP.textContent=phonesSet+'/'+getProvNames().length;
+  const elW=document.getElementById('accCountPdfWa');if(elW)elW.textContent=waSet+'/5';
+  const elPr=document.getElementById('accCountProvs');if(elPr)elPr.textContent=getProvNames().length;
   // Phones
   document.getElementById('cfgPhones').innerHTML=getProvNames().map(name=>`
     <div class="cfg-row">
@@ -2427,17 +2685,14 @@ function inp_globalGoTo(provName, prodId){
   openProv(provName);
   // Scroll al producto después de renderizar
   setTimeout(()=>{
-    const rows=document.querySelectorAll('#prodTbody tr');
-    rows.forEach(tr=>{
-      const inp=tr.querySelector(`[data-pid="${prodId}"]`);
-      if(inp){
-        tr.scrollIntoView({behavior:'smooth',block:'center'});
-        inp.focus();inp.select();
-        tr.style.background='rgba(0,201,110,.12)';
-        setTimeout(()=>tr.style.background='',1500);
-      }
-    });
-  },200);
+    const inp=document.querySelector(`#prodCardList .tbl-qty[data-pid="${prodId}"]`);
+    if(inp){
+      const card=inp.closest('.prod-card-item');
+      (card||inp).scrollIntoView({behavior:'smooth',block:'center'});
+      inp.focus();inp.select();
+      if(card){card.style.boxShadow='0 0 0 2px var(--g)';setTimeout(()=>card.style.boxShadow='',1500);}
+    }
+  },250);
 }
 
 // ══════════════════════════════════════════
@@ -2455,6 +2710,7 @@ function inp_globalGoTo(provName, prodId){
   Promise.all([loadConfigFromSupabase(),loadPedidosFromSupabase()]).then(()=>{
     initRealtimeConfig();
     initRealtimePedidos();
+    markSyncLive();
     renderHome();
     if(S.currentProv){renderProdTable();updateProvTotals();updatePreview();renderProvStatus();}
   });
