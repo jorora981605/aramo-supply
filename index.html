@@ -7,10 +7,11 @@
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="apple-mobile-web-app-title" content="ARAMO">
 <meta name="mobile-web-app-capable" content="yes">
-<meta name="theme-color" content="#080808">
+<meta name="theme-color" content="#f4f7f5">
 <meta name="description" content="Sistema de pedidos ARAMO Supply">
 <link rel="manifest" href="manifest.json">
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="catalogo-productos.js"></script>
 <link rel="apple-touch-icon" href="icon.png">
 <link rel="apple-touch-startup-image" href="splash.png">
 <title>ARAMO Supply</title>
@@ -441,6 +442,178 @@ input,select,textarea{font-family:var(--fn)}
   .pdf-total-box .lbl{font-size:9px;text-transform:uppercase;letter-spacing:.6px;color:#666;margin-bottom:3px}
   .pdf-total-box .val{font-size:16px;font-weight:900}
 }
+
+/* ARAMO SIMPLE — claro por defecto, táctil y siempre visible */
+:root{
+  --bg:#f4f7f5;--s:#fff;--card:#fff;--ch:#edf3ef;--b:#dbe5df;--b2:#c3d2c9;
+  --g:#087a4c;--gd:rgba(8,122,76,.09);--gg:rgba(8,122,76,.24);--gh:#0a965d;
+  --o:#b95f0a;--od:rgba(185,95,10,.09);--og:rgba(185,95,10,.24);--oh:#d87818;
+  --t:#15221b;--m:#5c6b62;--sb:#e8eeea;--sh:0 12px 30px rgba(32,64,45,.10);
+  --chrome:#fff;--chrome-soft:#fff;--chrome-bar:rgba(255,255,255,.96);
+  --chrome-hi:0 8px 24px rgba(32,64,45,.08);--chrome-hi-sm:0 3px 12px rgba(32,64,45,.07);--chrome-flat:#f7faf8;
+}
+html[data-theme="dark"]{
+  --bg:#0c100e;--s:#141a17;--card:#1a211d;--ch:#202923;--b:#2d3932;--b2:#405046;
+  --g:#43dc94;--gd:rgba(67,220,148,.12);--gg:rgba(67,220,148,.28);--gh:#70eaae;
+  --o:#ffad5c;--od:rgba(255,173,92,.12);--og:rgba(255,173,92,.3);--oh:#ffc17e;
+  --t:#f4f7f5;--m:#a7b2ab;--sb:#273029;--sh:0 12px 32px rgba(0,0,0,.35);
+  --chrome:#1a211d;--chrome-soft:#171d1a;--chrome-bar:rgba(20,26,23,.96);
+  --chrome-hi:0 8px 24px rgba(0,0,0,.28);--chrome-hi-sm:0 3px 12px rgba(0,0,0,.22);--chrome-flat:#202823;
+}
+html,body{background:var(--bg);color:var(--t)}
+body{background:linear-gradient(180deg,var(--gd),transparent 260px),var(--bg);font-size:17px}
+.app{min-height:100dvh;padding-bottom:calc(82px + env(safe-area-inset-bottom,0px))}
+.topbar{position:sticky;top:0;min-height:58px;background:var(--chrome-bar);padding-top:calc(12px + env(safe-area-inset-top,0px))}
+.theme-toggle{width:42px;height:42px;border-radius:14px;border:1px solid var(--b);background:var(--chrome-flat);color:var(--t);font-size:20px}
+.scroll{padding-bottom:calc(100px + env(safe-area-inset-bottom,0px))}
+.nav-bottom{transform:none!important;min-height:72px;background:var(--chrome-bar);box-shadow:0 -8px 24px rgba(32,64,45,.08)}
+.nav-btn{min-width:0;margin:5px 2px;padding:7px 2px;font-size:10px;letter-spacing:0;text-transform:none}
+.nav-btn .ico{font-size:21px}.nav-btn.active{background:var(--gd);box-shadow:none}
+.home-grid{grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}
+.prov-card,.card,.cfg-acc,.prov-cfg-item,.prod-card-item{background:var(--card);box-shadow:var(--chrome-hi-sm)}
+.prov-card{align-items:flex-start;text-align:left;padding:15px;min-height:128px}.prov-av{width:40px;height:40px}
+.btn,.nav-btn,.voice-branch-btn,.mg-btn,.filter-btn,.wa-mini{min-height:44px}
+.voice-branch-btn{height:58px;color:#fff;background:var(--g)!important;box-shadow:none}.voice-branch-btn.a{background:var(--o)!important}
+.quick-order{margin:14px 16px 4px;padding:16px;border-radius:20px;background:var(--card);border:1px solid var(--b);box-shadow:var(--sh)}
+.quick-order h2{font-size:20px;margin-bottom:5px}.quick-order p{font-size:14px;line-height:1.45;color:var(--m);margin-bottom:12px}
+.quick-order>div[style*="display:flex"]{flex-wrap:wrap}.quick-order .voice-branch-btn{flex:1 1 220px;min-width:0;white-space:normal}
+.simple-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.simple-action{display:flex;align-items:center;gap:10px;min-width:0;padding:14px;border:1px solid var(--b);border-radius:16px;background:var(--card);color:var(--t);font-size:15px;font-weight:800;text-align:left;white-space:normal}
+.simple-action span{font-size:24px}.market-total{font-size:34px;font-weight:900;color:var(--g);letter-spacing:-1px}
+.market-card{padding:18px;border-radius:20px;background:var(--card);border:1px solid var(--b);box-shadow:var(--sh);margin-bottom:12px}
+.market-row{display:flex;justify-content:space-between;gap:16px;padding:12px 0;border-bottom:1px solid var(--b);font-size:15px}.market-row:last-child{border-bottom:0}
+.price-search{position:sticky;top:0;z-index:5;padding:12px 0;background:var(--bg)}
+.big-search{width:100%;min-height:50px;padding:0 16px;border-radius:16px;border:1px solid var(--b2);background:var(--card);color:var(--t);font-size:16px;outline:none}
+.price-result{display:flex;align-items:center;gap:12px;width:100%;padding:14px;margin-bottom:8px;border-radius:16px;border:1px solid var(--b);background:var(--card);color:var(--t);text-align:left}
+.price-result-name{font-size:16px;font-weight:800;flex:1}.price-result-meta{font-size:13px;color:var(--m)}
+.compare-row{display:grid;grid-template-columns:1fr 115px;gap:10px;align-items:center;padding:12px 0;border-bottom:1px solid var(--b)}
+.compare-provider{font-weight:800}.compare-unit{font-size:13px;color:var(--m)}
+.compare-price{width:100%;padding:11px;border:1px solid var(--b2);border-radius:12px;background:var(--s);color:var(--t);font-size:16px;text-align:right}
+.config-voice-btn{width:100%;margin:8px 0 12px;min-height:50px;border:0;border-radius:14px;background:var(--g);color:#fff;font-size:15px;font-weight:800}
+.product-picker{margin:4px 0 14px;padding:14px;border:2px solid var(--gg);border-radius:18px;background:var(--gd)}
+.product-picker-title{font-size:16px;font-weight:900;margin-bottom:3px}.product-picker-help{font-size:13px;color:var(--m);line-height:1.4;margin-bottom:10px}
+.product-picker-search{width:100%;min-height:48px;padding:0 14px;border:2px solid var(--b2);border-radius:14px;background:var(--card);color:var(--t);font-size:15px;outline:none}
+.product-picker-search:focus{border-color:var(--g)}
+.product-picker-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px;margin-top:10px}
+.product-pick{display:flex;align-items:center;gap:8px;min-width:0;min-height:48px;padding:9px 10px;border:1px solid var(--b2);border-radius:13px;background:var(--card);color:var(--t);font-size:13px;font-weight:800;text-align:left}
+.product-pick:hover,.product-pick:active{border-color:var(--g);background:var(--gd)}.product-pick .emoji{font-size:20px;flex-shrink:0}.product-pick .name{overflow:hidden;text-overflow:ellipsis}
+.product-picker-more{width:100%;min-height:42px;margin-top:9px;border:1px solid var(--g);border-radius:12px;background:var(--card);color:var(--g);font-weight:900}
+.product-picker-empty{padding:16px 4px 6px;text-align:center;color:var(--m);font-size:13px}
+.manual-product-label{margin:14px 0 7px;padding-top:12px;border-top:1px solid var(--b);font-size:12px;color:var(--m);font-weight:800}
+.new-provider-box{padding:14px;margin-bottom:14px;border:2px solid var(--gg);border-radius:17px;background:var(--gd)}
+.new-provider-title{font-size:17px;font-weight:900}.new-provider-help{font-size:13px;line-height:1.4;color:var(--m);margin:4px 0 10px}
+.new-provider-box .new-prov-row{margin:0}.new-provider-box .new-prov-inp{min-height:48px;background:var(--card);border:2px solid var(--b2);border-radius:13px}
+.provider-voice-add{width:100%;min-height:46px;margin-top:8px;border:1px solid var(--g);border-radius:13px;background:var(--card);color:var(--g);font-size:14px;font-weight:900}
+.provider-list-title{margin:5px 2px 9px;font-size:13px;font-weight:900;color:var(--m);text-transform:uppercase;letter-spacing:.5px}
+.del-prov-btn{background:#fff0ed!important;border:1px solid #db4b35!important;color:#a92919!important}
+html[data-theme="dark"] .del-prov-btn{background:#3b1d19!important;color:#ff9b8d!important}
+.modal{padding-bottom:calc(28px + env(safe-area-inset-bottom,0px));background:var(--card);color:var(--t)}.modal-title{font-size:21px}
+.modal-inp,.cfg-inp,.new-prov-inp,.prod-cfg-name,.prod-cfg-unit{color:var(--t);background:var(--s);border-color:var(--b2)}
+.wa-bar{bottom:calc(72px + env(safe-area-inset-bottom,0px));padding:10px 14px;background:var(--bg)}
+#view-prov .scroll{padding-bottom:190px!important}
+#view-prov{background:#e9f0ec}
+html[data-theme="dark"] #view-prov{background:#0f1512}
+.prov-topbar{background:var(--card);padding:12px 14px;box-shadow:0 5px 18px rgba(24,69,43,.10)}
+.back-btn{background:var(--g);border-color:var(--g);color:#fff;font-weight:900}
+.prov-nav-btn{background:var(--card);border:2px solid var(--b2);color:var(--t);font-size:18px;min-width:42px;min-height:42px}
+.prov-status-bar{background:var(--card);padding:10px 12px;gap:7px;box-shadow:0 4px 12px rgba(24,69,43,.06)}
+.prov-status-bar .btn{border-width:2px;font-size:12px;padding:8px 10px}
+.prov-status-bar .clear-m{background:var(--gd);border-color:var(--g);color:var(--g)}
+.prov-status-bar .clear-a{background:var(--od);border-color:var(--o);color:var(--o)}
+.prov-status-bar .copy-branch{background:#eef2ff;border-color:#6675c8;color:#35449c}
+html[data-theme="dark"] .prov-status-bar .copy-branch{background:#202744;border-color:#8692da;color:#cbd1ff}
+.prod-filter{background:var(--card);padding:12px 14px;border-bottom:0}.search-inp{min-height:48px;border:2px solid var(--b2);font-size:16px}
+.filter-btn{min-height:48px;background:#fff4df;border:2px solid #e6a23c;color:#805100;font-size:13px}
+html[data-theme="dark"] .filter-btn{background:#322819;color:#ffd18b}
+.provider-help{margin:2px 14px 0;padding:12px 14px;border-radius:14px;background:#dcece3;border:1px solid #b8d7c5;color:#24583a;font-size:14px;line-height:1.4}
+html[data-theme="dark"] .provider-help{background:#183426;border-color:#285c3f;color:#bce8cd}
+.prod-card-item{border:2px solid #ccd9d1;border-radius:18px;padding:15px;margin-bottom:13px;box-shadow:0 7px 18px rgba(24,69,43,.10)}
+html[data-theme="dark"] .prod-card-item{border-color:#3b4941}
+.prod-card-item::before{display:none}
+.prod-card-item.filled-m{border-color:var(--g);background:linear-gradient(180deg,var(--gd),var(--card) 45%)}
+.prod-card-item.filled-a{border-color:var(--o);background:linear-gradient(180deg,var(--od),var(--card) 45%)}
+.prod-card-item.filled-both{border-color:#8a7851;background:linear-gradient(120deg,var(--gd),var(--card) 45%,var(--od))}
+.prod-card-top{margin-bottom:13px}.prod-emoji-big{font-size:28px}
+.prod-nm{text-align:left;font-size:20px;line-height:1.15}.prod-nm small{display:block;margin-top:4px;color:var(--m);font-size:12px;font-weight:700}
+.prod-fav{width:42px;height:42px;border-radius:13px;background:#fff7df;border:1px solid #ead59a;color:#9c7621}
+html[data-theme="dark"] .prod-fav{background:#332d1d;border-color:#66592e}
+.qty-block{padding:11px;border-radius:15px;border:2px solid var(--b);background:var(--s)}
+.qty-block:first-child{border-color:var(--gg);background:var(--gd)}.qty-block:last-child{border-color:var(--og);background:var(--od)}
+.qty-block:first-child .qty-pm{background:var(--g);border-color:var(--g);color:#fff}
+.qty-block:last-child .qty-pm{background:var(--o);border-color:var(--o);color:#fff}
+.qty-pm{box-shadow:0 3px 8px rgba(0,0,0,.15);font-weight:600}
+.tbl-qty{background:var(--card);border:2px solid var(--b2);color:var(--t)}
+.prod-details-toggle{width:100%;min-height:42px;margin-top:11px;border:1px solid var(--b2);border-radius:12px;background:var(--chrome-flat);color:var(--m);font-weight:800;font-size:13px}
+.prod-details-toggle span{display:inline-block;transition:transform .2s}.prod-details-toggle.open span{transform:rotate(180deg)}
+.prod-details{display:none}.prod-details.open{display:block}
+.prod-note-inp{min-height:46px;border:2px solid var(--b2);font-size:15px}
+.prod-card-bottom label{display:flex;flex-direction:column;gap:5px;color:var(--m);font-size:11px;font-weight:800;text-transform:uppercase}
+.prod-card-bottom label>span{text-align:center}
+.tbl-unit,.tbl-price,.tbl-sub{background:var(--s);border:2px solid var(--b2);border-radius:12px;box-shadow:none}
+.tbl-sub{justify-content:center;padding:0}
+.extras-section,.totals-row,.preview-box{background:var(--card);border:1px solid var(--b);border-radius:16px;margin-left:14px;margin-right:14px;padding:14px;box-shadow:var(--chrome-hi-sm)}
+.add-extra{background:var(--gd);border:2px solid var(--g);color:var(--g);font-weight:800}
+.wa-mini{background:var(--card);border:2px solid var(--b2);color:var(--t)}
+/* HOY — tablero 2D vivo y legible */
+#view-resumen{background:linear-gradient(180deg,var(--gd),var(--bg) 320px)}
+.today-wrap{width:min(980px,100%);margin:0 auto;padding:16px 16px calc(100px + env(safe-area-inset-bottom,0px))}
+.today-heading{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:12px}
+.today-date{font-size:16px;font-weight:800;text-transform:capitalize;margin-top:3px}
+.live-pill{display:flex;align-items:center;gap:6px;padding:7px 10px;border-radius:20px;background:var(--card);border:1px solid var(--gg);color:var(--g);font-size:10px;font-weight:900;letter-spacing:.7px}
+.live-pill span{width:8px;height:8px;border-radius:50%;background:var(--g);box-shadow:0 0 0 0 var(--gg);animation:livePulse 1.8s infinite}
+@keyframes livePulse{50%{box-shadow:0 0 0 7px transparent;opacity:.65}}
+.today-hero-card{display:grid;grid-template-columns:122px 1fr;gap:18px;align-items:center;padding:18px;border:1px solid var(--b);border-radius:22px;background:var(--card);box-shadow:var(--sh)}
+.progress-ring{--progress:0deg;width:116px;height:116px;padding:10px;border-radius:50%;background:conic-gradient(var(--g) var(--progress),var(--b) 0);transition:background .7s ease;position:relative}
+.progress-ring::after{content:"";position:absolute;inset:10px;border-radius:50%;background:var(--card)}
+.progress-ring>div{position:relative;z-index:1;width:100%;height:100%;display:flex;flex-direction:column;align-items:center;justify-content:center}
+.progress-ring strong{font-size:26px;line-height:1;color:var(--g)}.progress-ring span{font-size:11px;color:var(--m);font-weight:800;margin-top:4px}
+.today-hero-copy h2{font-size:22px;line-height:1.15;margin-bottom:6px}.today-hero-copy p{font-size:14px;line-height:1.45;color:var(--m)}
+.today-main-action{margin-top:12px;min-height:44px;padding:0 18px;border:0;border-radius:13px;background:var(--g);color:#fff;font-weight:900;font-size:14px}
+.today-money-card{margin-top:12px;padding:18px;border-radius:22px;background:linear-gradient(145deg,#087a4c,#075c3b);color:#fff;box-shadow:0 10px 26px rgba(8,122,76,.22)}
+html[data-theme="dark"] .today-money-card{background:linear-gradient(145deg,#125d3d,#163c2c)}
+.today-money-top{display:grid;grid-template-columns:1fr 1fr;gap:14px}.today-money-top>div{display:flex;flex-direction:column;gap:3px}
+.today-money-top span{font-size:12px;opacity:.78;font-weight:800}.today-money-top strong{font-size:28px;letter-spacing:-1px}
+.today-money-top .today-take{text-align:right}.today-money-top .today-take strong{color:#ffe2a7}
+.branch-viz{margin-top:16px}.branch-viz-label{display:flex;justify-content:space-between;font-size:12px;font-weight:800;margin:7px 0 4px}
+.branch-track{height:10px;border-radius:20px;background:rgba(255,255,255,.18);overflow:hidden}
+.branch-fill{height:100%;width:0;border-radius:20px;transition:width .8s cubic-bezier(.2,.8,.2,1)}
+.branch-fill.m{background:#6ff0b0}.branch-fill.a{background:#ffc37d}
+.today-stats{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px;margin-top:12px}
+.today-stat{padding:15px;border-radius:18px;background:var(--card);border:1px solid var(--b);box-shadow:var(--chrome-hi-sm)}
+.today-stat .ico{font-size:22px}.today-stat strong{display:block;font-size:23px;margin:8px 0 2px}.today-stat span{display:block;font-size:12px;color:var(--m);font-weight:800}
+.today-stat.good{border-color:var(--gg)}.today-stat.warn{border-color:var(--og)}
+.today-budget{margin-top:12px;border-radius:20px;padding:16px}.today-section-title{display:flex;align-items:center;justify-content:space-between;gap:12px;margin:18px 2px 9px}
+.today-section-title>span{font-size:16px;font-weight:900}.today-section-title strong,.today-section-title small{font-size:12px;color:var(--m)}
+.today-budget .today-section-title{margin:0 0 8px}.budget-bar{height:12px;border-radius:20px}.budget-fill{transition:width .8s cubic-bezier(.2,.8,.2,1)}
+.budget-edit{display:flex;gap:8px;margin-top:10px}.budget-inp{margin:0;min-height:44px;border:2px solid var(--b2)}
+.today-provider{display:grid;grid-template-columns:46px 1fr auto;align-items:center;gap:12px;padding:13px;margin-bottom:9px;border:1px solid var(--b);border-radius:17px;background:var(--card);box-shadow:var(--chrome-hi-sm);cursor:pointer}
+.today-provider.sent{border-color:var(--gg)}.today-provider.pending{border-color:var(--og)}
+.today-provider-icon{width:46px;height:46px;border-radius:14px;display:flex;align-items:center;justify-content:center;background:var(--gd);font-size:20px;font-weight:900;color:var(--g)}
+.today-provider-name{font-size:16px;font-weight:900}.today-provider-state{font-size:12px;color:var(--m);margin-top:3px}
+.today-provider-money{text-align:right}.today-provider-money strong{display:block;font-size:15px}.today-provider-money small{color:var(--m);font-size:11px}
+@media(max-width:430px){
+  .today-hero-card{grid-template-columns:96px 1fr;padding:15px;gap:13px}.progress-ring{width:94px;height:94px}.progress-ring strong{font-size:22px}
+  .today-hero-copy h2{font-size:18px}.today-stats{grid-template-columns:1fr 1fr}.today-stat:last-child{grid-column:1/-1}
+  .today-money-top strong{font-size:23px}.today-provider{grid-template-columns:40px 1fr auto}.today-provider-icon{width:40px;height:40px}
+}
+#globalSearchResults{bottom:calc(76px + env(safe-area-inset-bottom,0px))!important;background:var(--card)!important;box-shadow:var(--sh)!important}
+@media(max-width:799px){
+  .nav-bottom{justify-content:stretch!important;gap:0!important;padding-left:0!important;padding-right:0!important}
+  .nav-btn{flex:1 1 20%!important;width:auto!important;margin:4px 1px!important;padding:7px 1px!important}
+  .metric-grid.c3{grid-template-columns:repeat(3,minmax(0,1fr))}
+  .metric-card{min-width:0;padding:12px 9px}.metric-val{font-size:18px}
+}
+@media(max-width:430px){
+  .simple-grid{grid-template-columns:1fr}.quick-order{margin-left:12px;margin-right:12px}
+  .prov-status-bar .prov-total-quick{width:100%;margin-left:0;text-align:right}
+  .qty-block,.qty-block:last-child{border-width:2px;border-style:solid;padding:12px}
+  .prod-card-bottom{grid-template-columns:1fr 1fr}.prod-card-bottom label:last-child{grid-column:1/-1}
+}
+@media(min-width:800px){
+  .home-grid{grid-template-columns:repeat(4,minmax(0,1fr))}
+  .quick-order,.sec,.dinero-wrap{max-width:980px;width:calc(100% - 32px);margin-left:auto;margin-right:auto}
+  .nav-bottom{left:50%;right:auto;transform:translateX(-50%)!important;width:min(720px,100%);border-radius:22px 22px 0 0}
+}
 </style>
 </head>
 <body>
@@ -453,6 +626,7 @@ input,select,textarea{font-family:var(--fn)}
   <div style="display:flex;align-items:center;gap:8px;margin-left:auto">
     <span id="syncDot" style="width:7px;height:7px;border-radius:50%;background:var(--g);opacity:0;transition:opacity .3s" title="Sincronizado"></span>
     <span class="saved-txt" id="savedMob">✓</span>
+    <button class="theme-toggle" id="themeToggle" type="button" aria-label="Cambiar tema">🌙</button>
   </div>
 </div>
 <!-- BUSCADOR GLOBAL — solo visible en Inicio -->
@@ -477,13 +651,17 @@ input,select,textarea{font-family:var(--fn)}
       <div class="day-progress-lbl"><span id="dpTxt"></span><span class="dp-done" id="dpPct"></span></div>
       <div class="day-progress"><div class="day-progress-fill" id="dpFill" style="width:0%"></div></div>
     </div>
-    <div style="padding:10px 16px 0">
-      <div class="sec-lbl" style="margin-bottom:8px">🎤 Pedido completo por voz</div>
+    <div class="quick-order">
+      <h2>Hacé el pedido hablando</h2>
+      <p>Decí toda la lista seguida. La app reconoce productos, cantidades y proveedor automáticamente; no tenés que tocar “Siguiente”.</p>
       <div style="display:flex;gap:8px">
-        <button class="voice-branch-btn m" id="btnVoiceGlobalM">🎤 Moravia</button>
-        <button class="voice-branch-btn a" id="btnVoiceGlobalA">🎤 Los Ángeles</button>
+        <button class="voice-branch-btn m" id="btnVoiceGlobalM">🎤 Pedido Moravia</button>
+        <button class="voice-branch-btn a" id="btnVoiceGlobalA">🎤 Pedido Los Ángeles</button>
       </div>
-      <div style="font-size:11px;color:var(--m);margin-top:6px;text-align:center">Decí seguido: "20 kilos de papa amarilla gruesa, 10 cajas de tomate..." — se agrega solo al proveedor correcto, con la nota incluida.</div>
+      <div class="simple-grid" style="margin-top:10px">
+        <button class="simple-action" type="button" onclick="switchView('precios')"><span>💰</span>Comparar precios</button>
+        <button class="simple-action" type="button" onclick="switchView('mercado')"><span>🛒</span>Dinero de mercado</button>
+      </div>
     </div>
     <div class="voice-float" id="voiceFloatGlobal" style="margin:10px 16px 0">
       <div class="voice-float-row">
@@ -496,25 +674,6 @@ input,select,textarea{font-family:var(--fn)}
     </div>
     <div class="home-grid" id="homeGrid"></div>
 
-    <div class="dinero-wrap">
-      <div class="dinero-top">
-        <span class="dinero-lbl">💵 Llevar al mercado</span>
-        <span class="dinero-amount" id="dineroAmt">₡0</span>
-      </div>
-      <div class="margin-row">
-        <button class="mg-btn active" onclick="setMargen(0)">Exacto</button>
-        <button class="mg-btn" onclick="setMargen(5)">+5%</button>
-        <button class="mg-btn" onclick="setMargen(10)">+10%</button>
-        <button class="mg-btn" onclick="setMargen(15)">+15%</button>
-        <button class="mg-btn" onclick="setMargenCustom()">Custom</button>
-      </div>
-      <div class="dinero-breakdown">
-        <div class="db-row"><span>#1 Moravia</span><span id="dbM" style="color:var(--g)">₡0</span></div>
-        <div class="db-row"><span>#2 Los Ángeles</span><span id="dbA" style="color:var(--o)">₡0</span></div>
-        <div class="db-row"><span>Subtotal</span><span id="dbSub">₡0</span></div>
-        <div class="db-row"><span id="dbML">Margen 0%</span><span id="dbMV" style="color:var(--g)">₡0</span></div>
-      </div>
-    </div>
   </div>
 </div>
 
@@ -530,9 +689,9 @@ input,select,textarea{font-family:var(--fn)}
   </div>
   <div class="prov-status-bar">
     <span class="status-badge sb-empty" id="provStatusBadge">Sin pedido</span>
-    <button class="btn btn-o btn-sm" id="btnClearM" style="color:var(--g);border-color:var(--gg)">✕ M</button>
-    <button class="btn btn-o btn-sm" id="btnClearA" style="color:var(--o);border-color:var(--og)">✕ LA</button>
-    <button class="btn btn-o btn-sm" id="btnDupMA">M→LA</button>
+    <button class="btn btn-o btn-sm clear-m" id="btnClearM">Limpiar Moravia</button>
+    <button class="btn btn-o btn-sm clear-a" id="btnClearA">Limpiar Los Ángeles</button>
+    <button class="btn btn-o btn-sm copy-branch" id="btnDupMA">Copiar M → LA</button>
     <span class="prov-total-quick" id="provTotalQuick">₡0</span>
   </div>
   <div class="prod-filter">
@@ -543,8 +702,8 @@ input,select,textarea{font-family:var(--fn)}
     <button class="filter-btn" id="filterUsed">⭐ Usados</button>
   </div>
   <div style="display:flex;gap:8px;padding:0 14px 10px">
-    <button class="voice-branch-btn m" id="btnVoiceM">🎤 Moravia</button>
-    <button class="voice-branch-btn a" id="btnVoiceA">🎤 Los Ángeles</button>
+    <button class="voice-branch-btn m" id="btnVoiceM">🎤 Dictar Moravia</button>
+    <button class="voice-branch-btn a" id="btnVoiceA">🎤 Dictar Los Ángeles</button>
   </div>
   <div class="scroll" id="provScroll" style="padding-bottom:220px">
     <div class="voice-float" id="voiceFloatProv">
@@ -556,6 +715,7 @@ input,select,textarea{font-family:var(--fn)}
       <div class="voice-float-transcript" id="voiceFloatProvTranscript"></div>
       <div class="voice-live-chips" id="voiceLiveChipsProv"></div>
     </div>
+    <div class="provider-help">Tocá <strong>+</strong> o escribí la cantidad. Los cambios se guardan solos.</div>
     <div style="padding:10px 14px 0" id="prodCardList"></div>
 
     <div class="extras-section" style="margin-top:10px">
@@ -603,26 +763,90 @@ input,select,textarea{font-family:var(--fn)}
 <!-- ═══ RESUMEN ═══ -->
 <div class="view" id="view-resumen">
   <div class="scroll">
-    <div class="sec">
-      <div class="sec-lbl" id="resumenFecha"></div>
-      <div class="metric-grid c3" style="margin-bottom:11px" id="resMetrics"></div>
-      <div class="budget-card" style="margin-bottom:11px">
-        <div style="display:flex;justify-content:space-between;align-items:center">
-          <div class="sec-lbl" style="margin:0">Presupuesto diario</div>
-          <span style="font-size:11px;color:var(--m)" id="budgetPct">—</span>
+    <div class="today-wrap">
+      <div class="today-heading">
+        <div><div class="sec-lbl" style="margin:0">Estado de hoy</div><div id="resumenFecha" class="today-date"></div></div>
+        <div class="live-pill"><span></span> EN VIVO</div>
+      </div>
+
+      <div class="today-hero-card">
+        <div class="progress-ring" id="todayProgressRing"><div><strong id="todayProgressPct">0%</strong><span>enviado</span></div></div>
+        <div class="today-hero-copy">
+          <h2 id="todayStatusTitle">Todo listo para empezar</h2>
+          <p id="todayStatusText">Los datos cambian automáticamente con cada pedido.</p>
+          <button class="today-main-action" id="todayMainAction" type="button">Crear pedido</button>
         </div>
+      </div>
+
+      <div class="today-money-card">
+        <div class="today-money-top">
+          <div><span>Total de compras</span><strong id="todayTotal">₡0</strong></div>
+          <div class="today-take"><span>Llevar</span><strong id="todayTake">₡0</strong></div>
+        </div>
+        <div class="branch-viz">
+          <div class="branch-viz-label"><span>Moravia</span><strong id="todayMoravia">₡0</strong></div>
+          <div class="branch-track"><div class="branch-fill m" id="todayMoraviaBar"></div></div>
+          <div class="branch-viz-label"><span>Los Ángeles</span><strong id="todayAngeles">₡0</strong></div>
+          <div class="branch-track"><div class="branch-fill a" id="todayAngelesBar"></div></div>
+        </div>
+      </div>
+
+      <div class="today-stats" id="resMetrics"></div>
+
+      <div class="budget-card today-budget">
+        <div class="today-section-title"><span>Presupuesto</span><strong id="budgetPct">Sin límite</strong></div>
         <div class="budget-bar"><div class="budget-fill ok" id="budgetBar" style="width:0%"></div></div>
-        <div class="budget-meta"><span id="budgetSpent">₡0</span><span id="budgetLeft">—</span></div>
-        <div style="display:flex;gap:7px;margin-top:9px">
-          <input type="number" class="budget-inp" id="budgetInp" placeholder="Presupuesto ₡...">
+        <div class="budget-meta"><span id="budgetSpent">₡0 usado</span><span id="budgetLeft">Definí un límite</span></div>
+        <div class="budget-edit">
+          <input type="number" class="budget-inp" id="budgetInp" placeholder="Límite del día ₡">
           <button class="btn btn-g btn-sm" onclick="saveBudget()">Guardar</button>
         </div>
       </div>
-      <div class="sec-lbl">Proveedores de hoy</div>
+
+      <div class="today-section-title"><span>Proveedores de hoy</span><small>Tocá uno para abrirlo</small></div>
       <div id="resProvList"></div>
-      <div id="resTotalBar"></div>
+      <div id="resTotalBar" style="display:none"></div>
     </div>
   </div>
+</div>
+
+<!-- ═══ MERCADO ═══ -->
+<div class="view" id="view-mercado">
+  <div class="scroll"><div class="sec">
+    <div class="sec-lbl">Dinero para las compras</div>
+    <div class="market-card">
+      <div style="color:var(--m);font-size:14px;margin-bottom:4px">Llevar al mercado</div>
+      <div class="market-total" id="dineroAmt">₡0</div>
+      <div style="color:var(--m);font-size:13px;margin-top:5px">Se calcula automáticamente con los pedidos actuales.</div>
+    </div>
+    <div class="market-card">
+      <div class="sec-lbl">Colchón de seguridad</div>
+      <div class="margin-row">
+        <button class="mg-btn active" onclick="setMargen(0)">Exacto</button>
+        <button class="mg-btn" onclick="setMargen(5)">+5%</button>
+        <button class="mg-btn" onclick="setMargen(10)">+10%</button>
+        <button class="mg-btn" onclick="setMargen(15)">+15%</button>
+        <button class="mg-btn" onclick="setMargenCustom()">Otro</button>
+      </div>
+    </div>
+    <div class="market-card">
+      <div class="market-row"><span>Moravia</span><strong id="dbM">₡0</strong></div>
+      <div class="market-row"><span>Los Ángeles</span><strong id="dbA">₡0</strong></div>
+      <div class="market-row"><span>Subtotal</span><strong id="dbSub">₡0</strong></div>
+      <div class="market-row"><span id="dbML">Margen 0%</span><strong id="dbMV">₡0</strong></div>
+    </div>
+  </div></div>
+</div>
+
+<!-- ═══ PRECIOS ═══ -->
+<div class="view" id="view-precios">
+  <div class="scroll"><div class="sec">
+    <div class="sec-lbl">Buscar y comparar precios</div>
+    <div class="price-search">
+      <input class="big-search" id="priceSearch" type="search" placeholder="Escribí un producto, por ejemplo tomate…" autocomplete="off">
+    </div>
+    <div id="priceSearchResults"></div>
+  </div></div>
 </div>
 
 <!-- ═══ CONFIG ═══ -->
@@ -646,31 +870,33 @@ input,select,textarea{font-family:var(--fn)}
       <div class="cfg-acc" data-acc="provs">
         <button class="cfg-acc-hdr">🏪 Proveedores y productos <span class="cfg-acc-count" id="accCountProvs"></span><span class="cfg-acc-arrow">▾</span></button>
         <div class="cfg-acc-body">
-          <div id="cfgProveedores"></div>
-          <div class="new-prov-row">
-            <input class="new-prov-inp" id="newProvName" placeholder="Nombre del nuevo proveedor...">
-            <button class="btn btn-g btn-sm" onclick="addProveedor()">+ Agregar</button>
+          <div class="new-provider-box">
+            <div class="new-provider-title">Añadir proveedor</div>
+            <div class="new-provider-help">Escribí el nombre o decilo por voz. Aparecerá automáticamente en orden alfabético.</div>
+            <div class="new-prov-row">
+              <input class="new-prov-inp" id="newProvName" placeholder="Nombre del proveedor">
+              <button class="btn btn-g btn-sm" onclick="addProveedor()">+ Añadir</button>
+            </div>
+            <button class="provider-voice-add" id="providerVoiceAdd" type="button" onclick="startAddProviderVoice()">🎤 Añadir proveedor por voz</button>
           </div>
+          <div class="provider-list-title">Proveedores actuales</div>
+          <div id="cfgProveedores"></div>
         </div>
       </div>
 
       <div class="cfg-acc" data-acc="precios">
-        <button class="cfg-acc-hdr">💰 Precios <span class="cfg-acc-arrow">▾</span></button>
+        <button class="cfg-acc-hdr">💰 Precios <span class="cfg-acc-arrow">→</span></button>
         <div class="cfg-acc-body">
-          <div style="display:flex;flex-direction:column;gap:7px">
-            <button class="btn btn-o btn-full btn-sm" onclick="resetPreciosAll()">🗑 Reiniciar todos los precios</button>
-            <button class="btn btn-o btn-full btn-sm" onclick="resetPreciosProv()">🗑 Reiniciar precios del proveedor actual</button>
-          </div>
+          <div class="cfg-acc-sub">Buscá un producto, compará quién lo vende y editá sus precios en una sola ventana.</div>
+          <button class="btn btn-g btn-full" onclick="switchView('precios')">Abrir buscador de precios</button>
         </div>
       </div>
 
       <div class="cfg-acc" data-acc="datos">
-        <button class="cfg-acc-hdr">💾 Datos <span class="cfg-acc-arrow">▾</span></button>
+        <button class="cfg-acc-hdr">⚠️ Reiniciar aplicación <span class="cfg-acc-arrow">▾</span></button>
         <div class="cfg-acc-body">
-          <div style="display:flex;flex-direction:column;gap:7px">
-            <button class="btn btn-o btn-full btn-sm" onclick="exportData()">⬇️ Exportar backup JSON</button>
-            <button class="btn btn-r btn-full btn-sm" onclick="resetAll()">⚠️ Reiniciar todo</button>
-          </div>
+          <div class="cfg-acc-sub">Solo usá esto si querés borrar pedidos y configuración en todos los dispositivos.</div>
+          <button class="btn btn-r btn-full btn-sm" onclick="resetAll()">Reiniciar todo</button>
         </div>
       </div>
 
@@ -684,8 +910,9 @@ input,select,textarea{font-family:var(--fn)}
 
 <nav class="nav-bottom">
   <button class="nav-btn active" data-view="home"><span class="ico">🏠</span>Inicio</button>
-  <button class="nav-btn" data-view="resumen"><span class="ico">📊</span>Resumen</button>
-  <button class="nav-btn" onclick="sendListaWA()"><span class="ico">📋</span>Lista WA</button>
+  <button class="nav-btn" data-view="mercado"><span class="ico">🛒</span>Mercado</button>
+  <button class="nav-btn" data-view="precios"><span class="ico">💰</span>Precios</button>
+  <button class="nav-btn" data-view="resumen"><span class="ico">📊</span>Hoy</button>
   <button class="nav-btn" data-view="config"><span class="ico">⚙️</span>Config</button>
 </nav>
 
@@ -723,6 +950,16 @@ input,select,textarea{font-family:var(--fn)}
       <button class="btn btn-g btn-full" id="voiceGApplyBtn" style="margin-top:10px">✓ Aplicar a los pedidos</button>
     </div>
     <button class="btn btn-o btn-full" id="voiceGCloseBtn">Cerrar</button>
+  </div>
+</div>
+
+<div class="overlay" id="modalPriceCompare">
+  <div class="modal">
+    <div class="modal-handle"></div>
+    <div class="modal-title" id="priceModalTitle">Producto</div>
+    <div style="font-size:14px;color:var(--m);margin:-6px 0 12px">Compará y editá. Los cambios se guardan automáticamente.</div>
+    <div id="priceCompareList"></div>
+    <button class="btn btn-g btn-full" type="button" onclick="closePriceModal()">Listo</button>
   </div>
 </div>
 
@@ -839,6 +1076,7 @@ let S={
 let filterMode='all';
 let currentSearch='';
 let cfgOpenProv=null;
+const cfgCatalogExpanded={};
 
 const LS={
   get:(k,d)=>{try{return JSON.parse(localStorage.getItem(k))??d}catch{return d}},
@@ -879,16 +1117,15 @@ function hydrate(){
 function getAllProviders(){
   const merged={...DEFAULT_PROVIDERS};
   Object.entries(S.customProviders||{}).forEach(([name,data])=>{merged[name]=data;});
-  // Respetar el orden guardado
-  const order=S.providerOrder||Object.keys(merged);
   const result={};
-  order.forEach(n=>{if(merged[n])result[n]=merged[n];});
-  // Agregar nuevos que no estén en order
-  Object.keys(merged).forEach(n=>{if(!result[n])result[n]=merged[n];});
+  Object.keys(merged)
+    .filter(name=>!merged[name]?.deleted)
+    .sort((a,b)=>a.localeCompare(b,'es',{sensitivity:'base'}))
+    .forEach(name=>{result[name]=merged[name];});
   return result;
 }
 
-function getProvNames(){return Object.keys(getAllProviders()).sort((a,b)=>a.localeCompare(b,'es'));}
+function getProvNames(){return Object.keys(getAllProviders());}
 
 function getPedido(prov){
   if(!S.pedidos[prov])S.pedidos[prov]={qtys:{moravia:{},angeles:{}},extras:{moravia:[],angeles:[]},notes:{},note:'',sent:false};
@@ -1204,6 +1441,8 @@ function switchView(name){
   // Limpiar búsqueda al salir
   if(name!=='home'){const inp=document.getElementById('globalSearch');if(inp)inp.value='';const res=document.getElementById('globalSearchResults');if(res)res.style.display='none';}
   if(name==='home')renderHome();
+  if(name==='mercado')updateHomeDinero();
+  if(name==='precios')renderPriceSearch();
   if(name==='resumen')renderResumen();
   if(name==='config')renderConfig();
 }
@@ -1212,20 +1451,7 @@ document.querySelectorAll('.nav-btn').forEach(b=>{
   if(b.dataset.view)b.addEventListener('click',()=>switchView(b.dataset.view));
 });
 
-// Contraer la barra inferior al bajar el scroll, mostrarla de nuevo al subir.
-// La página entera es la que scrollea (los .scroll internos no tienen altura
-// propia fija), así que escuchamos scroll en window, no en cada .scroll.
-(function initNavAutoHide(){
-  const navBar=document.querySelector('.nav-bottom');
-  let lastTop=0;
-  function onScroll(){
-    const st=window.scrollY||document.documentElement.scrollTop||0;
-    if(st>lastTop&&st>40)navBar.classList.add('collapsed');
-    else if(st<lastTop)navBar.classList.remove('collapsed');
-    lastTop=st<=0?0:st;
-  }
-  window.addEventListener('scroll',onScroll,{passive:true});
-})();
+// La navegación queda siempre visible para evitar acciones escondidas.
 
 // ══════════════════════════════════════════
 // HOME
@@ -1348,14 +1574,7 @@ function renderProdTable(){
     return true;
   });
 
-  filtered.sort((a,b)=>{
-    const af=S.favs.includes(a.id),bf=S.favs.includes(b.id);
-    if(af!==bf)return af?-1:1;
-    const av=(+p.qtys.moravia?.[a.id]?.qty||0)+(+p.qtys.angeles?.[a.id]?.qty||0)>0;
-    const bv=(+p.qtys.moravia?.[b.id]?.qty||0)+(+p.qtys.angeles?.[b.id]?.qty||0)>0;
-    if(av!==bv)return av?-1:1;
-    return a.name.localeCompare(b.name,'es');
-  });
+  filtered.sort((a,b)=>a.name.localeCompare(b.name,'es',{sensitivity:'base'}));
 
   const container=document.getElementById('prodCardList');
   container.innerHTML='';
@@ -1392,7 +1611,7 @@ function renderProdTable(){
     card.innerHTML=`
       <div class="prod-card-top">
         <span class="prod-emoji-big">${prod.emoji||'🌿'}</span>
-        <span class="prod-nm">${prod.name}</span>
+        <span class="prod-nm">${prod.name}<small>${unit}</small></span>
         <div class="prod-meta">${lastQHint}${priceHintHTML}</div>
         <button class="prod-fav${isFav?' on':''}" data-pid="${prod.id}">${isFav?'⭐':'☆'}</button>
       </div>
@@ -1415,15 +1634,18 @@ function renderProdTable(){
           </div>
         </div>
       </div>
-      <div class="prod-note-row">
-        <input class="prod-note-inp" type="text" placeholder="Nota para este producto..." value="${note}" data-pid="${prod.id}">
-      </div>
-      <div class="prod-card-bottom">
-        <select class="tbl-unit" data-pid="${prod.id}">
-          ${UNITS.map(u=>`<option value="${u}"${u===unit?' selected':''}>${u}</option>`).join('')}
-        </select>
-        <input class="tbl-price" type="number" value="${price}" placeholder="₡ precio" inputmode="decimal" data-pid="${prod.id}">
-        <div class="tbl-sub${subtotal>0?' has-val':''}">${subtotal>0?'₡'+fmt(subtotal):'—'}</div>
+      <button class="prod-details-toggle" type="button">Más detalles <span>⌄</span></button>
+      <div class="prod-details">
+        <div class="prod-note-row">
+          <input class="prod-note-inp" type="text" placeholder="Nota opcional para este producto" value="${note}" data-pid="${prod.id}">
+        </div>
+        <div class="prod-card-bottom">
+          <label><span>Unidad</span><select class="tbl-unit" data-pid="${prod.id}">
+            ${UNITS.map(u=>`<option value="${u}"${u===unit?' selected':''}>${u}</option>`).join('')}
+          </select></label>
+          <label><span>Precio</span><input class="tbl-price" type="number" value="${price}" placeholder="₡ 0" inputmode="decimal" data-pid="${prod.id}"></label>
+          <label><span>Subtotal</span><div class="tbl-sub${subtotal>0?' has-val':''}">${subtotal>0?'₡'+fmt(subtotal):'—'}</div></label>
+        </div>
       </div>
     `;
 
@@ -1449,6 +1671,13 @@ function renderProdTable(){
     };
 
     const noteInp=card.querySelector('.prod-note-inp');
+    const detailsToggle=card.querySelector('.prod-details-toggle');
+    const details=card.querySelector('.prod-details');
+    detailsToggle.addEventListener('click',()=>{
+      const open=details.classList.toggle('open');
+      detailsToggle.classList.toggle('open',open);
+      detailsToggle.firstChild.textContent=open?'Ocultar detalles ':'Más detalles ';
+    });
     noteInp.addEventListener('input',()=>{
       const v=noteInp.value;
       if(!v.trim())delete p.notes[prod.id];else p.notes[prod.id]=v;
@@ -1651,6 +1880,32 @@ document.getElementById('filterUsed').addEventListener('click',()=>{
 // ══════════════════════════════════════════
 function getSpeechRecognitionCtor(){return window.SpeechRecognition||window.webkitSpeechRecognition||null;}
 
+let microphoneAccessGranted=false;
+async function ensureMicrophoneAccess(){
+  if(!window.isSecureContext&&location.protocol!=='file:'){
+    toast('El micrófono necesita abrir la app desde el enlace HTTPS','err');
+    return false;
+  }
+  if(microphoneAccessGranted)return true;
+  if(!navigator.mediaDevices?.getUserMedia){
+    if(location.protocol==='file:'){
+      toast('Abrí la versión HTTPS para usar el micrófono','err');
+      return false;
+    }
+    return true;
+  }
+  try{
+    const stream=await navigator.mediaDevices.getUserMedia({audio:true});
+    stream.getTracks().forEach(track=>track.stop());
+    microphoneAccessGranted=true;
+    return true;
+  }catch(error){
+    const denied=error?.name==='NotAllowedError'||error?.name==='SecurityError';
+    toast(denied?'Permití el micrófono en el navegador y volvé a tocar el botón':'No pude acceder al micrófono','err');
+    return false;
+  }
+}
+
 function normalizeVoice(s){return s.toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g,'').trim();}
 
 const VOICE_UNIT_SYNONYMS={
@@ -1813,7 +2068,7 @@ const VOICE_ERROR_MSG={
 
 // Motor de grabación reutilizable — cada modal de voz tiene su propia instancia.
 function createVoiceEngine(opts){
-  const st={recognition:null,listening:false,finalTranscript:'',gotAnyResult:false,watchdog:null};
+  const st={recognition:null,listening:false,finalTranscript:'',gotAnyResult:false,watchdog:null,silenceTimer:null};
   function arm(){
     clearTimeout(st.watchdog);
     st.watchdog=setTimeout(()=>{
@@ -1823,9 +2078,10 @@ function createVoiceEngine(opts){
       }
     },6000);
   }
-  function start(){
+  async function start(){
     const Ctor=getSpeechRecognitionCtor();
     if(!Ctor){toast('Tu navegador no soporta dictado por voz. Probá con Chrome o Edge.','err');return;}
+    if(!await ensureMicrophoneAccess())return;
     if(!st.recognition){
       st.recognition=new Ctor();
       st.recognition.lang='es-CR';
@@ -1834,6 +2090,7 @@ function createVoiceEngine(opts){
       st.recognition.onresult=e=>{
         st.gotAnyResult=true;
         clearTimeout(st.watchdog);
+        clearTimeout(st.silenceTimer);
         let interim='';
         for(let i=e.resultIndex;i<e.results.length;i++){
           const r=e.results[i];
@@ -1842,8 +2099,9 @@ function createVoiceEngine(opts){
         }
         const full=(st.finalTranscript+interim).trim();
         opts.transcriptEl().textContent=full||'…';
-        opts.statusEl().textContent='Escuchando... tocá de nuevo para terminar';
+        opts.statusEl().textContent='Escuchando… terminaré automáticamente cuando dejés de hablar';
         if(opts.onLive)opts.onLive(full);
+        st.silenceTimer=setTimeout(()=>{if(st.listening)st.recognition.stop();},2400);
       };
       st.recognition.onerror=e=>{
         if(e.error==='no-speech')return;
@@ -1854,8 +2112,9 @@ function createVoiceEngine(opts){
       st.recognition.onend=()=>{
         st.listening=false;
         clearTimeout(st.watchdog);
+        clearTimeout(st.silenceTimer);
         opts.recBtnEl().classList.remove('recording');
-        opts.statusEl().textContent='Tocá el micrófono para seguir dictando';
+        opts.statusEl().textContent='Pedido procesado automáticamente';
         if(st.finalTranscript.trim())opts.onFinal(st.finalTranscript);
       };
     }
@@ -1864,11 +2123,15 @@ function createVoiceEngine(opts){
       st.recognition.start();
       st.listening=true;
       opts.recBtnEl().classList.add('recording');
-      opts.statusEl().textContent='Escuchando... tocá de nuevo para terminar';
+      opts.statusEl().textContent='Escuchando… hablá seguido y la app terminará sola';
       arm();
-    }catch(err){/* ya estaba iniciado */}
+    }catch(err){
+      st.listening=false;
+      opts.recBtnEl().classList.remove('recording');
+      toast('No pude iniciar el micrófono. Cerrá otras apps que lo estén usando e intentá de nuevo.','err');
+    }
   }
-  function stop(){clearTimeout(st.watchdog);if(st.recognition&&st.listening)st.recognition.stop();}
+  function stop(){clearTimeout(st.watchdog);clearTimeout(st.silenceTimer);if(st.recognition&&st.listening)st.recognition.stop();}
   function toggle(){st.listening?stop():start();}
   function reset(){st.finalTranscript='';}
   return{state:st,start,stop,toggle,reset};
@@ -2334,18 +2597,50 @@ function generatePDF(){ sendListaWA(); }
 // RESUMEN
 // ══════════════════════════════════════════
 function renderResumen(){
-  document.getElementById('resumenFecha').textContent=new Date().toLocaleDateString('es-CR',{weekday:'long',year:'numeric',month:'long',day:'numeric'});
+  const now=new Date();
+  document.getElementById('resumenFecha').textContent=now.toLocaleDateString('es-CR',{weekday:'long',day:'numeric',month:'long'});
   const all=calcAllProvs();
   const margen=all.total*(S.margen/100);
-  const sent=getProvNames().filter(p=>isSent(p)).length;
-  const pending=getProvNames().filter(p=>hasData(p)&&!isSent(p)).length;
+  const provsActivos=getProvNames().filter(p=>hasData(p));
+  const sent=provsActivos.filter(p=>isSent(p)).length;
+  const pending=provsActivos.filter(p=>!isSent(p)).length;
+  const items=provsActivos.reduce((total,prov)=>total+countItems(prov),0);
+  const progress=provsActivos.length?Math.round(sent/provsActivos.length*100):0;
+  const maxBranch=Math.max(all.moravia,all.angeles,1);
+
+  document.getElementById('todayProgressPct').textContent=progress+'%';
+  document.getElementById('todayProgressRing').style.setProperty('--progress',(progress*3.6)+'deg');
+  document.getElementById('todayTotal').textContent='₡'+fmt(all.total);
+  document.getElementById('todayTake').textContent='₡'+fmt(all.total+margen);
+  document.getElementById('todayMoravia').textContent='₡'+fmt(all.moravia);
+  document.getElementById('todayAngeles').textContent='₡'+fmt(all.angeles);
+  document.getElementById('todayMoraviaBar').style.width=Math.round(all.moravia/maxBranch*100)+'%';
+  document.getElementById('todayAngelesBar').style.width=Math.round(all.angeles/maxBranch*100)+'%';
+
+  const title=document.getElementById('todayStatusTitle');
+  const text=document.getElementById('todayStatusText');
+  const action=document.getElementById('todayMainAction');
+  if(!provsActivos.length){
+    title.textContent='Todo listo para empezar';
+    text.textContent='Creá el primer pedido del día hablando o eligiendo un proveedor.';
+    action.textContent='Crear pedido';
+    action.onclick=()=>switchView('home');
+  }else if(pending){
+    title.textContent=`${pending} pedido${pending===1?'':'s'} por enviar`;
+    text.textContent=`Ya hay ${items} producto${items===1?'':'s'} cargado${items===1?'':'s'}. Abrí el siguiente pendiente.`;
+    action.textContent='Continuar pendiente';
+    action.onclick=()=>openProv(provsActivos.find(p=>!isSent(p)));
+  }else{
+    title.textContent='¡Todo enviado!';
+    text.textContent=`Los ${sent} pedidos de hoy están listos.`;
+    action.textContent='Ver pedidos';
+    action.onclick=()=>switchView('home');
+  }
+
   document.getElementById('resMetrics').innerHTML=`
-    <div class="metric-card"><div class="metric-lbl">Total día</div><div class="metric-val green" style="font-size:17px">₡${fmt(all.total)}</div></div>
-    <div class="metric-card"><div class="metric-lbl">#1 Moravia</div><div class="metric-val green" style="font-size:15px">₡${fmt(all.moravia)}</div></div>
-    <div class="metric-card"><div class="metric-lbl">#2 Los Ángeles</div><div class="metric-val orange" style="font-size:15px">₡${fmt(all.angeles)}</div></div>
-    <div class="metric-card"><div class="metric-lbl">Llevar</div><div class="metric-val green" style="font-size:15px">₡${fmt(all.total+margen)}</div></div>
-    <div class="metric-card"><div class="metric-lbl">Enviados ✅</div><div class="metric-val green">${sent}</div></div>
-    <div class="metric-card"><div class="metric-lbl">Pendientes ⚠️</div><div class="metric-val orange">${pending}</div></div>
+    <div class="today-stat good"><div class="ico">✅</div><strong>${sent}</strong><span>Enviados</span></div>
+    <div class="today-stat warn"><div class="ico">⏳</div><strong>${pending}</strong><span>Pendientes</span></div>
+    <div class="today-stat"><div class="ico">📦</div><strong>${items}</strong><span>Productos pedidos</span></div>
   `;
   const budget=S.budget||0;
   if(budget>0){
@@ -2353,28 +2648,32 @@ function renderResumen(){
     document.getElementById('budgetBar').style.width=pct+'%';
     document.getElementById('budgetBar').className='budget-fill '+(pct<70?'ok':pct<90?'warn':'over');
     document.getElementById('budgetPct').textContent=pct+'%';
-    document.getElementById('budgetSpent').textContent='₡'+fmt(all.total)+' gastado';
+    document.getElementById('budgetSpent').textContent='₡'+fmt(all.total)+' usado';
     document.getElementById('budgetLeft').textContent='₡'+fmt(Math.max(0,budget-all.total))+' restante';
+  }else{
+    document.getElementById('budgetBar').style.width='0%';
+    document.getElementById('budgetPct').textContent='Sin límite';
+    document.getElementById('budgetSpent').textContent='₡'+fmt(all.total)+' usado';
+    document.getElementById('budgetLeft').textContent='Definí un límite';
   }
   document.getElementById('budgetInp').value=S.budget||'';
-  const provsActivos=getProvNames().filter(p=>hasData(p));
   const rpl=document.getElementById('resProvList');
   if(!provsActivos.length){rpl.innerHTML='<div class="empty"><div class="empty-ico">📋</div><div>Sin pedidos aún</div></div>';document.getElementById('resTotalBar').innerHTML='';return;}
   rpl.innerHTML=provsActivos.map(prov=>{
     const tM=calcSide('moravia',prov),tA=calcSide('angeles',prov);
-    const st=isSent(prov)?`<span style="font-size:10px;background:var(--gd);color:var(--g);border:1px solid var(--gg);padding:2px 7px;border-radius:20px;font-weight:700">✅ Enviado</span>`:`<span style="font-size:10px;background:var(--od);color:var(--o);border:1px solid var(--og);padding:2px 7px;border-radius:20px;font-weight:700">⚠️ Pendiente</span>`;
-    return `<div class="prov-summary-row" onclick="openProv('${prov}');switchView('prov')">
-      <div><div class="psr-name">${prov}</div><div style="margin-top:4px">${st}</div></div>
-      <div class="psr-totals"><div class="psr-total">₡${fmt(tM+tA)}</div><div class="psr-sub" style="color:var(--g)">#1: ₡${fmt(tM)}</div><div class="psr-sub" style="color:var(--o)">#2: ₡${fmt(tA)}</div></div>
+    const done=isSent(prov);
+    return `<div class="today-provider ${done?'sent':'pending'}" onclick="openProv('${prov}')">
+      <div class="today-provider-icon">${prov.charAt(0).toUpperCase()}</div>
+      <div><div class="today-provider-name">${prov}</div><div class="today-provider-state">${done?'✅ Enviado':'⏳ Falta enviar'} · ${countItems(prov)} productos</div></div>
+      <div class="today-provider-money"><strong>₡${fmt(tM+tA)}</strong><small>M ₡${fmt(tM)} · LA ₡${fmt(tA)}</small></div>
     </div>`;
   }).join('');
-  document.getElementById('resTotalBar').innerHTML=`
-    <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:1px;background:var(--b);border-radius:var(--r2);overflow:hidden;margin-top:8px">
-      <div style="background:var(--card);padding:10px;text-align:center"><div style="font-size:9px;color:var(--g);text-transform:uppercase;letter-spacing:.6px;margin-bottom:3px">#1 Moravia</div><div style="font-size:16px;font-weight:800;font-family:var(--mo);color:var(--g)">₡${fmt(all.moravia)}</div></div>
-      <div style="background:var(--card);padding:10px;text-align:center"><div style="font-size:9px;color:var(--o);text-transform:uppercase;letter-spacing:.6px;margin-bottom:3px">#2 Los Ángeles</div><div style="font-size:16px;font-weight:800;font-family:var(--mo);color:var(--o)">₡${fmt(all.angeles)}</div></div>
-      <div style="background:var(--card);padding:10px;text-align:center"><div style="font-size:9px;color:var(--g);text-transform:uppercase;letter-spacing:.6px;margin-bottom:3px">Gran Total</div><div style="font-size:16px;font-weight:800;font-family:var(--mo);color:var(--g)">₡${fmt(all.total)}</div></div>
-    </div>`;
+  document.getElementById('resTotalBar').innerHTML='';
 }
+
+setInterval(()=>{
+  if(document.getElementById('view-resumen')?.classList.contains('active'))renderResumen();
+},15000);
 
 function saveBudget(){S.budget=+document.getElementById('budgetInp').value||0;persist();renderResumen();toast('✓ Presupuesto guardado','ok');}
 
@@ -2434,7 +2733,7 @@ function renderCfgProveedores(){
             onchange="renameProveedor('${name}',this.value)">` :
           `<span class="prov-cfg-name">${name}</span>`
         }
-        ${isCustom?`<button class="btn btn-r btn-sm del-prov-btn" title="Tocá dos veces para eliminar" style="padding:4px 8px;font-size:10px">Eliminar</button>`:''}
+        <button class="btn btn-r btn-sm del-prov-btn" title="Tocá dos veces para eliminar" style="padding:4px 8px;font-size:10px">Eliminar</button>
         <span class="prov-cfg-toggle">${isOpen?'▲':'▼'}</span>
       </div>
       <div class="prov-cfg-body${isOpen?' open':''}" id="cfg-body-${name}"></div>
@@ -2451,12 +2750,20 @@ function renderCfgProveedores(){
       e.stopPropagation();
       if(delProvBtn.classList.contains('armed')){
         clearTimeout(delProvBtn._armTimer);
-        delete S.customProviders[name];
+        S.customProviders[name]={deleted:true};
         S.providerOrder=S.providerOrder.filter(n=>n!==name);
         delete S.pedidos[name];
-        persist();renderConfig();
+        delete S.phones[name];
+        if(S.currentProv===name)S.currentProv=null;
+        const localPrices=LS.get('aramo_prices',{});
+        Object.keys(localPrices).filter(key=>key.startsWith(name+'_')).forEach(key=>delete localPrices[key]);
+        LS.set('aramo_prices',localPrices);
+        Object.keys(preciosCache).filter(key=>key.startsWith(name+'_')).forEach(key=>delete preciosCache[key]);
+        cfgOpenProv=null;
+        persist();renderConfig();renderHome();
         supa.from('pedidos').delete().eq('proveedor',name).then(()=>{});
-        toast(`${name} eliminado`);
+        supa.from('precios').delete().eq('proveedor',name).then(()=>{});
+        toast(`✓ ${name} eliminado`,'ok');
         return;
       }
       delProvBtn.classList.add('armed');
@@ -2467,7 +2774,17 @@ function renderCfgProveedores(){
     if(isOpen){
       const body=item.querySelector('.prov-cfg-body');
       const products=provData.products||[];
-      products.forEach((prod,idx)=>{
+      const voiceBtn=document.createElement('button');
+      voiceBtn.className='config-voice-btn';
+      voiceBtn.type='button';
+      voiceBtn.textContent='🎤 Añadir o editar productos por voz';
+      voiceBtn.addEventListener('click',()=>startConfigProductsVoice(name,voiceBtn));
+      body.appendChild(voiceBtn);
+      renderProductPicker(name,body);
+      products
+        .map((prod,idx)=>({prod,idx}))
+        .sort((a,b)=>a.prod.name.localeCompare(b.prod.name,'es',{sensitivity:'base'}))
+        .forEach(({prod,idx})=>{
         const row=document.createElement('div');
         row.className='prod-cfg-row';
         row.innerHTML=`
@@ -2495,19 +2812,23 @@ function renderCfgProveedores(){
       });
       const addBtn=document.createElement('button');
       addBtn.className='add-prod-btn';
-      addBtn.textContent='+ Agregar producto';
+      addBtn.textContent='+ Crear un producto que no está en la lista';
       addBtn.addEventListener('click',()=>{
         ensureCustomProv(name);
         const newId='prod_'+Date.now();
         S.customProviders[name].products.push({id:newId,name:'Nuevo producto',emoji:'🌿',unit:'kg'});
         persist();renderCfgProveedores();
       });
+      const manualLabel=document.createElement('div');
+      manualLabel.className='manual-product-label';
+      manualLabel.textContent='Opciones manuales · solo si no encontrás el producto arriba';
+      body.appendChild(manualLabel);
       body.appendChild(addBtn);
 
       const bulkWrap=document.createElement('div');
       bulkWrap.style.marginTop='10px';
       bulkWrap.innerHTML=`
-        <div class="cfg-lbl" style="width:auto;white-space:normal;margin-bottom:5px">O pegá varios de una vez (uno por línea):</div>
+        <div class="cfg-lbl" style="width:auto;white-space:normal;margin-bottom:5px">Pegar varios productos (opcional):</div>
         <textarea class="modal-inp" id="bulkAddTa" placeholder="Tomate&#10;Cebolla&#10;Papa..." rows="4" style="resize:vertical;width:100%"></textarea>
         <button class="btn btn-g btn-full btn-sm">+ Agregar todos estos</button>
       `;
@@ -2538,6 +2859,75 @@ function ensureCustomProv(name){
   }
 }
 
+function getKnownProductCatalog(){
+  const catalog=new Map();
+  const spreadsheetProducts=Array.isArray(window.ARAMO_XLSX_PRODUCTS)?window.ARAMO_XLSX_PRODUCTS:[];
+  const sources=[...Object.values(DEFAULT_PROVIDERS),...Object.values(S.customProviders||{}),{products:spreadsheetProducts}];
+  sources.forEach(source=>(source.products||[]).forEach(product=>{
+    const key=normalizeVoice(product.name);
+    if(!key)return;
+    if(!catalog.has(key))catalog.set(key,{
+      key,name:product.name,emoji:product.emoji||'🌿',unit:product.unit||'kg',uses:0
+    });
+    catalog.get(key).uses++;
+  }));
+  return [...catalog.values()].sort((a,b)=>a.name.localeCompare(b.name,'es',{sensitivity:'base'}));
+}
+
+function renderProductPicker(prov,body){
+  const picker=document.createElement('div');
+  picker.className='product-picker';
+  picker.innerHTML=`
+    <div class="product-picker-title">Añadir productos con un toque</div>
+    <div class="product-picker-help">Tocá un producto y se agrega inmediatamente. La lista oculta automáticamente los que ${prov} ya tiene.</div>
+    <input class="product-picker-search" type="search" placeholder="🔍 Buscar en la lista…" autocomplete="off">
+    <div class="product-picker-grid"></div>
+    <button class="product-picker-more" type="button"></button>
+  `;
+  const search=picker.querySelector('.product-picker-search');
+  const grid=picker.querySelector('.product-picker-grid');
+  const more=picker.querySelector('.product-picker-more');
+
+  function available(){
+    const currentNames=new Set((getAllProviders()[prov]?.products||[]).map(p=>normalizeVoice(p.name)));
+    const q=normalizeVoice(search.value||'');
+    return getKnownProductCatalog().filter(p=>!currentNames.has(p.key)&&(!q||p.key.includes(q)));
+  }
+
+  function draw(){
+    const all=available();
+    const expanded=!!cfgCatalogExpanded[prov]||search.value.trim().length>0;
+    const visible=expanded?all:all.slice(0,12);
+    grid.innerHTML=visible.map(product=>`
+      <button class="product-pick" type="button" data-product-key="${product.key}">
+        <span class="emoji">${product.emoji}</span><span class="name">${product.name}</span>
+      </button>`).join('');
+    if(!visible.length)grid.innerHTML='<div class="product-picker-empty" style="grid-column:1/-1">✓ Ya agregaste todos los productos de esta lista</div>';
+    grid.querySelectorAll('.product-pick').forEach(button=>button.addEventListener('click',()=>{
+      const product=getKnownProductCatalog().find(p=>p.key===button.dataset.productKey);
+      if(!product)return;
+      ensureCustomProv(prov);
+      S.customProviders[prov].products.push({
+        id:'prod_'+Date.now()+'_'+Math.random().toString(36).slice(2,6),
+        name:product.name,emoji:product.emoji,unit:product.unit
+      });
+      persist();
+      renderCfgProveedores();
+      toast(`✓ ${product.name} agregado a ${prov}`,'ok');
+    }));
+    more.style.display=all.length>12&&!search.value.trim()?'block':'none';
+    more.textContent=cfgCatalogExpanded[prov]?'Mostrar menos':`Ver ${all.length-12} productos más`;
+  }
+
+  search.addEventListener('input',draw);
+  more.addEventListener('click',()=>{
+    cfgCatalogExpanded[prov]=!cfgCatalogExpanded[prov];
+    draw();
+  });
+  draw();
+  body.appendChild(picker);
+}
+
 function renameProveedor(oldName, newName){
   newName=newName.trim();
   if(!newName||newName===oldName)return;
@@ -2561,7 +2951,7 @@ function renameProveedor(oldName, newName){
 
 function addProveedor(){
   const inp=document.getElementById('newProvName');
-  const name=inp.value.trim();
+  const name=titleCase(inp.value.replace(/^(?:agregar|añadir|nuevo|proveedor)\s+/i,'').trim());
   if(!name){toast('Escribí un nombre','err');return;}
   if(getAllProviders()[name]){toast('Ya existe ese proveedor','err');return;}
   S.customProviders[name]={color:'#888',products:[]};
@@ -2572,35 +2962,144 @@ function addProveedor(){
   toast('✓ Proveedor agregado','ok');
 }
 
-function resetPreciosAll(){
-  if(!confirm('¿Reiniciar TODOS los precios a cero?'))return;
-  LS.set('aramo_prices',{});
-  preciosCache={};
-  supa.from('precios').delete().neq('precio',null).then(()=>{});
-  if(S.currentProv)renderProdTable();
-  toast('Precios reiniciados','ok');
+async function startAddProviderVoice(){
+  const Ctor=getSpeechRecognitionCtor();
+  if(!Ctor){toast('El dictado necesita Chrome o Edge','err');return;}
+  if(!await ensureMicrophoneAccess())return;
+  const button=document.getElementById('providerVoiceAdd');
+  const recognition=new Ctor();
+  recognition.lang='es-CR';
+  recognition.continuous=false;
+  recognition.interimResults=false;
+  button.disabled=true;
+  button.textContent='🔴 Escuchando… decí el nombre';
+  recognition.onresult=e=>{
+    const spoken=Array.from(e.results).map(row=>row[0].transcript).join(' ').trim();
+    document.getElementById('newProvName').value=spoken;
+    addProveedor();
+  };
+  recognition.onerror=e=>toast(VOICE_ERROR_MSG[e.error]||'No pude escuchar el nombre. Intentá otra vez.','err');
+  recognition.onend=()=>{
+    button.disabled=false;
+    button.textContent='🎤 Añadir proveedor por voz';
+  };
+  recognition.start();
 }
 
-function resetPreciosProv(){
-  if(!S.currentProv){toast('Abrí un proveedor primero','err');return;}
-  if(!confirm(`¿Reiniciar precios de ${S.currentProv}?`))return;
-  const p=LS.get('aramo_prices',{});
-  Object.keys(p).filter(k=>k.startsWith(S.currentProv+'_')).forEach(k=>delete p[k]);
-  LS.set('aramo_prices',p);
-  Object.keys(preciosCache).filter(k=>k.startsWith(S.currentProv+'_')).forEach(k=>delete preciosCache[k]);
-  supa.from('precios').delete().eq('proveedor',S.currentProv).then(()=>{});
-  if(S.currentProv)renderProdTable();
-  toast('Precios de '+S.currentProv+' reiniciados','ok');
+// Configuración por voz: “agregar tomate, cebolla”, “quitar tomate” o
+// “cambiar tomate por tomate cherry”. No exige pasos ni confirmaciones extra.
+async function startConfigProductsVoice(prov,button){
+  const Ctor=getSpeechRecognitionCtor();
+  if(!Ctor){toast('El dictado necesita Chrome o Edge','err');return;}
+  if(!await ensureMicrophoneAccess())return;
+  const recognition=new Ctor();
+  recognition.lang='es-CR';
+  recognition.continuous=false;
+  recognition.interimResults=false;
+  const original=button.textContent;
+  button.textContent='🔴 Escuchando… hablá ahora';
+  button.disabled=true;
+  recognition.onresult=e=>{
+    const text=Array.from(e.results).map(r=>r[0].transcript).join(' ');
+    applyConfigVoiceCommands(prov,text);
+  };
+  recognition.onerror=e=>toast(VOICE_ERROR_MSG[e.error]||'No pude escuchar. Intentá otra vez.','err');
+  recognition.onend=()=>{button.textContent=original;button.disabled=false;};
+  recognition.start();
 }
 
-function exportData(){
-  const data={state:S,history:histGet(),prices:LS.get('aramo_prices',{})};
-  const blob=new Blob([JSON.stringify(data,null,2)],{type:'application/json'});
-  const url=URL.createObjectURL(blob);const a=document.createElement('a');
-  a.href=url;a.download=`aramo-backup-${new Date().toISOString().slice(0,10)}.json`;
-  document.body.appendChild(a);a.click();document.body.removeChild(a);URL.revokeObjectURL(url);
-  toast('✓ Exportado','ok');
+function applyConfigVoiceCommands(prov,text){
+  ensureCustomProv(prov);
+  const products=S.customProviders[prov].products;
+  const commands=text.split(/\s*(?:,|;|\by\b|\bluego\b)\s*/i).map(s=>s.trim()).filter(Boolean);
+  let changes=0;
+  commands.forEach(command=>{
+    const normalized=command.toLowerCase().trim();
+    const rename=normalized.match(/(?:cambiar|renombrar)\s+(.+?)\s+por\s+(.+)/i);
+    if(rename){
+      const found=products.find(p=>normalizeVoice(p.name)===normalizeVoice(rename[1]));
+      if(found){found.name=titleCase(rename[2]);changes++;}
+      return;
+    }
+    const remove=normalized.match(/(?:quitar|eliminar|borrar)\s+(.+)/i);
+    if(remove){
+      const idx=products.findIndex(p=>normalizeVoice(p.name)===normalizeVoice(remove[1]));
+      if(idx>=0){products.splice(idx,1);changes++;}
+      return;
+    }
+    const clean=command.replace(/^(?:agregar|añadir|crear|producto)\s+/i,'').trim();
+    if(!clean)return;
+    if(!products.some(p=>normalizeVoice(p.name)===normalizeVoice(clean))){
+      products.push({id:'prod_'+Date.now()+'_'+changes,name:titleCase(clean),emoji:'🌿',unit:detectVoiceUnit(normalizeVoice(command))||'kg'});
+      changes++;
+    }
+  });
+  persist();renderCfgProveedores();
+  toast(changes?`✓ ${changes} cambio${changes===1?'':'s'} guardado${changes===1?'':'s'}`:'No encontré cambios para aplicar',changes?'ok':'err');
 }
+
+function titleCase(value){
+  return value.trim().toLowerCase().replace(/(^|\s)\S/g,c=>c.toUpperCase());
+}
+
+// Catálogo único para buscar un producto y comparar todos sus proveedores.
+function getPriceCatalog(){
+  const catalog=new Map();
+  Object.entries(getAllProviders()).forEach(([prov,data])=>{
+    (data.products||[]).forEach(product=>{
+      const key=normalizeVoice(product.name);
+      if(!catalog.has(key))catalog.set(key,{key,name:product.name,emoji:product.emoji||'🌿',offers:[]});
+      catalog.get(key).offers.push({prov,product,color:data.color||'var(--g)'});
+    });
+  });
+  return [...catalog.values()]
+    .map(item=>({...item,offers:item.offers.sort((a,b)=>a.prov.localeCompare(b.prov,'es',{sensitivity:'base'}))}))
+    .sort((a,b)=>a.name.localeCompare(b.name,'es',{sensitivity:'base'}));
+}
+
+function renderPriceSearch(){
+  const input=document.getElementById('priceSearch');
+  const wrap=document.getElementById('priceSearchResults');
+  if(!input||!wrap)return;
+  const q=normalizeVoice(input.value||'');
+  const items=getPriceCatalog().filter(item=>!q||normalizeVoice(item.name).includes(q));
+  wrap.innerHTML=items.slice(0,80).map(item=>{
+    const known=item.offers.filter(o=>+getPrice(o.prov,o.product.id)>0);
+    const best=known.sort((a,b)=>+getPrice(a.prov,a.product.id)-+getPrice(b.prov,b.product.id))[0];
+    return `<button class="price-result" type="button" data-price-key="${item.key}">
+      <span style="font-size:24px">${item.emoji}</span>
+      <span class="price-result-name">${item.name}<span class="price-result-meta" style="display:block">${item.offers.length} proveedor${item.offers.length===1?'':'es'}</span></span>
+      <strong>${best?'₡'+fmt(getPrice(best.prov,best.product.id)):'Editar'}</strong>
+    </button>`;
+  }).join('')||'<div class="empty-state"><div class="empty-ico">🔍</div>No encontré ese producto</div>';
+  wrap.querySelectorAll('[data-price-key]').forEach(btn=>btn.addEventListener('click',()=>openPriceModal(btn.dataset.priceKey)));
+}
+
+function openPriceModal(key){
+  const item=getPriceCatalog().find(row=>row.key===key);
+  if(!item)return;
+  document.getElementById('priceModalTitle').textContent=`${item.emoji} ${item.name}`;
+  document.getElementById('priceCompareList').innerHTML=item.offers.map(({prov,product})=>`
+    <div class="compare-row">
+      <div><div class="compare-provider">${prov}</div><div class="compare-unit">Precio por ${product.unit||'unidad'}</div></div>
+      <input class="compare-price" type="number" inputmode="decimal" min="0" step="0.01"
+        value="${getPrice(prov,product.id)}" placeholder="₡ 0"
+        data-prov="${prov}" data-pid="${product.id}">
+    </div>`).join('');
+  document.querySelectorAll('#priceCompareList .compare-price').forEach(input=>{
+    input.addEventListener('input',()=>setPrice(input.dataset.prov,input.dataset.pid,input.value));
+  });
+  document.getElementById('modalPriceCompare').classList.add('open');
+}
+
+function closePriceModal(){
+  document.getElementById('modalPriceCompare').classList.remove('open');
+  renderPriceSearch();
+  if(S.currentProv)renderProdTable();
+}
+
+document.getElementById('priceSearch').addEventListener('input',renderPriceSearch);
+document.getElementById('modalPriceCompare').addEventListener('click',e=>{if(e.target.id==='modalPriceCompare')closePriceModal();});
 
 function resetAll(){
   if(!confirm('¿Reiniciar TODO? Esto borra los pedidos y la configuración para TODOS los dispositivos conectados, no solo este.'))return;
@@ -2650,6 +3149,7 @@ function closeGlobalSearch(){
           }
         });
       });
+      matches.sort((a,b)=>a.prod.name.localeCompare(b.prod.name,'es',{sensitivity:'base'})||a.prov.localeCompare(b.prov,'es',{sensitivity:'base'}));
 
       if(!matches.length){
         results.style.display='block';
@@ -2695,12 +3195,34 @@ function inp_globalGoTo(provName, prodId){
   },250);
 }
 
+// Tema claro por defecto; la preferencia queda guardada en este dispositivo.
+function applyTheme(theme){
+  document.documentElement.dataset.theme=theme;
+  localStorage.setItem('aramo_theme',theme);
+  const button=document.getElementById('themeToggle');
+  if(button){
+    button.textContent=theme==='dark'?'☀️':'🌙';
+    button.setAttribute('aria-label',theme==='dark'?'Usar tema claro':'Usar tema oscuro');
+  }
+  document.querySelector('meta[name="theme-color"]').content=theme==='dark'?'#0c100e':'#f4f7f5';
+}
+document.getElementById('themeToggle').addEventListener('click',()=>{
+  applyTheme(document.documentElement.dataset.theme==='dark'?'light':'dark');
+});
+
 // ══════════════════════════════════════════
 // INIT
 // ══════════════════════════════════════════
 (function init(){
+  applyTheme(localStorage.getItem('aramo_theme')||'light');
   hydrate();
   renderHome();
+  if(location.hash==='#hoy')switchView('resumen');
+  if(location.hash==='#productos'){
+    cfgOpenProv=getProvNames()[0]||null;
+    document.querySelector('[data-acc="provs"]')?.classList.add('open');
+    switchView('config');
+  }
   // Cargar precios desde Supabase y activar tiempo real
   loadPreciosFromSupabase().then(()=>{
     initRealtimePrices();
