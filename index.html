@@ -1880,30 +1880,14 @@ document.getElementById('filterUsed').addEventListener('click',()=>{
 // ══════════════════════════════════════════
 function getSpeechRecognitionCtor(){return window.SpeechRecognition||window.webkitSpeechRecognition||null;}
 
-let microphoneAccessGranted=false;
 async function ensureMicrophoneAccess(){
-  if(!window.isSecureContext&&location.protocol!=='file:'){
+  if(!window.isSecureContext){
     toast('El micrófono necesita abrir la app desde el enlace HTTPS','err');
     return false;
   }
-  if(microphoneAccessGranted)return true;
-  if(!navigator.mediaDevices?.getUserMedia){
-    if(location.protocol==='file:'){
-      toast('Abrí la versión HTTPS para usar el micrófono','err');
-      return false;
-    }
-    return true;
-  }
-  try{
-    const stream=await navigator.mediaDevices.getUserMedia({audio:true});
-    stream.getTracks().forEach(track=>track.stop());
-    microphoneAccessGranted=true;
-    return true;
-  }catch(error){
-    const denied=error?.name==='NotAllowedError'||error?.name==='SecurityError';
-    toast(denied?'Permití el micrófono en el navegador y volvé a tocar el botón':'No pude acceder al micrófono','err');
-    return false;
-  }
+  // SpeechRecognition administra su propio permiso. Abrir getUserMedia antes y
+  // cerrar la pista interrumpe el reconocimiento en varios Android/iPhone.
+  return true;
 }
 
 function normalizeVoice(s){return s.toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g,'').trim();}
@@ -2064,11 +2048,13 @@ const VOICE_ERROR_MSG={
   'service-not-allowed':'El micrófono está bloqueado. Habilitá el permiso de micrófono para este sitio en tu navegador.',
   'audio-capture':'No se encontró micrófono. Revisá que esté conectado y seleccionado en tu sistema.',
   'network':'Falló la conexión del reconocimiento de voz. Revisá tu internet.',
+  'language-not-supported':'El navegador no admite español para el dictado.',
+  'aborted':'El dictado se detuvo. Tocá el micrófono para intentarlo otra vez.',
 };
 
 // Motor de grabación reutilizable — cada modal de voz tiene su propia instancia.
 function createVoiceEngine(opts){
-  const st={recognition:null,listening:false,finalTranscript:'',gotAnyResult:false,watchdog:null,silenceTimer:null};
+  const st={recognition:null,listening:false,finalTranscript:'',latestTranscript:'',gotAnyResult:false,watchdog:null,silenceTimer:null,lastError:''};
   function arm(){
     clearTimeout(st.watchdog);
     st.watchdog=setTimeout(()=>{
@@ -2085,7 +2071,8 @@ function createVoiceEngine(opts){
     if(!st.recognition){
       st.recognition=new Ctor();
       st.recognition.lang='es-CR';
-      st.recognition.continuous=true;
+      // continuous=true falla en Safari/iPhone y en varios Chrome móviles.
+      st.recognition.continuous=false;
       st.recognition.interimResults=true;
       st.recognition.onresult=e=>{
         st.gotAnyResult=true;
@@ -2098,28 +2085,39 @@ function createVoiceEngine(opts){
           else interim+=r[0].transcript;
         }
         const full=(st.finalTranscript+interim).trim();
+        st.latestTranscript=full;
         opts.transcriptEl().textContent=full||'…';
         opts.statusEl().textContent='Escuchando… terminaré automáticamente cuando dejés de hablar';
         if(opts.onLive)opts.onLive(full);
         st.silenceTimer=setTimeout(()=>{if(st.listening)st.recognition.stop();},2400);
       };
       st.recognition.onerror=e=>{
-        if(e.error==='no-speech')return;
+        st.lastError=e.error||'unknown';
         clearTimeout(st.watchdog);
-        toast(VOICE_ERROR_MSG[e.error]||('Error de voz: '+e.error),'err');
-        opts.statusEl().textContent=VOICE_ERROR_MSG[e.error]||'Ocurrió un error con el micrófono.';
+        const msg=e.error==='no-speech'
+          ?'No escuché ninguna voz. Tocá el micrófono y hablá de inmediato.'
+          :(VOICE_ERROR_MSG[e.error]||('Error de voz del navegador: '+e.error));
+        toast(msg,'err');
+        opts.statusEl().textContent=msg;
       };
       st.recognition.onend=()=>{
         st.listening=false;
         clearTimeout(st.watchdog);
         clearTimeout(st.silenceTimer);
         opts.recBtnEl().classList.remove('recording');
-        opts.statusEl().textContent='Pedido procesado automáticamente';
-        if(st.finalTranscript.trim())opts.onFinal(st.finalTranscript);
+        const transcript=(st.finalTranscript||st.latestTranscript).trim();
+        if(transcript){
+          opts.statusEl().textContent='Pedido procesado automáticamente';
+          opts.onFinal(transcript);
+        }else if(!st.lastError){
+          opts.statusEl().textContent='No escuché ninguna voz. Tocá el micrófono y hablá de inmediato.';
+        }
       };
     }
     try{
       st.gotAnyResult=false;
+      st.lastError='';
+      st.latestTranscript='';
       st.recognition.start();
       st.listening=true;
       opts.recBtnEl().classList.add('recording');
@@ -2133,7 +2131,7 @@ function createVoiceEngine(opts){
   }
   function stop(){clearTimeout(st.watchdog);clearTimeout(st.silenceTimer);if(st.recognition&&st.listening)st.recognition.stop();}
   function toggle(){st.listening?stop():start();}
-  function reset(){st.finalTranscript='';}
+  function reset(){st.finalTranscript='';st.latestTranscript='';st.lastError='';}
   return{state:st,start,stop,toggle,reset};
 }
 
