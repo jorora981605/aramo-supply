@@ -490,6 +490,10 @@ body{background:linear-gradient(180deg,var(--gd),transparent 260px),var(--bg);fo
 .compare-provider{font-weight:800}.compare-unit{font-size:13px;color:var(--m)}
 .compare-price{width:100%;padding:11px;border:1px solid var(--b2);border-radius:12px;background:var(--s);color:var(--t);font-size:16px;text-align:right}
 .config-voice-btn{width:100%;margin:8px 0 12px;min-height:50px;border:0;border-radius:14px;background:var(--g);color:#fff;font-size:15px;font-weight:800}
+.provider-wa-box{margin:8px 0 12px;padding:12px;border:2px solid #25d366;border-radius:14px;background:color-mix(in srgb,#25d366 10%,var(--card));display:grid;grid-template-columns:1fr auto;gap:8px;align-items:center}
+.provider-wa-box label{grid-column:1/-1;font-size:13px;font-weight:900;color:var(--t)}
+.provider-wa-box input{min-width:0;width:100%;min-height:44px;padding:0 12px;border:1px solid var(--b2);border-radius:11px;background:var(--card);color:var(--t);font-size:16px}
+.provider-wa-box button{min-height:44px;padding:0 13px;border:0;border-radius:11px;background:#25d366;color:#062b12;font-weight:900}
 .product-picker{margin:4px 0 14px;padding:14px;border:2px solid var(--gg);border-radius:18px;background:var(--gd)}
 .product-picker-title{font-size:16px;font-weight:900;margin-bottom:3px}.product-picker-help{font-size:13px;color:var(--m);line-height:1.4;margin-bottom:10px}
 .product-picker-search{width:100%;min-height:48px;padding:0 14px;border:2px solid var(--b2);border-radius:14px;background:var(--card);color:var(--t);font-size:15px;outline:none}
@@ -653,7 +657,7 @@ html[data-theme="dark"] .today-money-card{background:linear-gradient(145deg,#125
     </div>
     <div class="quick-order">
       <h2>Hacé el pedido hablando</h2>
-      <p>Decí toda la lista seguida. La app reconoce productos, cantidades y proveedor automáticamente; no tenés que tocar “Siguiente”.</p>
+      <p>Separá cada producto diciendo <strong>SIGUIENTE</strong>. Ejemplo: “10 kilos de papa, SIGUIENTE, 5 cajas de tomate”.</p>
       <div style="display:flex;gap:8px">
         <button class="voice-branch-btn m" id="btnVoiceGlobalM">🎤 Pedido Moravia</button>
         <button class="voice-branch-btn a" id="btnVoiceGlobalA">🎤 Pedido Los Ángeles</button>
@@ -668,7 +672,7 @@ html[data-theme="dark"] .today-money-card{background:linear-gradient(145deg,#125
         <span class="voice-float-ctx" id="voiceFloatGlobalCtx">🎤 Moravia</span>
         <button class="voice-float-done" id="voiceFloatGlobalDone">✓ Listo</button>
       </div>
-      <div class="voice-float-status" id="voiceFloatGlobalStatus">Escuchando...</div>
+      <div class="voice-float-status" id="voiceFloatGlobalStatus">Decí SIGUIENTE entre productos</div>
       <div class="voice-float-transcript" id="voiceFloatGlobalTranscript"></div>
       <div class="voice-live-chips" id="voiceLiveChipsGlobal"></div>
     </div>
@@ -711,7 +715,7 @@ html[data-theme="dark"] .today-money-card{background:linear-gradient(145deg,#125
         <span class="voice-float-ctx" id="voiceFloatProvCtx">🎤 Moravia</span>
         <button class="voice-float-done" id="voiceFloatProvDone">✓ Listo</button>
       </div>
-      <div class="voice-float-status" id="voiceFloatProvStatus">Escuchando...</div>
+      <div class="voice-float-status" id="voiceFloatProvStatus">Decí SIGUIENTE entre productos</div>
       <div class="voice-float-transcript" id="voiceFloatProvTranscript"></div>
       <div class="voice-live-chips" id="voiceLiveChipsProv"></div>
     </div>
@@ -1910,25 +1914,13 @@ const VOICE_STOP_WORDS=new Set(['de','del','la','el','los','las','en','y','para'
 // Palabras de relleno que la gente dice al dictar pero no aportan nada
 const VOICE_FILLER=new Set(['y','tambien','ademas','luego','despues','quiero','ponme','pone','poneme','agrega','agregame','anota','anotame','manda','mandame','ocupo','necesito','por','favor','este','eh','mas','sucursal','tienda']);
 
-// Corta el dictado en items SIN necesidad de decir "siguiente":
-// cada vez que aparece un número nuevo empieza otro producto.
-// "20 kilos de papa amarilla 10 cajas de tomate" → 2 segmentos.
-// (decir "siguiente" sigue funcionando igual que antes)
+// “SIGUIENTE” es el separador único y predecible en todos los pedidos por voz.
+// Así los nombres o notas que contienen números no se cortan por accidente.
 function segmentVoiceTranscript(raw){
-  const parts=String(raw||'').split(/\bsiguientes?\b/i);
-  const segs=[];
-  parts.forEach(part=>{
-    const words=part.trim().split(/\s+/).filter(Boolean);
-    let cur=[],curHasNum=false;
-    words.forEach(w=>{
-      const isNum=/^\d/.test(normalizeVoice(w));
-      if(isNum&&curHasNum){segs.push(cur.join(' '));cur=[];curHasNum=false;}
-      cur.push(w);
-      if(isNum)curHasNum=true;
-    });
-    if(cur.length)segs.push(cur.join(' '));
-  });
-  return segs.map(s=>s.trim()).filter(s=>/\S/.test(s));
+  return String(raw||'')
+    .split(/\bsiguientes?\b/i)
+    .map(s=>s.replace(/^[,;.\s]+|[,;.\s]+$/g,'').trim())
+    .filter(Boolean);
 }
 
 // Lo que sobra del segmento (sin número, unidad, relleno ni el nombre del
@@ -2087,7 +2079,7 @@ function createVoiceEngine(opts){
         const full=(st.finalTranscript+interim).trim();
         st.latestTranscript=full;
         opts.transcriptEl().textContent=full||'…';
-        opts.statusEl().textContent='Escuchando… terminaré automáticamente cuando dejés de hablar';
+        opts.statusEl().textContent='Escuchando… decí SIGUIENTE entre cada producto';
         if(opts.onLive)opts.onLive(full);
         st.silenceTimer=setTimeout(()=>{if(st.listening)st.recognition.stop();},2400);
       };
@@ -2121,7 +2113,7 @@ function createVoiceEngine(opts){
       st.recognition.start();
       st.listening=true;
       opts.recBtnEl().classList.add('recording');
-      opts.statusEl().textContent='Escuchando… hablá seguido y la app terminará sola';
+      opts.statusEl().textContent='Escuchando… decí SIGUIENTE entre cada producto';
       arm();
     }catch(err){
       st.listening=false;
@@ -2772,10 +2764,28 @@ function renderCfgProveedores(){
     if(isOpen){
       const body=item.querySelector('.prov-cfg-body');
       const products=provData.products||[];
+      const waBox=document.createElement('div');
+      waBox.className='provider-wa-box';
+      waBox.innerHTML=`
+        <label>💬 WhatsApp de ${name}</label>
+        <input type="tel" inputmode="tel" placeholder="+506 8888 8888" value="${S.phones[name]||''}" aria-label="WhatsApp de ${name}">
+        <button type="button">Abrir chat</button>
+      `;
+      waBox.querySelector('input').addEventListener('input',e=>{
+        S.phones[name]=e.target.value;
+        persist();
+      });
+      waBox.querySelector('button').addEventListener('click',()=>{
+        const raw=(S.phones[name]||'').replace(/\D/g,'');
+        if(!raw){toast(`Agregá primero el WhatsApp de ${name}`,'err');waBox.querySelector('input').focus();return;}
+        const msg=hasData(name)?buildMsg(name,'both'):`Hola ${name}`;
+        window.open(`https://wa.me/${raw}?text=${encodeURIComponent(msg)}`,'_blank');
+      });
+      body.appendChild(waBox);
       const voiceBtn=document.createElement('button');
       voiceBtn.className='config-voice-btn';
       voiceBtn.type='button';
-      voiceBtn.textContent='🎤 Añadir o editar productos por voz';
+      voiceBtn.textContent='🎤 Productos por voz · decí SIGUIENTE';
       voiceBtn.addEventListener('click',()=>startConfigProductsVoice(name,voiceBtn));
       body.appendChild(voiceBtn);
       renderProductPicker(name,body);
@@ -2984,8 +2994,8 @@ async function startAddProviderVoice(){
   recognition.start();
 }
 
-// Configuración por voz: “agregar tomate, cebolla”, “quitar tomate” o
-// “cambiar tomate por tomate cherry”. No exige pasos ni confirmaciones extra.
+// Configuración por voz: “agregar tomate SIGUIENTE agregar cebolla”,
+// “quitar tomate” o “cambiar tomate por tomate cherry”.
 async function startConfigProductsVoice(prov,button){
   const Ctor=getSpeechRecognitionCtor();
   if(!Ctor){toast('El dictado necesita Chrome o Edge','err');return;}
@@ -2995,7 +3005,7 @@ async function startConfigProductsVoice(prov,button){
   recognition.continuous=false;
   recognition.interimResults=false;
   const original=button.textContent;
-  button.textContent='🔴 Escuchando… hablá ahora';
+  button.textContent='🔴 Escuchando… decí SIGUIENTE entre productos';
   button.disabled=true;
   recognition.onresult=e=>{
     const text=Array.from(e.results).map(r=>r[0].transcript).join(' ');
@@ -3009,7 +3019,7 @@ async function startConfigProductsVoice(prov,button){
 function applyConfigVoiceCommands(prov,text){
   ensureCustomProv(prov);
   const products=S.customProviders[prov].products;
-  const commands=text.split(/\s*(?:,|;|\by\b|\bluego\b)\s*/i).map(s=>s.trim()).filter(Boolean);
+  const commands=text.split(/\s*\bsiguientes?\b\s*/i).map(s=>s.replace(/^[,;.\s]+|[,;.\s]+$/g,'').trim()).filter(Boolean);
   let changes=0;
   commands.forEach(command=>{
     const normalized=command.toLowerCase().trim();
