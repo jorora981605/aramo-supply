@@ -314,7 +314,9 @@ input,select,textarea{font-family:var(--fn)}
 .prov-cfg-toggle{font-size:13px;color:var(--m);transition:var(--tr)}
 .prov-cfg-body{display:none;padding:10px 12px;border-top:1px solid var(--b)}
 .prov-cfg-body.open{display:block}
-.prod-cfg-row{display:flex;align-items:center;gap:6px;margin-bottom:6px}
+.prod-cfg-row{position:relative;margin-bottom:6px;border-radius:var(--r3);transition:max-height .2s ease,opacity .2s ease}
+.prod-cfg-row-bg{position:absolute;inset:0;background:#e5483a;color:#fff;display:flex;align-items:center;justify-content:flex-end;padding-right:16px;font-weight:700;border-radius:inherit}
+.prod-cfg-row-content{display:flex;align-items:center;gap:6px;background:var(--s);position:relative;touch-action:pan-y}
 .prod-cfg-name{flex:1;padding:8px 9px;background:var(--s);border:1px solid var(--b);border-radius:var(--r3);color:var(--t);font-size:14px;outline:none}
 .prod-cfg-name:focus{border-color:var(--g)}
 .prod-cfg-unit{width:84px;padding:8px 6px;background:var(--s);border:1px solid var(--b);border-radius:var(--r3);color:var(--t);font-size:13px;outline:none;-webkit-appearance:none;text-align:center}
@@ -439,15 +441,36 @@ body{background:linear-gradient(180deg,var(--gd),transparent 260px),var(--bg);fo
 .market-row{display:flex;justify-content:space-between;gap:16px;padding:12px 0;border-bottom:1px solid var(--b);font-size:15px}.market-row:last-child{border-bottom:0}
 .price-search{position:sticky;top:0;z-index:5;padding:12px 0;background:var(--bg)}
 .big-search{width:100%;min-height:50px;padding:0 16px;border-radius:16px;border:1px solid var(--b2);background:var(--card);color:var(--t);font-size:16px;outline:none}
-.price-result{display:flex;align-items:center;gap:12px;width:100%;padding:14px;margin-bottom:8px;border-radius:16px;border:1px solid var(--b);background:var(--card);color:var(--t);text-align:left}
-.price-result-name{font-size:16px;font-weight:800;flex:1}.price-result-meta{font-size:13px;color:var(--m)}
+#priceSearchResults{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}
+@media(max-width:480px){#priceSearchResults{grid-template-columns:repeat(2,1fr)}}
+.price-result{position:relative;display:flex;flex-direction:column;align-items:center;gap:3px;width:100%;padding:12px 6px;border-radius:14px;border:1px solid var(--b);background:var(--card);color:var(--t);text-align:center}
+.price-result.has-price{border-color:var(--gg)}
+.price-check{position:absolute;top:6px;right:6px;width:18px;height:18px;border-radius:50%;background:var(--g);color:#fff;font-size:11px;font-weight:900;display:flex;align-items:center;justify-content:center}
+.price-result-name{font-size:13px;font-weight:800;line-height:1.2;overflow:hidden;text-overflow:ellipsis;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical}
+.price-result-meta{font-size:11px;color:var(--m)}
+.price-result strong{font-size:13px;margin-top:2px}
+
+#prodCardList{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}
+@media(max-width:480px){#prodCardList{grid-template-columns:repeat(2,1fr)}}
+.prod-grid-item{position:relative;display:flex;flex-direction:column;align-items:center;gap:3px;width:100%;padding:12px 6px;border-radius:14px;border:1px solid var(--b);background:var(--card);color:var(--t);text-align:center;cursor:pointer}
+.prod-grid-item.filled-m{border-color:var(--g);background:var(--gd)}
+.prod-grid-item.filled-a{border-color:var(--o);background:var(--od)}
+.prod-grid-item.filled-both{border-color:var(--g);background:linear-gradient(90deg,var(--gd),var(--od))}
+.prod-grid-item .price-check{background:var(--g)}
+.prod-grid-fav{position:absolute;top:6px;left:6px;font-size:13px}
 .compare-row{display:grid;grid-template-columns:1fr 115px;gap:10px;align-items:center;padding:12px 0;border-bottom:1px solid var(--b)}
 .compare-provider{font-weight:800}.compare-unit{font-size:13px;color:var(--m)}
 .compare-price{width:100%;padding:11px;border:1px solid var(--b2);border-radius:12px;background:var(--s);color:var(--t);font-size:16px;text-align:right}
-.provider-wa-box{margin:8px 0 12px;padding:12px;border:2px solid #25d366;border-radius:14px;background:color-mix(in srgb,#25d366 10%,var(--card));display:grid;grid-template-columns:1fr auto;gap:8px;align-items:center}
-.provider-wa-box label{grid-column:1/-1;font-size:13px;font-weight:900;color:var(--t)}
-.provider-wa-box input{min-width:0;width:100%;min-height:44px;padding:0 12px;border:1px solid var(--b2);border-radius:11px;background:var(--card);color:var(--t);font-size:16px}
-.provider-wa-box button{min-height:44px;padding:0 13px;border:0;border-radius:11px;background:#25d366;color:#062b12;font-weight:900}
+.provider-wa-box{margin:8px 0 12px;padding:12px;border:2px solid #25d366;border-radius:14px;background:color-mix(in srgb,#25d366 10%,var(--card))}
+.provider-wa-box label{display:block;font-size:13px;font-weight:900;color:var(--t);margin-bottom:8px}
+.wa-contact-row{display:grid;grid-template-columns:1fr auto;gap:8px;align-items:center;margin-bottom:6px}
+.wa-contact-row input{min-width:0;width:100%;min-height:44px;padding:0 12px;border:1px solid var(--b2);border-radius:11px;background:var(--card);color:var(--t);font-size:16px}
+.wa-contact-rm{min-width:36px;min-height:36px;border:0;border-radius:10px;background:none;color:var(--m);font-size:18px;cursor:pointer}
+.wa-contact-rm:hover{color:var(--o);background:var(--od)}
+.wa-contact-actions{display:flex;gap:8px;margin-top:4px}
+.wa-contact-add{flex:1;min-height:44px;padding:0 13px;border:1px dashed #25d366;border-radius:11px;background:transparent;color:#0a7a3f;font-weight:800}
+html[data-theme="dark"] .wa-contact-add{color:#6fe3a0}
+.wa-contact-open{flex:1;min-height:44px;padding:0 13px;border:0;border-radius:11px;background:#25d366;color:#062b12;font-weight:900}
 .product-picker{margin:4px 0 14px;padding:14px;border:2px solid var(--gg);border-radius:18px;background:var(--gd)}
 .product-picker-title{font-size:16px;font-weight:900;margin-bottom:3px}.product-picker-help{font-size:13px;color:var(--m);line-height:1.4;margin-bottom:10px}
 .product-picker-search{width:100%;min-height:48px;padding:0 14px;border:2px solid var(--b2);border-radius:14px;background:var(--card);color:var(--t);font-size:15px;outline:none}
@@ -608,13 +631,10 @@ html[data-theme="dark"] .today-money-card{background:linear-gradient(145deg,#125
       <div class="day-progress-lbl"><span id="dpTxt"></span><span class="dp-done" id="dpPct"></span></div>
       <div class="day-progress"><div class="day-progress-fill" id="dpFill" style="width:0%"></div></div>
     </div>
-    <div class="sec">
-      <div class="simple-grid">
-        <button class="simple-action" type="button" onclick="switchView('precios')"><span>💰</span>Comparar precios</button>
-        <button class="simple-action" type="button" onclick="switchView('mercado')"><span>🛒</span>Dinero de mercado</button>
-      </div>
-    </div>
     <div class="home-grid" id="homeGrid"></div>
+    <div style="padding:4px 16px 14px;text-align:center">
+      <button class="btn btn-r btn-sm" type="button" onclick="resetAll()">⚠️ Reiniciar todo</button>
+    </div>
 
   </div>
 </div>
@@ -642,6 +662,7 @@ html[data-theme="dark"] .today-money-card{background:linear-gradient(145deg,#125
       <input type="text" class="search-inp" id="provSearch" placeholder="Buscar..." autocomplete="off">
     </div>
     <button class="filter-btn" id="filterUsed">⭐ Usados</button>
+    <button class="filter-btn" id="btnAddProdProv" title="Añadir producto">+ Producto</button>
   </div>
   <div class="scroll" id="provScroll" style="padding-bottom:220px">
     <div class="provider-help">Tocá <strong>+</strong> o escribí la cantidad. Los cambios se guardan solos.</div>
@@ -735,6 +756,9 @@ html[data-theme="dark"] .today-money-card{background:linear-gradient(145deg,#125
       <div class="today-section-title"><span>Proveedores de hoy</span><small>Tocá uno para abrirlo</small></div>
       <div id="resProvList"></div>
       <div id="resTotalBar" style="display:none"></div>
+
+      <div class="today-section-title"><span>Histórico</span><small>Días anteriores</small></div>
+      <div id="resHistorico"></div>
     </div>
   </div>
 </div>
@@ -782,11 +806,6 @@ html[data-theme="dark"] .today-money-card{background:linear-gradient(145deg,#125
 <div class="view" id="view-config" style="padding-bottom:80px">
   <div class="scroll" style="padding-bottom:120px">
     <div class="sec">
-
-      <div class="cfg-acc" data-acc="phones">
-        <button class="cfg-acc-hdr">📱 WhatsApp por proveedor <span class="cfg-acc-count" id="accCountPhones"></span><span class="cfg-acc-arrow">▾</span></button>
-        <div class="cfg-acc-body"><div id="cfgPhones"></div></div>
-      </div>
 
       <div class="cfg-acc" data-acc="pdfwa">
         <button class="cfg-acc-hdr">📋 Lista WA — contactos <span class="cfg-acc-count" id="accCountPdfWa"></span><span class="cfg-acc-arrow">▾</span></button>
@@ -863,6 +882,33 @@ html[data-theme="dark"] .today-money-card{background:linear-gradient(145deg,#125
     <div style="font-size:14px;color:var(--m);margin:-6px 0 12px">Compará y editá. Los cambios se guardan automáticamente.</div>
     <div id="priceCompareList"></div>
     <button class="btn btn-g btn-full" type="button" onclick="closePriceModal()">Listo</button>
+  </div>
+</div>
+
+<div class="overlay" id="modalProvList">
+  <div class="modal">
+    <div class="modal-handle"></div>
+    <div class="modal-title" id="provListModalTitle">Proveedores</div>
+    <div id="provListModalBody"></div>
+    <button class="btn btn-o btn-full" type="button" onclick="closeProvListModal()">Cerrar</button>
+  </div>
+</div>
+
+<div class="overlay" id="modalProdDetail">
+  <div class="modal">
+    <div class="modal-handle"></div>
+    <div class="modal-title" id="prodDetailTitle">Producto</div>
+    <div id="prodDetailBody"></div>
+    <button class="btn btn-g btn-full" type="button" onclick="closeProdDetailModal()" style="margin-top:10px">Listo</button>
+  </div>
+</div>
+
+<div class="overlay" id="modalAddProduct">
+  <div class="modal">
+    <div class="modal-handle"></div>
+    <div class="modal-title">Añadir producto</div>
+    <div id="addProductBody"></div>
+    <button class="btn btn-o btn-full" type="button" onclick="closeAddProductModal()" style="margin-top:10px">Cerrar</button>
   </div>
 </div>
 
@@ -969,6 +1015,7 @@ let S={
   pedidos:{},
   favs:[],
   phones:{},
+  waContacts:{},
   pdfWa:[{name:'',tel:''},{name:'',tel:''},{name:'',tel:''},{name:'',tel:''},{name:'',tel:''}],
   budget:0,
   providerOrder:Object.keys(DEFAULT_PROVIDERS),
@@ -989,7 +1036,7 @@ const LS={
 function saveLocalState(){
   LS.set('aramo4',{
     currentProv:S.currentProv,margen:S.margen,pedidos:S.pedidos,favs:S.favs,
-    phones:S.phones,pdfWa:S.pdfWa,budget:S.budget,
+    phones:S.phones,waContacts:S.waContacts,pdfWa:S.pdfWa,budget:S.budget,
     providerOrder:S.providerOrder,customProviders:S.customProviders
   });
 }
@@ -1005,6 +1052,27 @@ function persist(){
   },400);
 }
 
+// Migra el teléfono único viejo (S.phones[name]: string) al array nuevo
+// S.waContacts[name] (varios números por proveedor), sin pisar datos ya migrados.
+function migratePhonesToWaContacts(){
+  if(!S.waContacts)S.waContacts={};
+  Object.entries(S.phones||{}).forEach(([name,tel])=>{
+    if(tel&&tel.trim()&&(!S.waContacts[name]||!S.waContacts[name].length)){
+      S.waContacts[name]=[tel.trim()];
+    }
+  });
+}
+
+// Proveedor especial "Conseguir": productos sin proveedor fijo. Se siembra una
+// sola vez como proveedor normal; si el usuario lo borra, no vuelve a aparecer.
+function ensureConseguirProvider(){
+  const all=getAllProviders();
+  const wasDeleted=S.customProviders['Conseguir']?.deleted;
+  if(!all['Conseguir']&&!wasDeleted){
+    S.customProviders['Conseguir']={color:'#8e8e93',products:[]};
+  }
+}
+
 function hydrate(){
   const d=LS.get('aramo4',null);
   if(d){
@@ -1014,6 +1082,8 @@ function hydrate(){
     if(!S.providerOrder)S.providerOrder=Object.keys(DEFAULT_PROVIDERS);
     if(!S.customProviders)S.customProviders={};
   }
+  migratePhonesToWaContacts();
+  ensureConseguirProvider();
 }
 
 // Obtener lista completa de proveedores (defaults + custom)
@@ -1236,6 +1306,7 @@ function pushConfigToSupabase(){
     custom_providers:S.customProviders||{},
     provider_order:S.providerOrder||[],
     phones:S.phones||{},
+    wa_contacts:S.waContacts||{},
     pdf_wa:S.pdfWa||[],
     budget:S.budget||0,
     margen:S.margen||0,
@@ -1250,6 +1321,8 @@ function configRowToLocal(row){
   S.customProviders=row.custom_providers||{};
   S.providerOrder=(row.provider_order&&row.provider_order.length)?row.provider_order:S.providerOrder;
   S.phones=row.phones||{};
+  S.waContacts=row.wa_contacts||{};
+  migratePhonesToWaContacts();
   S.pdfWa=(row.pdf_wa&&row.pdf_wa.length)?row.pdf_wa:S.pdfWa;
   S.budget=row.budget||0;
   S.margen=row.margen??0;
@@ -1286,6 +1359,52 @@ function getLastPrice(prov,pid){return LS.get('aramo_lp',{})[prov+'_'+pid]||'';}
 function snapLastPrices(prov){const lp=LS.get('aramo_lp',{});const p=LS.get('aramo_prices',{});Object.keys(p).filter(k=>k.startsWith(prov+'_')).forEach(k=>{lp[k]=p[k]});LS.set('aramo_lp',lp);}
 function histGet(){return LS.get('aramo_hist',[]);}
 function histPush(e){const h=histGet();h.unshift(e);LS.set('aramo_hist',h.slice(0,60));}
+
+// ── HISTÓRICO DIARIO SINCRONIZADO (por sucursal, para comparar días) ──
+let historicoCache={};
+
+async function loadHistoricoFromSupabase(){
+  try{
+    const{data,error}=await supa.from('historico_diario').select('*').order('fecha',{ascending:false}).limit(200);
+    if(error){console.warn('Error cargando histórico:',error.message);return;}
+    historicoCache={};
+    (data||[]).forEach(row=>{historicoCache[row.id]=row;});
+    if(document.getElementById('view-resumen').classList.contains('active'))renderHistorico();
+  }catch(e){console.warn('Error cargando histórico:',e?.message||e);}
+}
+
+function initRealtimeHistorico(){
+  supa.channel('historico-changes')
+    .on('postgres_changes',{event:'*',schema:'public',table:'historico_diario'},payload=>{
+      const row=payload.new||payload.old;
+      if(!row?.id)return;
+      if(payload.eventType==='DELETE')delete historicoCache[row.id];
+      else historicoCache[row.id]=row;
+      if(document.getElementById('view-resumen').classList.contains('active'))renderHistorico();
+    })
+    .subscribe();
+}
+
+// Un solo registro por día+proveedor: siempre refleja el total VIGENTE de ese
+// día (sendWA ya calcula tM/tA sobre el pedido completo, no solo el lado
+// enviado), así que se reemplaza en cada envío. Los flags de "enviado" se
+// mergean contra lo que ya había para no revertir un lado ya enviado a false.
+function pushHistoricoToSupabase(prov,side,tM,tA){
+  const fecha=new Date().toISOString().slice(0,10);
+  const id=fecha+'_'+prov;
+  const prev=historicoCache[id]||{};
+  const row={
+    id,fecha,proveedor:prov,
+    total_moravia:tM,total_angeles:tA,total:tM+tA,
+    enviado_moravia:!!prev.enviado_moravia||side==='both'||side==='moravia',
+    enviado_angeles:!!prev.enviado_angeles||side==='both'||side==='angeles',
+    updated_at:new Date().toISOString(),
+  };
+  historicoCache[id]=row;
+  supa.from('historico_diario').upsert(row,{onConflict:'id'}).then(({error})=>{
+    if(error)console.warn('Error sincronizando histórico:',error.message);
+  });
+}
 
 const fmt=n=>Number(n||0).toLocaleString('es-CR');
 const fmtDate=iso=>new Date(iso).toLocaleDateString('es-CR',{month:'short',day:'numeric',hour:'2-digit',minute:'2-digit'});
@@ -1346,7 +1465,7 @@ function switchView(name){
   if(name==='home')renderHome();
   if(name==='mercado')updateHomeDinero();
   if(name==='precios')renderPriceSearch();
-  if(name==='resumen')renderResumen();
+  if(name==='resumen'){renderResumen();renderHistorico();}
   if(name==='config')renderConfig();
 }
 
@@ -1390,8 +1509,8 @@ function renderHome(){
   const pending=getProvNames().filter(p=>hasData(p)&&!isSent(p)).length;
   document.getElementById('homeMetrics').innerHTML=`
     <div class="metric-card"><div class="metric-lbl">Total día</div><div class="metric-val green" style="font-size:17px">₡${fmt(all.total)}</div></div>
-    <div class="metric-card"><div class="metric-lbl">Enviados ✅</div><div class="metric-val green">${sent}</div></div>
-    <div class="metric-card"><div class="metric-lbl">Pendientes ⚠️</div><div class="metric-val orange">${pending}</div></div>
+    <div class="metric-card" style="cursor:pointer" onclick="openProvListModal('sent')"><div class="metric-lbl">Enviados ✅</div><div class="metric-val green">${sent}</div></div>
+    <div class="metric-card" style="cursor:pointer" onclick="openProvListModal('pending')"><div class="metric-lbl">Pendientes ⚠️</div><div class="metric-val orange">${pending}</div></div>
   `;
   renderDayProgress();
   const grid=document.getElementById('homeGrid');
@@ -1421,6 +1540,24 @@ function renderHome(){
   });
   updateHomeDinero();
 }
+
+function openProvListModal(kind){
+  const names=getProvNames().filter(p=>kind==='sent'?isSent(p):(hasData(p)&&!isSent(p)));
+  document.getElementById('provListModalTitle').textContent=kind==='sent'?'Enviados':'Pendientes';
+  const body=document.getElementById('provListModalBody');
+  body.innerHTML=names.length
+    ?names.map(n=>`<button class="cfg-row" type="button" style="width:100%;text-align:left;background:var(--card);border:1px solid var(--b);border-radius:var(--r3);padding:10px 12px;margin-bottom:6px;color:var(--t);font-size:14px;font-weight:600" data-prov="${n}">${n}</button>`).join('')
+    :'<div class="empty" style="padding:14px 4px">Sin proveedores en este estado</div>';
+  body.querySelectorAll('[data-prov]').forEach(btn=>btn.addEventListener('click',()=>{
+    closeProvListModal();
+    openProv(btn.dataset.prov);
+  }));
+  document.getElementById('modalProvList').classList.add('open');
+}
+function closeProvListModal(){
+  document.getElementById('modalProvList').classList.remove('open');
+}
+document.getElementById('modalProvList').addEventListener('click',e=>{if(e.target.id==='modalProvList')closeProvListModal();});
 
 // ══════════════════════════════════════════
 // PROVEEDOR DETAIL
@@ -1461,6 +1598,39 @@ function renderProvStatus(){
 }
 
 // ── PRODUCT TABLE ──
+// Escribe/borra la cantidad de un lado para un producto y refresca todo lo
+// que depende de eso (totales, preview, estado, persistencia). Reusada por
+// los inputs del modal de detalle — desacoplada de cualquier nodo del DOM.
+function syncQty(prov,prod,side,val,unit){
+  const p=getPedido(prov);
+  if(!p.qtys[side])p.qtys[side]={};
+  if(!val||+val===0)delete p.qtys[side][prod.id];
+  else p.qtys[side][prod.id]={qty:val,unit};
+  markUnsent(prov);updateProvTotals();updatePreview();renderProvStatus();persist();
+}
+
+function syncNote(prov,prod,val){
+  const p=getPedido(prov);
+  if(!val.trim())delete p.notes[prod.id];else p.notes[prod.id]=val;
+  updatePreview();persist();
+}
+
+// HTML de la card compacta de la grilla — usada por el render principal y
+// por el refresco puntual al cerrar el modal de detalle.
+function renderProdCard(prod,prov,p){
+  const qM=p.qtys.moravia?.[prod.id]?.qty||'';
+  const qA=p.qtys.angeles?.[prod.id]?.qty||'';
+  const fillState=(+qM>0&&+qA>0)?'filled-both':+qM>0?'filled-m':+qA>0?'filled-a':'';
+  const isFav=S.favs.includes(prod.id);
+  return `<button type="button" class="prod-grid-item${fillState?' '+fillState:''}" data-pid="${prod.id}">
+    ${fillState?'<span class="price-check">✓</span>':''}
+    ${isFav?'<span class="prod-grid-fav">⭐</span>':''}
+    <span style="font-size:22px">${prod.emoji||'🌿'}</span>
+    <span class="price-result-name">${prod.name}</span>
+    ${fillState?`<span class="price-result-meta">M ${qM||0} · LA ${qA||0}</span>`:''}
+  </button>`;
+}
+
 function renderProdTable(){
   const prov=S.currentProv;
   if(!prov)return;
@@ -1480,175 +1650,214 @@ function renderProdTable(){
   filtered.sort((a,b)=>a.name.localeCompare(b.name,'es',{sensitivity:'base'}));
 
   const container=document.getElementById('prodCardList');
-  container.innerHTML='';
-  const allInputs=[];
-
-  filtered.forEach(prod=>{
-    const qM=p.qtys.moravia?.[prod.id]?.qty||'';
-    const qA=p.qtys.angeles?.[prod.id]?.qty||'';
-    const unit=p.qtys.moravia?.[prod.id]?.unit||p.qtys.angeles?.[prod.id]?.unit||prod.unit;
-    const price=getPrice(prov,prod.id);
-    const lastPrice=getLastPrice(prov,prod.id);
-    const subtotal=((+qM||0)+(+qA||0))>0&&+price>0?((+qM||0)+(+qA||0))*+price:0;
-    const isFav=S.favs.includes(prod.id);
-    const note=p.notes[prod.id]||'';
-
-    const fillState=(+qM>0&&+qA>0)?'filled-both':+qM>0?'filled-m':+qA>0?'filled-a':'';
-
-    let priceHintHTML='';
-    if(lastPrice&&price&&+price!==+lastPrice){
-      const diff=+price-+lastPrice;
-      priceHintHTML=`<span class="price-hint ${diff>0?'price-up':''}">${diff>0?'↑':'↓'}₡${fmt(Math.abs(diff))}</span>`;
-    }else if(price){
-      priceHintHTML=`<span class="price-hint">₡${fmt(price)}</span>`;
-    }
-
-    const hist=histGet().find(h=>h.provider===prov);
-    const lastQM=hist?.qtys?.moravia?.[prod.id]?.qty||'';
-    const lastQA=hist?.qtys?.angeles?.[prod.id]?.qty||'';
-    const lastQHint=(lastQM||lastQA)?`<span class="last-qty">ant: ${lastQM||0}/${lastQA||0}</span>`:'';
-
-    const card=document.createElement('div');
-    card.className='prod-card-item'+(fillState?' '+fillState:'');
-
-    card.innerHTML=`
-      <div class="prod-card-top">
-        <span class="prod-emoji-big">${prod.emoji||'🌿'}</span>
-        <span class="prod-nm">${prod.name}<small>${unit}</small></span>
-        <div class="prod-meta">${lastQHint}${priceHintHTML}</div>
-        <button class="prod-fav${isFav?' on':''}" data-pid="${prod.id}">${isFav?'⭐':'☆'}</button>
-      </div>
-      <div class="qty-row">
-        <div class="qty-block">
-          <div class="qty-block-lbl m">Moravia</div>
-          <div class="qty-controls">
-            <button class="qty-pm" data-pid="${prod.id}" data-side="moravia" data-op="minus">−</button>
-            <input class="tbl-qty moravia${+qM>0?' has-val':''}" type="number" value="${qM}" placeholder="0" min="0" step="0.5" inputmode="decimal" data-pid="${prod.id}" data-side="moravia">
-            <button class="qty-pm" data-pid="${prod.id}" data-side="moravia" data-op="plus">+</button>
-          </div>
-        </div>
-        <div class="prod-divider"></div>
-        <div class="qty-block">
-          <div class="qty-block-lbl a">Los Ángeles</div>
-          <div class="qty-controls">
-            <button class="qty-pm" data-pid="${prod.id}" data-side="angeles" data-op="minus">−</button>
-            <input class="tbl-qty angeles${+qA>0?' has-val':''}" type="number" value="${qA}" placeholder="0" min="0" step="0.5" inputmode="decimal" data-pid="${prod.id}" data-side="angeles">
-            <button class="qty-pm" data-pid="${prod.id}" data-side="angeles" data-op="plus">+</button>
-          </div>
-        </div>
-      </div>
-      <button class="prod-details-toggle" type="button">Más detalles <span>⌄</span></button>
-      <div class="prod-details">
-        <div class="prod-note-row">
-          <input class="prod-note-inp" type="text" placeholder="Nota opcional para este producto" value="${note}" data-pid="${prod.id}">
-        </div>
-        <div class="prod-card-bottom">
-          <label><span>Unidad</span><select class="tbl-unit" data-pid="${prod.id}">
-            ${UNITS.map(u=>`<option value="${u}"${u===unit?' selected':''}>${u}</option>`).join('')}
-          </select></label>
-          <label><span>Precio</span><input class="tbl-price" type="number" value="${price}" placeholder="₡ 0" inputmode="decimal" data-pid="${prod.id}"></label>
-          <label><span>Subtotal</span><div class="tbl-sub${subtotal>0?' has-val':''}">${subtotal>0?'₡'+fmt(subtotal):'—'}</div></label>
-        </div>
-      </div>
-    `;
-
-    const inpM=card.querySelector('.tbl-qty.moravia');
-    const inpA=card.querySelector('.tbl-qty.angeles');
-    const unitSel=card.querySelector('.tbl-unit');
-    const priceInp=card.querySelector('.tbl-price');
-    allInputs.push(inpM,inpA);
-
-    const sync=(side,inp)=>{
-      const val=inp.value;
-      const u=unitSel.value;
-      if(!p.qtys[side])p.qtys[side]={};
-      if(!val||+val===0)delete p.qtys[side][prod.id];
-      else p.qtys[side][prod.id]={qty:val,unit:u};
-      inp.classList.toggle('has-val',+val>0);
-      const mv=+inpM.value>0,av=+inpA.value>0;
-      card.classList.remove('filled-m','filled-a','filled-both');
-      if(mv&&av)card.classList.add('filled-both');
-      else if(mv)card.classList.add('filled-m');
-      else if(av)card.classList.add('filled-a');
-      markUnsent(prov);updateProvTotals();updatePreview();renderProvStatus();persist();
-    };
-
-    const noteInp=card.querySelector('.prod-note-inp');
-    const detailsToggle=card.querySelector('.prod-details-toggle');
-    const details=card.querySelector('.prod-details');
-    detailsToggle.addEventListener('click',()=>{
-      const open=details.classList.toggle('open');
-      detailsToggle.classList.toggle('open',open);
-      detailsToggle.firstChild.textContent=open?'Ocultar detalles ':'Más detalles ';
-    });
-    noteInp.addEventListener('input',()=>{
-      const v=noteInp.value;
-      if(!v.trim())delete p.notes[prod.id];else p.notes[prod.id]=v;
-      updatePreview();persist();
-    });
-
-    inpM.addEventListener('input',()=>sync('moravia',inpM));
-    inpA.addEventListener('input',()=>sync('angeles',inpA));
-    inpM.addEventListener('focus',()=>inpM.select());
-    inpA.addEventListener('focus',()=>inpA.select());
-
-    unitSel.addEventListener('change',()=>{
-      const provs=getAllProviders();
-      const prodIdx=provs[prov]?.products?.findIndex(x=>x.id===prod.id);
-      if(prodIdx!==-1){
-        if(DEFAULT_PROVIDERS[prov]){
-          if(!S.customProviders[prov])S.customProviders[prov]=JSON.parse(JSON.stringify(DEFAULT_PROVIDERS[prov]));
-          if(S.customProviders[prov].products[prodIdx])S.customProviders[prov].products[prodIdx].unit=unitSel.value;
-        } else if(S.customProviders[prov]?.products[prodIdx]){
-          S.customProviders[prov].products[prodIdx].unit=unitSel.value;
-        }
-      }
-      sync('moravia',inpM);sync('angeles',inpA);
-    });
-
-    priceInp.addEventListener('input',()=>{
-      setPrice(prov,prod.id,priceInp.value);
-      const st=card.querySelector('.tbl-sub');
-      const qMv=+inpM.value||0,qAv=+inpA.value||0;
-      const sub=(qMv+qAv)>0&&+priceInp.value>0?(qMv+qAv)*+priceInp.value:0;
-      if(st){st.textContent=sub>0?'₡'+fmt(sub):'—';st.classList.toggle('has-val',sub>0);}
-      updateProvTotals();persist();
-    });
-
-    card.querySelectorAll('.qty-pm').forEach(btn=>{
-      // Un solo evento (pointerdown) maneja el toque — nada de combinarlo con
-      // click, para que dos toques rápidos no se pisen ni se dupliquen entre sí.
-      btn.addEventListener('pointerdown',e=>{
-        e.preventDefault();
-        const side=btn.dataset.side;
-        const inp=side==='moravia'?inpM:inpA;
-        const cur=+inp.value||0;
-        const step=cur<1?.5:1;
-        if(btn.dataset.op==='plus')inp.value=+(cur+step).toFixed(1);
-        else inp.value=Math.max(0,+(cur-step).toFixed(1))||'';
-        sync(side,inp);
-      });
-    });
-
-    inpM.addEventListener('keydown',e=>{if(e.key==='Enter'||e.key==='Tab'){e.preventDefault();inpA.focus();inpA.select();}});
-    inpA.addEventListener('keydown',e=>{
-      if(e.key==='Enter'||e.key==='Tab'){
-        e.preventDefault();
-        const idx=allInputs.indexOf(inpA);
-        const next=allInputs[idx+1];
-        if(next){next.focus();next.select();}
-      }
-    });
-
-    card.querySelector('.prod-fav').addEventListener('click',()=>{
-      const i=S.favs.indexOf(prod.id);
-      if(i===-1)S.favs.push(prod.id);else S.favs.splice(i,1);
-      renderProdTable();persist();
-    });
-
-    container.appendChild(card);
+  container.innerHTML=filtered.map(prod=>renderProdCard(prod,prov,p)).join('');
+  container.querySelectorAll('.prod-grid-item').forEach(btn=>{
+    btn.addEventListener('click',()=>openProdDetailModal(btn.dataset.pid));
   });
 }
+
+let _prodDetailId=null;
+
+function openProdDetailModal(pid){
+  const prov=S.currentProv;
+  if(!prov)return;
+  const provData=getAllProviders()[prov];
+  const prod=(provData?.products||[]).find(x=>x.id===pid);
+  if(!prod)return;
+  _prodDetailId=pid;
+  const p=getPedido(prov);
+  const qM=p.qtys.moravia?.[prod.id]?.qty||'';
+  const qA=p.qtys.angeles?.[prod.id]?.qty||'';
+  const unit=p.qtys.moravia?.[prod.id]?.unit||p.qtys.angeles?.[prod.id]?.unit||prod.unit;
+  const price=getPrice(prov,prod.id);
+  const lastPrice=getLastPrice(prov,prod.id);
+  const subtotal=((+qM||0)+(+qA||0))>0&&+price>0?((+qM||0)+(+qA||0))*+price:0;
+  const note=p.notes[prod.id]||'';
+  const isFav=S.favs.includes(prod.id);
+
+  let priceHintHTML='';
+  if(lastPrice&&price&&+price!==+lastPrice){
+    const diff=+price-+lastPrice;
+    priceHintHTML=`<span class="price-hint ${diff>0?'price-up':''}">${diff>0?'↑':'↓'}₡${fmt(Math.abs(diff))}</span>`;
+  }else if(price){
+    priceHintHTML=`<span class="price-hint">₡${fmt(price)}</span>`;
+  }
+
+  const hist=histGet().find(h=>h.provider===prov);
+  const lastQM=hist?.qtys?.moravia?.[prod.id]?.qty||'';
+  const lastQA=hist?.qtys?.angeles?.[prod.id]?.qty||'';
+  const lastQHint=(lastQM||lastQA)?`<span class="last-qty">ant: ${lastQM||0}/${lastQA||0}</span>`:'';
+
+  document.getElementById('prodDetailTitle').innerHTML=`${prod.emoji||'🌿'} ${prod.name}
+    <button class="prod-fav${isFav?' on':''}" id="prodDetailFav" style="float:right">${isFav?'⭐':'☆'}</button>`;
+
+  document.getElementById('prodDetailBody').innerHTML=`
+    <div class="prod-meta" style="justify-content:flex-end;display:flex;gap:6px;margin-bottom:8px">${lastQHint}${priceHintHTML}</div>
+    <div class="qty-row">
+      <div class="qty-block">
+        <div class="qty-block-lbl m">Moravia</div>
+        <div class="qty-controls">
+          <button class="qty-pm" data-side="moravia" data-op="minus">−</button>
+          <input class="tbl-qty moravia${+qM>0?' has-val':''}" type="number" value="${qM}" placeholder="0" min="0" step="0.5" inputmode="decimal">
+          <button class="qty-pm" data-side="moravia" data-op="plus">+</button>
+        </div>
+      </div>
+      <div class="prod-divider"></div>
+      <div class="qty-block">
+        <div class="qty-block-lbl a">Los Ángeles</div>
+        <div class="qty-controls">
+          <button class="qty-pm" data-side="angeles" data-op="minus">−</button>
+          <input class="tbl-qty angeles${+qA>0?' has-val':''}" type="number" value="${qA}" placeholder="0" min="0" step="0.5" inputmode="decimal">
+          <button class="qty-pm" data-side="angeles" data-op="plus">+</button>
+        </div>
+      </div>
+    </div>
+    <div class="prod-note-row">
+      <input class="prod-note-inp" type="text" placeholder="Nota opcional para este producto" value="${note}">
+    </div>
+    <div class="prod-card-bottom">
+      <label><span>Unidad</span><select class="tbl-unit">
+        ${UNITS.map(u=>`<option value="${u}"${u===unit?' selected':''}>${u}</option>`).join('')}
+      </select></label>
+      <label><span>Precio</span><input class="tbl-price" type="number" value="${price}" placeholder="₡ 0" inputmode="decimal"></label>
+      <label><span>Subtotal</span><div class="tbl-sub${subtotal>0?' has-val':''}">${subtotal>0?'₡'+fmt(subtotal):'—'}</div></label>
+    </div>
+  `;
+
+  const body=document.getElementById('prodDetailBody');
+  const inpM=body.querySelector('.tbl-qty.moravia');
+  const inpA=body.querySelector('.tbl-qty.angeles');
+  const unitSel=body.querySelector('.tbl-unit');
+  const priceInp=body.querySelector('.tbl-price');
+  const noteInp=body.querySelector('.prod-note-inp');
+
+  inpM.addEventListener('input',()=>syncQty(prov,prod,'moravia',inpM.value,unitSel.value));
+  inpA.addEventListener('input',()=>syncQty(prov,prod,'angeles',inpA.value,unitSel.value));
+  inpM.addEventListener('focus',()=>inpM.select());
+  inpA.addEventListener('focus',()=>inpA.select());
+  inpM.addEventListener('keydown',e=>{if(e.key==='Enter'||e.key==='Tab'){e.preventDefault();inpA.focus();inpA.select();}});
+
+  unitSel.addEventListener('change',()=>{
+    const provs=getAllProviders();
+    const prodIdx=provs[prov]?.products?.findIndex(x=>x.id===prod.id);
+    if(prodIdx!==-1){
+      if(DEFAULT_PROVIDERS[prov]){
+        if(!S.customProviders[prov])S.customProviders[prov]=JSON.parse(JSON.stringify(DEFAULT_PROVIDERS[prov]));
+        if(S.customProviders[prov].products[prodIdx])S.customProviders[prov].products[prodIdx].unit=unitSel.value;
+      }else if(S.customProviders[prov]?.products[prodIdx]){
+        S.customProviders[prov].products[prodIdx].unit=unitSel.value;
+      }
+    }
+    syncQty(prov,prod,'moravia',inpM.value,unitSel.value);
+    syncQty(prov,prod,'angeles',inpA.value,unitSel.value);
+  });
+
+  priceInp.addEventListener('input',()=>{
+    setPrice(prov,prod.id,priceInp.value);
+    const st=body.querySelector('.tbl-sub');
+    const qMv=+inpM.value||0,qAv=+inpA.value||0;
+    const sub=(qMv+qAv)>0&&+priceInp.value>0?(qMv+qAv)*+priceInp.value:0;
+    if(st){st.textContent=sub>0?'₡'+fmt(sub):'—';st.classList.toggle('has-val',sub>0);}
+    updateProvTotals();persist();
+  });
+
+  noteInp.addEventListener('input',()=>syncNote(prov,prod,noteInp.value));
+
+  body.querySelectorAll('.qty-pm').forEach(btn=>{
+    btn.addEventListener('pointerdown',e=>{
+      e.preventDefault();
+      const side=btn.dataset.side;
+      const inp=side==='moravia'?inpM:inpA;
+      const cur=+inp.value||0;
+      const step=cur<1?.5:1;
+      if(btn.dataset.op==='plus')inp.value=+(cur+step).toFixed(1);
+      else inp.value=Math.max(0,+(cur-step).toFixed(1))||'';
+      syncQty(prov,prod,side,inp.value,unitSel.value);
+    });
+  });
+
+  document.getElementById('prodDetailFav').addEventListener('click',()=>{
+    const i=S.favs.indexOf(prod.id);
+    if(i===-1)S.favs.push(prod.id);else S.favs.splice(i,1);
+    persist();
+    openProdDetailModal(pid);
+  });
+
+  document.getElementById('modalProdDetail').classList.add('open');
+}
+
+function closeProdDetailModal(){
+  document.getElementById('modalProdDetail').classList.remove('open');
+  _prodDetailId=null;
+  renderProdTable();
+}
+document.getElementById('modalProdDetail').addEventListener('click',e=>{if(e.target.id==='modalProdDetail')closeProdDetailModal();});
+
+// Añadir producto al proveedor actual desde la vista de pedido, sin ir a
+// Config: elegir uno del catálogo conocido, o crear uno nuevo directo.
+function openAddProductModal(){
+  const prov=S.currentProv;
+  if(!prov)return;
+  const body=document.getElementById('addProductBody');
+
+  function currentNames(){return new Set((getAllProviders()[prov]?.products||[]).map(p=>normalizeText(p.name)));}
+
+  function addExisting(product){
+    ensureCustomProv(prov);
+    S.customProviders[prov].products.push({
+      id:'prod_'+Date.now()+'_'+Math.random().toString(36).slice(2,6),
+      name:product.name,emoji:product.emoji,unit:product.unit
+    });
+    persist();renderProdTable();draw();
+    toast(`✓ ${product.name} agregado`,'ok');
+  }
+
+  function addNew(name,unit){
+    ensureCustomProv(prov);
+    S.customProviders[prov].products.push({
+      id:'prod_'+Date.now()+'_'+Math.random().toString(36).slice(2,6),
+      name:titleCase(name),emoji:'🌿',unit:unit||'kg'
+    });
+    persist();renderProdTable();draw();
+    toast(`✓ ${titleCase(name)} agregado`,'ok');
+  }
+
+  function draw(){
+    const q=normalizeText(body.querySelector('#addProdSearch')?.value||'');
+    const names=currentNames();
+    const available=getKnownProductCatalog().filter(p=>!names.has(p.key)&&(!q||p.key.includes(q)));
+    body.innerHTML=`
+      <input class="product-picker-search" type="search" id="addProdSearch" placeholder="🔍 Buscar en el catálogo…" autocomplete="off" value="${body.querySelector('#addProdSearch')?.value||''}">
+      <div class="product-picker-grid">
+        ${available.slice(0,30).map(p=>`<button class="product-pick" type="button" data-key="${p.key}"><span class="emoji">${p.emoji}</span><span class="name">${p.name}</span></button>`).join('')||'<div class="product-picker-empty" style="grid-column:1/-1">Sin resultados</div>'}
+      </div>
+      <div class="manual-product-label">O creá uno nuevo</div>
+      <div class="new-prov-row">
+        <input class="new-prov-inp" id="addProdNewName" placeholder="Nombre del producto">
+        <select class="tbl-unit" id="addProdNewUnit" style="width:auto">${UNITS.map(u=>`<option value="${u}">${u}</option>`).join('')}</select>
+        <button class="btn btn-g btn-sm" id="addProdNewBtn">+ Crear</button>
+      </div>
+    `;
+    body.querySelector('#addProdSearch').addEventListener('input',draw);
+    body.querySelectorAll('.product-pick').forEach(btn=>btn.addEventListener('click',()=>{
+      const product=getKnownProductCatalog().find(p=>p.key===btn.dataset.key);
+      if(product)addExisting(product);
+    }));
+    body.querySelector('#addProdNewBtn').addEventListener('click',()=>{
+      const nameInp=body.querySelector('#addProdNewName');
+      const name=nameInp.value.trim();
+      if(!name){toast('Escribí un nombre','err');return;}
+      addNew(name,body.querySelector('#addProdNewUnit').value);
+    });
+  }
+  draw();
+  document.getElementById('modalAddProduct').classList.add('open');
+}
+function closeAddProductModal(){
+  document.getElementById('modalAddProduct').classList.remove('open');
+}
+document.getElementById('btnAddProdProv').addEventListener('click',openAddProductModal);
+document.getElementById('modalAddProduct').addEventListener('click',e=>{if(e.target.id==='modalAddProduct')closeAddProductModal();});
 
 // ── EXTRAS ──
 function renderExtras(side){
@@ -1818,16 +2027,24 @@ function sendWA(side='both'){
   const prov=S.currentProv;
   const msg=buildMsg(prov,side);
   if(!msg){toast('El pedido está vacío','err');return;}
-  const raw=(S.phones[prov]||'').replace(/\D/g,'');
+  const contacts=(S.waContacts[prov]||[]).map(t=>(t||'').replace(/\D/g,'')).filter(Boolean);
   const p=getPedido(prov);
   const tM=calcSide('moravia'),tA=calcSide('angeles');
   const entry={id:Date.now(),date:new Date().toISOString(),provider:prov,totalM:tM,totalA:tA,total:tM+tA,qtys:JSON.parse(JSON.stringify(p.qtys)),extras:JSON.parse(JSON.stringify(p.extras)),note:p.note||''};
   histPush(entry);snapLastPrices(prov);
+  pushHistoricoToSupabase(prov,side,tM,tA);
   S.pedidos[prov].sent=true;renderProvStatus();renderHome();
-  const url=raw?`https://wa.me/${raw}?text=${encodeURIComponent(msg)}`:`https://wa.me/?text=${encodeURIComponent(msg)}`;
+  const urls=contacts.length
+    ?contacts.map(raw=>`https://wa.me/${raw}?text=${encodeURIComponent(msg)}`)
+    :[`https://wa.me/?text=${encodeURIComponent(msg)}`];
   const btn=document.getElementById('btnWA');
   btn.innerHTML='<span style="font-size:20px">✓</span> Abriendo...';
-  setTimeout(()=>{window.open(url,'_blank');btn.innerHTML='<span style="font-size:20px">💬</span> Enviar por WhatsApp';toast('✓ Pedido enviado','ok');persist();},400);
+  urls.forEach((url,i)=>{
+    setTimeout(()=>{
+      window.open(url,'_blank');
+      if(i===urls.length-1){btn.innerHTML='<span style="font-size:20px">💬</span> Enviar por WhatsApp';toast('✓ Pedido enviado','ok');persist();}
+    },i*700);
+  });
 }
 
 document.getElementById('btnWA').addEventListener('click',()=>sendWA('both'));
@@ -1978,6 +2195,32 @@ function renderResumen(){
   document.getElementById('resTotalBar').innerHTML='';
 }
 
+// Agrupa historicoCache por fecha (sin incluir hoy, que ya se ve en vivo arriba)
+// y suma los 3 montos de todos los proveedores de cada día.
+function renderHistorico(){
+  const el=document.getElementById('resHistorico');
+  if(!el)return;
+  const today=new Date().toISOString().slice(0,10);
+  const byDate={};
+  Object.values(historicoCache).forEach(row=>{
+    if(row.fecha===today)return;
+    if(!byDate[row.fecha])byDate[row.fecha]={fecha:row.fecha,moravia:0,angeles:0,total:0};
+    byDate[row.fecha].moravia+=+row.total_moravia||0;
+    byDate[row.fecha].angeles+=+row.total_angeles||0;
+    byDate[row.fecha].total+=+row.total||0;
+  });
+  const days=Object.values(byDate).sort((a,b)=>b.fecha.localeCompare(a.fecha)).slice(0,30);
+  if(!days.length){el.innerHTML='<div class="empty"><div class="empty-ico">📅</div><div>Sin historial aún</div></div>';return;}
+  el.innerHTML=days.map(d=>{
+    const label=new Date(d.fecha+'T00:00:00').toLocaleDateString('es-CR',{weekday:'short',day:'numeric',month:'short'});
+    return `<div class="today-provider">
+      <div class="today-provider-icon">📅</div>
+      <div><div class="today-provider-name">${label}</div><div class="today-provider-state">M ₡${fmt(d.moravia)} · LA ₡${fmt(d.angeles)}</div></div>
+      <div class="today-provider-money"><strong>₡${fmt(d.total)}</strong></div>
+    </div>`;
+  }).join('');
+}
+
 setInterval(()=>{
   if(document.getElementById('view-resumen')?.classList.contains('active'))renderResumen();
 },15000);
@@ -1994,18 +2237,9 @@ document.querySelectorAll('.cfg-acc-hdr').forEach(hdr=>{
 
 function renderConfig(){
   // Contadores en los títulos — se ve el estado sin abrir nada
-  const phonesSet=getProvNames().filter(n=>(S.phones[n]||'').trim()).length;
   const waSet=(S.pdfWa||[]).filter(c=>(c.tel||'').trim()).length;
-  const elP=document.getElementById('accCountPhones');if(elP)elP.textContent=phonesSet+'/'+getProvNames().length;
   const elW=document.getElementById('accCountPdfWa');if(elW)elW.textContent=waSet+'/5';
   const elPr=document.getElementById('accCountProvs');if(elPr)elPr.textContent=getProvNames().length;
-  // Phones
-  document.getElementById('cfgPhones').innerHTML=getProvNames().map(name=>`
-    <div class="cfg-row">
-      <span class="cfg-lbl">${name}</span>
-      <input class="cfg-inp" type="tel" placeholder="+506XXXXXXXX" value="${S.phones[name]||''}" oninput="S.phones['${name}']=this.value;persist()">
-    </div>
-  `).join('');
 
   // PDF WhatsApp
   document.getElementById('cfgPdfWa').innerHTML=S.pdfWa.map((c,i)=>`
@@ -2018,6 +2252,47 @@ function renderConfig(){
 
   // Proveedores y productos
   renderCfgProveedores();
+}
+
+// Desliza rowEl.prod-cfg-row-content hacia la izquierda; al superar el umbral
+// dispara onDelete. Complementa el botón × (no lo reemplaza).
+function attachSwipeToDelete(rowEl,onDelete){
+  const content=rowEl.querySelector('.prod-cfg-row-content');
+  const THRESHOLD=70;
+  let startX=0,startY=0,dx=0,dragging=false,decided=false,isHorizontal=false;
+  content.addEventListener('pointerdown',e=>{
+    startX=e.clientX;startY=e.clientY;dx=0;dragging=true;decided=false;
+    content.setPointerCapture(e.pointerId);
+    content.style.transition='none';
+  });
+  content.addEventListener('pointermove',e=>{
+    if(!dragging)return;
+    dx=e.clientX-startX;
+    const dy=e.clientY-startY;
+    if(!decided){
+      if(Math.abs(dx)>8||Math.abs(dy)>8){decided=true;isHorizontal=Math.abs(dx)>Math.abs(dy);}
+      else return;
+    }
+    if(!isHorizontal)return;
+    dx=Math.min(0,dx);
+    content.style.transform=`translateX(${dx}px)`;
+  });
+  const finish=()=>{
+    if(!dragging)return;
+    dragging=false;
+    content.style.transition='transform .2s ease';
+    if(isHorizontal&&dx<-THRESHOLD){
+      content.style.transform='translateX(-100%)';
+      rowEl.style.maxHeight=rowEl.offsetHeight+'px';
+      rowEl.style.overflow='hidden';
+      requestAnimationFrame(()=>{rowEl.style.maxHeight='0px';rowEl.style.opacity='0';});
+      setTimeout(onDelete,200);
+    }else{
+      content.style.transform='translateX(0)';
+    }
+  };
+  content.addEventListener('pointerup',finish);
+  content.addEventListener('pointercancel',finish);
 }
 
 function renderCfgProveedores(){
@@ -2061,6 +2336,7 @@ function renderCfgProveedores(){
         S.providerOrder=S.providerOrder.filter(n=>n!==name);
         delete S.pedidos[name];
         delete S.phones[name];
+        delete S.waContacts[name];
         if(S.currentProv===name)S.currentProv=null;
         const localPrices=LS.get('aramo_prices',{});
         Object.keys(localPrices).filter(key=>key.startsWith(name+'_')).forEach(key=>delete localPrices[key]);
@@ -2081,23 +2357,49 @@ function renderCfgProveedores(){
     if(isOpen){
       const body=item.querySelector('.prov-cfg-body');
       const products=provData.products||[];
+      if(!S.waContacts[name])S.waContacts[name]=[];
       const waBox=document.createElement('div');
       waBox.className='provider-wa-box';
-      waBox.innerHTML=`
-        <label>💬 WhatsApp de ${name}</label>
-        <input type="tel" inputmode="tel" placeholder="+506 8888 8888" value="${S.phones[name]||''}" aria-label="WhatsApp de ${name}">
-        <button type="button">Abrir chat</button>
-      `;
-      waBox.querySelector('input').addEventListener('input',e=>{
-        S.phones[name]=e.target.value;
-        persist();
-      });
-      waBox.querySelector('button').addEventListener('click',()=>{
-        const raw=(S.phones[name]||'').replace(/\D/g,'');
-        if(!raw){toast(`Agregá primero el WhatsApp de ${name}`,'err');waBox.querySelector('input').focus();return;}
-        const msg=hasData(name)?buildMsg(name,'both'):`Hola ${name}`;
-        window.open(`https://wa.me/${raw}?text=${encodeURIComponent(msg)}`,'_blank');
-      });
+      const renderWaRows=()=>{
+        const contacts=S.waContacts[name];
+        waBox.innerHTML=`
+          <label>💬 WhatsApp de ${name} <span style="font-weight:400;color:var(--m);font-size:11px">— si se envía a varios números, se abren en fila</span></label>
+          ${contacts.map((tel,i)=>`
+            <div class="wa-contact-row">
+              <input type="tel" inputmode="tel" placeholder="+506 8888 8888" value="${tel||''}" data-i="${i}" aria-label="WhatsApp ${i+1} de ${name}">
+              <button type="button" class="wa-contact-rm" data-i="${i}" title="Quitar número">×</button>
+            </div>
+          `).join('')}
+          <div class="wa-contact-actions">
+            <button type="button" class="wa-contact-add">+ Agregar número</button>
+            <button type="button" class="wa-contact-open">Abrir chat</button>
+          </div>
+        `;
+        waBox.querySelectorAll('.wa-contact-row input').forEach(inp=>{
+          inp.addEventListener('input',e=>{
+            S.waContacts[name][+e.target.dataset.i]=e.target.value;
+            persist();
+          });
+        });
+        waBox.querySelectorAll('.wa-contact-rm').forEach(btn=>{
+          btn.addEventListener('click',()=>{
+            S.waContacts[name].splice(+btn.dataset.i,1);
+            persist();renderWaRows();
+          });
+        });
+        waBox.querySelector('.wa-contact-add').addEventListener('click',()=>{
+          S.waContacts[name].push('');
+          persist();renderWaRows();
+          waBox.querySelector('.wa-contact-row:last-child input').focus();
+        });
+        waBox.querySelector('.wa-contact-open').addEventListener('click',()=>{
+          const raw=(contacts[0]||'').replace(/\D/g,'');
+          if(!raw){toast(`Agregá primero el WhatsApp de ${name}`,'err');return;}
+          const msg=hasData(name)?buildMsg(name,'both'):`Hola ${name}`;
+          window.open(`https://wa.me/${raw}?text=${encodeURIComponent(msg)}`,'_blank');
+        });
+      };
+      renderWaRows();
       body.appendChild(waBox);
       renderProductPicker(name,body);
       products
@@ -2107,9 +2409,12 @@ function renderCfgProveedores(){
         const row=document.createElement('div');
         row.className='prod-cfg-row';
         row.innerHTML=`
-          <input class="prod-cfg-name" type="text" value="${prod.name}" placeholder="Nombre producto">
-          <select class="prod-cfg-unit">${UNITS.map(u=>`<option value="${u}"${u===prod.unit?' selected':''}>${u}</option>`).join('')}</select>
-          <button class="prod-cfg-rm" title="Eliminar producto">×</button>
+          <div class="prod-cfg-row-bg">Eliminar</div>
+          <div class="prod-cfg-row-content">
+            <input class="prod-cfg-name" type="text" value="${prod.name}" placeholder="Nombre producto">
+            <select class="prod-cfg-unit">${UNITS.map(u=>`<option value="${u}"${u===prod.unit?' selected':''}>${u}</option>`).join('')}</select>
+            <button class="prod-cfg-rm" title="Eliminar producto">×</button>
+          </div>
         `;
         row.querySelector('.prod-cfg-name').addEventListener('input',e=>{
           ensureCustomProv(name);
@@ -2121,12 +2426,16 @@ function renderCfgProveedores(){
           S.customProviders[name].products[idx].unit=e.target.value;
           persist();
         });
-        row.querySelector('.prod-cfg-rm').addEventListener('click',e=>{
-          e.stopPropagation();
+        const removeProduct=()=>{
           ensureCustomProv(name);
           S.customProviders[name].products.splice(idx,1);
           persist();renderCfgProveedores();
+        };
+        row.querySelector('.prod-cfg-rm').addEventListener('click',e=>{
+          e.stopPropagation();
+          removeProduct();
         });
+        attachSwipeToDelete(row,removeProduct);
         body.appendChild(row);
       });
       const addBtn=document.createElement('button');
@@ -2257,6 +2566,7 @@ function renameProveedor(oldName, newName){
   delete S.customProviders[oldName];
   if(S.pedidos[oldName]){S.pedidos[newName]=S.pedidos[oldName];delete S.pedidos[oldName];}
   if(S.phones[oldName]){S.phones[newName]=S.phones[oldName];delete S.phones[oldName];}
+  if(S.waContacts[oldName]){S.waContacts[newName]=S.waContacts[oldName];delete S.waContacts[oldName];}
   const idx=S.providerOrder.indexOf(oldName);
   if(idx!==-1)S.providerOrder[idx]=newName;
   else S.providerOrder.push(newName);
@@ -2309,9 +2619,12 @@ function renderPriceSearch(){
   wrap.innerHTML=items.slice(0,80).map(item=>{
     const known=item.offers.filter(o=>+getPrice(o.prov,o.product.id)>0);
     const best=known.sort((a,b)=>+getPrice(a.prov,a.product.id)-+getPrice(b.prov,b.product.id))[0];
-    return `<button class="price-result" type="button" data-price-key="${item.key}">
-      <span style="font-size:24px">${item.emoji}</span>
-      <span class="price-result-name">${item.name}<span class="price-result-meta" style="display:block">${item.offers.length} proveedor${item.offers.length===1?'':'es'}</span></span>
+    const hasPrice=known.length>0;
+    return `<button class="price-result${hasPrice?' has-price':''}" type="button" data-price-key="${item.key}">
+      ${hasPrice?'<span class="price-check">✓</span>':''}
+      <span style="font-size:22px">${item.emoji}</span>
+      <span class="price-result-name">${item.name}</span>
+      <span class="price-result-meta">${item.offers.length} prov.</span>
       <strong>${best?'₡'+fmt(getPrice(best.prov,best.product.id)):'Editar'}</strong>
     </button>`;
   }).join('')||'<div class="empty-state"><div class="empty-ico">🔍</div>No encontré ese producto</div>';
@@ -2426,16 +2739,8 @@ function inp_globalGoTo(provName, prodId){
   document.getElementById('globalSearch').value='';
   document.getElementById('globalSearchResults').style.display='none';
   openProv(provName);
-  // Scroll al producto después de renderizar
-  setTimeout(()=>{
-    const inp=document.querySelector(`#prodCardList .tbl-qty[data-pid="${prodId}"]`);
-    if(inp){
-      const card=inp.closest('.prod-card-item');
-      (card||inp).scrollIntoView({behavior:'smooth',block:'center'});
-      inp.focus();inp.select();
-      if(card){card.style.boxShadow='0 0 0 2px var(--g)';setTimeout(()=>card.style.boxShadow='',1500);}
-    }
-  },250);
+  // Abre directo el detalle del producto tras renderizar la grilla
+  setTimeout(()=>openProdDetailModal(prodId),250);
 }
 
 // Tema claro por defecto; la preferencia queda guardada en este dispositivo.
@@ -2472,9 +2777,10 @@ document.getElementById('themeToggle').addEventListener('click',()=>{
     if(S.currentProv) renderProdTable();
   });
   // Cargar pedidos y configuración compartida, y activar tiempo real
-  Promise.all([loadConfigFromSupabase(),loadPedidosFromSupabase()]).then(()=>{
+  Promise.all([loadConfigFromSupabase(),loadPedidosFromSupabase(),loadHistoricoFromSupabase()]).then(()=>{
     initRealtimeConfig();
     initRealtimePedidos();
+    initRealtimeHistorico();
     markSyncLive();
     renderHome();
     if(S.currentProv){renderProdTable();updateProvTotals();updatePreview();renderProvStatus();}
