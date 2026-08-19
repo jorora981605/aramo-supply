@@ -450,14 +450,7 @@ body{background:linear-gradient(180deg,var(--gd),transparent 260px),var(--bg);fo
 .price-result-meta{font-size:11px;color:var(--m)}
 .price-result strong{font-size:13px;margin-top:2px}
 
-#prodCardList{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}
-@media(max-width:480px){#prodCardList{grid-template-columns:repeat(2,1fr)}}
-.prod-grid-item{position:relative;display:flex;flex-direction:column;align-items:center;gap:3px;width:100%;padding:12px 6px;border-radius:14px;border:1px solid var(--b);background:var(--card);color:var(--t);text-align:center;cursor:pointer}
-.prod-grid-item.filled-m{border-color:var(--g);background:var(--gd)}
-.prod-grid-item.filled-a{border-color:var(--o);background:var(--od)}
-.prod-grid-item.filled-both{border-color:var(--g);background:linear-gradient(90deg,var(--gd),var(--od))}
-.prod-grid-item .price-check{background:var(--g)}
-.prod-grid-fav{position:absolute;top:6px;left:6px;font-size:13px}
+#prodCardList{display:block}
 .compare-row{display:grid;grid-template-columns:1fr 115px;gap:10px;align-items:center;padding:12px 0;border-bottom:1px solid var(--b)}
 .compare-provider{font-weight:800}.compare-unit{font-size:13px;color:var(--m)}
 .compare-price{width:100%;padding:11px;border:1px solid var(--b2);border-radius:12px;background:var(--s);color:var(--t);font-size:16px;text-align:right}
@@ -475,12 +468,61 @@ html[data-theme="dark"] .wa-contact-add{color:#6fe3a0}
 .product-picker-title{font-size:16px;font-weight:900;margin-bottom:3px}.product-picker-help{font-size:13px;color:var(--m);line-height:1.4;margin-bottom:10px}
 .product-picker-search{width:100%;min-height:48px;padding:0 14px;border:2px solid var(--b2);border-radius:14px;background:var(--card);color:var(--t);font-size:15px;outline:none}
 .product-picker-search:focus{border-color:var(--g)}
-.product-picker-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px;margin-top:10px}
-.product-pick{display:flex;align-items:center;gap:8px;min-width:0;min-height:48px;padding:9px 10px;border:1px solid var(--b2);border-radius:13px;background:var(--card);color:var(--t);font-size:13px;font-weight:800;text-align:left}
-.product-pick:hover,.product-pick:active{border-color:var(--g);background:var(--gd)}.product-pick .emoji{font-size:20px;flex-shrink:0}.product-pick .name{overflow:hidden;text-overflow:ellipsis}
+.product-picker-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px;margin-top:10px}
+.product-pick{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:4px;min-width:0;min-height:74px;padding:9px 5px;border:1px solid var(--b2);border-radius:13px;background:var(--card);color:var(--t);font-size:12px;font-weight:800;text-align:center;line-height:1.2}
+.product-pick:hover,.product-pick:active{border-color:var(--g);background:var(--gd)}.product-pick .emoji{font-size:22px;flex-shrink:0}
+.product-pick .name{width:100%;overflow:hidden;text-overflow:ellipsis;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical}
 .product-picker-more{width:100%;min-height:42px;margin-top:9px;border:1px solid var(--g);border-radius:12px;background:var(--card);color:var(--g);font-weight:900}
 .product-picker-empty{padding:16px 4px 6px;text-align:center;color:var(--m);font-size:13px}
 .manual-product-label{margin:14px 0 7px;padding-top:12px;border-top:1px solid var(--b);font-size:12px;color:var(--m);font-weight:800}
+/* ── FILA DE PRODUCTO CON DOBLE STEPPER ──
+   Las dos sucursales siempre visibles y editables en el mismo lugar. */
+/* El nombre manda: ocupa toda la primera línea; los steppers van debajo,
+   uno por sucursal, a lo ancho. Así nunca se trunca el producto. */
+.prod-row{padding:10px 12px 11px;margin-bottom:8px;border:1px solid var(--b);border-radius:15px;background:var(--card);box-shadow:var(--chrome-hi-sm)}
+.prod-row.active{border-color:var(--gg);background:linear-gradient(180deg,var(--gd),var(--card) 55%)}
+.prod-row-info{display:flex;align-items:center;gap:9px;width:100%;min-width:0;padding:0 0 9px;border:0;background:none;color:var(--t);text-align:left;cursor:pointer}
+.prod-row-emoji{font-size:24px;flex-shrink:0}
+.prod-row-name{flex:1;min-width:0;font-size:15.5px;font-weight:800;line-height:1.2;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.prod-row-name small{display:block;font-size:10.5px;font-weight:700;color:var(--m);text-transform:uppercase;margin-top:2px;white-space:nowrap}
+.prod-row-steppers{display:grid;grid-template-columns:1fr 1fr;gap:9px}
+.stepper{display:flex;align-items:center;justify-content:space-between;gap:1px;padding:3px 5px;border:1.5px solid var(--b);border-radius:12px;background:var(--s);position:relative}
+.stepper.m.on{border-color:var(--g);background:var(--gd)}
+.stepper.a.on{border-color:var(--o);background:var(--od)}
+.stepper-tag{position:absolute;top:-9px;left:9px;padding:1px 7px;border-radius:8px;background:var(--card);font-size:10px;font-weight:900;letter-spacing:.4px}
+.stepper.m .stepper-tag{color:var(--g)}
+.stepper.a .stepper-tag{color:var(--o)}
+.stepper-btn{flex:0 0 auto;width:44px;height:44px;border:0;border-radius:10px;background:transparent;color:var(--m);font-size:26px;font-weight:400;line-height:1;display:flex;align-items:center;justify-content:center;cursor:pointer;-webkit-tap-highlight-color:transparent;touch-action:manipulation;transition:var(--tr)}
+.stepper.m .stepper-btn{color:var(--g)}
+.stepper.a .stepper-btn{color:var(--o)}
+.stepper.m .stepper-btn:active{background:var(--g);color:#fff;transform:scale(.9)}
+.stepper.a .stepper-btn:active{background:var(--o);color:#fff;transform:scale(.9)}
+.stepper-val{flex:1;min-width:0;width:100%;height:44px;border:0;border-radius:9px;background:transparent;color:var(--t);font-size:18px;font-weight:800;text-align:center;outline:none;-moz-appearance:textfield;padding:0}
+.stepper-val::-webkit-inner-spin-button,.stepper-val::-webkit-outer-spin-button{-webkit-appearance:none;margin:0}
+.stepper-val::placeholder{color:var(--b2);font-weight:600}
+.stepper.m.on .stepper-val{color:var(--g)}
+.stepper.a.on .stepper-val{color:var(--o)}
+@media(max-width:360px){
+  .stepper-btn{width:38px;height:42px;font-size:24px}
+  .stepper-val{height:42px;font-size:17px}
+  .prod-row-steppers{gap:7px}
+}
+.home-cta{display:flex;align-items:center;gap:12px;width:100%;min-height:64px;padding:13px 15px;border:0;border-radius:18px;background:linear-gradient(135deg,var(--g),var(--gh));color:#fff;text-align:left;box-shadow:0 8px 22px rgba(8,122,76,.28);cursor:pointer;transition:var(--tr)}
+.home-cta:active{transform:scale(.98)}
+.home-cta-ico{font-size:26px;flex-shrink:0}
+.home-cta-txt{flex:1;min-width:0}
+.home-cta-txt strong{display:block;font-size:17px;font-weight:900;letter-spacing:-.2px}
+.home-cta-txt small{display:block;font-size:12.5px;opacity:.9;margin-top:2px;font-weight:600}
+.home-cta-arrow{font-size:26px;opacity:.85;flex-shrink:0}
+.catalogo-item{padding:11px 12px;margin-bottom:8px;border:1px solid var(--b);border-radius:14px;background:var(--card)}
+.catalogo-item-top{display:flex;align-items:center;gap:9px}
+.catalogo-item-name{flex:1;min-width:0;font-size:15px;font-weight:800;line-height:1.2}
+.catalogo-item-name small{display:block;font-size:11px;font-weight:700;color:var(--m);text-transform:uppercase;margin-top:2px}
+.catalogo-add{flex-shrink:0;min-height:38px;padding:0 12px;border:1px solid var(--g);border-radius:11px;background:var(--gd);color:var(--g);font-size:12px;font-weight:900;cursor:pointer}
+.catalogo-add:active{transform:scale(.95)}
+.catalogo-sellers{display:flex;flex-wrap:wrap;gap:5px;margin-top:9px}
+.catalogo-chip{padding:4px 9px;border-radius:20px;background:var(--sb);color:var(--m);font-size:11px;font-weight:800}
+.catalogo-chip.empty{background:var(--od);color:var(--o)}
 .new-provider-box{padding:14px;margin-bottom:14px;border:2px solid var(--gg);border-radius:17px;background:var(--gd)}
 .new-provider-title{font-size:17px;font-weight:900}.new-provider-help{font-size:13px;line-height:1.4;color:var(--m);margin:4px 0 10px}
 .new-provider-box .new-prov-row{margin:0}.new-provider-box .new-prov-inp{min-height:48px;background:var(--card);border:2px solid var(--b2);border-radius:13px}
@@ -625,6 +667,13 @@ html[data-theme="dark"] .today-money-card{background:linear-gradient(145deg,#125
   <div class="scroll">
     <div class="home-hero" id="homeHero"></div>
     <div style="padding:12px 16px 0">
+      <button class="home-cta" id="homeCreateOrder" type="button">
+        <span class="home-cta-ico">🧾</span>
+        <span class="home-cta-txt"><strong id="homeCtaTitle">Crear pedido</strong><small id="homeCtaSub">Elegí el proveedor y empezá</small></span>
+        <span class="home-cta-arrow">›</span>
+      </button>
+    </div>
+    <div style="padding:12px 16px 0">
       <div class="metric-grid c3" id="homeMetrics"></div>
     </div>
     <div class="day-progress-wrap" id="dayProgressWrap" style="display:none">
@@ -657,15 +706,10 @@ html[data-theme="dark"] .today-money-card{background:linear-gradient(145deg,#125
     <span class="prov-total-quick" id="provTotalQuick">₡0</span>
   </div>
   <div class="prod-filter">
-    <div class="search-wrap">
-      <span class="search-ico">🔍</span>
-      <input type="text" class="search-inp" id="provSearch" placeholder="Buscar..." autocomplete="off">
-    </div>
-    <button class="filter-btn" id="filterUsed">⭐ Usados</button>
-    <button class="filter-btn" id="btnAddProdProv" title="Añadir producto">+ Producto</button>
+    <button class="filter-btn" id="btnAddProdProv" title="Añadir producto" style="flex:1">+ Añadir producto</button>
   </div>
   <div class="scroll" id="provScroll" style="padding-bottom:220px">
-    <div class="provider-help">Tocá <strong>+</strong> o escribí la cantidad. Los cambios se guardan solos.</div>
+    <div class="provider-help">Tocá <strong>+</strong> en cada sucursal. Se guarda solo.</div>
     <div style="padding:10px 14px 0" id="prodCardList"></div>
 
     <div class="extras-section" style="margin-top:10px">
@@ -753,6 +797,27 @@ html[data-theme="dark"] .today-money-card{background:linear-gradient(145deg,#125
         </div>
       </div>
 
+      <div class="today-section-title"><span>🛒 Dinero para el mercado</span><small>Cuánto llevar</small></div>
+      <div class="market-card">
+        <div style="color:var(--m);font-size:14px;margin-bottom:4px">Llevar al mercado</div>
+        <div class="market-total" id="dineroAmt">₡0</div>
+        <div style="color:var(--m);font-size:13px;margin-top:5px">Se calcula automáticamente con los pedidos actuales.</div>
+        <div class="sec-lbl" style="margin:14px 0 7px">Colchón de seguridad</div>
+        <div class="margin-row">
+          <button class="mg-btn active" onclick="setMargen(0)">Exacto</button>
+          <button class="mg-btn" onclick="setMargen(5)">+5%</button>
+          <button class="mg-btn" onclick="setMargen(10)">+10%</button>
+          <button class="mg-btn" onclick="setMargen(15)">+15%</button>
+          <button class="mg-btn" onclick="setMargenCustom()">Otro</button>
+        </div>
+        <div style="margin-top:12px">
+          <div class="market-row"><span>Moravia</span><strong id="dbM">₡0</strong></div>
+          <div class="market-row"><span>Los Ángeles</span><strong id="dbA">₡0</strong></div>
+          <div class="market-row"><span>Subtotal</span><strong id="dbSub">₡0</strong></div>
+          <div class="market-row"><span id="dbML">Margen 0%</span><strong id="dbMV">₡0</strong></div>
+        </div>
+      </div>
+
       <div class="today-section-title"><span>Proveedores de hoy</span><small>Tocá uno para abrirlo</small></div>
       <div id="resProvList"></div>
       <div id="resTotalBar" style="display:none"></div>
@@ -761,34 +826,6 @@ html[data-theme="dark"] .today-money-card{background:linear-gradient(145deg,#125
       <div id="resHistorico"></div>
     </div>
   </div>
-</div>
-
-<!-- ═══ MERCADO ═══ -->
-<div class="view" id="view-mercado">
-  <div class="scroll"><div class="sec">
-    <div class="sec-lbl">Dinero para las compras</div>
-    <div class="market-card">
-      <div style="color:var(--m);font-size:14px;margin-bottom:4px">Llevar al mercado</div>
-      <div class="market-total" id="dineroAmt">₡0</div>
-      <div style="color:var(--m);font-size:13px;margin-top:5px">Se calcula automáticamente con los pedidos actuales.</div>
-    </div>
-    <div class="market-card">
-      <div class="sec-lbl">Colchón de seguridad</div>
-      <div class="margin-row">
-        <button class="mg-btn active" onclick="setMargen(0)">Exacto</button>
-        <button class="mg-btn" onclick="setMargen(5)">+5%</button>
-        <button class="mg-btn" onclick="setMargen(10)">+10%</button>
-        <button class="mg-btn" onclick="setMargen(15)">+15%</button>
-        <button class="mg-btn" onclick="setMargenCustom()">Otro</button>
-      </div>
-    </div>
-    <div class="market-card">
-      <div class="market-row"><span>Moravia</span><strong id="dbM">₡0</strong></div>
-      <div class="market-row"><span>Los Ángeles</span><strong id="dbA">₡0</strong></div>
-      <div class="market-row"><span>Subtotal</span><strong id="dbSub">₡0</strong></div>
-      <div class="market-row"><span id="dbML">Margen 0%</span><strong id="dbMV">₡0</strong></div>
-    </div>
-  </div></div>
 </div>
 
 <!-- ═══ PRECIOS ═══ -->
@@ -831,6 +868,15 @@ html[data-theme="dark"] .today-money-card{background:linear-gradient(145deg,#125
         </div>
       </div>
 
+      <div class="cfg-acc" data-acc="catalogo">
+        <button class="cfg-acc-hdr">🥬 Productos <span class="cfg-acc-count" id="accCountCatalogo"></span><span class="cfg-acc-arrow">▾</span></button>
+        <div class="cfg-acc-body">
+          <div class="cfg-acc-sub">Todos los productos que existen en la app. Desde acá los agregás a los proveedores que los venden.</div>
+          <input class="product-picker-search" id="catalogoSearch" type="search" placeholder="🔍 Buscar producto…" autocomplete="off" style="margin-bottom:10px">
+          <div id="catalogoList"></div>
+        </div>
+      </div>
+
       <div class="cfg-acc" data-acc="precios">
         <button class="cfg-acc-hdr">💰 Precios <span class="cfg-acc-arrow">→</span></button>
         <div class="cfg-acc-body">
@@ -857,7 +903,6 @@ html[data-theme="dark"] .today-money-card{background:linear-gradient(145deg,#125
 
 <nav class="nav-bottom">
   <button class="nav-btn active" data-view="home"><span class="ico">🏠</span>Inicio</button>
-  <button class="nav-btn" data-view="mercado"><span class="ico">🛒</span>Mercado</button>
   <button class="nav-btn" data-view="precios"><span class="ico">💰</span>Precios</button>
   <button class="nav-btn" data-view="resumen"><span class="ico">📊</span>Hoy</button>
   <button class="nav-btn" data-view="config"><span class="ico">⚙️</span>Config</button>
@@ -920,7 +965,19 @@ html[data-theme="dark"] .today-money-card{background:linear-gradient(145deg,#125
 // ══════════════════════════════════════════
 // UNITS & DEFAULT DATA
 // ══════════════════════════════════════════
-const UNITS=['kg','unidades','cajas','bolsas','rollos','paquetes','atados','racimos','litros','gramos'];
+// Solo tres unidades reales de compra. Las viejas se mapean a la más cercana
+// para que ningún producto guardado quede con una unidad que ya no existe.
+const UNITS=['kg','unidad','caja'];
+const UNIT_ALIASES={
+  unidades:'unidad',cajas:'caja',bolsas:'caja',paquetes:'caja',rollos:'unidad',
+  atados:'unidad',racimos:'unidad',litros:'unidad',gramos:'kg'
+};
+function normUnit(u){
+  if(!u)return 'kg';
+  const clean=String(u).trim().toLowerCase();
+  if(UNITS.includes(clean))return clean;
+  return UNIT_ALIASES[clean]||'kg';
+}
 
 const DEFAULT_PROVIDERS={
   Luisa:{color:'#ff6b9d',products:[
@@ -1023,8 +1080,6 @@ let S={
   customProviders:{},
 };
 
-let filterMode='all';
-let currentSearch='';
 let cfgOpenProv=null;
 const cfgCatalogExpanded={};
 
@@ -1453,6 +1508,8 @@ function markUnsent(prov){if(S.pedidos[prov])S.pedidos[prov].sent=false;}
 // NAV
 // ══════════════════════════════════════════
 function switchView(name){
+  // El mercado ahora vive dentro de "Hoy"; cualquier enlace viejo cae ahí.
+  if(name==='mercado')name='resumen';
   document.querySelectorAll('.view').forEach(v=>v.classList.remove('active'));
   document.querySelectorAll('.nav-btn').forEach(b=>b.classList.toggle('active',b.dataset.view===name));
   document.getElementById('view-'+name).classList.add('active');
@@ -1463,9 +1520,8 @@ function switchView(name){
   // Limpiar búsqueda al salir
   if(name!=='home'){const inp=document.getElementById('globalSearch');if(inp)inp.value='';const res=document.getElementById('globalSearchResults');if(res)res.style.display='none';}
   if(name==='home')renderHome();
-  if(name==='mercado')updateHomeDinero();
   if(name==='precios')renderPriceSearch();
-  if(name==='resumen'){renderResumen();renderHistorico();}
+  if(name==='resumen'){renderResumen();renderHistorico();updateHomeDinero();}
   if(name==='config')renderConfig();
 }
 
@@ -1507,6 +1563,7 @@ function renderHome(){
   const all=calcAllProvs();
   const sent=getProvNames().filter(p=>isSent(p)).length;
   const pending=getProvNames().filter(p=>hasData(p)&&!isSent(p)).length;
+  renderHomeCta(pending);
   document.getElementById('homeMetrics').innerHTML=`
     <div class="metric-card"><div class="metric-lbl">Total día</div><div class="metric-val green" style="font-size:17px">₡${fmt(all.total)}</div></div>
     <div class="metric-card" style="cursor:pointer" onclick="openProvListModal('sent')"><div class="metric-lbl">Enviados ✅</div><div class="metric-val green">${sent}</div></div>
@@ -1541,6 +1598,41 @@ function renderHome(){
   updateHomeDinero();
 }
 
+// Botón principal de Inicio: abre el selector de proveedor para arrancar el
+// pedido de una, sin buscar la tarjeta a mano en la grilla.
+function renderHomeCta(pending){
+  const btn=document.getElementById('homeCreateOrder');
+  if(!btn)return;
+  const title=document.getElementById('homeCtaTitle');
+  const sub=document.getElementById('homeCtaSub');
+  if(pending>0){
+    title.textContent='Continuar pedido';
+    sub.textContent=`${pending} pendiente${pending===1?'':'s'} · o empezá con otro proveedor`;
+  }else{
+    title.textContent='Crear pedido';
+    sub.textContent='Elegí el proveedor y empezá';
+  }
+  btn.onclick=()=>openCreateOrderModal();
+}
+
+function openCreateOrderModal(){
+  const names=getProvNames();
+  document.getElementById('provListModalTitle').textContent='¿A qué proveedor le pedís?';
+  const body=document.getElementById('provListModalBody');
+  body.innerHTML=names.length
+    ?names.map(n=>{
+      const estado=isSent(n)?'<span style="color:var(--g);font-size:12px;font-weight:800">✅ Enviado</span>'
+        :hasData(n)?'<span style="color:var(--o);font-size:12px;font-weight:800">⚠️ Pendiente</span>':'';
+      return `<button class="cfg-row" type="button" style="width:100%;display:flex;align-items:center;gap:10px;text-align:left;background:var(--card);border:1px solid var(--b);border-radius:var(--r3);padding:13px 12px;margin-bottom:6px;color:var(--t);font-size:15px;font-weight:700" data-prov="${n}"><span style="flex:1">${n}</span>${estado}</button>`;
+    }).join('')
+    :'<div class="empty" style="padding:14px 4px">Agregá un proveedor en Config</div>';
+  body.querySelectorAll('[data-prov]').forEach(btn=>btn.addEventListener('click',()=>{
+    closeProvListModal();
+    openProv(btn.dataset.prov);
+  }));
+  document.getElementById('modalProvList').classList.add('open');
+}
+
 function openProvListModal(kind){
   const names=getProvNames().filter(p=>kind==='sent'?isSent(p):(hasData(p)&&!isSent(p)));
   document.getElementById('provListModalTitle').textContent=kind==='sent'?'Enviados':'Pendientes';
@@ -1564,10 +1656,6 @@ document.getElementById('modalProvList').addEventListener('click',e=>{if(e.targe
 // ══════════════════════════════════════════
 function openProv(name){
   S.currentProv=name;
-  filterMode='all';
-  currentSearch='';
-  document.getElementById('provSearch').value='';
-  document.getElementById('filterUsed').classList.remove('active');
   document.getElementById('provTitle').textContent=name;
   document.getElementById('noteArea').value=getPedido(name).note||'';
   renderProvStatus();
@@ -1615,20 +1703,33 @@ function syncNote(prov,prod,val){
   updatePreview();persist();
 }
 
-// HTML de la card compacta de la grilla — usada por el render principal y
-// por el refresco puntual al cerrar el modal de detalle.
+// Fila de producto con los dos steppers de sucursal a la vista. Sin modo
+// global: la cantidad de cada sucursal siempre se ve y se toca donde está,
+// así no hay forma de cargar en la sucursal equivocada.
 function renderProdCard(prod,prov,p){
   const qM=p.qtys.moravia?.[prod.id]?.qty||'';
   const qA=p.qtys.angeles?.[prod.id]?.qty||'';
-  const fillState=(+qM>0&&+qA>0)?'filled-both':+qM>0?'filled-m':+qA>0?'filled-a':'';
-  const isFav=S.favs.includes(prod.id);
-  return `<button type="button" class="prod-grid-item${fillState?' '+fillState:''}" data-pid="${prod.id}">
-    ${fillState?'<span class="price-check">✓</span>':''}
-    ${isFav?'<span class="prod-grid-fav">⭐</span>':''}
-    <span style="font-size:22px">${prod.emoji||'🌿'}</span>
-    <span class="price-result-name">${prod.name}</span>
-    ${fillState?`<span class="price-result-meta">M ${qM||0} · LA ${qA||0}</span>`:''}
-  </button>`;
+  const active=(+qM>0||+qA>0);
+  const note=p.notes[prod.id]?' 📝':'';
+  return `<div class="prod-row${active?' active':''}" data-pid="${prod.id}">
+    <button type="button" class="prod-row-info" data-pid="${prod.id}">
+      <span class="prod-row-emoji">${prod.emoji||'🌿'}</span>
+      <span class="prod-row-name">${prod.name}<small>${normUnit(prod.unit)}${note}</small></span>
+    </button>
+    <div class="prod-row-steppers">
+      ${['moravia','angeles'].map(side=>{
+        const v=side==='moravia'?qM:qA;
+        const tag=side==='moravia'?'MORAVIA':'LOS ÁNGELES';
+        return `<div class="stepper ${side==='moravia'?'m':'a'}${+v>0?' on':''}">
+          <span class="stepper-tag">${tag}</span>
+          <button type="button" class="stepper-btn" data-pid="${prod.id}" data-side="${side}" data-op="minus">−</button>
+          <input class="stepper-val" type="number" inputmode="decimal" min="0" step="0.5"
+            value="${v}" placeholder="0" data-pid="${prod.id}" data-side="${side}">
+          <button type="button" class="stepper-btn" data-pid="${prod.id}" data-side="${side}" data-op="plus">+</button>
+        </div>`;
+      }).join('')}
+    </div>
+  </div>`;
 }
 
 function renderProdTable(){
@@ -1636,24 +1737,80 @@ function renderProdTable(){
   if(!prov)return;
   const p=getPedido(prov);
   const provData=getAllProviders()[prov];
-  const prods=provData?.products||[];
-  const q=currentSearch.toLowerCase();
+  const prods=(provData?.products||[]).slice();
 
-  let filtered=prods.filter(pr=>{
-    if(q&&!pr.name.toLowerCase().includes(q))return false;
-    if(filterMode==='used'){
-      return +p.qtys.moravia?.[pr.id]?.qty>0||+p.qtys.angeles?.[pr.id]?.qty>0;
-    }
-    return true;
+  // Orden útil sin buscador: lo ya pedido arriba (para revisarlo/corregirlo),
+  // después lo que más se le compra a este proveedor, y el resto alfabético.
+  const qtyOf=pr=>(+p.qtys.moravia?.[pr.id]?.qty||0)+(+p.qtys.angeles?.[pr.id]?.qty||0);
+  const usos=histUsageCount(prov);
+  prods.sort((a,b)=>{
+    const da=qtyOf(a)>0?0:1, db=qtyOf(b)>0?0:1;
+    if(da!==db)return da-db;
+    const ua=usos[a.id]||0, ub=usos[b.id]||0;
+    if(ua!==ub)return ub-ua;
+    return a.name.localeCompare(b.name,'es',{sensitivity:'base'});
   });
-
-  filtered.sort((a,b)=>a.name.localeCompare(b.name,'es',{sensitivity:'base'}));
 
   const container=document.getElementById('prodCardList');
-  container.innerHTML=filtered.map(prod=>renderProdCard(prod,prov,p)).join('');
-  container.querySelectorAll('.prod-grid-item').forEach(btn=>{
+  container.innerHTML=prods.map(prod=>renderProdCard(prod,prov,p)).join('')
+    ||'<div class="empty">Este proveedor todavía no tiene productos.<br>Tocá “+ Añadir producto”.</div>';
+
+  const findProd=pid=>(provData?.products||[]).find(x=>x.id===pid);
+
+  container.querySelectorAll('.stepper-btn').forEach(btn=>{
+    btn.addEventListener('click',()=>{
+      const prod=findProd(btn.dataset.pid);
+      if(!prod)return;
+      const side=btn.dataset.side;
+      const input=container.querySelector(`.stepper-val[data-pid="${prod.id}"][data-side="${side}"]`);
+      const cur=+input.value||0;
+      const next=btn.dataset.op==='plus'?cur+1:Math.max(0,cur-1);
+      input.value=next||'';
+      syncQty(prov,prod,side,input.value,normUnit(prod.unit));
+      paintRow(prod.id);
+    });
+  });
+
+  container.querySelectorAll('.stepper-val').forEach(inp=>{
+    inp.addEventListener('focus',()=>inp.select());
+    inp.addEventListener('input',()=>{
+      const prod=findProd(inp.dataset.pid);
+      if(!prod)return;
+      syncQty(prov,prod,inp.dataset.side,inp.value,normUnit(prod.unit));
+      paintRow(prod.id);
+    });
+  });
+
+  container.querySelectorAll('.prod-row-info').forEach(btn=>{
     btn.addEventListener('click',()=>openProdDetailModal(btn.dataset.pid));
   });
+}
+
+// Refresca solo el resaltado de una fila, sin volver a dibujar la lista:
+// re-renderizar entera haría perder el foco del input mientras se escribe.
+function paintRow(pid){
+  const row=document.querySelector(`.prod-row[data-pid="${pid}"]`);
+  if(!row)return;
+  let any=false;
+  row.querySelectorAll('.stepper').forEach(st=>{
+    const val=+st.querySelector('.stepper-val').value||0;
+    st.classList.toggle('on',val>0);
+    if(val>0)any=true;
+  });
+  row.classList.toggle('active',any);
+}
+
+// Cuántas veces se le pidió cada producto a este proveedor en días anteriores.
+function histUsageCount(prov){
+  const counts={};
+  histGet().filter(h=>h.provider===prov).forEach(h=>{
+    ['moravia','angeles'].forEach(side=>{
+      Object.entries(h.qtys?.[side]||{}).forEach(([pid,v])=>{
+        if(+v?.qty>0)counts[pid]=(counts[pid]||0)+1;
+      });
+    });
+  });
+  return counts;
 }
 
 let _prodDetailId=null;
@@ -1668,12 +1825,11 @@ function openProdDetailModal(pid){
   const p=getPedido(prov);
   const qM=p.qtys.moravia?.[prod.id]?.qty||'';
   const qA=p.qtys.angeles?.[prod.id]?.qty||'';
-  const unit=p.qtys.moravia?.[prod.id]?.unit||p.qtys.angeles?.[prod.id]?.unit||prod.unit;
+  const unit=normUnit(p.qtys.moravia?.[prod.id]?.unit||p.qtys.angeles?.[prod.id]?.unit||prod.unit);
   const price=getPrice(prov,prod.id);
   const lastPrice=getLastPrice(prov,prod.id);
   const subtotal=((+qM||0)+(+qA||0))>0&&+price>0?((+qM||0)+(+qA||0))*+price:0;
   const note=p.notes[prod.id]||'';
-  const isFav=S.favs.includes(prod.id);
 
   let priceHintHTML='';
   if(lastPrice&&price&&+price!==+lastPrice){
@@ -1688,8 +1844,7 @@ function openProdDetailModal(pid){
   const lastQA=hist?.qtys?.angeles?.[prod.id]?.qty||'';
   const lastQHint=(lastQM||lastQA)?`<span class="last-qty">ant: ${lastQM||0}/${lastQA||0}</span>`:'';
 
-  document.getElementById('prodDetailTitle').innerHTML=`${prod.emoji||'🌿'} ${prod.name}
-    <button class="prod-fav${isFav?' on':''}" id="prodDetailFav" style="float:right">${isFav?'⭐':'☆'}</button>`;
+  document.getElementById('prodDetailTitle').innerHTML=`${prod.emoji||'🌿'} ${prod.name}`;
 
   document.getElementById('prodDetailBody').innerHTML=`
     <div class="prod-meta" style="justify-content:flex-end;display:flex;gap:6px;margin-bottom:8px">${lastQHint}${priceHintHTML}</div>
@@ -1774,13 +1929,6 @@ function openProdDetailModal(pid){
       else inp.value=Math.max(0,+(cur-step).toFixed(1))||'';
       syncQty(prov,prod,side,inp.value,unitSel.value);
     });
-  });
-
-  document.getElementById('prodDetailFav').addEventListener('click',()=>{
-    const i=S.favs.indexOf(prod.id);
-    if(i===-1)S.favs.push(prod.id);else S.favs.splice(i,1);
-    persist();
-    openProdDetailModal(pid);
   });
 
   document.getElementById('modalProdDetail').classList.add('open');
@@ -1979,14 +2127,6 @@ document.getElementById('noteArea').addEventListener('input',e=>{
   if(S.currentProv){getPedido(S.currentProv).note=e.target.value;updatePreview();markUnsent(S.currentProv);persist();}
 });
 
-// ── SEARCH / FILTER ──
-document.getElementById('provSearch').addEventListener('input',e=>{currentSearch=e.target.value;renderProdTable();});
-document.getElementById('filterUsed').addEventListener('click',()=>{
-  filterMode=filterMode==='used'?'all':'used';
-  document.getElementById('filterUsed').classList.toggle('active',filterMode==='used');
-  renderProdTable();
-});
-
 // ══════════════════════════════════════════
 // UTILIDADES DE TEXTO
 // ══════════════════════════════════════════
@@ -2148,7 +2288,7 @@ function renderResumen(){
     title.textContent='Todo listo para empezar';
     text.textContent='Creá el primer pedido del día eligiendo un proveedor.';
     action.textContent='Crear pedido';
-    action.onclick=()=>switchView('home');
+    action.onclick=()=>{switchView('home');openCreateOrderModal();};
   }else if(pending){
     title.textContent=`${pending} pedido${pending===1?'':'s'} por enviar`;
     text.textContent=`Ya hay ${items} producto${items===1?'':'s'} cargado${items===1?'':'s'}. Abrí el siguiente pendiente.`;
@@ -2252,6 +2392,75 @@ function renderConfig(){
 
   // Proveedores y productos
   renderCfgProveedores();
+  renderCatalogo();
+}
+
+// ── CATÁLOGO GENERAL DE PRODUCTOS ──
+// Vista única de todos los productos que existen en la app, con los proveedores
+// que venden cada uno. Desde acá se asigna un producto a un proveedor sin tener
+// que entrar proveedor por proveedor.
+function renderCatalogo(){
+  const list=document.getElementById('catalogoList');
+  if(!list)return;
+  const catalog=getKnownProductCatalog();
+  const count=document.getElementById('accCountCatalogo');
+  if(count)count.textContent=catalog.length;
+
+  const q=normalizeText(document.getElementById('catalogoSearch')?.value||'');
+  const shown=q?catalog.filter(p=>p.key.includes(q)):catalog;
+
+  const provs=getProvNames();
+  const provsOf=key=>provs.filter(name=>
+    (getAllProviders()[name]?.products||[]).some(p=>normalizeText(p.name)===key));
+
+  if(!shown.length){
+    list.innerHTML='<div class="product-picker-empty">No hay productos con ese nombre</div>';
+    return;
+  }
+
+  list.innerHTML=shown.map(prod=>{
+    const sellers=provsOf(prod.key);
+    return `<div class="catalogo-item">
+      <div class="catalogo-item-top">
+        <span style="font-size:22px">${prod.emoji}</span>
+        <div class="catalogo-item-name">${prod.name}<small>${normUnit(prod.unit)}</small></div>
+        <button class="catalogo-add" type="button" data-key="${prod.key}">+ Proveedor</button>
+      </div>
+      <div class="catalogo-sellers">${sellers.length
+        ?sellers.map(s=>`<span class="catalogo-chip">${s}</span>`).join('')
+        :'<span class="catalogo-chip empty">Ningún proveedor lo vende</span>'}</div>
+    </div>`;
+  }).join('');
+
+  list.querySelectorAll('.catalogo-add').forEach(btn=>btn.addEventListener('click',()=>{
+    openCatalogoAssign(btn.dataset.key);
+  }));
+}
+
+// Elige a qué proveedor agregar un producto del catálogo.
+function openCatalogoAssign(key){
+  const prod=getKnownProductCatalog().find(p=>p.key===key);
+  if(!prod)return;
+  const faltantes=getProvNames().filter(name=>
+    !(getAllProviders()[name]?.products||[]).some(p=>normalizeText(p.name)===key));
+
+  document.getElementById('provListModalTitle').textContent=`${prod.emoji} ${prod.name} — agregar a:`;
+  const body=document.getElementById('provListModalBody');
+  body.innerHTML=faltantes.length
+    ?faltantes.map(n=>`<button class="cfg-row" type="button" style="width:100%;text-align:left;background:var(--card);border:1px solid var(--b);border-radius:var(--r3);padding:12px;margin-bottom:6px;color:var(--t);font-size:15px;font-weight:700" data-prov="${n}">${n}</button>`).join('')
+    :'<div class="empty" style="padding:14px 4px">Ya está en todos los proveedores</div>';
+
+  body.querySelectorAll('[data-prov]').forEach(btn=>btn.addEventListener('click',()=>{
+    const name=btn.dataset.prov;
+    ensureCustomProv(name);
+    S.customProviders[name].products.push({
+      id:'prod_'+Date.now()+'_'+Math.random().toString(36).slice(2,6),
+      name:prod.name,emoji:prod.emoji,unit:normUnit(prod.unit)
+    });
+    persist();closeProvListModal();renderConfig();
+    toast(`✓ ${prod.name} agregado a ${name}`,'ok');
+  }));
+  document.getElementById('modalProvList').classList.add('open');
 }
 
 // Desliza rowEl.prod-cfg-row-content hacia la izquierda; al superar el umbral
@@ -2412,7 +2621,7 @@ function renderCfgProveedores(){
           <div class="prod-cfg-row-bg">Eliminar</div>
           <div class="prod-cfg-row-content">
             <input class="prod-cfg-name" type="text" value="${prod.name}" placeholder="Nombre producto">
-            <select class="prod-cfg-unit">${UNITS.map(u=>`<option value="${u}"${u===prod.unit?' selected':''}>${u}</option>`).join('')}</select>
+            <select class="prod-cfg-unit">${UNITS.map(u=>`<option value="${u}"${u===normUnit(prod.unit)?' selected':''}>${u}</option>`).join('')}</select>
             <button class="prod-cfg-rm" title="Eliminar producto">×</button>
           </div>
         `;
@@ -2438,42 +2647,6 @@ function renderCfgProveedores(){
         attachSwipeToDelete(row,removeProduct);
         body.appendChild(row);
       });
-      const addBtn=document.createElement('button');
-      addBtn.className='add-prod-btn';
-      addBtn.textContent='+ Crear un producto que no está en la lista';
-      addBtn.addEventListener('click',()=>{
-        ensureCustomProv(name);
-        const newId='prod_'+Date.now();
-        S.customProviders[name].products.push({id:newId,name:'Nuevo producto',emoji:'🌿',unit:'kg'});
-        persist();renderCfgProveedores();
-      });
-      const manualLabel=document.createElement('div');
-      manualLabel.className='manual-product-label';
-      manualLabel.textContent='Opciones manuales · solo si no encontrás el producto arriba';
-      body.appendChild(manualLabel);
-      body.appendChild(addBtn);
-
-      const bulkWrap=document.createElement('div');
-      bulkWrap.style.marginTop='10px';
-      bulkWrap.innerHTML=`
-        <div class="cfg-lbl" style="width:auto;white-space:normal;margin-bottom:5px">Pegar varios productos (opcional):</div>
-        <textarea class="modal-inp" id="bulkAddTa" placeholder="Tomate&#10;Cebolla&#10;Papa..." rows="4" style="resize:vertical;width:100%"></textarea>
-        <button class="btn btn-g btn-full btn-sm">+ Agregar todos estos</button>
-      `;
-      bulkWrap.querySelector('button').addEventListener('click',()=>{
-        const ta=document.getElementById('bulkAddTa');
-        const lines=ta.value.split('\n').map(l=>l.trim()).filter(Boolean);
-        if(!lines.length){toast('Pegá al menos un producto','err');return;}
-        ensureCustomProv(name);
-        lines.forEach((line,i)=>{
-          const newId='prod_'+Date.now()+'_'+i+'_'+Math.random().toString(36).slice(2,6);
-          const niceName=line.toLowerCase().replace(/(^|\s)\S/g,c=>c.toUpperCase());
-          S.customProviders[name].products.push({id:newId,name:niceName,emoji:'🌿',unit:'kg'});
-        });
-        persist();renderCfgProveedores();
-        toast(`✓ ${lines.length} producto${lines.length>1?'s':''} agregado${lines.length>1?'s':''}`,'ok');
-      });
-      body.appendChild(bulkWrap);
     }
 
     container.appendChild(item);
@@ -2494,8 +2667,11 @@ function getKnownProductCatalog(){
   sources.forEach(source=>(source.products||[]).forEach(product=>{
     const key=normalizeText(product.name);
     if(!key)return;
+    // Los nombres importados vienen gritados ("ACHIOTE BOLSA", y algunos con
+    // la ñ suelta en minúscula) — se capitalizan para que la lista se lea pareja.
+    const nice=isShouting(product.name)?titleCase(product.name):product.name;
     if(!catalog.has(key))catalog.set(key,{
-      key,name:product.name,emoji:product.emoji||'🌿',unit:product.unit||'kg',uses:0
+      key,name:nice,emoji:product.emoji||'🌿',unit:normUnit(product.unit),uses:0
     });
     catalog.get(key).uses++;
   }));
@@ -2523,6 +2699,7 @@ function renderProductPicker(prov,body){
   }
 
   function draw(){
+    picker.querySelectorAll('.picker-create-btn').forEach(b=>b.remove());
     const all=available();
     const expanded=!!cfgCatalogExpanded[prov]||search.value.trim().length>0;
     const visible=expanded?all:all.slice(0,12);
@@ -2545,6 +2722,27 @@ function renderProductPicker(prov,body){
     }));
     more.style.display=all.length>12&&!search.value.trim()?'block':'none';
     more.textContent=cfgCatalogExpanded[prov]?'Mostrar menos':`Ver ${all.length-12} productos más`;
+
+    // Si lo que busca no existe en el catálogo, puede crearlo desde acá mismo:
+    // es la única vía de alta manual ahora que se quitaron las opciones sueltas.
+    const term=search.value.trim();
+    if(term&&!all.some(p=>p.key===normalizeText(term))){
+      const create=document.createElement('button');
+      create.type='button';
+      create.className='product-picker-more picker-create-btn';
+      create.style.borderStyle='dashed';
+      create.textContent=`+ Crear "${titleCase(term)}"`;
+      create.addEventListener('click',()=>{
+        ensureCustomProv(prov);
+        S.customProviders[prov].products.push({
+          id:'prod_'+Date.now()+'_'+Math.random().toString(36).slice(2,6),
+          name:titleCase(term),emoji:'🌿',unit:'kg'
+        });
+        persist();renderCfgProveedores();
+        toast(`✓ ${titleCase(term)} agregado a ${prov}`,'ok');
+      });
+      grid.after(create);
+    }
   }
 
   search.addEventListener('input',draw);
@@ -2593,6 +2791,15 @@ function addProveedor(){
 
 function titleCase(value){
   return value.trim().toLowerCase().replace(/(^|\s)\S/g,c=>c.toUpperCase());
+}
+
+// ¿El nombre viene "gritado"? Se mide por proporción de mayúsculas y no por
+// igualdad exacta: en los datos importados hay casos como "PEQUEñA".
+function isShouting(value){
+  const letters=String(value).replace(/[^a-zA-ZáéíóúüñÁÉÍÓÚÜÑ]/g,'');
+  if(letters.length<3)return false;
+  const upper=letters.replace(/[^A-ZÁÉÍÓÚÜÑ]/g,'').length;
+  return upper/letters.length>=0.7;
 }
 
 // Catálogo único para buscar un producto y comparar todos sus proveedores.
@@ -2655,6 +2862,7 @@ function closePriceModal(){
 }
 
 document.getElementById('priceSearch').addEventListener('input',renderPriceSearch);
+document.getElementById('catalogoSearch').addEventListener('input',renderCatalogo);
 document.getElementById('modalPriceCompare').addEventListener('click',e=>{if(e.target.id==='modalPriceCompare')closePriceModal();});
 
 function resetAll(){
