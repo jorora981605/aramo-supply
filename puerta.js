@@ -36,6 +36,17 @@ function falta(iso){
   const a=Math.abs(m),t=a<60?a+' min':Math.floor(a/60)+' h'+(a%60?' '+(a%60)+' min':'');
   return m>0?'en '+t:'hace '+t;
 }
+const mapaUrl=u=>'https://www.google.com/maps/search/?api=1&query='+u.lat+','+u.lng;
+function uberLink(o){
+  // Abre la app de Uber con el destino del cliente ya puesto (universal link de Uber).
+  const s=suc(o.sucursal),e=o.retiro.envio,q=[];
+  q.push('action=setPickup');
+  if(s?.lat&&s?.lng)q.push('pickup[latitude]='+s.lat,'pickup[longitude]='+s.lng,'pickup[nickname]='+encodeURIComponent(s.n+' '+s.zona));
+  else q.push('pickup=my_location');
+  q.push('dropoff[latitude]='+e.lat,'dropoff[longitude]='+e.lng,'dropoff[nickname]='+encodeURIComponent(o.cliente.nombre+' · '+o.ref));
+  if(e.senas)q.push('dropoff[formatted_address]='+encodeURIComponent(e.senas));
+  return 'https://m.uber.com/ul/?'+q.join('&');
+}
 function abrir(url){const w=window.open(url,'_blank','noopener');if(!w)location.href=url;}
 let _tt=0;
 function toast(m){let t=$('moToast');if(!t){t=document.createElement('div');t.id='moToast';t.className='mo-toast';t.setAttribute('role','status');document.body.appendChild(t);}t.textContent=m;t.classList.add('show');clearTimeout(_tt);_tt=setTimeout(()=>t.classList.remove('show'),2800);}
@@ -226,7 +237,7 @@ function tarjeta(o){
   return `<button type="button" class="mo-card${urgente(o)?' urg':''}" data-mo="abrir" data-id="${o.id}">
     <div class="mo-card-h"><span class="mo-ref">${esc(o.ref)}</span>${o.prueba?'<span class="mo-pill">🧪 prueba</span>':''}<span class="mo-when${tarde?' tarde':''}">${o.estado==='entregado'?'✓ '+fh(o.updated):o.estado==='cancelado'?'Cancelado':'🕐 '+fh(o.retiro.at)+' · '+falta(o.retiro.at)}</span></div>
     <div class="mo-who">${esc(o.cliente.nombre)} <span style="color:var(--m);font-weight:700">· ${esc(fmtTel(o.cliente.tel))}</span></div>
-    <div class="mo-meta">${esc(s?.n||'')} · ${o.retiro.carro?'🚗 al carro'+(o.retiro.placa?' ('+esc(o.retiro.placa)+')':''):'🚶 adentro'} · ${n} productos</div>
+    <div class="mo-meta">${esc(s?.n||'')} · ${o.retiro.envio?(o.retiro.envio.uber?'🛵 Uber en camino':'🛵 envío Uber'):o.retiro.carro?'🚗 al carro'+(o.retiro.placa?' ('+esc(o.retiro.placa)+')':''):'🚶 adentro'} · ${n} productos</div>
     <div class="mo-emos">${o.items.map(i=>i.e).join('')}</div>
     ${o.estado==='alistando'?`<div class="mo-bar"><i style="width:${n?r/n*100:0}%"></i></div>`:''}
     <div class="mo-foot">${pago}${o.sust==='avisar'?'':`<span class="mo-pill">${SUST[o.sust]}</span>`}<span class="mo-total">${N.esAprox(o)?'~':''}${$c(N.totalDe(o))}</span></div>
@@ -251,7 +262,8 @@ function msgCliente(o){
       ?`\n📲 Pagá ${$c(tot)} por SINPE Móvil${telDig(t.sinpe?.numero)?' al '+fmtTel(t.sinpe.numero)+(t.sinpe.nombre?' ('+t.sinpe.nombre+')':''):''} con la descripción ${o.ref}.`
       :o.pago.metodo==='link'&&t.linkTarjeta?`\n🔗 Pagá con tarjeta aquí: ${t.linkTarjeta}`:`\n💳 Total: ${$c(tot)} (${(N.PAGOS[o.pago.metodo]?.n||'').toLowerCase()}).`;
     const sin=o.items.filter(i=>i.estado==='nohay');
-    return `${hola}\n✅ Tu canasta ${o.ref} está *lista* en ${s?.n||'ARAMO'} (${s?.zona||''}).${pago}${sin.length?`\n⚠️ No hubo: ${sin.map(i=>i.n+(i.sub?' → '+i.sub:'')).join(', ')}.`:''}\n🧾 Mostrá tu código de retiro al llegar.\n\nSeguí tu pedido aquí 👉 ${link}`;
+    const donde=o.retiro.envio?(o.retiro.envio.uber?' y ya va en camino con Uber 🛵':'; ya pedimos el Uber a tu ubicación 🛵'):` en ${s?.n||'ARAMO'} (${s?.zona||''})`;
+    return `${hola}\n✅ Tu canasta ${o.ref} está *lista*${donde}.${o.retiro.envio&&+o.retiro.envio.costo?`\n🛵 Envío: ${$c(o.retiro.envio.costo)} (incluido en el total).`:''}${pago}${sin.length?`\n⚠️ No hubo: ${sin.map(i=>i.n+(i.sub?' → '+i.sub:'')).join(', ')}.`:''}${o.retiro.envio?'':'\n🧾 Mostrá tu código de retiro al llegar.'}\n\nSeguí tu pedido aquí 👉 ${link}`;
   }
   if(o.estado==='alistando')return `${hola}\n🧑‍🌾 Ya estamos alistando tu canasta ${o.ref}. Te avisamos cuando esté lista.\n\nSeguila aquí 👉 ${link}`;
   if(o.estado==='entregado')return `${hola}\n🛍️ ¡Gracias por comprar en ${t.nombre||'ARAMO'}! Tu pedido ${o.ref} quedó entregado.`;
@@ -274,11 +286,11 @@ function pintarEncargo(){
   let acc='';
   if(o.estado==='nuevo')acc=`<button type="button" class="mo-btn p w" data-mo="aceptar">🧑‍🌾 Aceptar y empezar a alistar</button><div class="mo-btns"><button type="button" class="mo-btn r" data-mo="rechazar">Rechazar</button><button type="button" class="mo-btn" data-mo="wa">💬 Escribirle</button></div>`;
   if(o.estado==='alistando')acc=`<button type="button" class="mo-btn p w" data-mo="listo" ${r<n?'disabled':''}>${r<n?`Faltan ${n-r} productos por revisar`:'✅ Marcar lista y avisar'}</button><div class="mo-btns"><button type="button" class="mo-btn" data-mo="todo-ok">✓ Todo está</button><button type="button" class="mo-btn" data-mo="wa">💬 Avisarle</button></div>`;
-  if(o.estado==='listo')acc=`${o.pago.metodo==='sinpe'&&o.pago.estado!=='verificado'?`<button type="button" class="mo-btn o w" data-mo="pagado" style="margin-bottom:8px">📲 Confirmar SINPE de ${$c(tot)}${o.pago.estado==='reportado'?' (el cliente dice que pagó)':''}</button>`:''}<button type="button" class="mo-btn p w" data-mo="entregar">🛍️ Entregar con código</button><div class="mo-btns"><button type="button" class="mo-btn" data-mo="wa">💬 Avisarle que está lista</button><button type="button" class="mo-btn" data-mo="volver-alistar">↩︎ Volver a alistar</button></div>`;
+  if(o.estado==='listo')acc=`${o.pago.metodo==='sinpe'&&o.pago.estado!=='verificado'?`<button type="button" class="mo-btn o w" data-mo="pagado" style="margin-bottom:8px">📲 Confirmar SINPE de ${$c(tot)}${o.pago.estado==='reportado'?' (el cliente dice que pagó)':''}</button>`:''}${o.retiro.envio?(o.retiro.envio.uber?'':'<button type="button" class="mo-btn o w" style="margin-bottom:8px" data-mo="uber">🚗 Pedir Uber</button>')+'<button type="button" class="mo-btn p w" data-mo="entregado-uber">🛍️ El cliente ya la recibió</button>':'<button type="button" class="mo-btn p w" data-mo="entregar">🛍️ Entregar con código</button>'}<div class="mo-btns"><button type="button" class="mo-btn" data-mo="wa">💬 Avisarle que está lista</button><button type="button" class="mo-btn" data-mo="volver-alistar">↩︎ Volver a alistar</button></div>`;
   if(o.estado==='entregado'||o.estado==='cancelado')acc=`<button type="button" class="mo-btn w" data-mo="wa">💬 Escribirle</button>`;
   abrirHoja(`<div class="mo-h">${esc(o.ref)} ${o.prueba?'<span class="mo-pill">🧪 prueba</span>':''}</div><div class="mo-s">${estadoTxt} · hecho ${fdia(o.created)} ${fh(o.created)}${o.estado==='alistando'?` · ${r}/${n} revisados`:''}</div>
     <div class="mo-blk"><h4>Cliente</h4><div class="mo-row"><span style="flex:1"><strong style="font-size:16px">${esc(o.cliente.nombre)}</strong><br><small style="color:var(--m)">${esc(fmtTel(o.cliente.tel))}</small></span><a class="mo-btn" href="tel:${esc(telDig(o.cliente.tel))}">📞</a><button type="button" class="mo-btn" data-mo="wa">💬</button></div></div>
-    <div class="mo-blk"><h4>Retiro</h4><div style="font-weight:900">${esc(s?.n||'')} · ${esc(s?.zona||'')}</div><div class="mo-s">${fdia(o.retiro.at)} a las ${fh(o.retiro.at)} (${falta(o.retiro.at)}) · ${o.retiro.carro?'🚗 al carro'+(o.retiro.placa?': '+esc(o.retiro.placa):''):'🚶 adentro'}</div></div>
+    ${o.retiro.envio?envioHtml(o):`<div class="mo-blk"><h4>Retiro</h4><div style="font-weight:900">${esc(s?.n||'')} · ${esc(s?.zona||'')}</div><div class="mo-s">${fdia(o.retiro.at)} a las ${fh(o.retiro.at)} (${falta(o.retiro.at)}) · ${o.retiro.carro?'🚗 al carro'+(o.retiro.placa?': '+esc(o.retiro.placa):''):'🚶 adentro'}</div></div>`}
     <div class="mo-blk"><h4>Pago</h4><div style="font-weight:900">${P.e||''} ${esc(P.n||'')} ${o.pago.estado==='verificado'?'<span class="mo-pill g">✓ cobrado</span>':o.pago.estado==='reportado'?'<span class="mo-pill o">el cliente dice que pagó</span>':'<span class="mo-pill">pendiente</span>'}</div>${o.pago.conCuanto?`<div class="mo-s">Paga con ${$c(o.pago.conCuanto)} → vuelto ${$c(Math.max(0,o.pago.conCuanto-tot))}</div>`:''}</div>
     <div class="mo-blk"><h4>Productos · si algo no hay: ${SUST[o.sust]||''}</h4>${items}
       <div class="mo-tot"><span>${N.esAprox(o)?'Total aproximado':'Total'}</span><b>${$c(tot)}</b></div>${o.nota?`<div class="mo-s" style="margin-top:8px">📝 ${esc(o.nota)}</div>`:''}</div>
@@ -288,9 +300,22 @@ function pintarEncargo(){
     const i=+inp.dataset.moQ,v=inp.value===''?null:+inp.value;
     N.cambiar(o.id,x=>{x.items[i].qr=v;if(v===0)x.items[i].estado='nohay';else if(x.items[i].estado!=='nohay')x.items[i].estado='listo';},'tienda').then(pintarEncargo);
   }));
+  const ce=$('moEnvio');if(ce)ce.addEventListener('change',()=>{const v=Math.max(0,+ce.value||0);N.cambiar(o.id,x=>{if(x.retiro.envio)x.retiro.envio.costo=v;},'tienda','Envío Uber: '+$c(v)).then(()=>{pintarEncargo();pintarMostrador();});});
   $('moSheet').querySelectorAll('[data-mo-sub]').forEach(inp=>inp.addEventListener('change',()=>{
     const i=+inp.dataset.moSub;N.cambiar(o.id,x=>{x.items[i].sub=inp.value.trim();},'tienda');
   }));
+}
+function envioHtml(o){
+  const e=o.retiro.envio,s=suc(o.sucursal),d=.003;
+  return `<div class="mo-blk"><h4>🛵 Envío con Uber</h4>
+    <iframe class="mo-mapa" title="Ubicación del cliente" loading="lazy" src="https://www.openstreetmap.org/export/embed.html?bbox=${e.lng-d},${e.lat-d},${e.lng+d},${e.lat+d}&layer=mapnik&marker=${e.lat},${e.lng}"></iframe>
+    <div class="mo-s" style="margin-top:8px">Sale de ${esc(s?.n||'')} ${fdia(o.retiro.at)} a las ${fh(o.retiro.at)} (${falta(o.retiro.at)})${e.acc?` · ubicación ±${e.acc} m`:''}</div>
+    ${e.senas?`<div style="margin-top:6px;font-weight:800">📝 ${esc(e.senas)}</div>`:''}
+    ${e.uber?`<div class="mo-s" style="margin-top:6px;color:var(--g);font-weight:900">✓ Uber pedido a las ${fh(e.uber)}</div>`:''}
+    <button type="button" class="mo-btn p w" style="margin-top:10px" data-mo="uber">🚗 ${e.uber?'Abrir Uber de nuevo':'Pedir Uber a esta ubicación'}</button>
+    <div class="mo-btns"><a class="mo-btn" href="${mapaUrl(e)}" target="_blank" rel="noopener">🗺️ Ver en mapa</a><button type="button" class="mo-btn" data-mo="copiar" data-v="${esc(mapaUrl(e)+(e.senas?' · '+e.senas:''))}">📋 Copiar dirección</button></div>
+    <label class="mo-field">Costo del envío (se suma al total)<input type="number" inputmode="numeric" min="0" step="50" placeholder="Ej.: 1800" value="${+e.costo||''}" id="moEnvio"></label>
+    ${s?.lat?'':'<div class="mo-s" style="margin-top:6px">💡 Uber toma como salida donde estás. Para fijar la tienda: ⚙️ Pagos y horarios → "Guardar ubicación de la tienda".</div>'}</div>`;
 }
 function pintarPin(o){
   const d=M.pin.padEnd(4,' ').split('');
@@ -364,10 +389,11 @@ function pintarAjustes(){
       <label class="mo-field">Nombre<input id="ajNombre" value="${esc(t.nombre)}"></label>
       <label class="mo-field">WhatsApp de la tienda (recibe pedidos y comprobantes)<input id="ajWa" inputmode="tel" placeholder="8888-8888" value="${esc(fmtTel(t.whatsapp))}"></label>
       <label class="mo-field">Minutos para alistar un pedido<input id="ajMin" type="number" min="10" max="240" value="${+t.alistadoMin||40}"></label>
-      <label class="mo-sw">Ofrecer "me la llevan al carro"<input type="checkbox" id="ajCarro" ${t.alCarro?'checked':''}></label></div>
+      <label class="mo-sw">Ofrecer "me la llevan al carro"<input type="checkbox" id="ajCarro" ${t.alCarro?'checked':''}></label>
+      <label class="mo-sw">Ofrecer envío a domicilio con Uber<input type="checkbox" id="ajEnvio" ${t.envio!==false?'checked':''}></label></div>
     <div class="mo-blk"><h4>📲 SINPE Móvil</h4><div class="mo-dos"><label class="mo-field">Número<input id="ajSinpe" inputmode="tel" placeholder="8888-8888" value="${esc(fmtTel(t.sinpe?.numero))}"></label><label class="mo-field">A nombre de<input id="ajSinpeN" placeholder="Ej.: ARAMO S.A." value="${esc(t.sinpe?.nombre||'')}"></label></div></div>
     <div class="mo-blk"><h4>🔗 Tarjeta en línea (opcional)</h4><label class="mo-field">Link de pago (Tilopay, ONVO, BAC…)<input id="ajLink" type="url" placeholder="https://…" value="${esc(t.linkTarjeta||'')}"></label><div class="mo-s">Si lo dejás vacío, la tarjeta se cobra con datáfono al recoger.</div></div>
-    ${(t.sucursales||[]).map(s=>`<div class="mo-blk"><h4>${esc(s.n)} · ${esc(s.zona)}</h4><label class="mo-sw">Recibe pedidos<input type="checkbox" data-aj-act="${s.k}" ${s.activa!==false?'checked':''}></label><div class="mo-dos"><label class="mo-field">Abre<input type="time" data-aj-abre="${s.k}" value="${esc(s.abre)}"></label><label class="mo-field">Cierra<input type="time" data-aj-cierra="${s.k}" value="${esc(s.cierra)}"></label></div></div>`).join('')}
+    ${(t.sucursales||[]).map(s=>`<div class="mo-blk"><h4>${esc(s.n)} · ${esc(s.zona)}</h4><label class="mo-sw">Recibe pedidos<input type="checkbox" data-aj-act="${s.k}" ${s.activa!==false?'checked':''}></label><div class="mo-dos"><label class="mo-field">Abre<input type="time" data-aj-abre="${s.k}" value="${esc(s.abre)}"></label><label class="mo-field">Cierra<input type="time" data-aj-cierra="${s.k}" value="${esc(s.cierra)}"></label></div><button type="button" class="mo-btn w" style="margin-top:10px" data-mo="tienda-gps" data-k="${s.k}">📍 ${s.lat?'Ubicación guardada · actualizar':'Guardar ubicación de la tienda (estando aquí)'}</button></div>`).join('')}
     <button type="button" class="mo-btn p w" style="margin-top:12px" data-mo="aj-ok">Guardar</button>`);
 }
 function linkCanasta(){return new URL('canasta.html',location.href).href.split('#')[0].split('?')[0];}
@@ -434,6 +460,21 @@ const ACT={
     pintarPin(o);
   },
   qr(){escanear(N.get(M.abierto));},
+  uber(){
+    const o=N.get(M.abierto);if(!o?.retiro?.envio)return;
+    abrir(uberLink(o));
+    if(!o.retiro.envio.uber)N.cambiar(o.id,x=>{x.retiro.envio.uber=new Date().toISOString();},'tienda','Uber pedido').then(()=>{pintarEncargo();pintarMostrador();});
+  },
+  'entregado-uber'(){const o=N.get(M.abierto);if(confirm(`¿${o.cliente.nombre} ya recibió ${o.ref}?`))entregar(o,'Entregado por Uber');},
+  'tienda-gps'(el){
+    if(!navigator.geolocation){toast('Este teléfono no comparte ubicación');return;}
+    toast('📍 Tomando la ubicación de la tienda…');
+    navigator.geolocation.getCurrentPosition(p=>{
+      const t=T(),k=el.dataset.k;
+      N.guardarTienda({sucursales:(t.sucursales||[]).map(s=>s.k===k?{...s,lat:+p.coords.latitude.toFixed(6),lng:+p.coords.longitude.toFixed(6)}:s)});
+      toast('📍 Ubicación de la tienda guardada');pintarAjustes();
+    },()=>toast('No se pudo tomar la ubicación'),{enableHighAccuracy:true,timeout:15000});
+  },
   'sin-codigo'(){const o=N.get(M.abierto);if(confirm(`¿Entregar ${o.ref} a ${o.cliente.nombre} sin código? Revisá su nombre y teléfono.`))entregar(o,'Entregado sin código (verificado a mano)');},
   wa(){const o=N.get(M.abierto);if(o)abrir(N.wa(o.cliente.tel,msgCliente(o)));},
   vis(el){const V=M.vit,k=el.dataset.k;V.ocultos.has(k)?V.ocultos.delete(k):V.ocultos.add(k);guardarScroll(pintarVitrina);},
@@ -443,7 +484,7 @@ const ACT={
   'aj-ok'(){
     const t=T(),v=id=>$(id)?.value.trim()||'';
     const sucs=(t.sucursales||[]).map(s=>({...s,activa:!!document.querySelector(`[data-aj-act="${s.k}"]`)?.checked,abre:document.querySelector(`[data-aj-abre="${s.k}"]`)?.value||s.abre,cierra:document.querySelector(`[data-aj-cierra="${s.k}"]`)?.value||s.cierra}));
-    N.guardarTienda({nombre:v('ajNombre')||'ARAMO',whatsapp:telDig(v('ajWa')),alistadoMin:Math.max(10,+v('ajMin')||40),alCarro:$('ajCarro').checked,sinpe:{numero:telDig(v('ajSinpe')),nombre:v('ajSinpeN')},linkTarjeta:v('ajLink'),sucursales:sucs});
+    N.guardarTienda({nombre:v('ajNombre')||'ARAMO',whatsapp:telDig(v('ajWa')),alistadoMin:Math.max(10,+v('ajMin')||40),alCarro:$('ajCarro').checked,envio:$('ajEnvio').checked,sinpe:{numero:telDig(v('ajSinpe')),nombre:v('ajSinpeN')},linkTarjeta:v('ajLink'),sucursales:sucs});
     cerrarHoja();toast('⚙️ Guardado');
   },
   copiar(el){navigator.clipboard?.writeText(el.dataset.v).then(()=>toast('📋 Link copiado'),()=>toast(el.dataset.v));},

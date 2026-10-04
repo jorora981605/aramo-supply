@@ -122,6 +122,7 @@ window.ARAMO_CANASTA={
     linkTarjeta:'',         // opcional: link de pago con tarjeta (Tilopay, ONVO, etc.)
     alistadoMin:40,         // minutos que tarda en estar lista
     alCarro:true,           // ofrecer "me lo llevan al carro"
+    envio:true,             // ofrecer envío a domicilio con Uber (el cliente comparte su ubicación)
     sucursales:[
       {k:'moravia',n:'ARAMO',zona:'Moravia',mapa:'ARAMO verdulería Moravia',abre:'07:00',cierra:'19:00',activa:true},
       {k:'angeles',n:'LASR',zona:'Los Ángeles',mapa:'LASR verdulería Los Ángeles',abre:'07:00',cierra:'19:00',activa:true},

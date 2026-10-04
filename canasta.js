@@ -22,7 +22,7 @@ const $c=N.colones;
 const C={
   vista:'armar',pasillo:'top',q:'',parse:null,
   cesta:LS.get('cn_cesta',{}),
-  retiro:Object.assign({suc:null,modo:'asap',dia:0,hora:null,carro:false,placa:''},LS.get('cn_retiro',{})),
+  retiro:Object.assign({suc:null,modo:'asap',dia:0,hora:null,carro:false,placa:'',entrega:'tienda',ubi:null,senas:''},LS.get('cn_retiro',{})),
   perfil:Object.assign({nombre:'',tel:''},LS.get('cn_perfil',{})),
   pago:Object.assign({metodo:'sinpe',conCuanto:0},LS.get('cn_pago',{})),
   sust:LS.get('cn_sust','avisar'),
@@ -31,6 +31,7 @@ const C={
   personas:LS.get('cn_personas',4),
   actual:null,editPerfil:false,
 };
+if(C.retiro.carro&&C.retiro.entrega==='tienda')C.retiro.entrega='carro';
 function guardar(){
   LS.set('cn_cesta',C.cesta);LS.set('cn_retiro',C.retiro);LS.set('cn_perfil',C.perfil);LS.set('cn_pago',C.pago);
   LS.set('cn_sust',C.sust);LS.set('cn_nota',C.nota);LS.set('cn_mis',C.mis);LS.set('cn_personas',C.personas);
@@ -102,7 +103,9 @@ function renderCiclo(){
   el.style.setProperty('--pct',Math.min(1,i/4));
   el.innerHTML=PASOS.map((p,j)=>{
     const puede=!seg&&(j===0||(j<=2&&lleno));
-    return `<button type="button" class="paso${j<i?' ok':''}${j===i?' ya':''}" data-act="paso" data-i="${j}" ${puede?'':'disabled'} aria-label="${p.n}"><b>${j<i?'✓':p.e}</b>${p.n}</button>`;
+    const envio=seg?!!N.get(C.actual)?.retiro?.envio:esEnvio();
+    const n=j===4&&envio?'Te llega':p.n,e=j===4&&envio?'🛵':p.e;
+    return `<button type="button" class="paso${j<i?' ok':''}${j===i?' ya':''}" data-act="paso" data-i="${j}" ${puede?'':'disabled'} aria-label="${n}"><b>${j<i?'✓':e}</b>${n}</button>`;
   }).join('');
 }
 
@@ -153,13 +156,55 @@ function asegurarRetiro(){
       r.hora=(slots(s,r.dia)[0]||null)?.toISOString()||null;
     }
   }
-  if(!T().alCarro)r.carro=false;
+  if(r.entrega==='carro'&&!T().alCarro)r.entrega='tienda';
+  if(r.entrega==='envio'&&T().envio===false)r.entrega='tienda';
+  r.carro=r.entrega==='carro';
 }
 function horaRetiro(){
   const s=suc(C.retiro.suc);if(!s)return null;
   if(C.retiro.modo==='asap')return asap(s);
   const h=C.retiro.hora?new Date(C.retiro.hora):null;
   return h&&+h>Date.now()?h:null;
+}
+
+// ══════════════ Entrega: adentro, al carro o envío con Uber ══════════════
+const esEnvio=()=>C.retiro.entrega==='envio';
+function entregaTxt(r){return r?.envio||r?.entrega==='envio'?'🛵 envío con Uber':r?.carro?'🚗 al carro'+(r.placa?' ('+r.placa+')':''):'🚶 adentro';}
+const mapaUrl=u=>'https://www.google.com/maps/search/?api=1&query='+u.lat+','+u.lng;
+function mapaEmbed(u){const d=.0035;return `https://www.openstreetmap.org/export/embed.html?bbox=${u.lng-d},${u.lat-d},${u.lng+d},${u.lat+d}&layer=mapnik&marker=${u.lat},${u.lng}`;}
+function leerCoords(txt){
+  const m=String(txt||'').match(/(-?\d{1,2}\.\d{3,})\s*,\s*(-?\d{1,3}\.\d{3,})/);
+  if(!m)return null;
+  const lat=+m[1],lng=+m[2];
+  return Math.abs(lat)<=90&&Math.abs(lng)<=180?{lat,lng,acc:null}:null;
+}
+function tomarUbicacion(){
+  if(!navigator.geolocation){toast('Este teléfono no comparte ubicación; pegá un link de Google Maps');return;}
+  toast('📍 Buscando tu ubicación…');
+  navigator.geolocation.getCurrentPosition(p=>{
+    C.retiro.ubi={lat:+p.coords.latitude.toFixed(6),lng:+p.coords.longitude.toFixed(6),acc:Math.round(p.coords.accuracy||0)};
+    guardar();buzz(15);toast('📍 Ubicación lista');refrescar();
+  },e=>{toast(e.code===1?'Permití la ubicación en tu navegador o pegá un link de Google Maps':'No pudimos ubicarte; probá de nuevo o pegá un link');},{enableHighAccuracy:true,timeout:15000,maximumAge:60000});
+}
+// Qué falta para seguir: el botón nunca queda muerto sin explicar por qué.
+function faltaRetiro(){
+  if(!suc(C.retiro.suc))return{m:'Elegí la tienda',v:'retiro'};
+  if(!horaRetiro())return{m:'Elegí la hora',v:'retiro'};
+  if(esEnvio()&&!C.retiro.ubi)return{m:'Falta tu ubicación para el envío',v:'retiro',f:'cnUbiBtn'};
+  return null;
+}
+function faltaAlgo(){
+  if(!cestaN())return{m:'Tu canasta está vacía',v:'armar'};
+  const r=faltaRetiro();if(r)return r;
+  if(C.perfil.nombre.trim().length<2)return{m:'Escribí tu nombre',v:'pago',f:'cnNombre'};
+  if(telDig(C.perfil.tel).length!==8)return{m:'El teléfono debe tener 8 números',v:'pago',f:'cnTel'};
+  return null;
+}
+function avisarFalta(x){
+  toast(x.m);buzz([40,40,40]);
+  if(x.f==='cnNombre'||x.f==='cnTel')C.editPerfil=true;
+  if(C.vista!==x.v)ir(x.v);else refrescar();
+  setTimeout(()=>{const el=x.f&&$(x.f);if(el){el.scrollIntoView({block:'center',behavior:'smooth'});if(el.tagName==='INPUT')el.focus();el.classList.add('falta');setTimeout(()=>el.classList.remove('falta'),1600);}},120);
 }
 
 // ══════════════ Lista escrita o dictada ══════════════
@@ -230,7 +275,7 @@ function smartHtml(){
   if(a){
     const s=suc(a.sucursal),{r,n}=avance(a),E=N.ESTADOS.find(x=>x.k===a.estado)||N.ESTADOS[0];
     const t={nuevo:'Recibimos tu pedido',alistando:`Alistando tu canasta · ${r} de ${n}`,listo:'¡Tu canasta está lista!'}[a.estado]||E.n;
-    return `<div class="smart" data-art="${E.e}"><small>Tu pedido ${esc(a.ref)}</small><h2>${t}</h2><p>Recogela ${cuando(a.retiro.at)} en ${esc(s?.n||'')}.</p><div class="row"><button type="button" class="btn btn-p" data-act="ver" data-id="${a.id}">Ver mi pedido</button></div></div>`;
+    return `<div class="smart" data-art="${E.e}"><small>Tu pedido ${esc(a.ref)}</small><h2>${t}</h2><p>${a.retiro.envio?'Te la enviamos con Uber '+cuando(a.retiro.at):'Recogela '+cuando(a.retiro.at)+' en '+esc(s?.n||'')}.</p><div class="row"><button type="button" class="btn btn-p" data-act="ver" data-id="${a.id}">Ver mi pedido</button></div></div>`;
   }
   const u=ultimoEntregado();
   if(u&&!cestaN()){
@@ -303,11 +348,20 @@ VISTAS.retiro=()=>{
     ${r.modo==='prog'?`<div class="card" style="margin-top:10px;padding:12px"><div class="chips">${[0,1,2].map(d=>`<button type="button" class="chip${r.dia===d?' on':''}" data-act="dia" data-d="${d}">${d===0?'Hoy':d===1?'Mañana':aFecha(2,0).toLocaleDateString('es-CR',{weekday:'long'})}</button>`).join('')}</div><div class="slots">${slots(s,r.dia).map(h=>`<button type="button" class="chip${r.hora&&+new Date(r.hora)===+h?' on':''}" data-act="hora" data-h="${h.toISOString()}">${fh(h)}</button>`).join('')||'<span class="sub">Ese día ya no hay horas. Probá otro.</span>'}</div></div>`:''}`;
   }
   const h=horaRetiro();
-  return `<h1 class="h1">¿Dónde y cuándo la recogés?</h1><p class="sub">Te avisamos cuando esté lista.</p>
-  <section class="sec"><div class="sec-h"><h2 class="h2">Tienda</h2></div><div class="opts">${opcSuc}</div></section>
-  <section class="sec"><div class="sec-h"><h2 class="h2">Hora</h2></div>${cuandoH}</section>
-  ${t.alCarro?`<section class="sec"><div class="sec-h"><h2 class="h2">¿Cómo la recogés?</h2></div><div class="seg" style="grid-template-columns:1fr 1fr"><button type="button" class="${!r.carro?'on':''}" data-act="carro" data-v="0"><b>🚶</b>Paso adentro</button><button type="button" class="${r.carro?'on':''}" data-act="carro" data-v="1"><b>🚗</b>Me la llevan al carro</button></div>${r.carro?`<input class="inp" id="cnPlaca" style="margin-top:10px" placeholder="Placa o color del carro (opcional)" value="${esc(r.placa)}" autocomplete="off">`:''}</section>`:''}
-  ${s&&h?`<div class="contexto"><span class="pill">📍 ${esc(s.n)}</span><span class="pill">🕐 ${esc(cuando(h))}</span><span class="pill o">${r.carro?'🚗 Al carro':'🚶 Adentro'}</span></div>`:''}`;
+  const env=r.entrega==='envio';
+  const modos=[['tienda','🚶','Paso a la tienda'],...(t.alCarro?[['carro','🚗','Me la llevan al carro']]:[]),...(t.envio!==false?[['envio','🛵','Envío a mi casa']]:[])];
+  const u=r.ubi;
+  const ubiH=env?`<div class="card ubi" style="padding:14px;margin-top:10px">
+      ${u?`<iframe class="ubi-mapa" title="Tu ubicación" src="${mapaEmbed(u)}" loading="lazy"></iframe><div class="ubi-ok"><span>📍 <b>Ubicación lista</b>${u.acc?` · ±${u.acc} m`:''}</span><button type="button" class="link" data-act="ubi-gps">Volver a tomar</button></div>`
+        :`<button type="button" class="btn btn-p btn-w" id="cnUbiBtn" data-act="ubi-gps">📍 Usar mi ubicación actual</button><input class="inp" id="cnUbiLink" style="margin-top:10px" placeholder="…o pegá un link de Google Maps" autocomplete="off">`}
+      <input class="inp" id="cnSenas" style="margin-top:10px" placeholder="Señas: casa verde, portón negro…" value="${esc(r.senas||'')}" autocomplete="street-address">
+      <p class="nota-peso">🛵 Sale de ${esc(s?.n||'la tienda')} con Uber a tu ubicación. El envío se cobra aparte, según la tarifa de Uber, y te lo confirmamos antes.</p></div>`:'';
+  return `<h1 class="h1">${env?'¿Cuándo y adónde te la enviamos?':'¿Dónde y cuándo la recogés?'}</h1><p class="sub">Te avisamos cuando esté lista.</p>
+  <section class="sec"><div class="sec-h"><h2 class="h2">¿Cómo la recibís?</h2></div><div class="seg" style="grid-template-columns:repeat(${modos.length},1fr)">${modos.map(([k,e,n])=>`<button type="button" class="${r.entrega===k?'on':''}" data-act="entrega" data-v="${k}">${k==='envio'?'<span class="star">NUEVO</span>':''}<b>${e}</b>${n}</button>`).join('')}</div>
+    ${r.entrega==='carro'?`<input class="inp" id="cnPlaca" style="margin-top:10px" placeholder="Placa o color del carro (opcional)" value="${esc(r.placa)}" autocomplete="off">`:''}${ubiH}</section>
+  <section class="sec"><div class="sec-h"><h2 class="h2">${env?'Sale desde':'Tienda'}</h2></div><div class="opts">${opcSuc}</div></section>
+  <section class="sec"><div class="sec-h"><h2 class="h2">${env?'Hora de salida':'Hora'}</h2></div>${cuandoH}</section>
+  ${s&&h?`<div class="contexto"><span class="pill">📍 ${esc(s.n)}</span><span class="pill">🕐 ${esc(cuando(h))}</span><span class="pill o">${esc(entregaTxt(r))}</span></div>`:''}`;
 };
 
 VISTAS.pago=()=>{
@@ -317,7 +371,7 @@ VISTAS.pago=()=>{
   const s=suc(C.retiro.suc),h=horaRetiro();
   const quien=okPerfil&&!C.editPerfil
     ?`<div class="yo"><span class="av">${esc(P.nombre.trim()[0]?.toUpperCase()||'🙂')}</span><div class="t"><strong>${esc(P.nombre)}</strong><small>${esc(fmtTel(P.tel))} · te avisamos aquí</small></div><button type="button" class="link" data-act="edit-perfil">Cambiar</button></div>`
-    :`<div class="dos"><label><span class="vh">Nombre</span><input class="inp" id="cnNombre" placeholder="Tu nombre" autocomplete="given-name" value="${esc(P.nombre)}"></label><label><span class="vh">Teléfono</span><input class="inp" id="cnTel" placeholder="Teléfono" inputmode="tel" autocomplete="tel" maxlength="9" value="${esc(P.tel)}"></label></div><div class="err" id="cnPerfilErr"></div>`;
+    :`<div class="dos"><label><span class="vh">Nombre</span><input class="inp" id="cnNombre" placeholder="Tu nombre" autocomplete="given-name" value="${esc(P.nombre)}"></label><label><span class="vh">Teléfono</span><input class="inp" id="cnTel" placeholder="Teléfono" inputmode="tel" autocomplete="tel" maxlength="20" value="${esc(P.tel)}"></label></div><div class="err" id="cnPerfilErr"></div>`;
   const ef=C.pago.metodo==='efectivo'?`<div class="card" style="margin-top:10px;padding:12px"><div class="lbl" style="margin-top:0">¿Con cuánto pagás?</div><div class="chips">${[0,...billetes(tot)].map(v=>`<button type="button" class="chip${(+C.pago.conCuanto||0)===v?' on':''}" data-act="con" data-v="${v}">${v?$c(v):'Exacto'}</button>`).join('')}</div></div>`:'';
   return `<h1 class="h1">Último paso</h1><p class="sub">Revisá y confirmá. No pagás nada todavía.</p>
   <section class="sec"><div class="sec-h"><h2 class="h2">¿A nombre de quién?</h2></div>${quien}</section>
@@ -325,11 +379,11 @@ VISTAS.pago=()=>{
     <div class="opts">${metodos.map(([k,m])=>`<button type="button" class="opt${C.pago.metodo===k?' on':''}" data-act="metodo" data-k="${k}">${k==='sinpe'?'<span class="star" style="right:10px">MÁS RÁPIDO</span>':''}<span class="oi">${m.e}</span><span class="ot"><strong>${m.n}</strong><small>${m.txt}</small></span><span class="ok">✓</span></button>`).join('')}</div>${ef}</section>
   <section class="sec"><div class="totales">
     <div class="l"><span>🧺 ${cestaN()} productos</span><button type="button" class="link" data-act="ir" data-v="canasta">Editar</button></div>
-    <div class="l"><span>📍 ${esc(sucTxt(s))}</span><button type="button" class="link" data-act="ir" data-v="retiro">Cambiar</button></div>
-    <div class="l"><span>🕐 ${h?esc(cuando(h)):'Falta la hora'}${C.retiro.carro?' · 🚗 al carro':''}</span></div>
+    <div class="l"><span>${esEnvio()?'🛵 Envío con Uber · sale de '+esc(s?.n||''):'📍 '+esc(sucTxt(s))}</span><button type="button" class="link" data-act="ir" data-v="retiro">Cambiar</button></div>
+    <div class="l"><span>🕐 ${h?esc(cuando(h)):'Falta la hora'}${C.retiro.entrega==='carro'?' · 🚗 al carro':''}</span></div>
     <div class="l"><span>${SUST[C.sust].e} Si algo no hay: ${SUST[C.sust].n.toLowerCase()}</span></div>
-    <div class="l big"><span>Total aproximado</span><b>${$c(tot)}</b></div>
-    <p class="nota-peso">⚖️ Te confirmamos el total exacto al pesar. ${N.PAGOS[C.pago.metodo]?.txt||''}</p></div></section>
+    <div class="l big"><span>Total aproximado${esEnvio()?' + envío':''}</span><b>${$c(tot)}</b></div>
+    <p class="nota-peso">⚖️ Te confirmamos el total exacto al pesar${esEnvio()?', más el envío de Uber':''}. ${N.PAGOS[C.pago.metodo]?.txt||''}</p></div></section>
   ${N.modo()!=='nube'?`<div class="nube-aviso">💬 Al confirmar, te mostramos un botón para enviarle tu pedido a la tienda por WhatsApp.</div>`:''}`;
 };
 function billetes(t){
@@ -350,7 +404,7 @@ VISTAS.seguimiento=()=>{
   const hero={
     nuevo:['📥','Recibimos tu pedido',N.modo()==='nube'||o.avisado?'La tienda ya lo tiene y empieza a alistarlo.':'Falta un paso: avisale a la tienda (abajo).'],
     alistando:['🧑‍🌾','Alistando tu canasta',`${r} de ${n} productos escogidos`],
-    listo:['✅','¡Tu canasta está lista!',`Te espera en ${s?.n||''} · ${cuando(o.retiro.at)}`],
+    listo:['✅','¡Tu canasta está lista!',o.retiro.envio?(o.retiro.envio.uber?'🛵 Ya va en camino con Uber a tu ubicación.':'Estamos pidiendo el Uber a tu ubicación.'):`Te espera en ${s?.n||''} · ${cuando(o.retiro.at)}`],
     entregado:['🛍️','¡Que la disfrutés!','Gracias por comprar en '+(t.nombre||'ARAMO')+'.'],
     cancelado:['✖️','Pedido cancelado',o.motivo||''],
   }[o.estado]||['🧺','Tu pedido',''];
@@ -362,18 +416,18 @@ VISTAS.seguimiento=()=>{
     ${o.estado!=='cancelado'?`<div class="tl">${N.ESTADOS.map((x,i)=>`<div class="${i<=idx?'ok':''}${i===idx?' ya':''}">${x.n}<small>${horaDe(x.k)}</small></div>`).join('')}</div>`:''}
   </div>
   ${o.estado==='nuevo'&&!o.avisado&&N.modo()!=='nube'?`<div class="ultimo sec"><h3>💬 Enviale tu pedido a la tienda</h3><p>Un toque y le llega por WhatsApp con todo listo para alistarlo.</p><button type="button" class="btn btn-p btn-w" data-act="wa-enviar">Enviar por WhatsApp</button></div>`:''}
-  ${!fin?`<div class="codigo sec"><div class="qr" id="cnQR" aria-label="Código QR de retiro"></div><div><small>Código de retiro</small><div class="pin">${esc(o.pin)}</div><small>Mostralo al recoger${o.retiro.carro?' (te lo llevamos al carro)':''}.</small><span class="ref">Pedido ${esc(o.ref)}</span></div></div>`:''}
+  ${!fin?`<div class="codigo sec"><div class="qr" id="cnQR" aria-label="Código QR de retiro"></div><div><small>Código de retiro</small><div class="pin">${esc(o.pin)}</div><small>${o.retiro.envio?'Dáselo al repartidor si te lo pide':'Mostralo al recoger'}${o.retiro.carro?' (te lo llevamos al carro)':''}.</small><span class="ref">Pedido ${esc(o.ref)}</span></div></div>`:''}
   ${pagoHtml(o,total,aprox)}
   <section class="sec"><div class="sec-h"><h2 class="h2">Tu canasta</h2><small>${o.items.length} productos</small></div>
     <div class="card">${o.items.map(it=>{
       const st=it.estado==='listo'?'<span class="it-estado" style="color:var(--g)">✓ Lista</span>':it.estado==='nohay'?'<span class="it-estado" style="color:var(--r)">No hubo</span>':'<span class="it-estado" style="color:var(--mute)">⏳</span>';
       const q=it.qr!=null&&it.qr!==''?+it.qr:it.q;
       return `<div class="fila${it.estado==='nohay'?' nohay':''}"><span class="art">${it.e}</span><div class="t"><strong>${esc(it.n)}</strong><small>${esc(qtxt(q,it.u))}${it.qr!=null&&+it.qr!==+it.q?` (pediste ${esc(qtxt(it.q,it.u))})`:''}${it.mad?' · '+esc(MAD[it.mad]||''):''}${it.sub?' · cambio: '+esc(it.sub):''}</small></div>${o.estado==='nuevo'?'':st}</div>`;}).join('')}</div>
-    <div class="totales"><div class="l big"><span>${aprox?'Total aproximado':'Total'}</span><b>${$c(total)}</b></div>${aprox?'<p class="nota-peso">⚖️ El total exacto aparece cuando pesen tus productos.</p>':''}</div>
+    <div class="totales">${o.retiro.envio?`<div class="l"><span>🛵 Envío con Uber</span><span>${+o.retiro.envio.costo?$c(o.retiro.envio.costo):'se confirma'}</span></div>`:''}<div class="l big"><span>${aprox?'Total aproximado':'Total'}</span><b>${$c(total)}</b></div>${aprox?'<p class="nota-peso">⚖️ El total exacto aparece cuando pesen tus productos.</p>':''}</div>
   </section>
   ${o.estado==='entregado'?`<section class="sec card" style="padding:16px;text-align:center"><h2 class="h2">¿Qué tal estuvo todo?</h2><div class="caritas">${['😍','🙂','😐'].map((c,i)=>`<button type="button" class="${o.rating===3-i?'on':''}" data-act="rating" data-v="${3-i}" aria-label="Calificar ${3-i}">${c}</button>`).join('')}</div><button type="button" class="btn btn-p btn-w" style="margin-top:14px" data-act="repetir" data-id="${o.id}">🔁 Repetir esta canasta</button></section>`:''}
   <section class="sec acciones">
-    ${s?`<button type="button" class="btn btn-s" data-act="mapa">🗺️ Cómo llegar</button>`:''}
+    ${s&&!o.retiro.envio?`<button type="button" class="btn btn-s" data-act="mapa">🗺️ Cómo llegar</button>`:''}
     <button type="button" class="btn btn-s" data-act="wa-tienda">💬 Escribir a la tienda</button>
     ${o.estado==='nuevo'?`<button type="button" class="btn btn-r" style="grid-column:1/-1" data-act="cancelar">Cancelar pedido</button>`:''}
   </section>
@@ -432,8 +486,8 @@ function renderBar(){
   const mini=`<button type="button" class="cesta-mini" data-act="ir" data-v="canasta"><span class="cesta-ico" id="cnIco">🧺<em>${n}</em></span><span class="cesta-txt"><strong>${$c(tot)}</strong><small>${cestaItems().map(x=>x.p.e).join(' ')}</small></span></button>`;
   if(v==='armar'&&n)h=mini+`<button type="button" class="btn btn-p" data-act="ir" data-v="canasta">Ver canasta →</button>`;
   else if(v==='canasta'&&n)h=mini+`<button type="button" class="btn btn-p" data-act="ir" data-v="retiro">Elegir retiro →</button>`;
-  else if(v==='retiro'&&n)h=`<div class="cesta-txt" style="flex:1"><strong>${horaRetiro()?esc(cuando(horaRetiro())):'Elegí una hora'}</strong><small>${esc(sucTxt(suc(C.retiro.suc)))}</small></div><button type="button" class="btn btn-p" data-act="ir" data-v="pago" ${horaRetiro()?'':'disabled'}>Seguir →</button>`;
-  else if(v==='pago'&&n)h=`<button type="button" class="btn btn-p btn-w" data-act="pedir" id="cnPedir" ${perfilOk()&&horaRetiro()?'':'disabled'}>Hacer pedido · ${$c(tot)}</button>`;
+  else if(v==='retiro'&&n)h=`<div class="cesta-txt" style="flex:1"><strong>${horaRetiro()?esc(cuando(horaRetiro())):'Elegí una hora'}</strong><small>${esEnvio()?(C.retiro.ubi?'🛵 Envío a tu ubicación':'🛵 Falta tu ubicación'):esc(sucTxt(suc(C.retiro.suc)))}</small></div><button type="button" class="btn btn-p" data-act="a-pago">Seguir →</button>`;
+  else if(v==='pago'&&n)h=`<button type="button" class="btn btn-p btn-w" data-act="pedir" id="cnPedir">Hacer pedido · ${$c(tot)}</button>`;
   bar.classList.toggle('hide',!h||MINI&&v!=='armar');
   if(h)inn.innerHTML=h;
 }
@@ -492,15 +546,14 @@ function costoReceta(r,personas){return N.redondear5(r.items.reduce((t,[k,q4])=>
 
 // ══════════════ Pedido ══════════════
 function hacerPedido(){
-  if(!perfilOk()){C.editPerfil=true;render(false);toast('Falta tu nombre o teléfono');return;}
+  const falta=faltaAlgo();if(falta){avisarFalta(falta);return;}
   const s=suc(C.retiro.suc),h=horaRetiro();
-  if(!s||!h){toast('Elegí dónde y cuándo la recogés');ir('retiro');return;}
   const items=cestaItems().filter(x=>!x.p.agotado);
   if(!items.length){toast('Tu canasta está vacía');ir('armar');return;}
   const o=N.crear({
     id:N.nuevoId(),ref:N.nuevoRef(),pin:N.nuevoPin(),estado:'nuevo',sucursal:s.k,
     cliente:{nombre:C.perfil.nombre.trim(),tel:telDig(C.perfil.tel)},
-    retiro:{modo:C.retiro.modo,at:h.toISOString(),carro:!!C.retiro.carro,placa:C.retiro.carro?C.retiro.placa.trim():''},
+    retiro:{modo:C.retiro.modo,at:h.toISOString(),entrega:C.retiro.entrega,carro:C.retiro.entrega==='carro',placa:C.retiro.entrega==='carro'?C.retiro.placa.trim():'',envio:esEnvio()?{...C.retiro.ubi,senas:(C.retiro.senas||'').trim()}:null},
     pago:{metodo:C.pago.metodo,conCuanto:C.pago.metodo==='efectivo'?+C.pago.conCuanto||0:0,estado:'pendiente'},
     sust:C.sust,nota:C.nota.trim(),
     items:items.map(x=>({k:x.k,n:x.p.n,e:x.p.e,u:x.p.u,q:x.q,p:x.p.p,mad:x.mad||'',nota:x.nota||''})),
@@ -516,7 +569,8 @@ function msgTienda(o){
   return [
     `🧺 *Pedido ARAMO Canasta · ${o.ref}*`,
     `👤 ${o.cliente.nombre} · ${fmtTel(o.cliente.tel)}`,
-    `📍 ${s?.n||''} (${s?.zona||''}) · ${cuando(o.retiro.at)} · ${o.retiro.carro?'🚗 al carro'+(o.retiro.placa?' ('+o.retiro.placa+')':''):'adentro'}`,
+    `📍 ${s?.n||''} (${s?.zona||''}) · ${cuando(o.retiro.at)} · ${entregaTxt(o.retiro)}`,
+    o.retiro.envio?`🗺️ Entregar en: ${mapaUrl(o.retiro.envio)}${o.retiro.envio.senas?' · '+o.retiro.envio.senas:''}`:'',
     `${M?.e||'💳'} ${M?.n||''}${o.pago.conCuanto?' · paga con '+$c(o.pago.conCuanto):''}`,
     '',
     ...o.items.map(i=>`• ${qtxt(i.q,i.u)} ${i.n}${i.mad?' · '+(MAD[i.mad]||'').toLowerCase():''}${i.nota?' · '+i.nota:''}`),
@@ -606,9 +660,13 @@ function ligarArmar(){
 }
 function ligarInputs(){
   const nota=$('cnNota');if(nota)nota.addEventListener('input',()=>{C.nota=nota.value;guardar();});
+  const senas=$('cnSenas');if(senas)senas.addEventListener('input',()=>{C.retiro.senas=senas.value;guardar();});
+  const ul=$('cnUbiLink');if(ul)ul.addEventListener('input',()=>{const c=leerCoords(ul.value);if(c){C.retiro.ubi=c;guardar();toast('📍 Ubicación lista');refrescar();}else if(ul.value.length>12)toast('Ese link no trae la ubicación; usá el botón 📍');});
   const placa=$('cnPlaca');if(placa)placa.addEventListener('input',()=>{C.retiro.placa=placa.value;guardar();});
   const nom=$('cnNombre'),tel=$('cnTel');
-  const chk=()=>{C.perfil.nombre=nom.value;C.perfil.tel=tel.value;guardar();renderBar();const e=$('cnPerfilErr');if(e)e.textContent=tel.value&&telDig(tel.value).length!==8&&tel.value.replace(/\D/g,'').length>=8?'El teléfono debe tener 8 dígitos':'';};
+  const chk=()=>{C.perfil.nombre=nom.value;C.perfil.tel=tel.value;guardar();renderBar();};
+  const err=()=>{const e=$('cnPerfilErr');if(e)e.textContent=tel.value&&telDig(tel.value).length!==8?'El teléfono debe tener 8 números (ej.: 8888-1234)':'';};
+  if(tel)tel.addEventListener('blur',err);
   if(nom&&tel){nom.addEventListener('input',chk);tel.addEventListener('input',chk);}
 }
 const ACT={
@@ -621,7 +679,7 @@ const ACT={
   'ir-taller'(){$('cnTaller')?.scrollIntoView({behavior:'smooth',block:'start'});},
   'limpiar-q'(){C.q='';C.parse=null;$('cnQ').value='';refrescarArmar();},
   ir(el){ir(el.dataset.v);},
-  paso(el){ir(['armar','retiro','pago'][+el.dataset.i]||'armar');},
+  paso(el){const v=['armar','retiro','pago'][+el.dataset.i]||'armar';if(v==='pago'){const f=faltaRetiro();if(f){avisarFalta(f);return;}}ir(v);},
   ver(el){C.actual=el.dataset.id;ir('seguimiento');},
   repetir(el){
     const o=N.get(el.dataset.id);if(!o)return;let n=0;
@@ -641,7 +699,9 @@ const ACT={
   cuando(el){C.retiro.modo=el.dataset.v;asegurarRetiro();guardar();refrescar();},
   dia(el){C.retiro.dia=+el.dataset.d;C.retiro.hora=null;asegurarRetiro();guardar();refrescar();},
   hora(el){C.retiro.hora=el.dataset.h;guardar();refrescar();},
-  carro(el){C.retiro.carro=el.dataset.v==='1';guardar();refrescar();},
+  entrega(el){C.retiro.entrega=el.dataset.v;C.retiro.carro=el.dataset.v==='carro';guardar();refrescar();if(el.dataset.v==='envio'&&!C.retiro.ubi)setTimeout(()=>$('cnUbiBtn')?.scrollIntoView({block:'center',behavior:'smooth'}),80);},
+  'ubi-gps'(){tomarUbicacion();},
+  'a-pago'(){const f=faltaRetiro();if(f){avisarFalta(f);return;}ir('pago');},
   metodo(el){C.pago.metodo=el.dataset.k;guardar();refrescar();},
   con(el){C.pago.conCuanto=+el.dataset.v;guardar();refrescar();},
   'edit-perfil'(){C.editPerfil=true;refrescar();$('cnNombre')?.focus();},

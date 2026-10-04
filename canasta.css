@@ -301,6 +301,11 @@ html.mini *{animation:none!important;transition:none!important}
 @media (prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
 @media (min-width:760px){.main{padding:18px 20px 0}.ciclo{margin:0 16px}.cn-top{padding-left:20px;padding-right:20px}}
 
+/* entrega con envío */
+.ubi-mapa{display:block;width:100%;height:190px;border:0;border-radius:14px;background:var(--bg2)}
+.ubi-ok{display:flex;align-items:center;justify-content:space-between;gap:8px;margin-top:8px;font-size:13px;color:var(--g)}
+.falta{border-color:var(--r)!important;box-shadow:0 0 0 4px var(--rs)!important;animation:faltaS .35s}
+@keyframes faltaS{25%{transform:translateX(-5px)}75%{transform:translateX(5px)}}
 /* ajustes finos */
 .icon-btn .dot[hidden]{display:none}
 .sec-h{flex-wrap:wrap;row-gap:2px}

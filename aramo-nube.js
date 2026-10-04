@@ -187,7 +187,7 @@ function nuevoPin(){return rnd(4).map(x=>x%10).join('');}
 function colones(n){return '₡'+Math.round(+n||0).toLocaleString('es-CR').replace(/[\s  ,]/g,'.');}
 function redondear5(n){return Math.round((+n||0)/5)*5;}
 function qtyItem(it){return it.estado==='nohay'?0:(it.qr!=null&&it.qr!==''?+it.qr:+it.q||0);}
-function totalDe(o){return redondear5((o?.items||[]).reduce((t,it)=>t+qtyItem(it)*(it.pr!=null&&it.pr!==''?+it.pr:+it.p||0),0));}
+function totalDe(o){return redondear5((o?.items||[]).reduce((t,it)=>t+qtyItem(it)*(it.pr!=null&&it.pr!==''?+it.pr:+it.p||0),0)+(+o?.retiro?.envio?.costo||0));}
 function esAprox(o){return !['listo','entregado'].includes(o?.estado)&&(o?.items||[]).some(it=>it.u==='kg'&&it.qr==null);}
 function telCR(t){const d=String(t||'').replace(/\D/g,'');return d.length===8?'506'+d:d;}
 function wa(tel,texto){const n=telCR(tel);return 'https://wa.me/'+(n||'')+'?text='+encodeURIComponent(texto);}

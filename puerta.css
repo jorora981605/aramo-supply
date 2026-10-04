@@ -151,6 +151,7 @@ html[data-theme="dark"] .mo-btn.p{color:#06150d}
 @keyframes moShake{25%{transform:translateX(-6px)}75%{transform:translateX(6px)}}
 .mo-pad{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}
 .mo-pad button{min-height:58px;border-radius:16px;border:1px solid var(--b);background:var(--card);color:var(--t);font-size:24px;font-weight:900}
+.mo-mapa{display:block;width:100%;height:200px;border:0;border-radius:14px;background:var(--ch)}
 .mo-video{width:100%;border-radius:16px;margin-top:10px;background:#000;max-height:260px;object-fit:cover}
 .mo-field{display:block;margin-top:10px;font-size:12px;font-weight:900;color:var(--m)}
 .mo-field input,.mo-field select{display:block;width:100%;margin-top:5px;min-height:46px;padding:0 12px;border-radius:13px;border:1.5px solid var(--b2);background:var(--bg);color:var(--t);font-size:15px;font-weight:700}
