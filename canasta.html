@@ -3,14 +3,17 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
-<title>ARAMO Canasta</title>
-<meta name="description" content="Armá tu canasta de frutas y verduras en ARAMO y recogela lista.">
-<meta name="theme-color" content="#f6f3ea">
+<title>ARAMO Taller de pedidos</title>
+<meta name="description" content="Decí qué necesitás: ARAMO arma tu canasta de frutas y verduras, la pesa, te avisa y la recogés lista o te llega a casa.">
+<meta name="theme-color" content="#06120d">
 <meta name="apple-mobile-web-app-capable" content="yes">
-<meta name="apple-mobile-web-app-title" content="ARAMO Canasta">
+<meta name="apple-mobile-web-app-title" content="ARAMO Taller">
 <link rel="manifest" href="./canasta.webmanifest">
 <link rel="apple-touch-icon" href="./icon.png">
 <link rel="icon" href="./icon.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Chakra+Petch:wght@500;600;700&family=IBM+Plex+Sans:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600;700&display=swap">
 <link rel="stylesheet" href="canasta.css">
 <script>try{var t=localStorage.getItem('cn_theme');if(t)document.documentElement.dataset.theme=t;if(/[?&]mini=1/.test(location.search)){document.documentElement.classList.add('mini');var m=location.search.match(/[?&]tema=(light|dark)/);if(m)document.documentElement.dataset.theme=m[1];}}catch(e){}</script>
 <script src="canasta-config.js"></script>
@@ -20,21 +23,28 @@
 <script defer src="canasta.js"></script>
 </head>
 <body>
-<div class="cn" id="cn">
-  <header class="cn-top">
-    <div class="cn-logo"><i>🧺</i><div><small>ARAMO</small>Canasta</div></div>
-    <div class="cn-top-r">
-      <button class="icon-btn" id="cnMis" type="button" aria-label="Mis pedidos">🧾<span class="dot" id="cnMisDot" hidden></span></button>
-      <button class="icon-btn" id="cnTema" type="button" aria-label="Cambiar tema">🌙</button>
+<div class="tl" id="tl">
+  <header class="tl-top">
+    <div class="brand">
+      <h1>ARAMO <span>Taller</span></h1>
+      <p>Decí qué necesitás. Lo escogemos uno por uno, lo pesamos, te avisamos y lo recogés listo o te llega a casa.</p>
     </div>
+    <div class="tl-tools">
+      <button class="ib" id="tlBitBtn" type="button" aria-label="Bitácora de mis pedidos">🧾<span class="n" id="tlBitN" hidden></span></button>
+      <button class="ib" id="tlTema" type="button" aria-label="Cambiar tema">☀️</button>
+    </div>
+    <div class="chips" id="tlChips"></div>
   </header>
-  <nav class="ciclo" id="cnCiclo" aria-label="Pasos del pedido"></nav>
-  <main class="main" id="cnMain"></main>
+  <div class="grid">
+    <section class="panel spine" id="tlSpine" aria-label="Ciclo del pedido"></section>
+    <section class="panel mesa" id="tlMesa" aria-live="polite"></section>
+  </div>
+  <section class="panel" id="tlBit" aria-label="Bitácora"></section>
 </div>
-<div class="bar hide" id="cnBar"><div class="bar-in" id="cnBarIn"></div></div>
-<div class="sheet-bg" id="cnSheetBg"></div>
-<div class="sheet" id="cnSheet" role="dialog" aria-modal="true"></div>
-<div class="toast" id="cnToast" role="status" aria-live="polite"></div>
-<noscript>ARAMO Canasta necesita JavaScript activado.</noscript>
+<div class="bar hide" id="tlBar"><div class="bar-in" id="tlBarIn"></div></div>
+<div class="sheet-bg" id="tlSheetBg"></div>
+<div class="sheet" id="tlSheet" role="dialog" aria-modal="true"></div>
+<div class="toast" id="tlToast" role="status" aria-live="polite"></div>
+<noscript>ARAMO Taller necesita JavaScript activado.</noscript>
 </body>
 </html>

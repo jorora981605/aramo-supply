@@ -101,9 +101,9 @@ function montar(){
         <div class="pu-ventana"><div class="pu-barra"><i></i><i></i><i></i><span>Surtido</span></div><div class="pu-vista" id="puMiniS"></div><div class="pu-glow"><span class="pu-abrir">Abrir Surtido</span></div></div>
         <div class="pu-info"><b>🚚 Surtido</b><small>Lo que ARAMO le pide a sus proveedores</small><span class="pu-stat" id="puStatS"></span></div>
       </button>
-      <button type="button" class="pu-cara" data-pu="canasta" style="--c:var(--o)" aria-label="Abrir Canasta">
-        <div class="pu-ventana"><div class="pu-barra"><i></i><i></i><i></i><span>Canasta</span></div><div class="pu-vista" id="puMiniC"><iframe title="Vista de Canasta" src="canasta.html?mini=1&tema=${document.documentElement.dataset.theme==='dark'?'dark':'light'}" loading="lazy" tabindex="-1" aria-hidden="true"></iframe></div><div class="pu-glow"><span class="pu-abrir">Abrir Canasta</span></div></div>
-        <div class="pu-info"><b>🧺 Canasta</b><small>Lo que los clientes le piden a ARAMO</small><span class="pu-stat o" id="puStatC"></span></div>
+      <button type="button" class="pu-cara" data-pu="canasta" style="--c:var(--o)" aria-label="Abrir Taller de pedidos">
+        <div class="pu-ventana"><div class="pu-barra"><i></i><i></i><i></i><span>Taller de pedidos</span></div><div class="pu-vista" id="puMiniC"><iframe title="Vista de Canasta" src="canasta.html?mini=1&tema=${document.documentElement.dataset.theme==='dark'?'dark':'light'}" loading="lazy" tabindex="-1" aria-hidden="true"></iframe></div><div class="pu-glow"><span class="pu-abrir">Abrir Taller</span></div></div>
+        <div class="pu-info"><b>🧺 Taller</b><small>Donde los clientes arman su pedido, de punta a punta</small><span class="pu-stat o" id="puStatC"></span></div>
       </button>
     </div>
     <button type="button" class="pu-mostrador" data-pu="mostrador"><span class="ic">🛎️</span><span class="tx"><strong>Mostrador</strong><small id="puMoSub">Encargos de clientes: alistar, cobrar y entregar</small></span><span class="nn" id="puMoN" hidden></span><span style="font-size:22px;color:var(--m)">›</span></button>
@@ -113,9 +113,9 @@ function montar(){
 
   const mo=document.createElement('div');
   mo.className='mo';mo.id='mostrador';mo.setAttribute('role','dialog');mo.setAttribute('aria-label','Mostrador');
-  mo.innerHTML=`<div class="mo-top"><button type="button" class="bk" data-mo="puerta" aria-label="Volver a ARAMO">‹</button><div class="mo-title"><small>ARAMO · Canasta</small><b>Mostrador</b></div><button type="button" class="pu-nube" id="moNube" data-mo="compartir"><i></i><span></span></button></div>
+  mo.innerHTML=`<div class="mo-top"><button type="button" class="bk" data-mo="puerta" aria-label="Volver a ARAMO">‹</button><div class="mo-title"><small>ARAMO · Taller</small><b>Mostrador</b></div><button type="button" class="pu-nube" id="moNube" data-mo="compartir"><i></i><span></span></button></div>
     <div class="mo-in"><div class="mo-chips" id="moSucs"></div><div id="moAhora"></div><div class="mo-tabs" id="moTabs"></div><div class="mo-lista" id="moLista"></div><div id="moFaltan"></div>
-    <div class="mo-herr"><button type="button" data-mo="prueba"><b>🧪</b>Pedido de prueba</button><button type="button" data-mo="vitrina"><b>🏷️</b>Vitrina y precios</button><button type="button" data-mo="ajustes"><b>⚙️</b>Pagos y horarios</button><button type="button" data-mo="compartir"><b>📣</b>Compartir Canasta</button></div></div>`;
+    <div class="mo-herr"><button type="button" data-mo="prueba"><b>🧪</b>Pedido de prueba</button><button type="button" data-mo="vitrina"><b>🏷️</b>Vitrina y precios</button><button type="button" data-mo="ajustes"><b>⚙️</b>Pagos y horarios</button><button type="button" data-mo="compartir"><b>📣</b>Compartir Taller</button></div></div>`;
   document.body.appendChild(mo);
 
   const bg=document.createElement('div');bg.className='mo-bg';bg.id='moBg';document.body.appendChild(bg);
@@ -145,7 +145,7 @@ function pintarPuerta(){
   $('puMoSub').textContent=a.length?`${nuevos} nuevos · ${a.filter(o=>o.estado==='alistando').length} alistando · ${listos} por entregar`:'Encargos de clientes: alistar, cobrar y entregar';
   const ent=hoyEntregados().filter(o=>o.estado==='entregado');
   const ventas=ent.reduce((t,o)=>t+N.totalDe(o),0);
-  const pasos=[['🏪','Proveedores',s.provs||'—'],['🚚','Surtido',s.prods?s.prods+' prod.':'—'],['🏷️','Vitrina',CFG.productos.length-(T().ocultos||[]).length+' prod.'],['🧺','Canasta',a.length+' en curso'],['🛎️','Mostrador',listos+' listos'],['🛍️','Entregado',ent.length?$c(ventas):'0 hoy']];
+  const pasos=[['🏪','Proveedores',s.provs||'—'],['🚚','Surtido',s.prods?s.prods+' prod.':'—'],['🏷️','Vitrina',CFG.productos.length-(T().ocultos||[]).length+' prod.'],['🧺','Taller',a.length+' en curso'],['🛎️','Mostrador',listos+' listos'],['🛍️','Entregado',ent.length?$c(ventas):'0 hoy']];
   $('puCadena').innerHTML=pasos.map((p,i)=>`${i?'<span class="pu-flecha">›</span>':''}<div class="pu-eslabon"><b>${p[0]}</b>${p[1]}<em>${esc(p[2])}</em></div>`).join('');
   pintarNube();
 }
@@ -285,10 +285,15 @@ function pintarEncargo(){
     </div>`;}).join('');
   let acc='';
   if(o.estado==='nuevo')acc=`<button type="button" class="mo-btn p w" data-mo="aceptar">🧑‍🌾 Aceptar y empezar a alistar</button><div class="mo-btns"><button type="button" class="mo-btn r" data-mo="rechazar">Rechazar</button><button type="button" class="mo-btn" data-mo="wa">💬 Escribirle</button></div>`;
-  if(o.estado==='alistando')acc=`<button type="button" class="mo-btn p w" data-mo="listo" ${r<n?'disabled':''}>${r<n?`Faltan ${n-r} productos por revisar`:'✅ Marcar lista y avisar'}</button><div class="mo-btns"><button type="button" class="mo-btn" data-mo="todo-ok">✓ Todo está</button><button type="button" class="mo-btn" data-mo="wa">💬 Avisarle</button></div>`;
+  if(o.estado==='alistando')acc=`<button type="button" class="mo-btn p w" data-mo="listo" ${r<n?'disabled':''}>${r<n?(n-r===1?'Falta 1 producto por revisar':`Faltan ${n-r} productos por revisar`):'✅ Marcar lista y avisar'}</button><div class="mo-btns"><button type="button" class="mo-btn" data-mo="todo-ok">✓ Todo está</button><button type="button" class="mo-btn" data-mo="wa">💬 Avisarle</button></div>`;
   if(o.estado==='listo')acc=`${o.pago.metodo==='sinpe'&&o.pago.estado!=='verificado'?`<button type="button" class="mo-btn o w" data-mo="pagado" style="margin-bottom:8px">📲 Confirmar SINPE de ${$c(tot)}${o.pago.estado==='reportado'?' (el cliente dice que pagó)':''}</button>`:''}${o.retiro.envio?(o.retiro.envio.uber?'':'<button type="button" class="mo-btn o w" style="margin-bottom:8px" data-mo="uber">🚗 Pedir Uber</button>')+'<button type="button" class="mo-btn p w" data-mo="entregado-uber">🛍️ El cliente ya la recibió</button>':'<button type="button" class="mo-btn p w" data-mo="entregar">🛍️ Entregar con código</button>'}<div class="mo-btns"><button type="button" class="mo-btn" data-mo="wa">💬 Avisarle que está lista</button><button type="button" class="mo-btn" data-mo="volver-alistar">↩︎ Volver a alistar</button></div>`;
   if(o.estado==='entregado'||o.estado==='cancelado')acc=`<button type="button" class="mo-btn w" data-mo="wa">💬 Escribirle</button>`;
-  abrirHoja(`<div class="mo-h">${esc(o.ref)} ${o.prueba?'<span class="mo-pill">🧪 prueba</span>':''}</div><div class="mo-s">${estadoTxt} · hecho ${fdia(o.created)} ${fh(o.created)}${o.estado==='alistando'?` · ${r}/${n} revisados`:''}</div>
+  const pesoR=o.items.reduce((t,i)=>t+(i.u==='kg'&&i.estado==='listo'?+(i.qr??i.q)||0:0),0);
+  const verd={nuevo:['Nuevo','run'],alistando:[`Alistando ${r}/${n}`,'run'],listo:['Lista','ok'],entregado:['Entregado','ok'],cancelado:['Cancelado','bad']}[o.estado]||['',''];
+  const holo=o.items.map(i=>{const q=i.qr!=null&&i.qr!==''?+i.qr:i.q;return `<div class="mo-hit ${i.estado==='listo'?'ok':i.estado==='nohay'?'no':o.estado==='alistando'?'wait':''}" title="${esc(i.n)}"><b>${i.e}</b><small>${esc(qtxt(q,i.u))}</small></div>`;}).join('');
+  abrirHoja(`<p class="mo-kick">Encargo · mesa de trabajo</p><div class="mo-hrow"><div class="mo-h">${esc(o.ref)} ${o.prueba?'<span class="mo-pill">🧪 prueba</span>':''}</div><span class="mo-verd ${verd[1]}">${esc(verd[0])}</span></div><div class="mo-s">${estadoTxt} · sellado ${fdia(o.created)} ${fh(o.created)}</div>
+    <div class="mo-stage${o.estado==='alistando'?' run':''}"><span class="mo-tag">Lo que ve el cliente · en vivo</span><div class="mo-scan"></div><div class="mo-holo">${holo}</div></div>
+    <div class="mo-metrics"><div><span>Revisados</span><b>${r}/${n}</b></div><div><span>Peso real</span><b>${pesoR?(Math.round(pesoR*100)/100).toLocaleString('es-CR')+' kg':'—'}</b></div><div><span>${N.esAprox(o)?'Total aprox.':'Total'}</span><b>${$c(tot)}</b></div></div>
     <div class="mo-blk"><h4>Cliente</h4><div class="mo-row"><span style="flex:1"><strong style="font-size:16px">${esc(o.cliente.nombre)}</strong><br><small style="color:var(--m)">${esc(fmtTel(o.cliente.tel))}</small></span><a class="mo-btn" href="tel:${esc(telDig(o.cliente.tel))}">📞</a><button type="button" class="mo-btn" data-mo="wa">💬</button></div></div>
     ${o.retiro.envio?envioHtml(o):`<div class="mo-blk"><h4>Retiro</h4><div style="font-weight:900">${esc(s?.n||'')} · ${esc(s?.zona||'')}</div><div class="mo-s">${fdia(o.retiro.at)} a las ${fh(o.retiro.at)} (${falta(o.retiro.at)}) · ${o.retiro.carro?'🚗 al carro'+(o.retiro.placa?': '+esc(o.retiro.placa):''):'🚶 adentro'}</div></div>`}
     <div class="mo-blk"><h4>Pago</h4><div style="font-weight:900">${P.e||''} ${esc(P.n||'')} ${o.pago.estado==='verificado'?'<span class="mo-pill g">✓ cobrado</span>':o.pago.estado==='reportado'?'<span class="mo-pill o">el cliente dice que pagó</span>':'<span class="mo-pill">pendiente</span>'}</div>${o.pago.conCuanto?`<div class="mo-s">Paga con ${$c(o.pago.conCuanto)} → vuelto ${$c(Math.max(0,o.pago.conCuanto-tot))}</div>`:''}</div>
@@ -401,7 +406,7 @@ function pintarCompartir(){
   const url=linkCanasta(),on=N.modo()==='nube';
   let qr='';
   if(window.qrcode){const q=window.qrcode(0,'M');q.addData(url);q.make();qr=q.createSvgTag({cellSize:4,margin:0,scalable:true});}
-  abrirHoja(`<div class="mo-h">📣 Compartir Canasta</div><div class="mo-s">Pegá este QR en caja o mandá el link: tus clientes arman su canasta y la recogen lista.</div>
+  abrirHoja(`<div class="mo-h">📣 Compartir el Taller</div><div class="mo-s">Pegá este QR en caja o mandá el link: tus clientes arman su pedido en el Taller y lo recogen listo o les llega a casa.</div>
     ${qr?`<div class="mo-qr">${qr}</div>`:''}
     <code class="mo-code">${esc(url)}</code>
     <div class="mo-btns"><button type="button" class="mo-btn" data-mo="copiar" data-v="${esc(url)}">📋 Copiar link</button><button type="button" class="mo-btn p" data-mo="wa-share">💬 Mandar por WhatsApp</button></div>
@@ -488,7 +493,7 @@ const ACT={
     cerrarHoja();toast('⚙️ Guardado');
   },
   copiar(el){navigator.clipboard?.writeText(el.dataset.v).then(()=>toast('📋 Link copiado'),()=>toast(el.dataset.v));},
-  'wa-share'(){abrir(N.wa('',`🧺 ¡Ya podés pedir en ${T().nombre||'ARAMO'} desde el celular! Armá tu canasta de frutas y verduras y la recogés lista 👉 ${linkCanasta()}`));},
+  'wa-share'(){abrir(N.wa('',`🧺 ¡Ya podés pedir en ${T().nombre||'ARAMO'} desde el celular! Entrá al Taller, armá tu canasta de frutas y verduras y la recogés lista o te llega a casa 👉 ${linkCanasta()}`));},
 };
 function guardarScroll(fn){const y=$('moSheet').scrollTop;fn();$('moSheet').scrollTop=y;}
 document.addEventListener('click',e=>{

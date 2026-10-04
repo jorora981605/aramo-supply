@@ -1,11 +1,11 @@
 {
-  "name": "ARAMO Canasta",
-  "short_name": "Canasta",
+  "name": "ARAMO Taller de pedidos",
+  "short_name": "ARAMO Taller",
   "description": "Armá tu canasta de frutas y verduras en ARAMO y recogela lista.",
   "start_url": "./canasta.html",
   "scope": "./",
   "display": "standalone",
-  "background_color": "#f6f3ea",
+  "background_color": "#06120d",
   "theme_color": "#0b7a4b",
   "orientation": "portrait",
   "icons": [
