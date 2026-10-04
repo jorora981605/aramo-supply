@@ -347,12 +347,12 @@ function mesaArmar(){
   const presets=(u&&!n?`<button type="button" class="preset hi" data-act="repetir" data-id="${u.id}"><span class="e">🔁</span><span class="t">Repetir mi última canasta</span><small>${u.items.length} prod · ${$c(N.totalDe(u))}</small></button>`:'')
     +recetas.map(r=>`<button type="button" class="preset" data-act="receta" data-k="${r.k}"><span class="e">${r.e}</span><span class="t">${esc(r.n)}</span><small>${r.items.length} ingred. · ${$c(costoReceta(r,C.personas))}</small></button>`).join('');
   return cab(1,'¿Qué necesitás?',n?'Armando':'Vacía',n?'run':'')
-  +`<div class="stage${C.pulso?' pulse':''}"><span class="tag">Tu canasta · en vivo</span><span class="tag r">Precios de referencia</span><div class="scan"></div>
+  +`<div class="stage${C.pulso?' pulse':''}"><span class="tag">Tu canasta · en vivo</span><span class="tag r">Referencia</span><div class="scan"></div>
     ${n?`<div class="holo">${it.map(x=>`<button type="button" class="holo-it${x.k===C.ultimo?' nuevo':''}" data-act="info" data-k="${x.k}" aria-label="${esc(x.p.n)}"><b>${x.p.e}</b><small>${esc(qtxt(x.q,x.p.u))}</small></button>`).join('')}</div>`
       :`<div class="holo-vacio"><b>🧺</b>Tu canasta aparece aquí mientras la armás.</div>`}</div>
   <div class="metrics">${metric('Productos',n)}${metric('Peso aprox.',cestaPeso()?kg(cestaPeso())+' kg':'—')}${metric('Total aprox.',$c(cestaTotal()))}</div>
   <div class="sec"><p class="kicker">Escribí o dictá tu lista</p>
-    <form class="ask" id="tlAsk" autocomplete="off"><input id="tlQ" type="search" enterkeyhint="go" placeholder="Ej.: 2 kg tomate, 6 limones" value="${esc(C.q)}" aria-label="Escribí tu lista o buscá un producto"><button type="button" class="mic" id="tlMic" aria-label="Dictar lista">🎙️</button><button type="submit" class="btn">Armar</button></form>
+    <form class="ask" id="tlAsk" autocomplete="off"><input id="tlQ" type="search" enterkeyhint="go" placeholder="Ej.: 2 kg de tomate" value="${esc(C.q)}" aria-label="Escribí tu lista o buscá un producto"><button type="button" class="mic" id="tlMic" aria-label="Dictar lista">🎙️</button><button type="submit" class="btn">Armar</button></form>
     <div id="tlParse">${parseHtml()}</div></div>
   <div class="sec"><p class="kicker">Recetas listas · para ${C.personas} ${C.personas===1?'persona':'personas'}</p><div class="presets">${presets}</div>
     ${CFG.recetas.length>4?`<p class="note"><button type="button" class="link" data-act="mas-recetas">${C.verRecetas?'Ver menos recetas':'Ver las '+CFG.recetas.length+' recetas'}</button></p>`:''}</div>
@@ -452,7 +452,7 @@ function billetes(t){
 function mesaSellar(){
   const it=cestaItems(),s=suc(C.retiro.suc),h=horaRetiro(),f=faltaAlgo(),tot=cestaTotal(),M=N.PAGOS[C.pago.metodo];
   return cab(4,'Revisá y sellá tu pedido',f?'Falta: '+f.m.toLowerCase():'Listo para sellar',f?'warn':'ok')
-  +`<div class="stage"><span class="tag">Comprobante</span><span class="tag r">Total aproximado</span>
+  +`<div class="stage"><span class="tag">Comprobante</span><span class="tag r">Aproximado</span>
     <div class="ticket">${it.map(x=>`<div class="l"><span>${x.p.e} ${esc(qtxt(x.q,x.p.u))} ${esc(x.p.n)}${x.mad?' · '+esc(MAD[x.mad].toLowerCase()):''}</span><span>${$c(x.q*x.p.p)}</span></div>`).join('')||'<div class="l m"><span>Sin productos</span><span></span></div>'}
       <hr><div class="l m"><span>${esc(entregaTxt(C.retiro))} · ${esc(s?.n||'—')}</span><span>${h?esc(fh(h)):'—'}</span></div>
       <div class="l m"><span>${M.e} ${esc(M.n)}</span><span>${esc(C.perfil.nombre.trim()||'—')}</span></div>

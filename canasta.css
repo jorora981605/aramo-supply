@@ -331,3 +331,15 @@ html.mini *{animation:none!important;transition:none!important}
 .next .btn{white-space:nowrap}
 .next .btn.big{flex:1 1 auto}
 @media (max-width:420px){.next .btn.big{font-size:15px;padding:0 12px}.next .btn.ghost{padding:0 12px}}
+
+/* Encabezado compacto en el celular: herramientas a la derecha, etiquetas en una fila deslizable */
+.tl-top{align-items:flex-start}
+.stage .tag{max-width:calc(100% - 130px);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.stage .tag.r{max-width:none}
+@media (max-width:640px){
+  .brand{flex:1 1 0}
+  .brand p{font-size:13.5px}
+  .chips{flex-wrap:nowrap;overflow-x:auto;scrollbar-width:none;margin:0 -14px;padding:0 14px 2px;width:calc(100% + 28px)}
+  .chips::-webkit-scrollbar{display:none}
+  .chip{flex:none}
+}
