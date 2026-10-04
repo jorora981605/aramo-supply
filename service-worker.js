@@ -1,5 +1,5 @@
-const CACHE_NAME = 'aramo-shell-v11';
-const APP_SHELL = ['./APP.html', './manifest.json', './icon.png', './catalogo-productos.js', './supplier-base.js', './express.js', './express.css'];
+const CACHE_NAME = 'aramo-shell-v12';
+const APP_SHELL = ['./APP.html', './manifest.json', './icon.png', './catalogo-productos.js', './supplier-base.js', './express.js', './express.css', './puerta.js', './puerta.css', './aramo-nube.js', './canasta-config.js', './canasta.html', './canasta.js', './canasta.css', './canasta.webmanifest'];
 
 self.addEventListener('install', event => {
   event.waitUntil(caches.open(CACHE_NAME).then(cache => cache.addAll(APP_SHELL)));

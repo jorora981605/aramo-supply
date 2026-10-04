@@ -1,0 +1,15 @@
+{
+  "name": "ARAMO Canasta",
+  "short_name": "Canasta",
+  "description": "Armá tu canasta de frutas y verduras en ARAMO y recogela lista.",
+  "start_url": "./canasta.html",
+  "scope": "./",
+  "display": "standalone",
+  "background_color": "#f6f3ea",
+  "theme_color": "#0b7a4b",
+  "orientation": "portrait",
+  "icons": [
+    {"src": "./icon.png", "sizes": "192x192", "type": "image/png", "purpose": "any maskable"},
+    {"src": "./icon.png", "sizes": "512x512", "type": "image/png", "purpose": "any maskable"}
+  ]
+}
