@@ -54,6 +54,11 @@ html[data-theme="dark"] .pu-abrir{color:#08130d}
 .pu.zoom .pu-in{transition:transform .38s cubic-bezier(.5,0,.75,0),opacity .38s;opacity:0}
 @media (min-width:760px){.pu-caras{gap:22px}.pu-ventana{aspect-ratio:4/5}.pu-h1{font-size:32px}}
 
+/* Tercera ventana: ARAMO POS (programa de la computadora de caja) */
+.pu-foto{position:absolute;left:0;right:0;top:26px;bottom:0;width:100%;height:calc(100% - 26px);object-fit:cover;object-position:center top;pointer-events:none}
+.pu-cara-pos{grid-column:1/-1}
+.pu-cara-pos .pu-ventana{aspect-ratio:16/8}
+@media (min-width:760px){.pu-caras{grid-template-columns:repeat(3,minmax(0,1fr))}.pu-cara-pos{grid-column:auto}.pu-cara-pos .pu-ventana{aspect-ratio:4/5}}
 .pu-home{display:grid;place-items:center;width:40px;height:40px;margin-right:2px;border-radius:13px;border:1px solid var(--b);background:var(--chrome-flat);color:var(--t);font-size:18px;flex:none}
 
 /* ── Mostrador ── */

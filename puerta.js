@@ -149,7 +149,7 @@ function montar(){
   pu.innerHTML=`<div class="pu-in">
     <div class="pu-head"><div><div class="pu-brand">ARAMO</div><div class="pu-date" id="puDate"></div></div><button type="button" class="pu-nube" id="puNube" data-pu="compartir"><i></i><span></span></button></div>
     <div id="puAlarma"></div>
-    <h1 class="pu-h1" id="puH1">¿Qué abrimos?</h1><p class="pu-sub">Las dos caras de ARAMO: lo que pedimos y lo que nos piden.</p>
+    <h1 class="pu-h1" id="puH1">¿Qué abrimos?</h1><p class="pu-sub">Elegí qué usar: lo que pedimos, lo que nos piden o la caja del mostrador.</p>
     <div class="pu-caras">
       <button type="button" class="pu-cara" data-pu="surtido" style="--c:var(--g)" aria-label="Abrir Surtido">
         <div class="pu-ventana"><div class="pu-barra"><i></i><i></i><i></i><span>Surtido</span></div><div class="pu-vista" id="puMiniS"></div><div class="pu-glow"><span class="pu-abrir">Abrir Surtido</span></div></div>
@@ -158,6 +158,10 @@ function montar(){
       <button type="button" class="pu-cara" data-pu="canasta" style="--c:var(--o)" aria-label="Abrir Taller de pedidos">
         <div class="pu-ventana"><div class="pu-barra"><i></i><i></i><i></i><span>Taller de pedidos</span></div><div class="pu-vista" id="puMiniC"><iframe title="Vista del Taller" src="canasta.html?mini=1&tema=${document.documentElement.dataset.theme==='dark'?'dark':'light'}" loading="lazy" tabindex="-1" aria-hidden="true"></iframe></div><div class="pu-glow"><span class="pu-abrir">Abrir Taller</span></div></div>
         <div class="pu-info"><b>🧺 Taller</b><small>Donde los clientes arman su pedido, de punta a punta</small><span class="pu-stat o" id="puStatC"></span></div>
+      </button>
+      <button type="button" class="pu-cara pu-cara-pos" data-pu="pos" style="--c:#1b5e20" aria-label="Abrir ARAMO POS">
+        <div class="pu-ventana"><div class="pu-barra"><i></i><i></i><i></i><span>ARAMO POS</span></div><img class="pu-foto" src="pos-vista.jpg" alt="" loading="lazy"><div class="pu-glow"><span class="pu-abrir">Abrir ARAMO POS</span></div></div>
+        <div class="pu-info"><b>🧾 ARAMO POS</b><small>Ventas y caja del mostrador</small><span class="pu-stat" id="puStatP"></span></div>
       </button>
     </div>
     <button type="button" class="pu-mostrador" data-pu="mostrador"><span class="ic">🛎️</span><span class="tx"><strong>Mostrador y Caja</strong><small id="puMoSub">Recibir, alistar, cobrar y entregar</small></span><span class="nn" id="puMoN" hidden></span><span style="font-size:22px;color:var(--m)">›</span></button>
@@ -217,6 +221,7 @@ function pintarPuerta(){
   const s=surtidoResumen();
   $('puStatS').textContent=s.prods?`🧺 ${s.prods} producto${s.prods===1?'':'s'} · ${s.provs} proveedor${s.provs===1?'':'es'}`:'Pedido de hoy vacío';
   const a=activos().filter(paraMi),nuevos=a.filter(o=>o.estado==='nuevo').length,listos=a.filter(o=>o.estado==='listo').length;
+  $('puStatP').textContent=esCompu()?'💻 Se abre en esta computadora':'💻 Se abre en la computadora de caja';
   $('puStatC').textContent=a.length?`🛎️ ${a.length} pedido${a.length>1?'s':''} en curso`:'Lista para recibir pedidos';
   $('puMoN').hidden=!nuevos;$('puMoN').textContent=nuevos;
   $('puMoSub').textContent=`📡 ${receptorNom()} · `+(a.length?`${nuevos} nuevos · ${a.filter(o=>o.estado==='alistando').length} alistando · ${listos} por entregar`:'recibir, alistar, cobrar y entregar');
@@ -249,6 +254,17 @@ function abrirPuerta(){
   pintarPuerta();clonarSurtido();autoPrecios();
   requestAnimationFrame(escalarMinis);
 }
+// ARAMO POS es un programa de la computadora: se abre con el enlace aramo-pos://
+// (registrado en la computadora de caja). Si ya está abierto, lo trae al frente.
+function esCompu(){return /Windows/i.test(navigator.userAgent)&&!/Mobi|Android/i.test(navigator.userAgent);}
+function abrirPOS(){
+  if(!esCompu()){toast('🧾 ARAMO POS se abre en la computadora de caja');return;}
+  toast('🧾 Abriendo ARAMO POS…');
+  let salio=false;const onBlur=()=>{salio=true;};
+  window.addEventListener('blur',onBlur,{once:true});
+  const a=document.createElement('a');a.href='aramo-pos://abrir';a.style.display='none';document.body.appendChild(a);a.click();a.remove();
+  setTimeout(()=>{window.removeEventListener('blur',onBlur);if(!salio&&document.hasFocus())toast('Si no se abrió: ARAMO POS no está instalado en esta computadora');},3000);
+}
 function cerrarPuerta(){$('puerta').classList.remove('open','zoom');document.body.classList.remove('pu-lock');}
 function entrar(cara,el){
   const pu=$('puerta'),v=el?.querySelector('.pu-ventana');
@@ -256,6 +272,7 @@ function entrar(cara,el){
   buzz(12);
   setTimeout(()=>{
     pu.querySelector('.pu-in').style.transform='';
+    if(cara==='pos'){pu.classList.remove('zoom');abrirPOS();return;}
     if(cara==='surtido'){cerrarPuerta();if(primeraVez&&typeof openScopePicker==='function')openScopePicker();}
     else if(cara==='canasta'){location.href='canasta.html';return;}
     else if(cara==='mostrador'){cerrarPuerta();abrirMostrador();}
@@ -709,7 +726,7 @@ function pedidoPrueba(){
 
 // ══════════════ Acciones ══════════════
 const ACT={
-  surtido(el){entrar('surtido',el);},canasta(el){entrar('canasta',el);},mostrador(el){entrar('mostrador',el);},
+  surtido(el){entrar('surtido',el);},canasta(el){entrar('canasta',el);},mostrador(el){entrar('mostrador',el);},pos(el){entrar('pos',el);},
   puerta(){abrirPuerta();},
   compartir(){if(!$('mostrador').classList.contains('open')){cerrarPuerta();abrirMostrador();}M.vista='compartir';pintarCompartir();},
   tab(el){M.tab=el.dataset.k;pintarMostrador();},
