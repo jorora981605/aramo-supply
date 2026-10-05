@@ -26,7 +26,7 @@ const LS={get(k,d){try{const v=JSON.parse(localStorage.getItem(k));return v??d;}
 const $c=N.colones;
 
 const C={
-  paso:'armar',actual:null,pasillo:'top',q:'',parse:null,verRecetas:false,ultimo:null,pulso:false,
+  paso:'armar',actual:null,pasillo:null,q:'',parse:null,verRecetas:false,recCat:'todas',ultimo:null,pulso:false,
   cesta:LS.get('cn_cesta',{}),
   retiro:Object.assign({suc:null,modo:'asap',dia:0,hora:null,carro:false,placa:'',entrega:'tienda',ubi:null,senas:'',visto:false},LS.get('cn_retiro',{})),
   perfil:Object.assign({nombre:'',tel:''},LS.get('cn_perfil',{})),
@@ -46,12 +46,26 @@ function guardar(){
 // ══════════════ Vitrina ══════════════
 const T=()=>N.tienda();
 let _cat=null;
-function cat(){
-  if(_cat)return _cat;
-  const t=T(),ocultos=new Set(t.ocultos||[]),agot=new Set(t.agotados||[]),precios=t.precios||{};
-  return _cat=CFG.productos.filter(p=>!ocultos.has(p.k)).map(p=>({...p,p:+precios[p.k]||p.p,agotado:agot.has(p.k)}));
-}
+function cat(){return _cat||(_cat=N.catalogo().filter(p=>!p.oculto));}
 const prod=k=>cat().find(p=>p.k===k);
+const RECETAS=()=>N.recetas();
+// Favoritos automáticos: lo que más ha pedido este cliente
+function favoritos(){
+  const n={};
+  misPedidos().forEach(o=>(o.items||[]).forEach(i=>{if(i.estado!=='nohay')n[i.k]=(n[i.k]||0)+1;}));
+  return Object.entries(n).sort((a,b)=>b[1]-a[1]).map(([k])=>prod(k)).filter(Boolean).slice(0,12);
+}
+// "Para completar": lo que suele ir con lo que ya está en la canasta (según el recetario)
+function sugerencias(){
+  const en=new Set(Object.keys(C.cesta));if(!en.size)return [];
+  const puntos={};
+  RECETAS().forEach(r=>{
+    const ks=r.items.map(i=>i[0]),comun=ks.filter(k=>en.has(k)).length;
+    if(!comun)return;
+    ks.forEach(k=>{if(!en.has(k))puntos[k]=(puntos[k]||0)+comun;});
+  });
+  return Object.entries(puntos).sort((a,b)=>b[1]-a[1]).map(([k])=>prod(k)).filter(p=>p&&!p.agotado).slice(0,4);
+}
 
 // ══════════════ Cantidades y textos ══════════════
 function fq(n){
@@ -69,7 +83,9 @@ const MAD={hoy:'Para comer hoy',semana:'Para la semana',verde:'Bien verde'};
 const SUST={avisar:{e:'📞',n:'Avisame'},similar:{e:'🔁',n:'Algo parecido'},quitar:{e:'✖️',n:'Quitalo'}};
 
 // ══════════════ Canasta ══════════════
-function cestaItems(){return Object.entries(C.cesta).map(([k,v])=>({k,p:prod(k),...v})).filter(x=>x.p&&x.q>0);}
+function cestaItems(){
+  return Object.entries(C.cesta).map(([k,v])=>{const p=prod(k);if(!p)return null;const q=Math.max(p.s,+(Math.round(v.q/p.s)*p.s).toFixed(2));return{k,p,...v,q};}).filter(x=>x&&x.q>0);
+}
 function cestaTotal(){return N.redondear5(cestaItems().reduce((t,x)=>t+x.q*x.p.p,0));}
 const cestaN=()=>cestaItems().length;
 const cestaPeso=()=>cestaItems().reduce((t,x)=>t+(x.p.u==='kg'?x.q:0),0);
@@ -93,6 +109,7 @@ function add(k,el){
 const misPedidos=()=>C.mis.map(id=>N.get(id)).filter(Boolean);
 const activo=()=>misPedidos().filter(o=>!['entregado','cancelado'].includes(o.estado))[0]||null;
 const ultimoEntregado=()=>misPedidos().find(o=>o.estado==='entregado')||null;
+const ultimoPedido=()=>misPedidos().find(o=>o.estado!=='cancelado')||null;
 function avance(o){const it=o.items||[],r=it.filter(x=>x.estado==='listo'||x.estado==='nohay').length;return{r,n:it.length};}
 const pesoReal=o=>(o.items||[]).reduce((t,i)=>t+(i.u==='kg'&&i.estado==='listo'?+(i.qr??i.q)||0:0),0);
 const suc=k=>(T().sucursales||[]).find(s=>s.k===k);
@@ -342,22 +359,28 @@ function siguienteBtn(){
 }
 
 function mesaArmar(){
-  const it=cestaItems(),n=it.length,u=ultimoEntregado();
-  const recetas=C.verRecetas?CFG.recetas:CFG.recetas.slice(0,4);
-  const presets=(u&&!n?`<button type="button" class="preset hi" data-act="repetir" data-id="${u.id}"><span class="e">🔁</span><span class="t">Repetir mi última canasta</span><small>${u.items.length} prod · ${$c(N.totalDe(u))}</small></button>`:'')
+  const it=cestaItems(),n=it.length,u=ultimoPedido();
+  const todas=RECETAS(),cats=(CFG.categoriasRecetas||[]).filter(c=>todas.some(r=>r.c===c.k));
+  const filtradas=C.recCat==='todas'?todas:todas.filter(r=>r.c===C.recCat);
+  const recetas=C.verRecetas?filtradas:filtradas.slice(0,4);
+  const presets=(u&&!n?`<button type="button" class="preset hi" data-act="repetir" data-id="${u.id}" data-express="1"><span class="e">⚡</span><span class="t">Repetir mi última canasta</span><small>${u.items.length} prod · ${$c(N.totalDe(u))}</small></button>`:'')
     +recetas.map(r=>`<button type="button" class="preset" data-act="receta" data-k="${r.k}"><span class="e">${r.e}</span><span class="t">${esc(r.n)}</span><small>${r.items.length} ingred. · ${$c(costoReceta(r,C.personas))}</small></button>`).join('');
+  const sug=sugerencias();
   return cab(1,'¿Qué necesitás?',n?'Armando':'Vacía',n?'run':'')
   +`<div class="stage${C.pulso?' pulse':''}"><span class="tag">Tu canasta · en vivo</span><span class="tag r">Referencia</span><div class="scan"></div>
-    ${n?`<div class="holo">${it.map(x=>`<button type="button" class="holo-it${x.k===C.ultimo?' nuevo':''}" data-act="info" data-k="${x.k}" aria-label="${esc(x.p.n)}"><b>${x.p.e}</b><small>${esc(qtxt(x.q,x.p.u))}</small></button>`).join('')}</div>`
+    ${n?`<div class="holo">${it.map(x=>`<button type="button" class="holo-it${x.k===C.ultimo?' nuevo':''}" data-act="info" data-k="${x.k}" aria-label="${esc(x.p.n)}"><b>${x.p.e}</b><em>${esc(x.p.n)}</em><small>${esc(qtxt(x.q,x.p.u))}</small></button>`).join('')}</div>`
       :`<div class="holo-vacio"><b>🧺</b>Tu canasta aparece aquí mientras la armás.</div>`}</div>
   <div class="metrics">${metric('Productos',n)}${metric('Peso aprox.',cestaPeso()?kg(cestaPeso())+' kg':'—')}${metric('Total aprox.',$c(cestaTotal()))}</div>
+  ${sug.length?`<div class="sec"><p class="kicker">Para completar · suele ir con lo tuyo</p><div class="tgs">${sug.map(p=>`<button type="button" class="tg" data-act="sumar" data-k="${p.k}">＋ ${p.e} ${esc(p.n)} <small>${porU(p)}</small></button>`).join('')}</div></div>`:''}
   <div class="sec"><p class="kicker">Escribí o dictá tu lista</p>
     <form class="ask" id="tlAsk" autocomplete="off"><input id="tlQ" type="search" enterkeyhint="go" placeholder="Ej.: 2 kg de tomate" value="${esc(C.q)}" aria-label="Escribí tu lista o buscá un producto"><button type="button" class="mic" id="tlMic" aria-label="Dictar lista">🎙️</button><button type="submit" class="btn">Armar</button></form>
     <div id="tlParse">${parseHtml()}</div></div>
-  <div class="sec"><p class="kicker">Recetas listas · para ${C.personas} ${C.personas===1?'persona':'personas'}</p><div class="presets">${presets}</div>
-    ${CFG.recetas.length>4?`<p class="note"><button type="button" class="link" data-act="mas-recetas">${C.verRecetas?'Ver menos recetas':'Ver las '+CFG.recetas.length+' recetas'}</button></p>`:''}</div>
+  <div class="sec"><p class="kicker">Recetario · ${todas.length} recetas para ${C.personas} ${C.personas===1?'persona':'personas'}</p>
+    <div class="pasillos" style="margin-bottom:8px">${[{k:'todas',n:'Todas',e:'📖'},...cats].map(c=>`<button type="button" class="tg${C.recCat===c.k?' on':''}" data-act="rec-cat" data-k="${c.k}">${c.e} ${esc(c.n)}</button>`).join('')}</div>
+    <div class="presets">${presets}</div>
+    ${filtradas.length>4?`<p class="note"><button type="button" class="link" data-act="mas-recetas">${C.verRecetas?'Ver menos':'Ver las '+filtradas.length+' recetas'}</button></p>`:''}</div>
   <div class="sec"><p class="kicker" id="tlGridT">Pasillos</p><div class="pasillos" id="tlPasillos"></div><div class="prods" id="tlGrid"></div></div>
-  ${dual('Se confirma al pesar','Lo que va por kilo se pesa al alistar. Pagás el total exacto, nunca más de lo que llevás.','Si algo no hay',`<div class="tgs">${Object.entries(SUST).map(([k,s])=>`<button type="button" class="tg${C.sust===k?' on':''}" data-act="sust" data-k="${k}">${s.e} ${s.n}</button>`).join('')}</div>`)}
+  ${dual('Se paga lo que pese','1 kg puede pesar 1,050 kg o 0,980 kg. Lo pesamos al alistar y pagás el monto exacto de lo que llevás.','Si algo no hay',`<div class="tgs">${Object.entries(SUST).map(([k,s])=>`<button type="button" class="tg${C.sust===k?' on':''}" data-act="sust" data-k="${k}">${s.e} ${s.n}</button>`).join('')}</div>`)}
   <div class="next">${siguienteBtn()}</div>`;
 }
 function parseHtml(){
@@ -369,7 +392,7 @@ function tile(p){
   const q=C.cesta[p.k]?.q||0;
   return `<div class="pt${q?' in':''}${p.agotado?' off':''}" role="button" tabindex="0" data-act="tile" data-k="${p.k}" aria-label="${esc(p.n)}">
     ${p.agotado?'<span class="pt-q r">AGOTADO</span>':q?`<span class="pt-q">${esc(qtxt(q,p.u))}</span>`:''}
-    <span class="pt-e">${p.e}</span><span class="pt-n">${esc(p.n)}</span><span class="pt-p">${porU(p)}</span>
+    <span class="pt-e">${p.e}</span><span class="pt-n">${esc(p.n)}</span>${p.d?`<span class="pt-d">${esc(p.d)}</span>`:''}<span class="pt-p">${porU(p)}</span>
     ${q?`<div class="step-q"><button type="button" data-act="menos" data-k="${p.k}" aria-label="Menos">−</button><span>${$c(q*p.p)}</span><button type="button" data-act="mas" data-k="${p.k}" aria-label="Más">+</button></div>`:p.agotado?'':'<span class="pt-add">＋ AGREGAR</span>'}
   </div>`;
 }
@@ -377,15 +400,18 @@ function pintarGrid(){
   const g=$('tlGrid');if(!g)return;
   const q=norm(C.q).replace(/[\d.,]+/g,' ').replace(/\b(kg|kilos?|unid\w*|rollos?)\b/g,' ').trim();
   const pas=$('tlPasillos');pas.hidden=!!q;
-  pas.innerHTML=CFG.pasillos.map(p=>`<button type="button" class="tg${C.pasillo===p.k?' on':''}" data-act="pasillo" data-k="${p.k}">${p.e} ${esc(p.n)}</button>`).join('');
+  const pasillos=(favoritos().length>=3?[{k:'fav',n:'Tus favoritos',e:'💚'}]:[]).concat(CFG.pasillos);
+  pas.innerHTML=pasillos.map(p=>`<button type="button" class="tg${C.pasillo===p.k?' on':''}" data-act="pasillo" data-k="${p.k}">${p.e} ${esc(p.n)}</button>`).join('');
   let lista;
   if(q){
     const w=q.split(/\s+/).filter(t=>!VACIAS.has(t));
     lista=cat().filter(p=>{const n=norm(p.n);return w.every(t=>n.includes(t.replace(/(es|s)$/,'')));});
     $('tlGridT').textContent=`Resultados · ${lista.length}`;
   }else{
-    lista=cat().filter(p=>C.pasillo==='top'?p.top:p.c===C.pasillo);
-    $('tlGridT').textContent='Pasillos · '+(CFG.pasillos.find(p=>p.k===C.pasillo)?.n||'');
+    const fav=favoritos();
+    if(!C.pasillo)C.pasillo=fav.length>=3?'fav':'top';
+    lista=C.pasillo==='fav'?fav:cat().filter(p=>C.pasillo==='top'?p.top:p.c===C.pasillo);
+    $('tlGridT').textContent='Pasillos · '+(C.pasillo==='fav'?'Tus favoritos':CFG.pasillos.find(p=>p.k===C.pasillo)?.n||'');
   }
   g.innerHTML=lista.length?lista.map(tile).join(''):`<div class="vacio">No encontramos “${esc(C.q)}”. <button type="button" class="link" data-act="limpiar-q">Ver todos los pasillos</button></div>`;
 }
@@ -473,13 +499,15 @@ function mesaPedido(o){
   const holo=o.items.map(i=>{
     const cls=i.estado==='listo'?'ok':i.estado==='nohay'?'no':E==='alistando'?'wait':'';
     const q=i.qr!=null&&i.qr!==''?+i.qr:i.q;
-    return `<div class="holo-it ${cls}" title="${esc(i.n)}"><b>${i.e}</b><small>${esc(qtxt(q,i.u))}</small></div>`;
+    return `<div class="holo-it ${cls}" title="${esc(i.n)}"><b>${i.e}</b><em>${esc(i.n)}</em><small>${esc(qtxt(q,i.u))}</small></div>`;
   }).join('');
   const ahora={nuevo:local&&!o.avisado?'Tu pedido está sellado en este teléfono; falta mandárselo a la tienda.':'La tienda ya tiene tu pedido y lo pone en cola.',alistando:'Están escogiendo y pesando cada producto. Los ✓ verdes ya están en tu canasta.',listo:env?'Tu canasta salió con Uber hacia tu ubicación.':`Te espera en ${esc(s?.n||'')} (${esc(s?.zona||'')}).`,entregado:'Tu pedido quedó entregado.',cancelado:esc(o.motivo||'El pedido no siguió.')}[E];
   const sigue={nuevo:'La tienda lo acepta y empieza a escoger.',alistando:'Te avisamos cuando esté lista: aquí y por WhatsApp.',listo:env?'Recibís tu canasta en tu casa.':`Pasá ${esc(cuando(o.retiro.at))} con tu código.`,entregado:'Calificá y repetila cuando querás.',cancelado:'Podés armar otro pedido cuando querás.'}[E];
   return cab(E==='listo'||E==='entregado'?6:5,titulo,V[0],V[1])
   +`<div class="stage${E==='alistando'?' running':''}"><span class="tag">Pedido ${esc(o.ref)} · en vivo desde la tienda</span><div class="scan"></div><div class="holo">${holo}</div></div>
   <div class="metrics">${metric('Escogidos',`${r}/${n}`)}${metric('Peso real',pesoReal(o)?kg(pesoReal(o))+' kg':'—')}${metric(aprox?'Total aprox.':'Total exacto',$c(total))}</div>
+  ${detallePeso(o)}
+  ${!fin&&N.avisos.soportado()&&N.avisos.permiso()==='default'?`<div class="card2"><h3>🔔 ¿Te avisamos en el teléfono?</h3><p>Te llega una notificación cuando tu canasta esté lista, aunque estés en otra app.</p><button type="button" class="btn ghost w" style="margin-top:10px" data-act="avisame">Avisarme cuando esté lista</button></div>`:''}
   ${E==='nuevo'&&local&&!o.avisado?`<div class="card2 t"><h3>💬 Último paso: avisale a la tienda</h3><p>Un toque y le llega por WhatsApp con todo listo para alistarlo.</p><button type="button" class="btn w" style="margin-top:10px" data-act="wa-enviar">Enviar por WhatsApp</button></div>`:''}
   ${!fin?`<div class="sello"><div class="qr" id="tlQR" aria-label="Código QR de retiro"></div><div><p class="kicker" style="margin:0">Código de retiro</p><div class="pin">${esc(o.pin)}</div><small>${env?'Dáselo al repartidor si te lo pide':'Mostralo al recoger'}${o.retiro.carro?' · te la llevamos al carro':''}</small><small class="mono">Pedido ${esc(o.ref)} · sellado ${esc(fh(o.created))}</small></div></div>`:''}
   ${pagoHtml(o,total,aprox)}
@@ -488,6 +516,19 @@ function mesaPedido(o){
   ${E==='entregado'?`<div class="card2" style="text-align:center"><h3>¿Qué tal estuvo todo?</h3><div class="caritas">${['😍','🙂','😐'].map((c,i)=>`<button type="button" class="${o.rating===3-i?'on':''}" data-act="rating" data-v="${3-i}" aria-label="Calificar ${3-i}">${c}</button>`).join('')}</div><button type="button" class="btn w" style="margin-top:12px" data-act="repetir" data-id="${o.id}">🔁 Repetir esta canasta</button></div>`:''}
   <div class="acciones">${s&&!env&&!fin?`<button type="button" class="btn ghost" data-act="mapa">🗺️ Cómo llegar</button>`:''}<button type="button" class="btn ghost" data-act="wa-tienda">💬 Escribir a la tienda</button>${E==='nuevo'?`<button type="button" class="btn bad" style="grid-column:1/-1" data-act="cancelar">Cancelar pedido</button>`:''}</div>
   <div class="next"><button type="button" class="btn${fin?'':' ghost'}" data-act="nuevo">＋ Nuevo pedido</button></div>`;
+}
+// Lista con nombres: lo que pediste contra lo que pesó (el monto final sale de aquí)
+function detallePeso(o){
+  if(o.estado==='nuevo'||o.estado==='cancelado')return '';
+  let dif=0;
+  const filas=o.items.map(i=>{
+    const real=i.qr!=null&&i.qr!=='',q=real?+i.qr:+i.q,pr=i.pr!=null&&i.pr!==''?+i.pr:+i.p;
+    if(i.estado==='nohay')return `<div class="l m"><span>${i.e} ${esc(i.n)} · no hubo</span><span>₡0</span></div>`;
+    const d=real&&i.u==='kg'&&Math.abs(q-i.q)>1e-9?q-i.q:0;dif+=(q-i.q)*pr;
+    return `<div class="l"><span>${i.e} ${esc(i.n)} · ${d?`pediste ${esc(qtxt(i.q,i.u))} → <b>pesó ${esc(kg(q))} kg</b>`:esc(qtxt(q,i.u))}</span><span>${$c(q*pr)}</span></div>`;
+  }).join('');
+  const env=+o.retiro?.envio?.costo||0;
+  return `<div class="card2"><p class="kicker" style="margin-bottom:6px">Tu canasta · lo que pesó cada producto</p><div class="ticket">${filas}${env?`<div class="l m"><span>🛵 Envío Uber</span><span>${$c(env)}</span></div>`:''}<hr>${Math.abs(dif)>=1?`<div class="l m"><span>Ajuste por peso real</span><span>${dif>0?'+':'−'}${$c(Math.abs(dif))}</span></div>`:''}<div class="l t"><span>${N.esAprox(o)?'TOTAL APROX.':'TOTAL EXACTO'}</span><span>${$c(N.totalDe(o))}</span></div></div></div>`;
 }
 function pagoHtml(o,total,aprox){
   const t=T(),m=o.pago||{},M=N.PAGOS[m.metodo]||N.PAGOS.efectivo;
@@ -597,7 +638,7 @@ function pintarHoja(){
       <div style="display:flex;gap:8px;margin-top:18px">${en?`<button type="button" class="btn bad" data-act="h-quitar">Quitar</button>`:''}<button type="button" class="btn" style="flex:1" data-act="h-ok">${en?'Listo':'Agregar'} · ${$c(H.q*p.p)}</button></div>`;
     $('tlHNota').addEventListener('input',e=>{H.nota=e.target.value;});
   }else{
-    const r=CFG.recetas.find(x=>x.k===H.k),L=ingredientes(r,H.personas,H.off),tot=N.redondear5(L.filter(x=>x.on).reduce((t,x)=>t+x.q*x.p.p,0));
+    const r=RECETAS().find(x=>x.k===H.k),L=ingredientes(r,H.personas,H.off),tot=N.redondear5(L.filter(x=>x.on).reduce((t,x)=>t+x.q*x.p.p,0));
     el.innerHTML=`<div class="sheet-grip"></div><button type="button" class="sheet-x" data-act="h-x" aria-label="Cerrar">✕</button>
       <div class="rc-hero"><b>${r.e}</b><div><p class="kicker" style="margin:0">Receta</p><h2>${esc(r.n)}</h2><p class="sub">${esc(r.desc)}</p></div></div>
       <span class="lbl">¿Para cuántas personas? · ${H.personas}</span>
@@ -655,8 +696,8 @@ function vigilar(){
   misPedidos().forEach(o=>{
     const antes=estados[o.id];estados[o.id]=o.estado;
     if(!antes||antes===o.estado)return;
-    if(o.estado==='listo'){toast('✅ ¡Tu canasta '+o.ref+' está lista!');buzz([90,60,90,60,160]);campana();}
-    else if(o.estado==='alistando')toast('🧑‍🌾 Ya están escogiendo tu canasta');
+    if(o.estado==='listo'){toast('✅ ¡Tu canasta '+o.ref+' está lista!');buzz([90,60,90,60,160]);campana();N.avisos.mostrar('✅ Tu canasta '+o.ref+' está lista',o.retiro.envio?'Va en camino con Uber a tu ubicación.':'Te espera en '+(suc(o.sucursal)?.n||'ARAMO')+'. Total '+$c(N.totalDe(o))+'.',{tag:'pedido-'+o.id,url:location.href.split('#')[0]});}
+    else if(o.estado==='alistando'){toast('🧑‍🌾 Ya están escogiendo tu canasta');N.avisos.mostrar('🧑‍🌾 Estamos escogiendo tu canasta','Pedido '+o.ref+' · te avisamos cuando esté lista.',{tag:'pedido-'+o.id});}
     else if(o.estado==='entregado')toast('🛍️ ¡Entregada! Gracias');
     else if(o.estado==='cancelado')toast('El pedido '+o.ref+' fue cancelado');
   });
@@ -742,6 +783,9 @@ const ACT={
   pasillo(el){C.pasillo=el.dataset.k;pintarGrid();},
   receta(el){abrirHoja({tipo:'receta',k:el.dataset.k,personas:C.personas,off:new Set()});},
   'mas-recetas'(){C.verRecetas=!C.verRecetas;render();},
+  'rec-cat'(el){C.recCat=el.dataset.k;C.verRecetas=false;render();},
+  sumar(el){add(el.dataset.k,el);},
+  avisame(){N.avisos.pedir().then(r=>{toast(r==='granted'?'🔔 Listo: te avisamos en el teléfono':'Tu navegador no permitió avisos; te avisamos por WhatsApp');render();});},
   'limpiar-q'(){C.q='';C.parse=null;const q=$('tlQ');if(q)q.value='';pintarGrid();},
   ir(el){ir(el.dataset.p);},
   paso(el){const i=+el.dataset.i,p=ARMANDO[i];if(!p)return;const f=puedeIr(p);if(f){avisarFalta(f);return;}ir(p);},
@@ -756,7 +800,10 @@ const ACT={
   repetir(el){
     const o=N.get(el.dataset.id);if(!o)return;let n=0;
     o.items.forEach(i=>{const p=prod(i.k);if(p&&!p.agotado&&i.estado!=='nohay'){C.cesta[i.k]={q:i.q,mad:i.mad||'',nota:i.nota||''};n++;}});
-    guardar();toast('🔁 '+n+' productos en tu canasta');C.pulso=true;ir('armar');
+    guardar();C.pulso=true;
+    // Exprés: si ya sabemos entrega y pago, va directo a revisar y sellar
+    if(el.dataset.express&&!puedeIr('sellar')){toast('⚡ '+n+' productos · revisá y sellá');ir('sellar');}
+    else{toast('🔁 '+n+' productos en tu canasta');ir('armar');}
   },
   'parse-t'(el){const x=C.parse[+el.dataset.i];if(x.p&&!x.p.agotado)x.on=!x.on;$('tlParse').innerHTML=parseHtml();},
   'parse-no'(){C.parse=null;$('tlParse').innerHTML='';},
@@ -771,7 +818,7 @@ const ACT={
   cuando(el){C.retiro.modo=el.dataset.v;asegurarRetiro();guardar();C.pulso=true;render();},
   dia(el){C.retiro.dia=+el.dataset.d;C.retiro.hora=null;asegurarRetiro();guardar();render();},
   hora(el){C.retiro.hora=el.dataset.h;guardar();C.pulso=true;render();},
-  entrega(el){C.retiro.entrega=el.dataset.v;C.retiro.carro=el.dataset.v==='carro';guardar();C.pulso=true;render();if(el.dataset.v==='envio'&&!C.retiro.ubi)setTimeout(()=>$('tlUbiBtn')?.scrollIntoView({block:'center',behavior:'smooth'}),80);},
+  entrega(el){C.retiro.entrega=el.dataset.v;C.retiro.carro=el.dataset.v==='carro';guardar();C.pulso=true;render();if(el.dataset.v==='envio'&&!C.retiro.ubi){setTimeout(()=>$('tlUbiBtn')?.scrollIntoView({block:'center',behavior:'smooth'}),80);tomarUbicacion();}},
   'ubi-gps'(){tomarUbicacion();},
   metodo(el){C.pago.metodo=el.dataset.k;guardar();C.pulso=true;render();},
   con(el){C.pago.conCuanto=+el.dataset.v;guardar();render();},
@@ -779,11 +826,11 @@ const ACT={
   pedir(){hacerPedido();},
   'wa-enviar'(){
     const o=pedidoVisto();if(!o)return;
-    abrir(N.wa(T().whatsapp,msgTienda(o)));
+    abrir(N.wa(N.waDe(o.sucursal),msgTienda(o)));
     N.cambiar(o.id,x=>{x.avisado=true;},'cliente','Pedido enviado por WhatsApp').then(()=>render());
   },
-  'wa-tienda'(){const o=pedidoVisto();abrir(N.wa(T().whatsapp,`Hola, sobre mi pedido ${o?.ref||''} de ARAMO: `));},
-  comprobante(){const o=pedidoVisto();abrir(N.wa(T().whatsapp,`📲 Comprobante SINPE del pedido ${o.ref} por ${$c(N.totalDe(o))} (adjunto la captura).`));},
+  'wa-tienda'(){const o=pedidoVisto();abrir(N.wa(N.waDe(o?.sucursal),`Hola, sobre mi pedido ${o?.ref||''} de ARAMO: `));},
+  comprobante(){const o=pedidoVisto();abrir(N.wa(N.waDe(o.sucursal),`📲 Comprobante SINPE del pedido ${o.ref} por ${$c(N.totalDe(o))} (adjunto la captura).`));},
   'ya-pague'(){N.cambiar(C.actual,o=>{o.pago.estado='reportado';o.pago.reportado=new Date().toISOString();},'cliente','El cliente avisó que pagó').then(()=>{toast('¡Gracias! La tienda lo confirma al entregarte');render();});},
   'link-pago'(){abrir(T().linkTarjeta);},
   mapa(){const o=pedidoVisto(),s=suc(o?.sucursal);abrir('https://www.google.com/maps/search/?api=1&query='+encodeURIComponent(s?.mapa||s?.n||'ARAMO'));},
@@ -792,7 +839,7 @@ const ACT={
     if(!confirm('¿Cancelar el pedido '+o.ref+'?'))return;
     N.cambiar(o.id,x=>{if(x.estado==='nuevo'){x.estado='cancelado';x.motivo='Lo canceló el cliente';}},'cliente').then(x=>{
       if(x?.estado!=='cancelado'){toast('Ya lo están alistando; escribile a la tienda');render();return;}
-      if(N.modo()!=='nube'&&o.avisado)abrir(N.wa(T().whatsapp,`Hola, cancelo mi pedido ${o.ref}. ¡Gracias!`));
+      if(N.modo()!=='nube'&&o.avisado)abrir(N.wa(N.waDe(o.sucursal),`Hola, cancelo mi pedido ${o.ref}. ¡Gracias!`));
       toast('Pedido cancelado');render();
     });
   },
@@ -809,7 +856,7 @@ const ACT={
   'h-per'(el){H.personas=+el.dataset.v;C.personas=H.personas;guardar();pintarHoja();buzz(5);},
   'h-ing'(el){const k=el.dataset.k;H.off.has(k)?H.off.delete(k):H.off.add(k);pintarHoja();},
   'h-receta'(){
-    const r=CFG.recetas.find(x=>x.k===H.k),L=ingredientes(r,H.personas,H.off).filter(x=>x.on);
+    const r=RECETAS().find(x=>x.k===H.k),L=ingredientes(r,H.personas,H.off).filter(x=>x.on);
     L.forEach(x=>sumar(x.p.k,x.q));
     guardar();cerrarHoja();C.pulso=true;fiesta(L.map(x=>x.p.e));toast(`${r.e} ${r.n}: ${L.length} productos a tu canasta`);buzz([20,30,20]);
     if(C.actual||C.paso!=='armar')ir('armar');else render();

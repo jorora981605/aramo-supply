@@ -1,4 +1,4 @@
-const CACHE_NAME = 'aramo-shell-v15';
+const CACHE_NAME = 'aramo-shell-v16';
 const APP_SHELL = ['./APP.html', './manifest.json', './icon.png', './catalogo-productos.js', './supplier-base.js', './express.js', './express.css', './puerta.js', './puerta.css', './aramo-nube.js', './canasta-config.js', './canasta.html', './canasta.js', './canasta.css', './canasta.webmanifest'];
 
 self.addEventListener('install', event => {
@@ -28,5 +28,24 @@ self.addEventListener('fetch', event => {
         return response;
       })
       .catch(() => caches.match(request).then(cached => cached || caches.match('./APP.html')))
+  );
+});
+
+// Tocar una notificación de ARAMO abre la app justo en ese pedido.
+self.addEventListener('notificationclick', event => {
+  event.notification.close();
+  const url = (event.notification.data && event.notification.data.url) || './APP.html';
+  const ver = url.match(/#ver=(.+)$/);
+  event.waitUntil(
+    self.clients.matchAll({ type: 'window', includeUncontrolled: true }).then(list => {
+      const base = url.split('#')[0];
+      for (const c of list) {
+        if (c.url.split('#')[0] === base && 'focus' in c) {
+          if (ver) c.postMessage({ tipo: 'abrir', id: ver[1] });
+          return c.focus();
+        }
+      }
+      return self.clients.openWindow(url);
+    })
   );
 });

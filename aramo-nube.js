@@ -151,6 +151,44 @@ function tienda(){
   t.sucursales=(base.sucursales||[]).map(s=>({...s,...((usar.sucursales||[]).find(x=>x.k===s.k)||{})}));
   return t;
 }
+// ── Catálogo único: fábrica + productos nuevos de la tienda + cambios de la tienda ──
+// Cambiar aquí precio, unidad o nombre se refleja solo en el Taller, las recetas,
+// el Mostrador y la Caja. Los pedidos ya sellados conservan lo que se vendió.
+function pasoDe(u){return u==='kg'?.5:1;}
+function catalogo(){
+  const t=tienda(),base=window.ARAMO_CANASTA?.productos||[];
+  const ed=t.prods||{},precios=t.precios||{},ocultos=new Set(t.ocultos||[]),agot=new Set(t.agotados||[]);
+  const vistos=new Set();
+  return [...base,...(t.nuevos||[])].filter(p=>p&&p.k&&!vistos.has(p.k)&&vistos.add(p.k)).map(p=>{
+    const e=ed[p.k]||{},u=e.u||p.u;
+    const s=+e.s||(e.u&&e.u!==p.u?pasoDe(u):+p.s)||pasoDe(u);
+    return{...p,...e,u,s,p:+precios[p.k]||+e.p||+p.p||0,agotado:agot.has(p.k),oculto:ocultos.has(p.k),propio:!base.some(b=>b.k===p.k)};
+  });
+}
+function recetas(){
+  const t=tienda(),fuera=new Set(t.recetasOcultas||[]);
+  return [...(window.ARAMO_CANASTA?.recetas||[]),...(t.recetas||[])].filter(r=>r&&!fuera.has(r.k));
+}
+function waDe(k){const t=tienda(),s=(t.sucursales||[]).find(x=>x.k===k);return s?.whatsapp||t.whatsapp||'';}
+
+// ── Avisos en el teléfono (notificación del sistema) ──
+const avisos={
+  soportado:()=>'Notification' in window,
+  permiso:()=>('Notification' in window)?Notification.permission:'denied',
+  async pedir(){if(!('Notification' in window))return 'denied';if(Notification.permission!=='default')return Notification.permission;try{return await Notification.requestPermission();}catch{return 'denied';}},
+  async mostrar(titulo,cuerpo,o={}){
+    try{
+      if(window.aramoPOS?.avisar){window.aramoPOS.avisar(titulo,cuerpo);return true;} // dentro de ARAMO POS: aviso de Windows
+      if(!('Notification' in window)||Notification.permission!=='granted')return false;
+      const opts={body:cuerpo,tag:o.tag||'aramo',renotify:true,icon:new URL('icon.png',location.href).href,badge:new URL('icon.png',location.href).href,requireInteraction:!!o.fijo,vibrate:[160,80,160,80,240],data:{url:o.url||location.href}};
+      const reg=navigator.serviceWorker&&await Promise.race([navigator.serviceWorker.getRegistration(),new Promise(r=>setTimeout(()=>r(null),1500))]);
+      if(reg&&reg.showNotification){await reg.showNotification(titulo,opts);return true;}
+      new Notification(titulo,opts);return true;
+    }catch{return false;}
+  },
+  insignia(n){try{window.aramoPOS?.contador?.(n||0);if(navigator.setAppBadge){n?navigator.setAppBadge(n):navigator.clearAppBadge();}}catch{}},
+};
+
 async function subirTienda(d){
   if(modo!=='nube'||!supa)return false;
   try{const r=await timeout(supa.from(TABLE).upsert({id:TIENDA_ID,data:d,estado:'tienda',updated_at:d.updated},{onConflict:'id'}),9000);if(r.error)throw new Error(r.error.message);tiendaNube=d;return true;}
@@ -211,7 +249,7 @@ window.AramoNube={
   get:id=>store[id]||null,
   modo:()=>modo,motivo:()=>motivo,pendientes:()=>pend.size,
   on:f=>{subs.add(f);return()=>subs.delete(f);},
-  tienda,guardarTienda,
+  tienda,guardarTienda,catalogo,recetas,waDe,avisos,
   pack,unpack,enlace,
   nuevoId,nuevoRef,nuevoPin,colones,redondear5,qtyItem,totalDe,esAprox,telCR,wa,
   ESTADOS,PAGOS,
