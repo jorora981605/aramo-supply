@@ -26,7 +26,7 @@ const PUERTAS=[
 const LISTA=[
   {n:1,t:'Ventanas vivas',d:'Cada app adentro de su ventana, vista de lejos: ves cómo está antes de entrar.'},
   {n:2,t:'Puestos del mercado',d:'Tres puestos gigantes con su toldo. Un toque y entrás: la más rápida con una mano.',rec:true},
-  {n:3,t:'Lo que toca ahora',d:'ARAMO te dice qué hacer primero en grande; las 3 puertas quedan abajo, al alcance del pulgar.'},
+  {n:3,t:'Mostrador grande',d:'El Mostrador en grande arriba (naranja si hay pedidos nuevos); las 3 puertas quedan abajo, al alcance del pulgar.'},
   {n:4,t:'Pizarra de la verdu',d:'Como la pizarra de precios: madera, tiza y la lista del día con sus números.'},
   {n:5,t:'Consola de taller',d:'Escribí lo que buscás (tomate, A-7KQ3, caja…) o usá 1·2·3. Para ir volando.'},
 ];
@@ -47,7 +47,6 @@ function elegir(n){LS.set('aramo_portada',Math.min(5,Math.max(1,+n||2)));}
 const herramientas=()=>`<div class="po-tools"><button type="button" class="po-chip po-local" data-pu="local" aria-label="Cambiar de local" title="Cambiar de local"><span data-d="local"></span></button><button type="button" class="po-chip po-nube" data-pu="compartir" data-nube title="Compartir el Taller"><i></i><span data-d="nube"></span></button><button type="button" class="po-chip po-avisar" data-pu="avisos-on" data-dn="avisosTxt" title="Activar avisos de pedidos nuevos"></button><span class="po-ics"><button type="button" class="po-chip" data-pu="portada" aria-label="Cambiar portada" title="Cambiar portada">🎨 <span>Portada</span></button><button type="button" class="po-chip" data-pu="ajustes-app" aria-label="Ajustes" title="Ajustes">⚙️ <span>Ajustes</span></button></span></div>`;
 const ahora=cls=>`<button type="button" class="po-ahora ${cls||''}" data-ahora><span class="po-ahora-e" data-d="ahora.e"></span><span class="po-ahora-t"><small data-d="ahora.k"></small><strong data-d="ahora.t"></strong><em data-d="ahora.s"></em></span><span class="po-ahora-go" data-d="ahora.cta"></span></button>`;
 const badge=p=>`<span class="po-badge" data-dn="${p}"></span>`;
-const subMostrador=cls=>`<button type="button" class="po-sub ${cls||''}" data-pu="mostrador" aria-label="Abrir Mostrador y Caja"><span>🛎️ Mostrador</span><b data-dn="t.nuevos"></b><small data-d="t.mo"></small></button>`;
 
 // ── 1 · Ventanas vivas ──
 function v1(){
@@ -70,7 +69,6 @@ function v1(){
       <div class="pu-info"><b>🧾 ARAMO POS</b><small>Ventas y caja del mostrador</small><span class="pu-stat" data-d="p.txt"></span></div>
     </button>
   </div>
-  <button type="button" class="pu-mostrador" data-pu="mostrador"><span class="ic">🛎️</span><span class="tx"><strong>Mostrador y Caja</strong><small data-d="t.mo"></small></span><span class="nn" data-dn="t.nuevos"></span><span style="font-size:22px;color:var(--m)">›</span></button>
   <div class="pu-flujo"><h3>Todo el ciclo, conectado</h3><div class="pu-cadena" data-dh="cadena"></div></div>`;
 }
 
@@ -87,24 +85,21 @@ function v2(){
       <span class="po2-tx"><b>${p.e} ${esc(p.n)}</b><small>${esc(p.d)}</small><em data-d="${p.dato}.chip"></em></span>
       ${badge(p.dato+'.alerta')}<span class="po2-ir" aria-hidden="true">→</span>
     </button>
-    ${p.k==='canasta'?subMostrador('po2-sub'):''}
   </div>`).join('')}</div>
   <footer class="po-pie"><span>🧾 Caja web hoy <b data-d="caja.total"></b></span><span>🧺 <b data-d="t.activos"></b> en curso</span><span>🚚 <b data-d="s.prods"></b> por pedir</span></footer>`;
 }
 
-// ── 3 · Lo que toca ahora ──
+// ── 3 · Mostrador grande ──
 function v3(){
   return `<header class="po3-top"><div><b class="po3-marca">ARAMO</b><span data-d="fecha"></span></div>${herramientas()}</header>
   <div data-dh="alarma"></div>
-  <section class="po3-hero" data-ahora-tono>
-    <p class="po3-k">Lo que toca ahora · <span data-d="hora"></span></p>
+  <section class="po3-hero" data-ahora-tono data-pu="mostrador">
     <div class="po3-e" data-d="ahora.e"></div>
     <h1 data-d="ahora.t"></h1><p class="po3-s" data-d="ahora.s"></p>
     <button type="button" class="po3-cta" data-ahora><span data-d="ahora.cta"></span> →</button>
   </section>
   <p class="po3-o">O abrí</p>
   <div class="po3-puertas">${PUERTAS.map(p=>`<button type="button" class="po3-pu c-${p.c}" data-pu="${p.k}" aria-label="${p.tecla} · Abrir ${esc(p.n)}"><span class="po3-n">${p.tecla}</span><b>${p.e}</b><strong>${esc(p.n)}</strong><small data-d="${p.dato}.chip"></small>${badge(p.dato+'.alerta')}</button>`).join('')}</div>
-  ${subMostrador('po3-sub')}
   <div class="po3-dia"><div><span>Caja web</span><b data-d="caja.total"></b></div><div><span>En curso</span><b data-d="t.activos"></b></div><div><span>Por pedir</span><b data-d="s.prods"></b></div></div>`;
 }
 
@@ -114,7 +109,7 @@ function v4(){
     <header class="po4-top"><div><p class="po4-k">ARAMO · frutas y verduras</p><h1>Hoy en ARAMO</h1><p class="po4-f"><span data-d="saludo"></span> · <span data-d="fecha"></span></p></div>${herramientas()}</header>
     <div data-dh="alarma"></div>
     <button type="button" class="po4-nota" data-ahora><span class="po4-estrella">★</span><span><small data-d="ahora.k"></small><strong data-d="ahora.t"></strong><em data-d="ahora.s"></em></span></button>
-    <ol class="po4-lista">${PUERTAS.map(p=>`<li><button type="button" class="po4-linea" data-pu="${p.k}" aria-label="${p.tecla} · Abrir ${esc(p.n)}"><span class="po4-n">${p.tecla}</span><span class="po4-e">${p.e}</span><span class="po4-t"><b>${esc(p.n)}</b><small>${esc(p.d)}</small></span><span class="po4-puntos" aria-hidden="true"></span><span class="po4-v" data-d="${p.dato}.chip"></span>${badge(p.dato+'.alerta')}</button>${p.k==='canasta'?subMostrador('po4-sub'):''}</li>`).join('')}</ol>
+    <ol class="po4-lista">${PUERTAS.map(p=>`<li><button type="button" class="po4-linea" data-pu="${p.k}" aria-label="${p.tecla} · Abrir ${esc(p.n)}"><span class="po4-n">${p.tecla}</span><span class="po4-e">${p.e}</span><span class="po4-t"><b>${esc(p.n)}</b><small>${esc(p.d)}</small></span><span class="po4-puntos" aria-hidden="true"></span><span class="po4-v" data-d="${p.dato}.chip"></span>${badge(p.dato+'.alerta')}</button></li>`).join('')}</ol>
     <footer class="po4-pie"><span>Caja web hoy: <b data-d="caja.total"></b></span><span>Pedidos: <b data-d="t.activos"></b></span><span>Por pedir: <b data-d="s.prods"></b></span></footer>
   </div></div>`;
 }
@@ -127,7 +122,6 @@ function v5(){
   <div class="po5-sug" id="poCmdSug"></div>
   <button type="button" class="po5-ahora" data-ahora><span class="po5-verd" data-d="ahora.k"></span><span><strong data-d="ahora.t"></strong><em data-d="ahora.s"></em></span><span class="po5-go" data-d="ahora.cta"></span></button>
   <div class="po5-tiles">${PUERTAS.map(p=>`<button type="button" class="po5-tile c-${p.c}" data-pu="${p.k}" aria-label="${p.tecla} · Abrir ${esc(p.n)}"><span class="po5-kick">0${p.tecla} · ${esc(p.n.toUpperCase())}</span><b>${p.e}</b><strong>${esc(p.n)}</strong><small>${esc(p.d)}</small><span class="po5-dato" data-d="${p.dato}.chip"></span>${badge(p.dato+'.alerta')}<kbd>${p.tecla}</kbd></button>`).join('')}</div>
-  ${subMostrador('po5-sub')}
   <section class="po5-bit"><p class="po5-kick">Bitácora de hoy</p><div data-dh="bit"></div></section>
   <p class="po5-teclas"><kbd>1</kbd> Surtido <kbd>2</kbd> Taller <kbd>3</kbd> POS <kbd>M</kbd> Mostrador <kbd>/</kbd> buscar</p>`;
 }

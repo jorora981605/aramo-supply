@@ -267,3 +267,8 @@ html[data-theme="dark"] .po3-hero[data-tono] .po3-cta{color:#1a1a1a}
 /* Celular angosto: "Activar avisos" se acorta para que los 5 botones quepan en una fila */
 @media (max-width:420px){.po-tools .po-chip.po-avisar{font-size:0!important;gap:0}.po-tools .po-chip.po-avisar::after{content:"🔔 Avisos";font-size:11.5px}}
 @media (max-width:420px){.po4 .po-tools>.po-chip{padding:0 8px}.po4 .po-tools{gap:5px}}
+
+/* La barra del Mostrador solo dice "Mostrador": sin renglones vacíos */
+.po-ahora-t small:empty,.po-ahora-t em:empty,.po3-hero [data-d]:empty,.po4-nota small:empty,.po4-nota em:empty,.po5-ahora [data-d]:empty{display:none}
+.po-ahora-t strong{font-size:19px}
+.po3-hero{cursor:pointer}
