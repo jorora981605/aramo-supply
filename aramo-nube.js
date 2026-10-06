@@ -125,7 +125,7 @@ async function cambiar(id,fn,quien,nota){
   const fresco=await leerUno(id);
   if(fresco)take(fresco,true);
   const cur=store[id];
-  if(!cur)return null;
+  if(!cur||cur.borrado)return null;
   const o=clone(cur);
   const antes=o.estado;
   fn(o);
@@ -137,9 +137,43 @@ async function cambiar(id,fn,quien,nota){
 function importar(o){
   if(!o?.id)return false;
   const nuevo=take(o);
-  if(nuevo){avisar(o);subir(o);}
+  if(nuevo){avisar(o);subirSiSigue(o);}
   if(solo)solo.add(o.id);
   return nuevo;
+}
+
+// Un link viejo de WhatsApp no revive un pedido que se borró al reiniciar el Mostrador.
+async function subirSiSigue(o){
+  const f=await leerUno(o.id);
+  if(f&&f.borrado&&!isNewer(o,f)){take(f);return;}
+  subir(o);
+}
+// Reiniciar: borra todos los encargos en este equipo y en la nube (los ajustes de la tienda no se tocan).
+// La llave pública no puede borrar filas de la nube: cada una se vacía y queda marcada como borrada,
+// con una versión tan alta que ningún equipo atrasado la puede revivir.
+async function borrarTodo(){
+  const t=now(),viejos={};
+  Object.values(store).forEach(o=>{viejos[o.id]=o.v||0;});
+  if(modo==='nube'&&supa){
+    try{const r=await timeout(supa.from(TABLE).select('id,data').neq('id',TIENDA_ID),15000);(r.data||[]).forEach(x=>{viejos[x.id]=Math.max(viejos[x.id]||0,x.data?.v||0);});}catch(e){console.warn('[nube] reinicio sin leer la nube',e.message||e);}
+  }
+  delete viejos[TIENDA_ID];
+  const tumbas=Object.keys(viejos).map(id=>({id,borrado:t,estado:'borrado',v:viejos[id]+1e9,created:t,updated:t}));
+  tumbas.forEach(o=>{store[o.id]=o;pend.add(o.id);avisar(o);});
+  persist();emit('encargo');
+  if(modo==='nube'&&supa){
+    for(let i=0;i<tumbas.length;i+=200){
+      const lote=tumbas.slice(i,i+200);
+      try{const r=await timeout(supa.from(TABLE).upsert(lote.map(rowOf),{onConflict:'id'}),15000);if(r.error)throw new Error(r.error.message);lote.forEach(o=>pend.delete(o.id));}
+      catch(e){console.warn('[nube] reinicio: quedan por subir',lote.length,e.message||e);}
+    }
+    persist();
+  }
+  return tumbas.length;
+}
+function restaurar(lista){
+  (lista||[]).forEach(o=>{if(!o?.id)return;const r={...clone(o),v:(o.v||0)+2e9,updated:now()};store[r.id]=r;avisar(r);subir(r);});
+  persist();emit('encargo');
 }
 
 // ── Ajustes de la tienda ──
@@ -244,9 +278,9 @@ const PAGOS={
 };
 
 window.AramoNube={
-  conectar,crear,cambiar,importar,
-  lista:()=>Object.values(store).sort((a,b)=>Date.parse(b.created||0)-Date.parse(a.created||0)),
-  get:id=>store[id]||null,
+  conectar,crear,cambiar,importar,borrarTodo,restaurar,
+  lista:()=>Object.values(store).filter(o=>!o.borrado).sort((a,b)=>Date.parse(b.created||0)-Date.parse(a.created||0)),
+  get:id=>store[id]&&!store[id].borrado?store[id]:null,
   modo:()=>modo,motivo:()=>motivo,pendientes:()=>pend.size,
   on:f=>{subs.add(f);return()=>subs.delete(f);},
   tienda,guardarTienda,catalogo,recetas,waDe,avisos,

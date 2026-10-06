@@ -224,8 +224,8 @@ function montar(){
         <button type="button" data-mo="mas" aria-expanded="false" id="moMasBtn"><b>⋯</b>Más</button>
       </div>
       <div class="mo-herr mo-mas" id="moMas" hidden>
-        <button type="button" data-mo="limpiar"><b>🧹</b>Limpieza total</button>
-        <button type="button" data-mo="deshacer-limpieza" id="moDeshacer" hidden><b>↩️</b>Deshacer limpieza</button>
+        <button type="button" data-mo="reiniciar"><b>🔄</b>Reiniciar Mostrador</button>
+        <button type="button" data-mo="deshacer-reinicio" id="moDeshacer" hidden><b>↩️</b>Deshacer reinicio</button>
         <button type="button" data-mo="recetario"><b>📖</b>Recetario</button>
         <button type="button" data-mo="ajustes"><b>💳</b>Pagos y horarios</button>
         <button type="button" data-mo="compartir"><b>📣</b>Compartir Taller</button>
@@ -448,7 +448,8 @@ function pintarMostrador(){
   const tabs=[['nuevo','Nuevos'],['alistando','Alistando'],['listo','Listos'],['hecho','Hoy']];
   $('moTabs').innerHTML=tabs.map(([k,n])=>`<button type="button" class="mo-tab${M.tab===k?' on':''}" data-mo="tab" data-k="${k}"><b>${grupos[k].length}</b>${n}</button>`).join('');
   const L=grupos[M.tab];
-  const dh=$('moDeshacer');if(dh)dh.hidden=!LS.get('aramo_ultima_limpieza',[]).length;
+  const resp=LS.get('aramo_reinicio_respaldo',null),dh=$('moDeshacer');
+  if(dh)dh.hidden=!(resp?.pedidos?.length&&Date.now()-resp.t<12*36e5);
   $('moLista').innerHTML=L.length?L.map(tarjeta).join(''):`<div class="mo-vacio"><b>${{nuevo:'📭',alistando:'🧺',listo:'✅',hecho:'🌙'}[M.tab]}</b>${{nuevo:'Sin pedidos nuevos.',alistando:'Nada alistándose ahora.',listo:'Nada esperando entrega.',hecho:'Todavía no se ha entregado nada hoy.'}[M.tab]}${M.tab==='nuevo'?'<br><br><button type="button" class="mo-btn" data-mo="prueba">🧪 Probar con un pedido de prueba</button>':''}</div>`;
   const falt=[...new Map(A.concat(H).flatMap(o=>(o.items||[]).filter(i=>i.estado==='nohay').map(i=>[i.k,i]))).values()];
   $('moFaltan').innerHTML=falt.length?`<div class="mo-faltan"><h4>🚚 No hubo hoy: pedirlo en Surtido</h4><div>${falt.map(i=>`<button type="button" class="mo-chip" data-mo="surtir" data-n="${esc(i.n)}">${i.e} ${esc(i.n)}</button>`).join('')}</div></div>`:'';
@@ -591,7 +592,7 @@ function pintarEncargo(){
 // Borradores: lo que estás pesando o cobrando se guarda solo, aunque cierres la ventana,
 // toques una notificación o se recargue la página.
 const BORR=LS.get('aramo_borradores',{});
-Object.keys(BORR).forEach(id=>{const o=N.get(id);if(o&&['entregado','cancelado'].includes(o.estado))delete BORR[id];});
+Object.keys(BORR).forEach(id=>{const o=N.get(id);if(!o||['entregado','cancelado'].includes(o.estado))delete BORR[id];});
 function guardarBorr(){
   const id=M.abierto;if(!id)return;
   const b=BORR[id]||{};
@@ -1005,27 +1006,24 @@ const ACT={
   'pk-listo'(){terminarPesaje();},
   'pk-volver'(){M.vista='encargo';pintarEncargo();},
   tab(el){M.tab=el.dataset.k;pintarMostrador();},
-  // 🧹 Quita todos los pedidos del Mostrador en todos los equipos (no se borran: se pueden traer de vuelta).
-  limpiar(){
-    const L=N.lista().filter(o=>!o.archivado&&(M.suc==='todas'||o.sucursal===M.suc));
-    if(!L.length){toast('El Mostrador ya está limpio');return;}
-    const vivos=L.filter(o=>!['entregado','cancelado'].includes(o.estado)).length;
-    if(!confirm(`🧹 Limpieza total\n\nSe quitan ${L.length} pedido${L.length>1?'s':''} del Mostrador, en todos los equipos.${vivos?`\nOjo: ${vivos} todavía no se ${vivos>1?'han':'ha'} entregado, y su cliente no recibe aviso.`:''}\nLo ya cobrado hoy sigue en 🧾 Caja de hoy.\n\n¿Limpiar todo?`))return;
-    const t=new Date().toISOString();
-    LS.set('aramo_ultima_limpieza',L.map(o=>o.id));
-    L.forEach(o=>sinAbrir.delete(o.id));guardarSinAbrir();N.avisos.insignia(sinAbrir.size);
-    Promise.all(L.map(o=>N.cambiar(o.id,x=>{x.archivado=t;},'tienda','Quitado del Mostrador (limpieza total)'))).then(()=>{
-      M.marca=null;M.tab='nuevo';cerrarHoja();pintarMostrador();pintarPuerta();
-      toast(`🧹 Mostrador limpio · ${L.length} pedido${L.length>1?'s':''} fuera`);
-    });
+  // 🔄 Reiniciar Mostrador: borra todos los pedidos, la Caja de hoy y los avisos, en todos los equipos.
+  // Precios, recetas y ajustes no se tocan. Este equipo guarda una copia por si te arrepentís.
+  async reiniciar(){
+    const L=N.lista();
+    if(!confirm(`🔄 Reiniciar Mostrador\n\nSe borra TODO: ${L.length} pedido${L.length===1?'':'s'}, la Caja de hoy y los avisos, en todos los equipos.\nNo se tocan los precios, las recetas ni los ajustes.\n\n¿Borrar todo?`))return;
+    LS.set('aramo_reinicio_respaldo',{t:Date.now(),pedidos:L});
+    sinAbrir.clear();guardarSinAbrir();N.avisos.insignia(0);clearInterval(_rep);
+    Object.keys(BORR).forEach(k=>delete BORR[k]);LS.set('aramo_borradores',BORR);
+    M.marca=null;M.tab='nuevo';cerrarHoja();
+    const n=await N.borrarTodo();
+    pintarMostrador();pintarPuerta();document.title='ARAMO';
+    toast(`🔄 Mostrador reiniciado · ${n} pedido${n===1?'':'s'} borrado${n===1?'':'s'}`);
   },
-  'deshacer-limpieza'(){
-    const ids=LS.get('aramo_ultima_limpieza',[]).filter(id=>N.get(id)?.archivado);
-    if(!ids.length){LS.set('aramo_ultima_limpieza',[]);pintarMostrador();return;}
-    Promise.all(ids.map(id=>N.cambiar(id,x=>{delete x.archivado;},'tienda','Vuelve al Mostrador'))).then(()=>{
-      LS.set('aramo_ultima_limpieza',[]);pintarMostrador();pintarPuerta();
-      toast(`↩️ ${ids.length} pedido${ids.length>1?'s':''} de vuelta en el Mostrador`);
-    });
+  'deshacer-reinicio'(){
+    const r=LS.get('aramo_reinicio_respaldo',null);if(!r?.pedidos?.length)return;
+    N.restaurar(r.pedidos);LS.set('aramo_reinicio_respaldo',null);
+    pintarMostrador();pintarPuerta();
+    toast(`↩️ ${r.pedidos.length} pedido${r.pedidos.length===1?'':'s'} de vuelta en el Mostrador`);
   },
   abrir(el){if(!$('mostrador').classList.contains('open')){cerrarPuerta();abrirMostrador();}abrirEncargo(el.dataset.id);},
   cerrar(){cerrarHoja();},
@@ -1222,6 +1220,7 @@ function repetirAlarma(){
 }
 function vigilar(){
   let nuevos=0;
+  sinAbrir.forEach(id=>{if(!N.get(id))sinAbrir.delete(id);}); // borrados al reiniciar en otro equipo
   N.lista().forEach(o=>{
     const k=o.estado+'|'+(o.pago?.estado||''),antes=vistos.get(o.id);vistos.set(o.id,k);
     if(o.archivado){sinAbrir.delete(o.id);return;}
