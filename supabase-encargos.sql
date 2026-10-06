@@ -29,3 +29,6 @@ begin
   alter publication supabase_realtime add table public.encargos;
 exception when duplicate_object then null;
 end $$;
+
+-- Que la app vea la tabla nueva enseguida
+notify pgrst, 'reload schema';

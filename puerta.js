@@ -267,11 +267,11 @@ function queToca(a,sr){
   const listo=a.filter(o=>o.estado==='listo').sort((x,y)=>Date.parse(x.retiro.at)-Date.parse(y.retiro.at))[0];
   const alist=a.find(o=>o.estado==='alistando');
   const h=new Date().getHours();
-  if(nuevoSin)return{e:'🛎️',k:nuevos.length>1?nuevos.length+' pedidos nuevos':'Pedido nuevo',t:`${nuevoSin.ref} · ${nuevoSin.cliente.nombre}`,s:`${nuevoSin.items.length} productos · ${nuevoSin.retiro.envio?'envío':'recoge'} ${fdia(nuevoSin.retiro.at)} ${fh(nuevoSin.retiro.at)} · ${sucNom(nuevoSin.sucursal)}`,cta:'Aceptar',act:'abrir',id:nuevoSin.id,tono:'urg'};
-  if(urg)return{e:'⏰',k:'Se atrasa',t:`${urg.ref} · ${urg.cliente.nombre}`,s:`${urg.retiro.envio?'Sale':'Recoge'} ${falta(urg.retiro.at)} · ${avance(urg).r} de ${avance(urg).n} listos`,cta:'Alistar',act:'abrir',id:urg.id,tono:'urg'};
-  if(pago)return{e:'📲',k:'Revisá un SINPE',t:`${pago.ref} · ${pago.cliente.nombre}`,s:`Dice que pagó ${$c(N.totalDe(pago))}`,cta:'Revisar',act:'abrir',id:pago.id,tono:'aviso'};
-  if(listo)return{e:'🛍️',k:'Listo para entregar',t:`${listo.ref} · ${listo.cliente.nombre}`,s:`${listo.retiro.envio?'Envío con Uber':'Recoge'} ${falta(listo.retiro.at)} · ${$c(N.totalDe(listo))}`,cta:'Entregar',act:'abrir',id:listo.id,tono:'ok'};
-  if(alist)return{e:'🧑‍🌾',k:'Alistando',t:`${alist.ref} · ${alist.cliente.nombre}`,s:`${avance(alist).r} de ${avance(alist).n} productos listos`,cta:'Seguir',act:'abrir',id:alist.id,tono:'ok'};
+  if(nuevoSin)return{e:'🛎️',k:nuevos.length>1?nuevos.length+' pedidos nuevos':'Pedido nuevo',t:`${nuevoSin.ref} · ${nuevoSin.cliente.nombre}`,s:`${nuevoSin.items.length} productos · ${nuevoSin.retiro.envio?'envío':'recoge'} ${fdia(nuevoSin.retiro.at)} ${fh(nuevoSin.retiro.at)} · ${sucNom(nuevoSin.sucursal)}`,cta:'Ver pedido',act:'ver',id:nuevoSin.id,tono:'urg'};
+  if(urg)return{e:'⏰',k:'Se atrasa',t:`${urg.ref} · ${urg.cliente.nombre}`,s:`${urg.retiro.envio?'Sale':'Recoge'} ${falta(urg.retiro.at)} · ${avance(urg).r} de ${avance(urg).n} listos`,cta:'Ver pedido',act:'ver',id:urg.id,tono:'urg'};
+  if(pago)return{e:'📲',k:'Revisá un SINPE',t:`${pago.ref} · ${pago.cliente.nombre}`,s:`Dice que pagó ${$c(N.totalDe(pago))}`,cta:'Ver pedido',act:'ver',id:pago.id,tono:'aviso'};
+  if(listo)return{e:'🛍️',k:'Listo para entregar',t:`${listo.ref} · ${listo.cliente.nombre}`,s:`${listo.retiro.envio?'Envío con Uber':'Recoge'} ${falta(listo.retiro.at)} · ${$c(N.totalDe(listo))}`,cta:'Ver pedido',act:'ver',id:listo.id,tono:'ok'};
+  if(alist)return{e:'🧑‍🌾',k:'Alistando',t:`${alist.ref} · ${alist.cliente.nombre}`,s:`${avance(alist).r} de ${avance(alist).n} productos listos`,cta:'Ver pedido',act:'ver',id:alist.id,tono:'ok'};
   if(sr.sinEnviar)return{e:'📤',k:'Surtido sin enviar',t:`${sr.sinEnviar} proveedor${sr.sinEnviar>1?'es':''} con pedido listo`,s:`${sr.prods} productos esperan salir por WhatsApp`,cta:'Enviar',act:'surtido',tono:'aviso'};
   if(h<11&&!sr.prods)return{e:'🚚',k:'Buen día',t:'Armá el pedido de hoy a proveedores',s:'Tocá un proveedor y sus productos, o dictá la lista',cta:'Empezar',act:'surtido',tono:'calma'};
   return{e:'☕',k:'Todo al día',t:'Sin pendientes en este momento',s:'Los pedidos nuevos suenan y aparecen aquí solos',cta:'Abrir POS',act:'pos',tono:'calma'};
@@ -417,6 +417,19 @@ function abrirMostrador(id){
   pintarMostrador();autoPrecios();pantallaEncendida();
   if(id)abrirEncargo(id);
 }
+// Desde afuera del Mostrador (portada, notificación, link de WhatsApp) el pedido NO se abre solo:
+// queda marcado en su lista y se abre cuando lo tocás.
+function mostrarEnLista(id){
+  const o=id&&N.get(id);
+  cerrarPuerta();cerrarHoja();
+  if(o){
+    M.tab=['nuevo','alistando','listo'].includes(o.estado)?o.estado:'hecho';
+    if(M.suc!=='todas'&&o.sucursal!==M.suc)M.suc='todas';
+    M.marca={id:o.id,hasta:Date.now()+6000};
+  }
+  abrirMostrador();
+  if(o)requestAnimationFrame(()=>{const c=document.querySelector(`#moLista .mo-card[data-id="${CSS.escape(o.id)}"]`);if(c)c.scrollIntoView({block:'center',behavior:'smooth'});});
+}
 const filtrar=L=>L.filter(o=>M.suc==='todas'||o.sucursal===M.suc);
 function pintarMostrador(){
   if(!$('mostrador')?.classList.contains('open'))return;
@@ -453,7 +466,7 @@ function tarjeta(o){
   const s=suc(o.sucursal),{r,n}=avance(o),P=N.PAGOS[o.pago?.metodo]||{},tarde=minsA(o.retiro.at)<0&&o.estado!=='entregado';
   const pago=o.cobro?`<span class="mo-pill g">🧾 Cobrado ${esc(N.PAGOS[o.cobro.metodo]?.n||'')}</span>`:o.pago?.estado==='verificado'?'<span class="mo-pill g">✓ Pagado</span>':o.pago?.estado==='reportado'?'<span class="mo-pill o">📲 Dice que pagó</span>':`<span class="mo-pill">${P.e||''} ${esc(P.n||'')}</span>`;
   const arrastrable=!['entregado','cancelado'].includes(o.estado);
-  return `<button type="button" class="mo-card${urgente(o)?' urg':''}${sinAbrir.has(o.id)?' nuevo-flash':''}" data-mo="abrir" data-id="${o.id}" ${arrastrable?'draggable="true"':''}>
+  return `<button type="button" class="mo-card${urgente(o)?' urg':''}${sinAbrir.has(o.id)?' nuevo-flash':''}${M.marca?.id===o.id&&Date.now()<M.marca.hasta?' marcado':''}" data-mo="abrir" data-id="${o.id}" ${arrastrable?'draggable="true"':''}>
     <div class="mo-card-h"><span class="mo-ref">${esc(o.ref)}</span>${o.prueba?'<span class="mo-pill">🧪 prueba</span>':''}${sinAbrir.has(o.id)?'<span class="mo-pill o">NUEVO</span>':''}<span class="mo-when${tarde?' tarde':''}">${o.estado==='entregado'?'✓ '+fh(o.updated):o.estado==='cancelado'?'Cancelado':'🕐 '+fh(o.retiro.at)+' · '+falta(o.retiro.at)}</span></div>
     <div class="mo-who">${esc(o.cliente.nombre)} <span style="color:var(--m);font-weight:700">· ${esc(fmtTel(o.cliente.tel))}</span></div>
     <div class="mo-meta">${esc(s?.n||'')} · ${o.retiro.envio?(o.retiro.envio.uber?'🛵 Uber en camino':'🛵 envío Uber'):o.retiro.carro?'🚗 al carro'+(o.retiro.placa?' ('+esc(o.retiro.placa)+')':''):'🚶 adentro'} · ${n} productos</div>
@@ -979,6 +992,7 @@ const ACT={
   'pk-volver'(){M.vista='encargo';pintarEncargo();},
   tab(el){M.tab=el.dataset.k;pintarMostrador();},
   abrir(el){if(!$('mostrador').classList.contains('open')){cerrarPuerta();abrirMostrador();}abrirEncargo(el.dataset.id);},
+  ver(el){mostrarEnLista(el.dataset.id);},
   cerrar(){cerrarHoja();},
   prueba(){pedidoPrueba();},
   caja(){M.vista='caja';pintarCajaHoy();},
@@ -1017,7 +1031,7 @@ const ACT={
     const txt=$('moPega')?.value||'',m=txt.match(/#encargo=([A-Za-z0-9_-]+)/);
     const o=m&&N.unpack(m[1]);
     if(!o?.id){toast('No encontramos un pedido en ese texto; pegá el mensaje completo');return;}
-    N.importar(o);sinAbrir.delete(o.id);guardarSinAbrir();toast('🛎️ Pedido '+o.ref+' recibido');abrirEncargo(o.id);
+    N.importar(o);sinAbrir.delete(o.id);guardarSinAbrir();toast('🛎️ Pedido '+o.ref+' recibido · tocalo para abrirlo');mostrarEnLista(o.id);
   },
   ajustes(){M.vista='ajustes';pintarAjustes();},
   receptor(){M.vista='receptor';pintarReceptor();},
@@ -1208,8 +1222,9 @@ function porHash(){
   if(!enc&&!ver&&h!=='#mostrador')return false;
   history.replaceState(null,'',location.pathname+location.search);
   primeraVez=false;document.getElementById('scopePicker')?.classList.remove('open');document.body.classList.remove('scope-picker-open');
-  if(enc){const o=N.unpack(enc[1]);if(o?.id){N.importar(o);sinAbrir.delete(o.id);guardarSinAbrir();cerrarPuerta();abrirMostrador(o.id);toast('🛎️ Pedido '+o.ref+' recibido por WhatsApp');return true;}}
-  cerrarPuerta();abrirMostrador(ver?ver[1]:null);return true;
+  if(enc){const o=N.unpack(enc[1]);if(o?.id){N.importar(o);sinAbrir.delete(o.id);guardarSinAbrir();mostrarEnLista(o.id);toast('🛎️ Pedido '+o.ref+' recibido por WhatsApp · tocalo para abrirlo');return true;}}
+  if(ver){mostrarEnLista(ver[1]);return true;}
+  cerrarPuerta();abrirMostrador();return true;
 }
 N.conectar();
 document.getElementById('scopePicker')?.classList.remove('open');document.body.classList.remove('scope-picker-open');
@@ -1224,7 +1239,7 @@ else{
   pedirLocal(()=>{if(h&&location.hash!==h)history.replaceState(null,'',location.pathname+location.search+h);if(!porHash()){if(MODO_POS)abrirMostrador();else abrirPuerta();}});
 }
 window.addEventListener('hashchange',porHash);
-navigator.serviceWorker?.addEventListener?.('message',e=>{if(e.data?.tipo==='abrir'&&e.data.id){cerrarPuerta();abrirMostrador(e.data.id);}});
+navigator.serviceWorker?.addEventListener?.('message',e=>{if(e.data?.tipo==='abrir'&&e.data.id)mostrarEnLista(e.data.id);});
 N.avisos.insignia(sinAbrir.size);
 if(sinAbrir.size)repetirAlarma();
 window.AramoPuerta={abrirPuerta,abrirMostrador,pintarMostrador,abrirCobro,autoPrecios,R};

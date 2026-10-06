@@ -399,3 +399,7 @@ html[data-theme="dark"] .loc-ir{color:#06150d}
 .mo-alarma .t,.mo-ahora .t{min-width:0}
 .mo-ahora strong{overflow:hidden;text-overflow:ellipsis;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical}
 .mo-ref{white-space:nowrap}
+
+/* Pedido traído desde la portada o una notificación: marcado en la lista, sin abrirse solo */
+.mo-card.marcado{border-color:var(--o);animation:moMarca 1s ease-in-out 4}
+@keyframes moMarca{50%{box-shadow:0 0 0 7px var(--od)}}
