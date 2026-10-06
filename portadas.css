@@ -245,3 +245,25 @@
 /* Contraste en tema oscuro: el verde claro lleva letra oscura */
 html[data-theme="dark"] .po3-cta,html[data-theme="dark"] .po-ahora-go{color:#06150d}
 html[data-theme="dark"] .po3-hero[data-tono] .po3-cta{color:#1a1a1a}
+/* Herramientas de la portada: local · compartir · avisos · portada · ajustes */
+.po-tools{flex-wrap:wrap;justify-content:flex-end}
+.po-chip[hidden]{display:none}
+.po-avisar{border-color:var(--og);background:var(--od);color:var(--o);animation:poLatido 1.6s ease-in-out infinite}
+.po-local{border-color:var(--gg);background:var(--gd);color:var(--g)}
+@media (max-width:420px){.po-local span,.po-avisar{font-size:11.5px}.po-tools{gap:6px}.po-chip{min-height:34px}}
+.po-local span{display:inline!important}
+/* Celular: las herramientas van en su propia fila, debajo del nombre */
+@media (max-width:520px){
+  .pu-head,.po2-top,.po3-top,.po4-top,.po5-top{flex-wrap:wrap}
+  .pu-head .po-tools,.po2-top .po-tools,.po3-top .po-tools,.po4-top .po-tools,.po5-top .po-tools{width:100%;margin-left:0;justify-content:flex-start}
+  .po-nube span{display:inline}
+  /* 🎨 y ⚙️ arriba a la derecha, junto al nombre; la fila queda para local, equipo y avisos */
+  .pu-head,.po2-top,.po3-top,.po4-top,.po5-top{position:relative}
+  .pu-head>div:first-child,.po2-top>.po2-marca,.po3-top>div:first-child,.po4-top>div:first-child,.po5-top>div:first-child{padding-right:100px}
+  .po-tools .po-ics{display:flex;gap:6px;position:absolute;top:0;right:0}
+  .po-ics .po-chip span{display:none}
+}
+.po-ics{display:contents}
+/* Celular angosto: "Activar avisos" se acorta para que los 5 botones quepan en una fila */
+@media (max-width:420px){.po-tools .po-chip.po-avisar{font-size:0!important;gap:0}.po-tools .po-chip.po-avisar::after{content:"🔔 Avisos";font-size:11.5px}}
+@media (max-width:420px){.po4 .po-tools>.po-chip{padding:0 8px}.po4 .po-tools{gap:5px}}

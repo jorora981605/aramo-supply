@@ -1,4 +1,4 @@
-const CACHE_NAME = 'aramo-shell-v20';
+const CACHE_NAME = 'aramo-shell-v22';
 const APP_SHELL = ['./APP.html', './index.html', './manifest.json', './icon.png', './pos-vista.jpg', './catalogo-productos.js', './supplier-base.js', './express.js', './express.css', './puerta.js', './puerta.css', './portadas.js', './portadas.css', './aramo-nube.js', './canasta-config.js', './canasta.html', './canasta.js', './canasta.css', './canasta.webmanifest'];
 
 self.addEventListener('install', event => {

@@ -929,9 +929,28 @@ if(!importarHash()){
   if(a&&!cestaN()&&!MINI)C.actual=a.id; // la mesa abre en lo que importa ahora
 }
 window.addEventListener('hashchange',()=>{if(importarHash()){history.replaceState({paso:C.paso,id:C.actual},'',location.pathname+location.search);render(true);arriba();}});
+// ══════════════ Equipo de la tienda ══════════════
+// Si este teléfono atiende un local (se eligió al abrir ARAMO), el Taller también
+// avisa de cada pedido nuevo de ese local y lleva directo al Mostrador.
+const LOCAL_TIENDA=MINI?null:LS.get('aramo_local',null);
+const avisados=new Set();let tiendaLista=false;
+function vigilarTienda(){
+  if(!LOCAL_TIENDA)return;
+  N.lista().forEach(o=>{
+    if(o.estado!=='nuevo'||o.sucursal!==LOCAL_TIENDA||avisados.has(o.id)||C.mis.includes(o.id))return;
+    avisados.add(o.id);
+    if(!tiendaLista)return; // los que ya estaban al abrir no suenan otra vez
+    toast('🛎️ Pedido nuevo '+o.ref+' · '+o.cliente.nombre);campana();buzz([120,60,120]);
+    N.avisos.mostrar('🛎️ Pedido nuevo · '+o.ref,`${o.cliente.nombre} · ${o.items.length} productos`,{tag:'nuevo-'+o.id,fijo:true,url:new URL('APP.html#ver='+o.id,location.href).href});
+    let a=$('tlTienda');if(!a){a=document.createElement('a');a.id='tlTienda';a.className='tl-tienda';document.body.appendChild(a);}
+    a.href='APP.html#ver='+o.id;a.innerHTML=`🛎️ <b>${esc(o.ref)}</b> · pedido nuevo · Ir al Mostrador →`;
+  });
+}
+N.on(t=>{if(t==='encargo')vigilarTienda();});
 if(!MINI){
   history.replaceState({paso:C.paso,id:C.actual},'',location.pathname+location.search);
-  N.conectar({ids:C.mis});
+  if(LOCAL_TIENDA)N.conectar().then(()=>{vigilarTienda();tiendaLista=true;});
+  else N.conectar({ids:C.mis});
   if('serviceWorker' in navigator)navigator.serviceWorker.register('./service-worker.js').catch(()=>{});
 }
 render(true);
