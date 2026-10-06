@@ -83,16 +83,16 @@ document.addEventListener('visibilitychange',()=>{if(document.visibilityState===
 
 // ══════════════ Datos vivos del Surtido ══════════════
 function surtidoResumen(){
-  let prods=0;const provs=new Set();
+  let prods=0;const provs=new Set(),sinEnviar=new Set();
   try{
     Object.entries(S.pedidos||{}).forEach(([prov,p])=>{
       ['moravia','angeles'].forEach(side=>{
-        Object.values(p?.qtys?.[side]||{}).forEach(v=>{if(+v?.qty>0){prods++;provs.add(prov);}});
-        if((p?.extras?.[side]||[]).some(x=>x&&(x.name||x.n)))provs.add(prov);
+        Object.values(p?.qtys?.[side]||{}).forEach(v=>{if(+v?.qty>0){prods++;provs.add(prov);if(!p.sent)sinEnviar.add(prov);}});
+        if((p?.extras?.[side]||[]).some(x=>x&&(x.name||x.n))){provs.add(prov);if(!p.sent)sinEnviar.add(prov);}
       });
     });
   }catch{}
-  return{prods,provs:provs.size};
+  return{prods,provs:provs.size,sinEnviar:sinEnviar.size};
 }
 function costoHoy(nombre){
   // Precio más bajo que ARAMO paga hoy por ese producto en Surtido.
@@ -146,32 +146,12 @@ function guardarSinAbrir(){LS.set('aramo_sin_abrir',[...sinAbrir]);N.avisos.insi
 function montar(){
   const pu=document.createElement('div');
   pu.className='pu';pu.id='puerta';pu.setAttribute('role','dialog');pu.setAttribute('aria-label','ARAMO');
-  pu.innerHTML=`<div class="pu-in">
-    <div class="pu-head"><div><div class="pu-brand">ARAMO</div><div class="pu-date" id="puDate"></div></div><button type="button" class="pu-nube" id="puNube" data-pu="compartir"><i></i><span></span></button></div>
-    <div id="puAlarma"></div>
-    <h1 class="pu-h1" id="puH1">¿Qué abrimos?</h1><p class="pu-sub">Elegí qué usar: lo que pedimos, lo que nos piden o la caja del mostrador.</p>
-    <div class="pu-caras">
-      <button type="button" class="pu-cara" data-pu="surtido" style="--c:var(--g)" aria-label="Abrir Surtido">
-        <div class="pu-ventana"><div class="pu-barra"><i></i><i></i><i></i><span>Surtido</span></div><div class="pu-vista" id="puMiniS"></div><div class="pu-glow"><span class="pu-abrir">Abrir Surtido</span></div></div>
-        <div class="pu-info"><b>🚚 Surtido</b><small>Lo que ARAMO le pide a sus proveedores</small><span class="pu-stat" id="puStatS"></span></div>
-      </button>
-      <button type="button" class="pu-cara" data-pu="canasta" style="--c:var(--o)" aria-label="Abrir Taller de pedidos">
-        <div class="pu-ventana"><div class="pu-barra"><i></i><i></i><i></i><span>Taller de pedidos</span></div><div class="pu-vista" id="puMiniC"><iframe title="Vista del Taller" src="canasta.html?mini=1&tema=${document.documentElement.dataset.theme==='dark'?'dark':'light'}" loading="lazy" tabindex="-1" aria-hidden="true"></iframe></div><div class="pu-glow"><span class="pu-abrir">Abrir Taller</span></div></div>
-        <div class="pu-info"><b>🧺 Taller</b><small>Donde los clientes arman su pedido, de punta a punta</small><span class="pu-stat o" id="puStatC"></span></div>
-      </button>
-      <button type="button" class="pu-cara pu-cara-pos" data-pu="pos" style="--c:#1b5e20" aria-label="Abrir ARAMO POS">
-        <div class="pu-ventana"><div class="pu-barra"><i></i><i></i><i></i><span>ARAMO POS</span></div><img class="pu-foto" src="pos-vista.jpg" alt="" loading="lazy"><div class="pu-glow"><span class="pu-abrir">Abrir ARAMO POS</span></div></div>
-        <div class="pu-info"><b>🧾 ARAMO POS</b><small>Ventas y caja del mostrador</small><span class="pu-stat" id="puStatP"></span></div>
-      </button>
-    </div>
-    <button type="button" class="pu-mostrador" data-pu="mostrador"><span class="ic">🛎️</span><span class="tx"><strong>Mostrador y Caja</strong><small id="puMoSub">Recibir, alistar, cobrar y entregar</small></span><span class="nn" id="puMoN" hidden></span><span style="font-size:22px;color:var(--m)">›</span></button>
-    <div class="pu-flujo"><h3>Todo el ciclo, conectado</h3><div class="pu-cadena" id="puCadena"></div></div>
-  </div>`;
+  pu.innerHTML='<div class="pu-in po" id="puIn"></div>';
   document.body.appendChild(pu);
 
   const mo=document.createElement('div');
   mo.className='mo';mo.id='mostrador';mo.setAttribute('role','dialog');mo.setAttribute('aria-label','Mostrador');
-  mo.innerHTML=`<div class="mo-top"><button type="button" class="bk" data-mo="puerta" aria-label="Volver a ARAMO">‹</button><div class="mo-title"><small id="moSub">ARAMO · Taller</small><b>Mostrador</b></div><button type="button" class="mo-recep" id="moRecep" data-mo="receptor"></button><button type="button" class="pu-nube" id="moNube" data-mo="compartir"><i></i><span></span></button></div>
+  mo.innerHTML=`<div class="mo-top"><button type="button" class="bk" data-mo="puerta" aria-label="Volver al menú principal" title="Volver al menú principal">⌂ <span>Menú</span></button><div class="mo-title"><small id="moSub">ARAMO · Taller</small><b>Mostrador</b></div><button type="button" class="mo-recep" id="moRecep" data-mo="receptor"></button><button type="button" class="pu-nube" id="moNube" data-mo="compartir"><i></i><span></span></button></div>
     <div class="mo-in"><div class="mo-cols"><div class="mo-main">
       <div id="moAlarma"></div><div id="moAvisos"></div><div id="moAhora"></div><div class="mo-tabs" id="moTabs"></div><div class="mo-lista" id="moLista"></div><div id="moFaltan"></div>
       <div class="mo-herr">
@@ -193,7 +173,7 @@ function montar(){
   bg.addEventListener('click',cerrarHoja);
 
   const top=document.querySelector('.topbar');
-  if(top&&!$('puHome')){const b=document.createElement('button');b.type='button';b.className='pu-home';b.id='puHome';b.setAttribute('aria-label','Volver a ARAMO');b.textContent='⌂';b.addEventListener('click',()=>abrirPuerta());top.insertBefore(b,top.firstChild);}
+  if(top&&!$('puHome')){const b=document.createElement('button');b.type='button';b.className='pu-home';b.id='puHome';b.setAttribute('aria-label','Volver al menú principal');b.title='Volver al menú principal';b.innerHTML='<span aria-hidden="true">⌂</span><span class="pu-home-label">Menú</span>';b.addEventListener('click',()=>abrirPuerta());top.insertBefore(b,top.firstChild);}
   window.addEventListener('resize',escalarMinis);
 
   // Arrastrar un pedido a la Caja
@@ -212,24 +192,103 @@ function alarmaHtml(){
   const o=L[0];
   return `<button type="button" class="mo-alarma" data-mo="abrir" data-id="${o.id}"><span class="e">🛎️</span><span class="t"><small>${L.length>1?L.length+' pedidos nuevos':'Pedido nuevo'} · ${esc(sucNom(o.sucursal))}</small><strong>${esc(o.ref)} · ${esc(o.cliente.nombre)} · ${o.items.length} productos</strong><em>${o.retiro.envio?'🛵 envío':'Recoge'} ${esc(fdia(o.retiro.at))} ${esc(fh(o.retiro.at))} · ${esc(nombres(o))}</em></span><span class="go">ABRIR</span></button>`;
 }
-function pintarPuerta(){
-  if(!$('puerta'))return;
+// Lo más importante en este momento, en orden de prioridad (una sola cosa).
+function queToca(a,sr){
+  const nuevos=a.filter(o=>o.estado==='nuevo');
+  const nuevoSin=[...sinAbrir].map(id=>N.get(id)).find(o=>o&&o.estado==='nuevo'&&paraMi(o))||nuevos[0];
+  const urg=a.filter(o=>o.estado==='nuevo'||o.estado==='alistando').find(urgente);
+  const pago=a.find(o=>o.pago?.estado==='reportado'&&!cobrado(o));
+  const listo=a.filter(o=>o.estado==='listo').sort((x,y)=>Date.parse(x.retiro.at)-Date.parse(y.retiro.at))[0];
+  const alist=a.find(o=>o.estado==='alistando');
   const h=new Date().getHours();
-  $('puH1').textContent=(h<12?'Buenos días':h<18?'Buenas tardes':'Buenas noches')+', ¿qué abrimos?';
-  const fd=new Date().toLocaleDateString('es-CR',{weekday:'long',day:'numeric',month:'long'});$('puDate').textContent=fd.charAt(0).toUpperCase()+fd.slice(1);
-  $('puAlarma').innerHTML=alarmaHtml().replace('data-mo="abrir"','data-pu="abrir"');
-  const s=surtidoResumen();
-  $('puStatS').textContent=s.prods?`🧺 ${s.prods} producto${s.prods===1?'':'s'} · ${s.provs} proveedor${s.provs===1?'':'es'}`:'Pedido de hoy vacío';
-  const a=activos().filter(paraMi),nuevos=a.filter(o=>o.estado==='nuevo').length,listos=a.filter(o=>o.estado==='listo').length;
-  $('puStatP').textContent=esCompu()?'💻 Se abre en esta computadora':'💻 Se abre en la computadora de caja';
-  $('puStatC').textContent=a.length?`🛎️ ${a.length} pedido${a.length>1?'s':''} en curso`:'Lista para recibir pedidos';
-  $('puMoN').hidden=!nuevos;$('puMoN').textContent=nuevos;
-  $('puMoSub').textContent=`📡 ${receptorNom()} · `+(a.length?`${nuevos} nuevos · ${a.filter(o=>o.estado==='alistando').length} alistando · ${listos} por entregar`:'recibir, alistar, cobrar y entregar');
-  const cob=cerradosHoy().filter(o=>o.estado==='entregado'&&paraMi(o));
-  const ventas=cob.reduce((t,o)=>t+N.totalDe(o),0);
-  const pasos=[['🏪','Proveedores',s.provs||'—'],['🚚','Surtido',s.prods?s.prods+' prod.':'—'],['🏷️','Vitrina',N.catalogo().filter(p=>!p.oculto).length+' prod.'],['🧺','Taller',a.length+' en curso'],['🛎️','Mostrador',listos+' listos'],['🧾','Caja',cob.length?$c(ventas):'₡0 hoy']];
-  $('puCadena').innerHTML=pasos.map((p,i)=>`${i?'<span class="pu-flecha">›</span>':''}<div class="pu-eslabon"><b>${p[0]}</b>${p[1]}<em>${esc(p[2])}</em></div>`).join('');
+  if(nuevoSin)return{e:'🛎️',k:nuevos.length>1?nuevos.length+' pedidos nuevos':'Pedido nuevo',t:`${nuevoSin.ref} · ${nuevoSin.cliente.nombre}`,s:`${nuevoSin.items.length} productos · ${nuevoSin.retiro.envio?'envío':'recoge'} ${fdia(nuevoSin.retiro.at)} ${fh(nuevoSin.retiro.at)} · ${sucNom(nuevoSin.sucursal)}`,cta:'Aceptar',act:'abrir',id:nuevoSin.id,tono:'urg'};
+  if(urg)return{e:'⏰',k:'Se atrasa',t:`${urg.ref} · ${urg.cliente.nombre}`,s:`${urg.retiro.envio?'Sale':'Recoge'} ${falta(urg.retiro.at)} · ${avance(urg).r} de ${avance(urg).n} listos`,cta:'Alistar',act:'abrir',id:urg.id,tono:'urg'};
+  if(pago)return{e:'📲',k:'Revisá un SINPE',t:`${pago.ref} · ${pago.cliente.nombre}`,s:`Dice que pagó ${$c(N.totalDe(pago))}`,cta:'Revisar',act:'abrir',id:pago.id,tono:'aviso'};
+  if(listo)return{e:'🛍️',k:'Listo para entregar',t:`${listo.ref} · ${listo.cliente.nombre}`,s:`${listo.retiro.envio?'Envío con Uber':'Recoge'} ${falta(listo.retiro.at)} · ${$c(N.totalDe(listo))}`,cta:'Entregar',act:'abrir',id:listo.id,tono:'ok'};
+  if(alist)return{e:'🧑‍🌾',k:'Alistando',t:`${alist.ref} · ${alist.cliente.nombre}`,s:`${avance(alist).r} de ${avance(alist).n} productos listos`,cta:'Seguir',act:'abrir',id:alist.id,tono:'ok'};
+  if(sr.sinEnviar)return{e:'📤',k:'Surtido sin enviar',t:`${sr.sinEnviar} proveedor${sr.sinEnviar>1?'es':''} con pedido listo`,s:`${sr.prods} productos esperan salir por WhatsApp`,cta:'Enviar',act:'surtido',tono:'aviso'};
+  if(h<11&&!sr.prods)return{e:'🚚',k:'Buen día',t:'Armá el pedido de hoy a proveedores',s:'Tocá un proveedor y sus productos, o dictá la lista',cta:'Empezar',act:'surtido',tono:'calma'};
+  return{e:'☕',k:'Todo al día',t:'Sin pendientes en este momento',s:'Los pedidos nuevos suenan y aparecen aquí solos',cta:'Abrir POS',act:'pos',tono:'calma'};
+}
+function bitacoraHoy(){
+  const ev=[];
+  N.lista().forEach(o=>{
+    if(!paraMi(o))return;
+    (o.log||[]).forEach(l=>{if(esHoy(l.t))ev.push({t:Date.parse(l.t),txt:`${o.ref} · ${l.m||({nuevo:'Pedido recibido',alistando:'Empezó a alistarse',listo:'Quedó listo',entregado:'Entregado',cancelado:'Cancelado'}[l.s]||l.s)}`});});
+  });
+  ev.sort((a,b)=>b.t-a.t);
+  return ev.slice(0,7).map(e=>`<div class="po5-ev"><span>${fh(e.t)}</span><span>${esc(e.txt)}</span></div>`).join('')||'<div class="po5-ev"><span>—</span><span>Todavía no hay movimientos hoy.</span></div>';
+}
+function datosPuerta(){
+  const h=new Date().getHours();
+  const sr=surtidoResumen();
+  const a=activos().filter(paraMi),nuevos=a.filter(o=>o.estado==='nuevo').length,alist=a.filter(o=>o.estado==='alistando').length,listos=a.filter(o=>o.estado==='listo').length;
+  const cob=N.lista().filter(o=>o.cobro&&esHoy(o.cobro.fecha)&&paraMi(o)),total=cob.reduce((t,o)=>t+(+o.cobro.total||0),0);
+  const fd=new Date().toLocaleDateString('es-CR',{weekday:'long',day:'numeric',month:'long'});
+  const pasos=[['🏪','Proveedores',sr.provs||'—'],['🚚','Surtido',sr.prods?sr.prods+' prod.':'—'],['🏷️','Vitrina',N.catalogo().filter(p=>!p.oculto).length+' prod.'],['🧺','Taller',a.length+' en curso'],['🛎️','Mostrador',listos+' listos'],['🧾','Caja',cob.length?$c(total):'₡0 hoy']];
+  return{
+    saludo:h<12?'Buenos días':h<18?'Buenas tardes':'Buenas noches',
+    fecha:fd.charAt(0).toUpperCase()+fd.slice(1),hora:fh(new Date()),
+    nubeOn:N.modo()==='nube',nube:N.modo()==='nube'?'En vivo':'En este equipo',
+    alarma:'', // en la portada, el pedido nuevo vive en "Ahora" (una sola tarjeta, la más importante)
+    ahora:queToca(a,sr),
+    s:{prods:sr.prods,provs:sr.provs,txt:sr.prods?`🧺 ${sr.prods} producto${sr.prods===1?'':'s'} · ${sr.provs} proveedor${sr.provs===1?'':'es'}`:'Pedido de hoy vacío',
+       chip:sr.prods?`${sr.prods} productos · ${sr.provs} prov.`:'Pedido de hoy vacío',alerta:sr.sinEnviar?`${sr.sinEnviar} sin enviar`:''},
+    t:{activos:a.length,nuevos,txt:a.length?`🛎️ ${a.length} pedido${a.length>1?'s':''} en curso`:'Lista para recibir pedidos',
+       chip:a.length?`${a.length} en curso · ${listos} listos`:'Lista para recibir pedidos',alerta:nuevos?`${nuevos} nuevo${nuevos>1?'s':''}`:'',
+       mo:`📡 ${receptorNom()} · `+(a.length?`${nuevos} nuevo${nuevos===1?'':'s'} · ${alist} alistando · ${listos} por entregar`:'recibir, alistar, cobrar y entregar')},
+    p:{txt:esCompu()?'💻 Se abre en esta computadora':'💻 Se abre en la computadora de caja',chip:esCompu()?'En esta computadora':'En la compu de caja',alerta:''},
+    caja:{total:$c(total),n:cob.length},
+    cadena:pasos.map((p,i)=>`${i?'<span class="pu-flecha">›</span>':''}<div class="pu-eslabon"><b>${p[0]}</b>${p[1]}<em>${esc(p[2])}</em></div>`).join(''),
+    bit:bitacoraHoy(),
+  };
+}
+let _portadaMontada=0;
+function pintarPuerta(){
+  const raiz=$('puIn');if(!raiz||!window.AramoPortadas)return;
+  const v=window.AramoPortadas.pintar(raiz,datosPuerta());
+  if(v!==_portadaMontada){
+    _portadaMontada=v;
+    if(v===1){clonarSurtido();requestAnimationFrame(escalarMinis);}
+    if(v===5)ligarConsola();
+  }
   pintarNube();
+}
+// ── Consola: escribir qué abrir ──
+function sugerencias(q){
+  q=nrm(q);
+  const L=[];
+  const P=[
+    {r:/^(1|surt|pedir|provee|compra)/,e:'🚚',t:'Abrir Surtido',s:'Pedidos a proveedores',act:'surtido'},
+    {r:/^(2|taller|client|canasta|tienda online)/,e:'🧺',t:'Abrir Taller',s:'Lo que ven los clientes',act:'canasta'},
+    {r:/^(3|pos|caja|vend|cobr|factur)/,e:'🧾',t:'Abrir ARAMO POS',s:'Ventas y caja del mostrador',act:'pos'},
+    {r:/^(m$|mostr|pedidos|encarg|recib)/,e:'🛎️',t:'Abrir Mostrador y Caja',s:'Recibir, alistar, cobrar y entregar',act:'mostrador'},
+    {r:/^(prec|vitrin|product)/,e:'🏷️',t:'Precios y productos',s:'Cambiar precio, unidad o nombre',act:'vitrina'},
+    {r:/^(recet)/,e:'📖',t:'Recetario',s:'Recetas del Taller',act:'recetario'},
+    {r:/^(ajust|sinpe|horari|whats)/,e:'⚙️',t:'Pagos y horarios',s:'SINPE, WhatsApp de cada tienda, horarios',act:'ajustes'},
+    {r:/^(pega|link)/,e:'📥',t:'Pedido de WhatsApp',s:'Pegar un pedido que llegó por WhatsApp',act:'whatsapp'},
+    {r:/^(cierre|hoy|cobrad)/,e:'🧾',t:'Caja de hoy',s:'Cobros del día por método',act:'caja'},
+  ];
+  if(!q)return[{e:'🚚',t:'1 · Surtido',s:'Pedidos a proveedores',act:'surtido'},{e:'🧺',t:'2 · Taller',s:'Lo que ven los clientes',act:'canasta'},{e:'🧾',t:'3 · ARAMO POS',s:'Ventas y caja',act:'pos'},{e:'🛎️',t:'M · Mostrador y Caja',s:'Pedidos de clientes',act:'mostrador'}];
+  P.forEach(x=>{if(x.r.test(q))L.push(x);});
+  // pedidos por código o por nombre del cliente
+  N.lista().filter(o=>nrm(o.ref).replace('-','').includes(q.replace('-',''))||nrm(o.cliente?.nombre).includes(q)).slice(0,4)
+    .forEach(o=>L.push({e:'🛎️',t:`${o.ref} · ${o.cliente.nombre}`,s:`${{nuevo:'Nuevo',alistando:'Alistando',listo:'Listo',entregado:'Entregado',cancelado:'Cancelado'}[o.estado]||''} · ${$c(N.totalDe(o))}`,act:'abrir',id:o.id}));
+  // productos: buscarlos en Surtido
+  if(q.length>=3){
+    const prod=N.catalogo().find(p=>nrm(p.n).startsWith(q))||N.catalogo().find(p=>nrm(p.n).includes(q));
+    if(prod)L.push({e:prod.e,t:`Buscar «${prod.n}» en Surtido`,s:'Ver quién lo vende y pedirlo',act:'surtir',n:prod.n});
+    else L.push({e:'🔍',t:`Buscar «${q}» en Surtido`,s:'Entre todos los proveedores',act:'surtir',n:q});
+  }
+  return L.slice(0,6);
+}
+function ligarConsola(){
+  const f=$('poCmd'),q=$('poCmdQ'),box=$('poCmdSug');if(!f||!q||!box)return;
+  const pintar=()=>{if(!q.value.trim()&&document.activeElement!==q){box.innerHTML='';return;}const L=sugerencias(q.value);box.innerHTML=L.map((x,i)=>`<button type="button" class="po5-opc${i===0?' on':''}" data-pu="${x.act}"${x.id?` data-id="${esc(x.id)}"`:''}${x.n?` data-n="${esc(x.n)}"`:''}><span>${x.e}</span><span><b>${esc(x.t)}</b><small>${esc(x.s)}</small></span>${i===0?'<kbd>Enter</kbd>':''}</button>`).join('');};
+  q.addEventListener('input',pintar);q.addEventListener('focus',pintar);
+  q.addEventListener('blur',()=>setTimeout(()=>{if(!q.value.trim()&&document.activeElement!==q)box.innerHTML='';},180));
+  f.addEventListener('submit',e=>{e.preventDefault();box.querySelector('.po5-opc')?.click();});
+  pintar();
 }
 function clonarSurtido(){
   const box=$('puMiniS');if(!box)return;
@@ -267,7 +326,7 @@ function abrirPOS(){
 }
 function cerrarPuerta(){$('puerta').classList.remove('open','zoom');document.body.classList.remove('pu-lock');}
 function entrar(cara,el){
-  const pu=$('puerta'),v=el?.querySelector('.pu-ventana');
+  const pu=$('puerta'),v=el?.querySelector?.('.pu-ventana')||(el&&el.closest?.('#puerta')?el:null);
   if(v){const r=v.getBoundingClientRect(),inn=pu.querySelector('.pu-in');inn.style.transformOrigin=`${r.left+r.width/2}px ${r.top+r.height/2+pu.scrollTop}px`;inn.style.transform='scale(2.4)';pu.classList.add('zoom');}
   buzz(12);
   setTimeout(()=>{
@@ -408,14 +467,15 @@ function pintarEncargo(){
   if(M.vista==='cobro')return pintarCobro(o);
   if(M.vista==='tiquete')return pintarTiquete(o);
   const s=suc(o.sucursal),{r,n}=avance(o),P=N.PAGOS[o.pago?.metodo]||{},tot=N.totalDe(o),edit=o.estado==='alistando';
-  const estadoTxt={nuevo:'📥 Nuevo',alistando:'🧑‍🌾 Alistando',listo:'✅ Listo',entregado:'🛍️ Entregado',cancelado:'✖️ Cancelado'}[o.estado];
+  const estadoTxt={nuevo:o.avisado?'📥 Pendiente de aceptación':'📥 Nuevo',alistando:'🧑‍🌾 Alistando',listo:'✅ Listo',entregado:'🛍️ Entregado',cancelado:'✖️ Cancelado'}[o.estado];
   const pesoR=o.items.reduce((t,i)=>t+(i.u==='kg'&&i.estado==='listo'?qReal(i):0),0);
   const est=N.redondear5(o.items.reduce((t,i)=>t+(+i.q)*(+i.p),0)),dif=tot-est-(+o.retiro?.envio?.costo||0);
-  const verd={nuevo:['Nuevo','run'],alistando:[`Alistando ${r}/${n}`,'run'],listo:[o.cobro?'Cobrado':'Listo','ok'],entregado:['Entregado','ok'],cancelado:['Cancelado','bad']}[o.estado]||['',''];
+  const verd={nuevo:[o.avisado?'Pendiente de aceptación':'Nuevo','run'],alistando:[`Alistando ${r}/${n}`,'run'],listo:[o.cobro?'Cobrado':'Listo','ok'],entregado:['Entregado','ok'],cancelado:['Cancelado','bad']}[o.estado]||['',''];
   const holo=o.items.map(i=>`<div class="mo-hit ${i.estado==='listo'?'ok':i.estado==='nohay'?'no':o.estado==='alistando'?'wait':''}" title="${esc(i.n)}"><b>${i.e}</b><em>${esc(i.n)}</em><small>${esc(i.u==='kg'&&i.qr!=null&&i.qr!==''?kg(qReal(i))+' kg':qtxt(qReal(i),i.u))}</small></div>`).join('');
   let acc='';
   if(o.estado==='nuevo')acc=`<button type="button" class="mo-btn p w" data-mo="aceptar">🧑‍🌾 Aceptar y empezar a alistar</button><div class="mo-btns"><button type="button" class="mo-btn r" data-mo="rechazar">Rechazar</button><button type="button" class="mo-btn" data-mo="imprimir">🖨️ Lista para alistar</button></div>`;
   if(o.estado==='alistando')acc=`<button type="button" class="mo-btn p w" data-mo="listo" ${r<n?'disabled':''}>${r<n?(n-r===1?'Falta 1 producto por revisar':`Faltan ${n-r} productos por revisar`):'✅ Marcar lista y avisar al cliente'}</button><div class="mo-btns"><button type="button" class="mo-btn" data-mo="todo-ok">✓ Todo está</button><button type="button" class="mo-btn" data-mo="imprimir">🖨️ Lista para alistar</button></div>`;
+  if(o.estado==='alistando')acc=acc.replace('<div class="mo-btns">','<button type="button" class="mo-btn o w" style="margin-top:8px" data-mo="todo-y-listo">✅ Confirmar todo disponible y pasar a LISTO</button><div class="mo-btns">');
   if(o.estado==='listo'){
     const env=o.retiro.envio;
     acc=`${o.pago.metodo==='sinpe'&&!cobrado(o)?`<button type="button" class="mo-btn o w" data-mo="pagado" style="margin-bottom:8px">📲 Confirmar SINPE de ${$c(tot)}${o.pago.estado==='reportado'?' (el cliente dice que pagó)':''}</button>`:''}
@@ -728,6 +788,8 @@ function pedidoPrueba(){
 const ACT={
   surtido(el){entrar('surtido',el);},canasta(el){entrar('canasta',el);},mostrador(el){entrar('mostrador',el);},pos(el){entrar('pos',el);},
   puerta(){abrirPuerta();},
+  portada(){M.vista='portada';abrirHoja(window.AramoPortadas.selectorHtml());},
+  'portada-usar'(el){window.AramoPortadas.elegir(+el.dataset.v);cerrarHoja();_portadaMontada=0;const r=$('puIn');if(r)r.dataset.v='';pintarPuerta();$('puerta').scrollTop=0;toast('🎨 Portada '+el.dataset.v+' · '+(window.AramoPortadas.LISTA.find(x=>x.n===+el.dataset.v)?.t||''));},
   compartir(){if(!$('mostrador').classList.contains('open')){cerrarPuerta();abrirMostrador();}M.vista='compartir';pintarCompartir();},
   tab(el){M.tab=el.dataset.k;pintarMostrador();},
   abrir(el){if(!$('mostrador').classList.contains('open')){cerrarPuerta();abrirMostrador();}abrirEncargo(el.dataset.id);},
@@ -777,6 +839,7 @@ const ACT={
   'avisos-on'(){N.avisos.pedir().then(r=>{toast(r==='granted'?'🔔 Avisos activados en este equipo':'El navegador no permitió los avisos');if(M.vista==='receptor')repintar(pintarReceptor);pintarMostrador();if(r==='granted')N.avisos.mostrar('🔔 Avisos de ARAMO activados','Aquí te va a llegar cada pedido nuevo de '+receptorNom()+'.',{tag:'aramo-prueba'});});},
   'probar-aviso'(){campana(true);N.avisos.mostrar('🛎️ Así suena un pedido nuevo','A-PRUEBA · Ana · 6 productos · '+receptorNom(),{tag:'aramo-prueba'});},
   surtir(el){
+    primeraVez=false;document.getElementById('scopePicker')?.classList.remove('open');document.body.classList.remove('scope-picker-open');
     cerrarHoja();$('mostrador').classList.remove('open');cerrarPuerta();
     try{switchView('proveedores');const i=$('pvSearch');if(i){i.value=el.dataset.n;i.dispatchEvent(new Event('input',{bubbles:true}));i.dispatchEvent(new KeyboardEvent('keydown',{key:'Enter',bubbles:true}));}}catch{}
     toast('🚚 Buscando '+el.dataset.n+' en Surtido');
@@ -790,6 +853,14 @@ const ACT={
   'it-ok'(el){const i=+el.dataset.i;N.cambiar(M.abierto,o=>{const it=o.items[i];it.estado=it.estado==='listo'?'':'listo';if(it.estado==='listo'&&(it.qr==null||it.qr===''))it.qr=it.q;},'tienda').then(()=>{buzz(8);repintar(pintarEncargo);pintarMostrador();});},
   'it-no'(el){const i=+el.dataset.i;N.cambiar(M.abierto,o=>{const it=o.items[i];it.estado=it.estado==='nohay'?'':'nohay';},'tienda').then(()=>{buzz(8);repintar(pintarEncargo);pintarMostrador();});},
   'todo-ok'(){N.cambiar(M.abierto,o=>{o.items.forEach(it=>{if(it.estado!=='nohay'){it.estado='listo';if(it.qr==null||it.qr==='')it.qr=it.q;}});},'tienda').then(()=>{repintar(pintarEncargo);pintarMostrador();});},
+  'todo-y-listo'(){
+    N.cambiar(M.abierto,o=>{o.items.forEach(it=>{if(it.estado!=='nohay'){it.estado='listo';if(it.qr==null||it.qr==='')it.qr=it.q;}});o.estado='listo';o.totalFinal=N.totalDe(o);},'tienda','Todo confirmado · pedido listo').then(o=>{
+      if(!o)return;
+      M.tab='listo';pintarEncargo();pintarMostrador();campana();
+      toast('✅ '+o.ref+' lista · avisando a '+o.cliente.nombre.split(' ')[0]);
+      abrir(N.wa(o.cliente.tel,msgCliente(o)));
+    });
+  },
   'precio-it'(el){
     const o=N.get(M.abierto),i=+el.dataset.i,it=o.items[i];
     const v=prompt(`Precio de ${it.n} para este pedido (₡ ${it.u==='kg'?'por kg':'c/u'})`,String(precioIt(it)));
@@ -892,7 +963,15 @@ document.addEventListener('click',e=>{
   const f=ACT[el.dataset.pu||el.dataset.mo];if(!f)return;
   e.preventDefault();f(el);
 });
-document.addEventListener('keydown',e=>{if(e.key==='Escape'&&$('moSheet')?.classList.contains('open'))cerrarHoja();});
+document.addEventListener('keydown',e=>{
+  if(e.key==='Escape'&&$('moSheet')?.classList.contains('open')){cerrarHoja();return;}
+  // Teclas rápidas en la pantalla principal: 1 Surtido · 2 Taller · 3 POS · M Mostrador · / buscar
+  if(!$('puerta')?.classList.contains('open')||$('moSheet')?.classList.contains('open'))return;
+  if(e.ctrlKey||e.metaKey||e.altKey||e.target.matches?.('input,textarea,select'))return;
+  const mapa={'1':'surtido','2':'canasta','3':'pos',m:'mostrador',M:'mostrador'};
+  if(mapa[e.key]){e.preventDefault();const el=document.querySelector(`#puIn [data-pu="${mapa[e.key]}"]`);ACT[mapa[e.key]](el);}
+  else if(e.key==='/'&&$('poCmdQ')){e.preventDefault();$('poCmdQ').focus();}
+});
 
 // ══════════════ En vivo: alarma de pedido nuevo ══════════════
 let _vitT=0;

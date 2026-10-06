@@ -231,7 +231,7 @@ function telCR(t){const d=String(t||'').replace(/\D/g,'');return d.length===8?'5
 function wa(tel,texto){const n=telCR(tel);return 'https://wa.me/'+(n||'')+'?text='+encodeURIComponent(texto);}
 
 const ESTADOS=[
-  {k:'nuevo',n:'Recibido',e:'📥',txt:'La tienda ya tiene tu pedido.'},
+  {k:'nuevo',n:'Pendiente de aceptación',e:'📥',txt:'La tienda recibió tu pedido y debe aceptarlo.'},
   {k:'alistando',n:'Alistando',e:'🧑‍🌾',txt:'Están escogiendo tus productos uno por uno.'},
   {k:'listo',n:'Listo',e:'✅',txt:'Tu canasta está lista para recoger.'},
   {k:'entregado',n:'Entregado',e:'🛍️',txt:'¡Gracias por comprar en ARAMO!'},

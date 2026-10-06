@@ -1,5 +1,5 @@
-const CACHE_NAME = 'aramo-shell-v17';
-const APP_SHELL = ['./APP.html', './manifest.json', './icon.png', './catalogo-productos.js', './supplier-base.js', './express.js', './express.css', './puerta.js', './puerta.css', './aramo-nube.js', './canasta-config.js', './canasta.html', './canasta.js', './canasta.css', './canasta.webmanifest'];
+const CACHE_NAME = 'aramo-shell-v20';
+const APP_SHELL = ['./APP.html', './index.html', './manifest.json', './icon.png', './pos-vista.jpg', './catalogo-productos.js', './supplier-base.js', './express.js', './express.css', './puerta.js', './puerta.css', './portadas.js', './portadas.css', './aramo-nube.js', './canasta-config.js', './canasta.html', './canasta.js', './canasta.css', './canasta.webmanifest'];
 
 self.addEventListener('install', event => {
   event.waitUntil(caches.open(CACHE_NAME).then(cache => cache.addAll(APP_SHELL)));
@@ -16,6 +16,9 @@ self.addEventListener('activate', event => {
   self.clients.claim();
 });
 
+// Primero internet (siempre lo más nuevo); sin conexión, lo guardado.
+// Los archivos se piden con ?v=… y se buscan también sin esa marca. Una página
+// que no esté guardada cae en APP.html; un script o estilo nunca recibe HTML.
 self.addEventListener('fetch', event => {
   const request = event.request;
   if (request.method !== 'GET' || new URL(request.url).origin !== self.location.origin) return;
@@ -23,11 +26,18 @@ self.addEventListener('fetch', event => {
   event.respondWith(
     fetch(request)
       .then(response => {
-        const copy = response.clone();
-        caches.open(CACHE_NAME).then(cache => cache.put(request, copy));
+        if (response.ok) {
+          const copy = response.clone();
+          caches.open(CACHE_NAME).then(cache => cache.put(request, copy));
+        }
         return response;
       })
-      .catch(() => caches.match(request).then(cached => cached || caches.match('./APP.html')))
+      .catch(async () => {
+        const cached = await caches.match(request) || await caches.match(request, { ignoreSearch: true });
+        if (cached) return cached;
+        if (request.mode === 'navigate') return (await caches.match('./APP.html')) || Response.error();
+        return Response.error();
+      })
   );
 });
 

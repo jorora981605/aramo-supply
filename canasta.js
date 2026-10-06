@@ -294,7 +294,7 @@ function pasos(){
     if(o){
       const E=o.estado;
       r.st=i<4?'done':i===4?(E==='cancelado'?'bad':E==='nuevo'||E==='alistando'?'on':'done'):(E==='listo'?'on':E==='entregado'?'done':'fut');
-      r.sum=resumenPedido(o,i,r.d);r.nav=false;
+      r.sum=resumenPedido(o,i,r.d);r.nav=i===5&&['listo','entregado'].includes(E);
     }else{
       r.st=i===a?'on':(i<4&&listoArmando(i))?'done':'fut';
       r.sum=resumenArmando(i,r);r.nav=i<4&&i!==a;
@@ -318,10 +318,14 @@ function resumenPedido(o,i,d){
   if(i===3)return `Sellado ${esc(fdia(o.created))} ${esc(fh(o.created))} · <code>${esc(o.ref)}</code>`;
   if(i===4){
     if(o.estado==='cancelado')return `<b>Cancelado</b>${o.motivo?' · '+esc(o.motivo):''}`;
-    if(o.estado==='nuevo')return N.modo()!=='nube'&&!o.avisado?'<b>Falta avisar a la tienda</b> por WhatsApp.':'Recibido. En cola para alistar.';
+    if(o.estado==='nuevo'){
+      if(N.modo()!=='nube'&&!o.avisado)return o.waPendiente?'<b>WhatsApp abierto</b> · confirmá el envío.':'<b>Falta avisar a la tienda</b> por WhatsApp.';
+      return N.modo()!=='nube'&&o.avisado?'<b>Pendiente de aceptación</b> por la tienda.':'<b>Recibido</b> · pendiente de aceptación.';
+    }
     if(o.estado==='alistando')return `<b>${r} de ${n}</b> escogidos`;
     const p=pesoReal(o);return `Escogido y pesado${p?` · ${kg(p)} kg`:''}`;
   }
+  if(i===5&&o.estado==='alistando')return '<b>Esperando</b> · se habilita cuando la tienda marque el pedido como listo.';
   if(o.estado==='listo')return o.retiro.envio?(o.retiro.envio.uber?'<b>Va en camino</b> con Uber.':'<b>Lista</b> · pidiendo el Uber.'):`<b>Lista</b> · te espera en ${esc(s?.n||'')}.`;
   if(o.estado==='entregado')return `<b>Entregado</b> ${esc(fdia(o.entregado||o.updated))} ${esc(fh(o.entregado||o.updated))}`;
   return esc(d);
@@ -338,8 +342,10 @@ function empujar(){if(!MINI)history.pushState({paso:C.paso,id:C.actual},'',locat
 function arriba(){
   if(MINI)return;
   requestAnimationFrame(()=>{
+    const actual=document.querySelector('.step.on');
+    actual?.scrollIntoView({behavior:'smooth',block:'nearest',inline:'center'});
     if(DESK.matches){window.scrollTo({top:0,behavior:'smooth'});return;}
-    const li=document.querySelector('.step.on')||document.querySelector('.step-mesa');
+    const li=actual;
     if(li)window.scrollTo({top:li.getBoundingClientRect().top+window.scrollY-10,behavior:'smooth'});
   });
 }
@@ -494,22 +500,25 @@ function mesaSellar(){
 function mesaPedido(o){
   const s=suc(o.sucursal),{r,n}=avance(o),t=T(),total=N.totalDe(o),aprox=N.esAprox(o),E=o.estado,env=o.retiro.envio;
   const fin=E==='entregado'||E==='cancelado',local=N.modo()!=='nube';
-  const V={nuevo:local&&!o.avisado?['Falta avisar','warn']:['Recibido','run'],alistando:[`Alistando ${r}/${n}`,'run'],listo:[env?(env.uber?'En camino':'Lista'):'Lista','ok'],entregado:['Entregado','ok'],cancelado:['Cancelado','bad']}[E]||['—',''];
-  const titulo={nuevo:'Recibimos tu pedido',alistando:'Estamos escogiendo tu canasta',listo:env?'Tu canasta va en camino':'¡Tu canasta está lista!',entregado:'¡Que la disfrutés!',cancelado:'Pedido cancelado'}[E]||'Tu pedido';
+  const waPendiente=!!o.waPendiente&&!o.avisado;
+  const V={nuevo:local&&!o.avisado?(waPendiente?['WhatsApp abierto','warn']:['Falta avisar','warn']):local&&o.avisado?['Pendiente de aceptación','run']:['Pendiente de aceptación','run'],alistando:[`Alistando ${r}/${n}`,'run'],listo:[env?(env.uber?'En camino':'Lista'):'Lista','ok'],entregado:['Entregado','ok'],cancelado:['Cancelado','bad']}[E]||['—',''];
+  const titulo={nuevo:local&&!o.avisado?(waPendiente?'Confirmá el envío por WhatsApp':'Recibimos tu pedido'):local&&o.avisado?'Pedido enviado a la tienda':'Pedido recibido',alistando:'Estamos escogiendo tu canasta',listo:env?'Tu canasta va en camino':'¡Tu canasta está lista!',entregado:'¡Que la disfrutés!',cancelado:'Pedido cancelado'}[E]||'Tu pedido';
   const holo=o.items.map(i=>{
     const cls=i.estado==='listo'?'ok':i.estado==='nohay'?'no':E==='alistando'?'wait':'';
     const q=i.qr!=null&&i.qr!==''?+i.qr:i.q;
     return `<div class="holo-it ${cls}" title="${esc(i.n)}"><b>${i.e}</b><em>${esc(i.n)}</em><small>${esc(qtxt(q,i.u))}</small></div>`;
   }).join('');
-  const ahora={nuevo:local&&!o.avisado?'Tu pedido está sellado en este teléfono; falta mandárselo a la tienda.':'La tienda ya tiene tu pedido y lo pone en cola.',alistando:'Están escogiendo y pesando cada producto. Los ✓ verdes ya están en tu canasta.',listo:env?'Tu canasta salió con Uber hacia tu ubicación.':`Te espera en ${esc(s?.n||'')} (${esc(s?.zona||'')}).`,entregado:'Tu pedido quedó entregado.',cancelado:esc(o.motivo||'El pedido no siguió.')}[E];
-  const sigue={nuevo:'La tienda lo acepta y empieza a escoger.',alistando:'Te avisamos cuando esté lista: aquí y por WhatsApp.',listo:env?'Recibís tu canasta en tu casa.':`Pasá ${esc(cuando(o.retiro.at))} con tu código.`,entregado:'Calificá y repetila cuando querás.',cancelado:'Podés armar otro pedido cuando querás.'}[E];
+  const ahora={nuevo:local&&!o.avisado?(waPendiente?'WhatsApp quedó abierto. Regresá aquí y confirmá únicamente después de tocar Enviar.':'Tu pedido está sellado en este teléfono; falta mandárselo a la tienda.'):(local?'La tienda recibió el WhatsApp y el pedido está pendiente de aceptación.':'La tienda recibió tu pedido y está pendiente de aceptarlo.'),alistando:'Están escogiendo y pesando cada producto. Los ✓ verdes ya están en tu canasta.',listo:env?'Tu canasta salió con Uber hacia tu ubicación.':`Te espera en ${esc(s?.n||'')} (${esc(s?.zona||'')}).`,entregado:'Tu pedido quedó entregado.',cancelado:esc(o.motivo||'El pedido no siguió.')}[E];
+  const sigue={nuevo:'La tienda lo acepta y empieza a escoger.',alistando:'Cuando la tienda marque “Lista”, el paso 6 se desbloquea automáticamente.',listo:env?'Recibís tu canasta en tu casa.':`Pasá ${esc(cuando(o.retiro.at))} con tu código.`,entregado:'Calificá y repetila cuando querás.',cancelado:'Podés armar otro pedido cuando querás.'}[E];
   return cab(E==='listo'||E==='entregado'?6:5,titulo,V[0],V[1])
   +`<div class="stage${E==='alistando'?' running':''}"><span class="tag">Pedido ${esc(o.ref)} · en vivo desde la tienda</span><div class="scan"></div><div class="holo">${holo}</div></div>
   <div class="metrics">${metric('Escogidos',`${r}/${n}`)}${metric('Peso real',pesoReal(o)?kg(pesoReal(o))+' kg':'—')}${metric(aprox?'Total aprox.':'Total exacto',$c(total))}</div>
   ${detallePeso(o)}
   ${!fin&&N.avisos.soportado()&&N.avisos.permiso()==='default'?`<div class="card2"><h3>🔔 ¿Te avisamos en el teléfono?</h3><p>Te llega una notificación cuando tu canasta esté lista, aunque estés en otra app.</p><button type="button" class="btn ghost w" style="margin-top:10px" data-act="avisame">Avisarme cuando esté lista</button></div>`:''}
-  ${E==='nuevo'&&local&&!o.avisado?`<div class="card2 t"><h3>💬 Último paso: avisale a la tienda</h3><p>Un toque y le llega por WhatsApp con todo listo para alistarlo.</p><button type="button" class="btn w" style="margin-top:10px" data-act="wa-enviar">Enviar por WhatsApp</button></div>`:''}
-  ${!fin?`<div class="sello"><div class="qr" id="tlQR" aria-label="Código QR de retiro"></div><div><p class="kicker" style="margin:0">Código de retiro</p><div class="pin">${esc(o.pin)}</div><small>${env?'Dáselo al repartidor si te lo pide':'Mostralo al recoger'}${o.retiro.carro?' · te la llevamos al carro':''}</small><small class="mono">Pedido ${esc(o.ref)} · sellado ${esc(fh(o.created))}</small></div></div>`:''}
+  ${E==='alistando'?`<div class="card2 t"><h3>⏳ Paso 5 en curso</h3><p>La tienda está escogiendo y pesando tu pedido. Cuando lo marque como listo, se habilita el paso 6.</p>${local?`<p>Este pedido se comparte por WhatsApp. Pedile a la tienda que te mande el enlace de seguimiento actualizado para abrir el paso 6.</p><button type="button" class="btn ghost w" style="margin-top:10px" data-act="wa-estado">💬 Pedir actualización a la tienda</button>`:`<button type="button" class="btn ghost w" style="margin-top:10px" data-act="actualizar-pedido">🔄 Revisar estado</button>`}</div>`:''}
+  ${E==='listo'?`<div class="card2"><h3>✅ Paso 6 desbloqueado</h3><p>La tienda confirmó que tu pedido está listo. Continuá para ver tu código de retiro o los detalles de entrega.</p><button type="button" class="btn w" style="margin-top:10px" data-act="paso6">Continuar al paso 6 →</button></div>`:''}
+  ${E==='nuevo'&&local&&!o.avisado?(waPendiente?`<div class="card2 t"><h3>💬 Confirmá el envío</h3><p>WhatsApp ya se abrió, pero ARAMO no puede saber si tocaste <b>Enviar</b>. Confirmalo solo después de verlo enviado.</p><div class="acciones"><button type="button" class="btn w" data-act="wa-enviar">Abrir WhatsApp de nuevo</button><button type="button" class="btn" data-act="wa-confirmar">✅ Ya lo envié</button></div></div>`:`<div class="card2 t"><h3>💬 Último paso: avisale a la tienda</h3><p>WhatsApp se abrirá con el pedido listo. Después regresá y confirmá el envío.</p><button type="button" class="btn w" style="margin-top:10px" data-act="wa-enviar">Abrir WhatsApp</button></div>`):''}
+  ${!fin?`<div class="sello" id="tlStep6"><div class="qr" id="tlQR" aria-label="Código QR de retiro"></div><div><p class="kicker" style="margin:0">Código de retiro</p><div class="pin">${esc(o.pin)}</div><small>${env?'Dáselo al repartidor si te lo pide':'Mostralo al recoger'}${o.retiro.carro?' · te la llevamos al carro':''}</small><small class="mono">Pedido ${esc(o.ref)} · sellado ${esc(fh(o.created))}</small></div></div>`:''}
   ${pagoHtml(o,total,aprox)}
   ${env?`<div class="card2"><h3>🛵 Envío con Uber</h3><p>${env.uber?`Pedido a las ${esc(fh(env.uber))} · va en camino.`:'Lo pedimos apenas tu canasta esté lista.'}${+env.costo?` Envío: ${$c(env.costo)} (incluido en el total).`:''}</p></div>`:''}
   ${dual('Qué pasa ahora',ahora,'Qué sigue',`<p>${sigue}</p>`)}
@@ -561,7 +570,7 @@ function pintarSpine(){
   const o=pedidoVisto(),a=activo(),L=pasos(),act=activoIdx();
   const banner=!o&&a?`<button type="button" class="encurso" data-act="ver" data-id="${a.id}"><span>🛎️</span><span><b>${esc(a.ref)}</b><small>${esc(resumenPedido(a,a.estado==='listo'?5:4,'').replace(/<[^>]+>/g,''))}</small></span><span>VER →</span></button>`:'';
   $('tlSpine').innerHTML=`<p class="kicker">${o?'Pedido '+esc(o.ref)+' · ciclo completo':'Tu pedido · ciclo completo'}</p>${banner}
-    <ol class="steps">${L.map(r=>`<li class="step ${r.st}" data-i="${r.i}"><button type="button" class="step-h" data-act="paso" data-i="${r.i}" ${r.nav?'':'disabled'}><span class="dot">${r.st==='done'?'✓':r.st==='bad'?'✕':r.i+1}</span><span><h3>${esc(r.n)}</h3><p>${r.sum}</p></span>${r.nav?`<span class="go">${r.st==='done'?'editar':'ir'}</span>`:''}</button></li>${r.i===act?'<li class="step-mesa" id="tlSlot"></li>':''}`).join('')}</ol>
+     <ol class="steps">${L.map(r=>`<li class="step ${r.st}" data-i="${r.i}"><button type="button" class="step-h" data-act="paso" data-i="${r.i}" ${r.nav?'':'disabled'}><span class="dot">${r.st==='done'?'✓':r.st==='bad'?'✕':r.i+1}</span><span><h3>${esc(r.n)}</h3><p>${r.sum}</p></span>${r.nav?`<span class="go">${r.st==='done'?'editar':'ir'}</span>`:''}</button></li>`).join('')}</ol>
     <p class="note">${o?'Este pedido se actualiza solo, en vivo.':'Podés volver a cualquier paso sin perder nada.'}</p>`;
 }
 function pintarMesa(anim){
@@ -574,9 +583,8 @@ function pintarMesa(anim){
   C.pulso=false;C.ultimo=null;
 }
 function colocarMesa(){
-  const m=$('tlMesa'),slot=$('tlSlot'),grid=document.querySelector('.grid');
-  if(!DESK.matches&&slot){if(m.parentElement!==slot)slot.appendChild(m);}
-  else if(m.parentElement!==grid)grid.appendChild(m);
+  const m=$('tlMesa'),grid=document.querySelector('.grid');
+  if(m.parentElement!==grid)grid.appendChild(m);
 }
 function pintarBit(){
   const L=misPedidos();
@@ -668,7 +676,7 @@ function hacerPedido(){
   });
   C.mis=[o.id,...C.mis.filter(x=>x!==o.id)];C.cesta={};C.nota='';C.editPerfil=false;C.paso='armar';guardar();
   estados[o.id]=o.estado;
-  fiesta(o.items.map(i=>i.e));buzz([30,40,30]);toast('🔒 Pedido '+o.ref+' sellado');
+  fiesta(o.items.map(i=>i.e));buzz([30,40,30]);toast(N.modo()==='nube'?'🔔 Pedido '+o.ref+' enviado al Taller · aviso automático a la tienda':'🔒 Pedido '+o.ref+' sellado · falta avisar a la tienda');
   ver(o.id);
 }
 function msgTienda(o){
@@ -788,7 +796,7 @@ const ACT={
   avisame(){N.avisos.pedir().then(r=>{toast(r==='granted'?'🔔 Listo: te avisamos en el teléfono':'Tu navegador no permitió avisos; te avisamos por WhatsApp');render();});},
   'limpiar-q'(){C.q='';C.parse=null;const q=$('tlQ');if(q)q.value='';pintarGrid();},
   ir(el){ir(el.dataset.p);},
-  paso(el){const i=+el.dataset.i,p=ARMANDO[i];if(!p)return;const f=puedeIr(p);if(f){avisarFalta(f);return;}ir(p);},
+  paso(el){const i=+el.dataset.i;if(i===5&&C.actual&&['listo','entregado'].includes(pedidoVisto()?.estado)){ $('tlStep6')?.scrollIntoView({behavior:'smooth',block:'center'});return;}const p=ARMANDO[i];if(!p)return;const f=puedeIr(p);if(f){avisarFalta(f);return;}ir(p);},
   siguiente(){
     const a=C.paso,f=a==='armar'?faltaArmar():a==='entrega'?faltaRetiro():a==='pago'?faltaPago():null;
     if(f){avisarFalta(f);return;}
@@ -827,11 +835,32 @@ const ACT={
   'wa-enviar'(){
     const o=pedidoVisto();if(!o)return;
     abrir(N.wa(N.waDe(o.sucursal),msgTienda(o)));
-    N.cambiar(o.id,x=>{x.avisado=true;},'cliente','Pedido enviado por WhatsApp').then(()=>render());
+    N.cambiar(o.id,x=>{x.waPendiente=true;x.waAbiertoAt=new Date().toISOString();},'cliente','WhatsApp abierto; pendiente de confirmación').then(()=>{toast('WhatsApp abierto · confirmá el envío al regresar');render();});
+  },
+  'wa-confirmar'(){
+    const o=pedidoVisto();if(!o)return;
+    if(!confirm('¿Ya tocaste “Enviar” en WhatsApp para el pedido '+o.ref+'?'))return;
+    N.cambiar(o.id,x=>{x.avisado=true;x.waPendiente=false;x.avisadoAt=new Date().toISOString();},'cliente','Cliente confirmó envío por WhatsApp').then(()=>{toast('✅ Confirmado · pendiente de aceptación de la tienda');render();});
   },
   'wa-tienda'(){const o=pedidoVisto();abrir(N.wa(N.waDe(o?.sucursal),`Hola, sobre mi pedido ${o?.ref||''} de ARAMO: `));},
+  'wa-estado'(){const o=pedidoVisto();if(!o)return;abrir(N.wa(N.waDe(o.sucursal),`Hola, sobre mi pedido ${o.ref} de ARAMO: ¿me confirman cuando esté listo y me mandan el enlace actualizado para ver el paso 6?`));},
   comprobante(){const o=pedidoVisto();abrir(N.wa(N.waDe(o.sucursal),`📲 Comprobante SINPE del pedido ${o.ref} por ${$c(N.totalDe(o))} (adjunto la captura).`));},
   'ya-pague'(){N.cambiar(C.actual,o=>{o.pago.estado='reportado';o.pago.reportado=new Date().toISOString();},'cliente','El cliente avisó que pagó').then(()=>{toast('¡Gracias! La tienda lo confirma al entregarte');render();});},
+  'actualizar-pedido'(){
+    const o=pedidoVisto();if(!o)return;
+    toast('🔄 Revisando el estado de tu pedido…');
+    N.conectar({ids:C.mis}).then(()=>{
+      const actualizado=N.get(o.id);
+      render();
+      if(actualizado?.estado==='listo')toast('✅ ¡La tienda ya lo marcó como listo!');
+      else if(actualizado?.estado==='entregado')toast('🛍️ Tu pedido ya fue entregado');
+      else if(N.modo()!=='nube')toast('📲 En modo WhatsApp, abrí el enlace de seguimiento que te mande la tienda');
+      else toast('⏳ La tienda todavía lo está alistando');
+    });
+  },
+  'paso6'(){
+    $('tlStep6')?.scrollIntoView({behavior:'smooth',block:'center'});
+  },
   'link-pago'(){abrir(T().linkTarjeta);},
   mapa(){const o=pedidoVisto(),s=suc(o?.sucursal);abrir('https://www.google.com/maps/search/?api=1&query='+encodeURIComponent(s?.mapa||s?.n||'ARAMO'));},
   cancelar(){
