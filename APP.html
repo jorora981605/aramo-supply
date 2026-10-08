@@ -690,12 +690,12 @@ html[data-theme="dark"] .today-money-card{background:linear-gradient(145deg,#125
   .nav-bottom{left:50%;right:auto;transform:translateX(-50%)!important;width:min(720px,100%);border-radius:22px 22px 0 0}
 }
 </style>
-<link rel="stylesheet" href="express.css?v=20261007-surtido-1">
+<link rel="stylesheet" href="express.css?v=20261007-productos-1">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Caveat:wght@600;700&family=Chakra+Petch:wght@500;600;700&family=JetBrains+Mono:wght@500;600&display=swap">
-<link rel="stylesheet" href="puerta.css?v=20261007-surtido-1">
-<link rel="stylesheet" href="portadas.css?v=20261007-surtido-1">
+<link rel="stylesheet" href="puerta.css?v=20261007-productos-1">
+<link rel="stylesheet" href="portadas.css?v=20261007-productos-1">
 </head>
 <body>
 
@@ -795,7 +795,7 @@ html[data-theme="dark"] .today-money-card{background:linear-gradient(145deg,#125
   <div class="prov-topbar">
     <button class="back-btn grande" id="backBtn" aria-label="Volver a proveedores" title="Volver a proveedores">← <span>Proveedores</span></button>
     <div class="prov-topbar-name" id="provTitle"></div>
-    <button class="prov-edit-btn" id="provEditBtn" type="button" aria-label="Editar proveedor" title="Editar nombre, WhatsApp y productos">✏️</button>
+    <button class="prov-edit-btn" id="provEditBtn" type="button" aria-label="Editar proveedor" title="Editar nombre, WhatsApp y productos">✎</button>
     <span class="status-badge sb-empty" id="provStatusBadge">Sin pedido</span>
     <button class="prov-nav-btn" id="prevProvBtn" aria-label="Proveedor anterior" title="Proveedor anterior">‹</button>
     <button class="prov-nav-btn" id="nextProvBtn" aria-label="Proveedor siguiente" title="Proveedor siguiente">›</button>
@@ -978,7 +978,7 @@ html[data-theme="dark"] .today-money-card{background:linear-gradient(145deg,#125
         </div>
       </div>
 
-      <div class="app-version">ARAMO · versión <b>2026-10-07 · Surtido rápido y ajustes por local</b> · se actualiza sola</div>
+      <div class="app-version">ARAMO · versión <b>2026-10-07 · Productos que no vuelven</b> · se actualiza sola</div>
 
       <div class="cfg-acc" data-acc="datos">
         <button class="cfg-acc-hdr">⚠️ Borrar TODA la aplicación <span class="cfg-acc-arrow">▾</span></button>
@@ -1368,7 +1368,10 @@ function getAllProviders(){
   Object.keys(merged)
     .filter(name=>!merged[name]?.deleted)
     .sort((a,b)=>a.localeCompare(b,'es',{sensitivity:'base'}))
-    .forEach(name=>{result[name]=merged[name];});
+    .forEach(name=>{
+      const d=merged[name];
+      result[name]=name==='Otros'?d:{...d,products:(d.products||[]).filter(p=>prodVivo(p,d.quitados)&&!borradoDeTodo(p))};
+    });
   _providersCache=result;
   return result;
 }
@@ -1386,7 +1389,7 @@ function getOtrosProducts(){
   };
   Object.values(DEFAULT_PROVIDERS).forEach(data=>(data?.products||[]).forEach(add));
   Object.entries(S.customProviders||{}).forEach(([name,data])=>{
-    if(name!=='Otros'&&!data?.deleted)(data?.products||[]).forEach(add);
+    if(name!=='Otros'&&!data?.deleted)(data?.products||[]).filter(p=>prodVivo(p,data.quitados)).forEach(add);
   });
   (S.customProviders?.Otros?.masterProducts||[]).forEach(add);
   (Array.isArray(window.ARAMO_XLSX_PRODUCTS)?window.ARAMO_XLSX_PRODUCTS:[]).forEach(add);
@@ -1425,7 +1428,8 @@ function applySupplierBaseCatalog(){
     const previousIds=new Map(previous.map(p=>[normalizeText(p.name),p.id]));
     next[name]={color:data.color,products:(data.products||[]).map(p=>({...p,id:previousIds.get(normalizeText(p.name))||p.id}))};
   });
-  next.Otros=existing.Otros?.deleted?{...existing.Otros}:{color:'#8e8e93',products:[],masterProducts:existing.Otros?.masterProducts||[]};
+  next.Otros=existing.Otros?.deleted?{...existing.Otros}:{color:'#8e8e93',products:[],masterProducts:existing.Otros?.masterProducts||[],borrados:existing.Otros?.borrados||{}};
+  Object.keys(next).forEach(name=>{if(existing[name]?.quitados&&!next[name].deleted)next[name].quitados=existing[name].quitados;});
   const known=new Set([...Object.keys(next),...Object.keys(aliases),'Anthony']);
   Object.entries(existing).forEach(([name,data])=>{
     if(!known.has(name)&&!data?.deleted)next[name]=data;
@@ -1657,7 +1661,7 @@ async function importCatalogFile(file){
         if(emoji)product.emoji=emoji;
         updated++;
       }else{
-        product={id:'prod_'+Date.now()+'_'+Math.random().toString(36).slice(2,8),name:isShouting(productRaw)?titleCase(productRaw):productRaw,emoji:emoji||'🌿',unit:normUnit(unit||'kg')};
+        product={agregado:Date.now(),id:'prod_'+Date.now()+'_'+Math.random().toString(36).slice(2,8),name:isShouting(productRaw)?titleCase(productRaw):productRaw,emoji:emoji||'🌿',unit:normUnit(unit||'kg')};
         products.push(product);
         added++;
       }
@@ -1861,9 +1865,11 @@ function mergeProviderStores(remote={},local={}){
     const previous=merged[name];
     if(!previous){merged[name]=data;return;}
     if(previous.deleted||data?.deleted){merged[name]={...previous,...data,deleted:true};return;}
-    merged[name]={...previous,...data,
-      products:mergeProductRecords(previous.products,data?.products),
+    const quitados=fusionarMarcas(previous.quitados,data?.quitados);
+    merged[name]={...previous,...data,quitados,
+      products:mergeProductRecords(previous.products,data?.products).filter(p=>prodVivo(p,quitados)),
       masterProducts:mergeProductRecords(previous.masterProducts,data?.masterProducts)};
+    if(previous.borrados||data?.borrados)merged[name].borrados=fusionarMarcas(previous.borrados,data?.borrados);
   });
   return merged;
 }
@@ -2540,7 +2546,7 @@ function openAddProductModal(){
   function addExisting(product){
     ensureCustomProv(prov);
     S.customProviders[prov].products.push({
-      id:'prod_'+Date.now()+'_'+Math.random().toString(36).slice(2,6),
+      agregado:Date.now(),id:'prod_'+Date.now()+'_'+Math.random().toString(36).slice(2,6),
       name:product.name,emoji:product.emoji,unit:product.unit
     });
     persist();renderProdTable();draw();
@@ -2550,7 +2556,7 @@ function openAddProductModal(){
   function addNew(name,unit){
     ensureCustomProv(prov);
     S.customProviders[prov].products.push({
-      id:'prod_'+Date.now()+'_'+Math.random().toString(36).slice(2,6),
+      agregado:Date.now(),id:'prod_'+Date.now()+'_'+Math.random().toString(36).slice(2,6),
       name:titleCase(name),emoji:'🌿',unit:unit||'kg'
     });
     persist();renderProdTable();draw();
@@ -2717,7 +2723,43 @@ document.getElementById('noteAreaA').addEventListener('input',e=>syncBranchNote(
 // ══════════════════════════════════════════
 function normalizeText(s){return s.toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g,'').trim();}
 const REMOVED_PRODUCT_KEYS=new Set(['botella de un litro','botella 1l','chayote bolsa','coco completo','guiskil','guisquil','chile','chile normal','cebolla blanca']);
-function isRemovedProduct(product){return REMOVED_PRODUCT_KEYS.has(normalizeText(product?.name||''));}
+function isRemovedProduct(product){return REMOVED_PRODUCT_KEYS.has(normalizeText(product?.name||''))||borradoDeTodo(product);}
+// Productos quitados: cada proveedor anota qué quitó y a qué hora (quitados), y la lista total
+// anota lo que se borró de todo (Otros.borrados). Como la nube junta lo de todos los equipos,
+// sin estas marcas un producto borrado o renombrado volvía a aparecer.
+// Un producto agregado DESPUÉS de la marca (agregado) vuelve a valer.
+function borradoDeTodo(p){const b=S?.customProviders?.Otros?.borrados,t=b&&b[normalizeText(p?.name||'')];return !!t&&(+p?.agregado||0)<=t;}
+function prodVivo(p,quitados){const n=String(p?.name||'').trim();if(!n)return false;const t=(quitados||{})[normalizeText(n)];return !t||(+p.agregado||0)>t;}
+function fusionarMarcas(a,b){const r={...(a||{})};Object.entries(b||{}).forEach(([k,t])=>{if(!r[k]||t>r[k])r[k]=t;});return r;}
+// Quita un producto SOLO de ese proveedor: sigue en la lista total de productos.
+function quitarDeProv(prov,pid,{dejarEnLista=true}={}){
+  ensureCustomProv(prov);
+  const data=S.customProviders[prov],i=(data.products||[]).findIndex(x=>x.id===pid);
+  if(i<0)return null;
+  const prod=data.products[i],k=normalizeText(prod.name||'');
+  if(k)data.quitados={...(data.quitados||{}),[k]:Date.now()};
+  data.products.splice(i,1);
+  invalidateProvidersCache();
+  if(dejarEnLista&&k&&!getKnownProductCatalog().some(p=>p.key===k)){
+    ensureOtrosProvider();
+    (S.customProviders.Otros.masterProducts||(S.customProviders.Otros.masterProducts=[])).push({id:'master_'+Date.now()+'_'+Math.random().toString(36).slice(2,6),name:prod.name,emoji:prod.emoji||'🌿',unit:normUnit(prod.unit),agregado:Date.now()});
+  }
+  return prod;
+}
+// Borra un producto de TODO: de cada proveedor y de la lista total.
+function borrarProductoDeTodo(key){
+  const prod=getKnownProductCatalog().find(p=>p.key===key);if(!prod)return false;
+  Object.entries(getAllProviders()).forEach(([prov,data])=>{
+    if(prov==='Otros')return;
+    (data.products||[]).filter(p=>normalizeText(p.name)===key).forEach(p=>quitarDeProv(prov,p.id,{dejarEnLista:false}));
+  });
+  ensureOtrosProvider();
+  const O=S.customProviders.Otros;
+  O.masterProducts=(O.masterProducts||[]).filter(p=>normalizeText(p.name)!==key);
+  O.borrados={...(O.borrados||{}),[key]:Date.now()};
+  invalidateProvidersCache();
+  return prod;
+}
 
 // ── PREVIEW & MSG ──
 function getBranchNote(p,side){const key=side==='moravia'?'__note_moravia':'__note_angeles';return String(p?.notes?.[key]||((side==='moravia'&&!p?.notes?.__note_moravia)?p?.note||'':'')).trim();}
@@ -3044,6 +3086,7 @@ function renderCatalogo(){
         <span style="font-size:22px">${prod.emoji}</span>
         <div class="catalogo-item-name">${prod.name}<small>${normUnit(prod.unit)}</small></div>
         <button class="catalogo-add" type="button" data-key="${prod.key}">+ Proveedor</button>
+        <button class="catalogo-del" type="button" data-key="${prod.key}" title="Borrar de todos los proveedores y de la lista" aria-label="Borrar ${prod.name} de todo">🗑️</button>
       </div>
       <div class="catalogo-sellers">${sellers.length
         ?sellers.map(s=>`<span class="catalogo-chip">${s}</span>`).join('')
@@ -3053,6 +3096,14 @@ function renderCatalogo(){
 
   list.querySelectorAll('.catalogo-add').forEach(btn=>btn.addEventListener('click',()=>{
     openCatalogoAssign(btn.dataset.key);
+  }));
+  list.querySelectorAll('.catalogo-del').forEach(btn=>btn.addEventListener('click',()=>{
+    const prod=getKnownProductCatalog().find(p=>p.key===btn.dataset.key);if(!prod)return;
+    const n=provsOf(prod.key).length;
+    if(!confirm(`¿Borrar "${prod.name}" de TODO?\n\nSe quita de ${n?n+' proveedor'+(n===1?'':'es')+' y de ':''}la lista de productos, en todos los equipos.`))return;
+    borrarProductoDeTodo(prod.key);
+    persist();renderCatalogo();
+    toast(`🗑️ ${prod.name} borrado de todo`,'ok');
   }));
 }
 
@@ -3077,12 +3128,12 @@ function saveNewCatalogProduct(){
   const key=normalizeText(name);
   if(getKnownProductCatalog().some(product=>product.key===key)){toast('Ese producto ya existe en el catálogo','err');return;}
   ensureOtrosProvider();
-  const product={id:'master_'+Date.now()+'_'+Math.random().toString(36).slice(2,6),name,emoji,unit};
+  const product={id:'master_'+Date.now()+'_'+Math.random().toString(36).slice(2,6),name,emoji,unit,agregado:Date.now()};
   if(!S.customProviders.Otros.masterProducts)S.customProviders.Otros.masterProducts=[];
   S.customProviders.Otros.masterProducts.push(product);
   if(provider&&provider!=='Otros'){
     ensureCustomProv(provider);
-    if(!(S.customProviders[provider].products||[]).some(p=>normalizeText(p.name)===key))S.customProviders[provider].products.push({...product});
+    if(!(S.customProviders[provider].products||[]).some(p=>normalizeText(p.name)===key))S.customProviders[provider].products.push({...product,agregado:Date.now()});
   }
   persist();
   renderCatalogo();
@@ -3106,7 +3157,7 @@ function openCatalogoAssign(key){
     const name=btn.dataset.prov;
     ensureCustomProv(name);
     S.customProviders[name].products.push({
-      id:'prod_'+Date.now()+'_'+Math.random().toString(36).slice(2,6),
+      agregado:Date.now(),id:'prod_'+Date.now()+'_'+Math.random().toString(36).slice(2,6),
       name:prod.name,emoji:prod.emoji,unit:normUnit(prod.unit)
     });
     persist();closeProvListModal();renderConfig();
@@ -3304,15 +3355,20 @@ function renderCfgProveedores(){
             <label class="prod-cfg-price">₡<input type="number" inputmode="decimal" min="0" value="${getPrice(name,prod.id)||''}" placeholder="Precio"></label>
           </div>
         `;
-        row.querySelector('.prod-cfg-name').addEventListener('input',e=>{
-          ensureCustomProv(name);
-          S.customProviders[name].products[idx].name=e.target.value;
-          persist();
+        const ref=()=>{ensureCustomProv(name);return (S.customProviders[name].products||[]).find(x=>x.id===prod.id);};
+        // El nombre se guarda al terminar de escribir. Sin nombre = quitarlo de este proveedor.
+        row.querySelector('.prod-cfg-name').addEventListener('change',e=>{
+          const v=e.target.value.trim(),r=ref();if(!r)return;
+          if(!v){e.target.value=r.name;removeProduct();return;}
+          if(v===r.name)return;
+          const viejo=normalizeText(r.name||'');
+          if(viejo&&viejo!==normalizeText(v))S.customProviders[name].quitados={...(S.customProviders[name].quitados||{}),[viejo]:Date.now()};
+          r.name=v;r.agregado=Date.now()+1;
+          persist();toast('✓ Nombre del producto actualizado','ok');
         });
         row.querySelectorAll('.prod-cfg-units button').forEach(b=>b.addEventListener('click',e=>{
           e.stopPropagation();
-          ensureCustomProv(name);
-          S.customProviders[name].products[idx].unit=b.dataset.u;
+          const r=ref();if(r)r.unit=b.dataset.u;
           row.querySelectorAll('.prod-cfg-units button').forEach(x=>x.classList.toggle('on',x===b));
           persist();
         }));
@@ -3320,9 +3376,9 @@ function renderCfgProveedores(){
           setPrice(name,prod.id,e.target.value);persist();
         });
         const removeProduct=()=>{
-          ensureCustomProv(name);
-          S.customProviders[name].products.splice(idx,1);
+          quitarDeProv(name,prod.id);
           persist();renderCfgProveedores();
+          toast(`✓ ${prod.name} quitado de ${name} · sigue en la lista de productos`,'ok');
         };
         row.querySelector('.prod-cfg-rm').addEventListener('click',e=>{
           e.stopPropagation();
@@ -3348,7 +3404,8 @@ function ensureCustomProv(name){
 function getKnownProductCatalog(){
   const catalog=new Map();
   const spreadsheetProducts=Array.isArray(window.ARAMO_XLSX_PRODUCTS)?window.ARAMO_XLSX_PRODUCTS:[];
-  const sources=[...Object.values(DEFAULT_PROVIDERS),...Object.values(S.customProviders||{}),{products:S.customProviders?.Otros?.masterProducts||[]},{products:spreadsheetProducts}];
+  const custom=Object.values(S.customProviders||{}).filter(d=>!d?.deleted).map(d=>({products:(d.products||[]).filter(p=>prodVivo(p,d.quitados))}));
+  const sources=[...Object.values(DEFAULT_PROVIDERS),...custom,{products:S.customProviders?.Otros?.masterProducts||[]},{products:spreadsheetProducts}];
   sources.forEach(source=>(source.products||[]).filter(product=>!isRemovedProduct(product)).forEach(product=>{
     const key=normalizeText(product.name);
     if(!key)return;
@@ -3398,7 +3455,7 @@ function renderProductPicker(prov,body){
       if(!product)return;
       ensureCustomProv(prov);
       S.customProviders[prov].products.push({
-        id:'prod_'+Date.now()+'_'+Math.random().toString(36).slice(2,6),
+        agregado:Date.now(),id:'prod_'+Date.now()+'_'+Math.random().toString(36).slice(2,6),
         name:product.name,emoji:product.emoji,unit:product.unit
       });
       persist();
@@ -3420,7 +3477,7 @@ function renderProductPicker(prov,body){
       create.addEventListener('click',()=>{
         ensureCustomProv(prov);
         S.customProviders[prov].products.push({
-          id:'prod_'+Date.now()+'_'+Math.random().toString(36).slice(2,6),
+          agregado:Date.now(),id:'prod_'+Date.now()+'_'+Math.random().toString(36).slice(2,6),
           name:titleCase(term),emoji:'🌿',unit:'kg'
         });
         persist();renderCfgProveedores();
@@ -3775,11 +3832,11 @@ if(isIOS && !isInStandalone && !dismissed){
   },3000);
 }
 </script>
-<script src="express.js?v=20261007-surtido-1"></script>
+<script src="express.js?v=20261007-productos-1"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcode-generator/1.4.4/qrcode.min.js"></script>
-<script src="canasta-config.js?v=20261007-surtido-1"></script>
-<script src="aramo-nube.js?v=20261007-surtido-1"></script>
-<script src="portadas.js?v=20261007-surtido-1"></script>
-<script src="puerta.js?v=20261007-surtido-1"></script>
+<script src="canasta-config.js?v=20261007-productos-1"></script>
+<script src="aramo-nube.js?v=20261007-productos-1"></script>
+<script src="portadas.js?v=20261007-productos-1"></script>
+<script src="puerta.js?v=20261007-productos-1"></script>
 </body>
 </html>

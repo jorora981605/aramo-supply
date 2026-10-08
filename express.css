@@ -242,3 +242,12 @@ html[data-theme="dark"] .seg-unit button.on{color:#0c100e}
 .overlay.xp-ov,.overlay.prov-edit-ov{bottom:var(--navh,72px)}
 .overlay.xp-ov .modal,.overlay.prov-edit-ov .modal{max-height:calc(100% - 8px)}
 .prov-prods-tit{margin:14px 0 6px}
+
+/* 2026-10-07 b: teclado compacto y lápiz discreto */
+.xs-pad{gap:5px;margin-top:7px}
+.xs-pad button{height:38px;border-radius:11px;font-size:17px;border-width:1px}
+.pv-edit{top:4px;right:4px;width:26px;height:26px;border:0;background:transparent;box-shadow:none;color:var(--m);font-size:15px;font-weight:700;opacity:.55}
+.pv-edit:hover,.pv-edit:focus-visible{opacity:1}
+.prov-edit-btn{width:30px;height:30px;border:0;background:transparent;color:var(--m);font-size:17px;opacity:.6}
+.catalogo-del{flex:none;width:34px;height:34px;border:1px solid var(--b);border-radius:10px;background:transparent;font-size:14px;opacity:.7}
+.catalogo-del:active{transform:scale(.92)}

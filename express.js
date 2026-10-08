@@ -339,7 +339,7 @@ function xpRenderProveedores(){
       <span class="pv-name">${esc(name)}</span>
       <span class="pv-meta">${n?`${n} prod.${tot?' · ₡'+fmt(tot):''}`:'—'}</span>
       ${n?`<span class="pv-state">${sent?'✅ Enviado':'⚠️ Por enviar'}</span>`:''}
-    </button><button type="button" class="pv-edit" data-edit="${esc(name)}" aria-label="Editar ${esc(name)}" title="Editar nombre, WhatsApp y productos">✏️</button></div>`;
+    </button><button type="button" class="pv-edit" data-edit="${esc(name)}" aria-label="Editar ${esc(name)}" title="Editar nombre, WhatsApp y productos">✎</button></div>`;
   }).join('');
   const top=$('pvTop');
   if(top){
