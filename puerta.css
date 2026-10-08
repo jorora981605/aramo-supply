@@ -404,3 +404,7 @@ html[data-theme="dark"] .loc-ir{color:#06150d}
 .mo-card.marcado{border-color:var(--o);animation:moMarca 1s ease-in-out 4}
 @keyframes moMarca{50%{box-shadow:0 0 0 7px var(--od)}}
 .mo-herr button[hidden]{display:none}
+.mo-comun summary{cursor:pointer;font-weight:900;font-size:14px;list-style:none}
+.mo-comun summary::before{content:'▸ ';color:var(--m)}
+.mo-comun[open] summary::before{content:'▾ '}
+.mo-comun[open] summary{margin-bottom:8px}

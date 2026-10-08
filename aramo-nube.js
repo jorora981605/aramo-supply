@@ -204,6 +204,8 @@ function recetas(){
   return [...(window.ARAMO_CANASTA?.recetas||[]),...(t.recetas||[])].filter(r=>r&&!fuera.has(r.k));
 }
 function waDe(k){const t=tienda(),s=(t.sucursales||[]).find(x=>x.k===k);return s?.whatsapp||t.whatsapp||'';}
+// SINPE Móvil de cada local (si un local no tiene el suyo, se usa el de la tienda).
+function sinpeDe(k){const t=tienda(),s=(t.sucursales||[]).find(x=>x.k===k);return s?.sinpe?.numero?s.sinpe:(t.sinpe||{});}
 
 // ── Avisos en el teléfono (notificación del sistema) ──
 const avisos={
@@ -283,7 +285,7 @@ window.AramoNube={
   get:id=>store[id]&&!store[id].borrado?store[id]:null,
   modo:()=>modo,motivo:()=>motivo,pendientes:()=>pend.size,
   on:f=>{subs.add(f);return()=>subs.delete(f);},
-  tienda,guardarTienda,catalogo,recetas,waDe,avisos,
+  tienda,guardarTienda,catalogo,recetas,waDe,sinpeDe,avisos,
   pack,unpack,enlace,
   nuevoId,nuevoRef,nuevoPin,colones,redondear5,qtyItem,totalDe,esAprox,telCR,wa,
   ESTADOS,PAGOS,

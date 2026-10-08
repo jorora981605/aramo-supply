@@ -334,13 +334,20 @@ function xpRenderProveedores(){
   list.hidden=searching&&!names.length;
   list.innerHTML=(searching&&names.length?'<div class="pv-label">Proveedores</div>':'')+names.map(name=>{
     const n=hasData(name)?xpCount(name):0,sent=n&&isSent(name),tot=n?sideTotal(name):0;
-    return `<button type="button" class="pv-card${n?(sent?' sent':' pending'):''}" data-prov="${esc(name)}">
+    return `<div class="pv-item"><button type="button" class="pv-card${n?(sent?' sent':' pending'):''}" data-prov="${esc(name)}">
       <span class="pv-av">${esc(name.charAt(0).toUpperCase())}</span>
       <span class="pv-name">${esc(name)}</span>
       <span class="pv-meta">${n?`${n} prod.${tot?' · ₡'+fmt(tot):''}`:'—'}</span>
       ${n?`<span class="pv-state">${sent?'✅ Enviado':'⚠️ Por enviar'}</span>`:''}
-    </button>`;
+    </button><button type="button" class="pv-edit" data-edit="${esc(name)}" aria-label="Editar ${esc(name)}" title="Editar nombre, WhatsApp y productos">✏️</button></div>`;
   }).join('');
+  const top=$('pvTop');
+  if(top){
+    const sides=activeOrderSides();
+    top.innerHTML=XP.undo&&Date.now()-XP.undo.at<120000
+      ?`<div class="pv-undo">Pedido reiniciado <button type="button" data-pv="undo">↩️ Deshacer</button></div>`
+      :t.items?`<button type="button" class="pv-reset" data-pv="reset">🗑️ Reiniciar pedido${sides.length===1?' de '+SIDE_NAME[sides[0]]:''} <small>borra las cantidades y empieza de cero</small></button>`:'';
+  }
 }
 window.renderProveedoresNav=xpRenderProveedores;
 
@@ -485,7 +492,7 @@ function xpLastQty(prov,pid){
 function xpOpenSheet(prov,pid){
   if(!xpProd(prov,pid))return;
   xpBuildOverlays();
-  XP.sheet={prov,pid};
+  XP.sheet={prov,pid,buf:{}};
   xpRenderSheet();
   xpOpen('xpSheet');
 }
@@ -504,7 +511,6 @@ function xpRenderSheet(){
   const prices=offers.map(xpPrice).filter(Boolean);
   const minP=prices.length>1?Math.min(...prices):0;
   const last=xpLastQty(prov,pid);
-  const presets=unit==='kg'?[.5,1,2,3,5,10,15,20]:[1,2,3,4,5,6,10,12];
   $('xpSheetBody').innerHTML=`
     <div class="xs-head">
       <span class="xs-emoji">${smartEmoji(prod)}</span>
@@ -517,14 +523,14 @@ function xpRenderSheet(){
         <div class="xs-side-top"><span>${SIDE_ICO[side]} ${SIDE_NAME[side]}</span><small data-xs-sub="${side}"></small></div>
         <div class="xs-qty">
           <button type="button" data-xs="dec" data-side="${side}" aria-label="Restar">−</button>
-          <input type="number" inputmode="decimal" min="0" step="0.5" value="${esc(q)}" placeholder="0" data-xs-q="${side}" aria-label="Cantidad ${SIDE_NAME[side]}">
+          <input type="text" inputmode="decimal" value="${esc(q)}" placeholder="0" data-xs-q="${side}" aria-label="Cantidad ${SIDE_NAME[side]}" autocomplete="off">
           <button type="button" data-xs="inc" data-side="${side}" aria-label="Sumar">+</button>
         </div>
-        <div class="xs-presets">${presets.map(v=>`<button type="button" data-xs="set" data-side="${side}" data-v="${v}">${fmtQ(v)}</button>`).join('')}</div>
+        <div class="xs-pad" role="group" aria-label="Teclado de cantidad">${['1','2','3','4','5','6','7','8','9','.','0','⌫'].map(k=>`<button type="button" data-xs="key" data-side="${side}" data-k="${k}"${k==='⌫'?' aria-label="Borrar"':''}>${k==='.'?',':k}</button>`).join('')}</div>
         <input class="xs-note" data-xs-note="${side}" placeholder="📝 Nota para ${SIDE_NAME[side]} (opcional)" value="${esc(getProductNote(p,pid,side))}">
       </div>`;}).join('')}
     <div class="xs-grid">
-      <label class="xs-field"><span>Unidad</span><select data-xs-unit>${UNITS.map(u=>`<option value="${u}"${u===unit?' selected':''}>${u}</option>`).join('')}</select></label>
+      <div class="xs-field wide"><span>Unidad</span><div class="seg-unit" role="group" aria-label="Unidad">${UNITS.map(u=>`<button type="button" data-xs="unit" data-u="${u}" class="${u===unit?'on':''}">${u==='unidad'?'Unidad':u==='caja'?'Caja':'Kg'}</button>`).join('')}</div></div>
       <label class="xs-field"><span>Precio ₡</span><input type="number" inputmode="decimal" min="0" data-xs-price value="${esc(getPrice(prov,pid))}" placeholder="0"></label>
       ${offers.length>1?`<label class="xs-field wide"><span>Pedírselo a</span><select data-xs-offer>${offers.map(o=>{const pr=xpPrice(o);return `<option value="${esc(o.prov)}|${esc(o.prod.id)}"${o.prov===prov&&o.prod.id===pid?' selected':''}>${esc(o.prov)}${pr?' · ₡'+fmt(pr):''}${minP&&pr===minP?' 💚 más barato':''}</option>`;}).join('')}</select></label>`:''}
     </div>
@@ -559,7 +565,21 @@ function xpSheetClick(e){
   const b=e.target.closest('[data-xs]');if(!b||!XP.sheet)return;
   const st=XP.sheet,act=b.dataset.xs,side=b.dataset.side;
   if(act==='close'||act==='done'){xpClose('xpSheet');return;}
+  // Teclado: tocar 3 y luego 4 arma 34. El primer toque reemplaza lo que había.
+  if(act==='key'){
+    const k=b.dataset.k,buf=st.buf||(st.buf={});
+    let v=buf[side]??'';
+    if(k==='⌫')v=(buf[side]==null?String(xpQty(st.prov,st.pid,side)||''):v).slice(0,-1);
+    else if(k==='.'){if(!v.includes('.'))v=(v||'0')+'.';}
+    else if(v.replace('.','').length<5)v=(v==='0'?'':v)+k;
+    buf[side]=v;
+    xpSheetSetSide(side,parseFloat(v)||0);
+    const inp=document.querySelector(`[data-xs-q="${side}"]`);if(inp)inp.value=v.replace('.',',');
+    buzz(6);return;
+  }
+  if(act==='unit')return xpSetUnit(b.dataset.u);
   if(act==='inc'||act==='dec'){
+    if(st.buf)st.buf[side]=null;
     const cur=xpQty(st.prov,st.pid,side);
     xpSheetSetSide(side,act==='inc'?(cur>0&&cur<1?1:cur+1):(cur>1?Math.ceil(cur)-1:0));
     buzz(8);return;
@@ -570,25 +590,28 @@ function xpSheetClick(e){
 function xpSheetInput(e){
   const st=XP.sheet;if(!st)return;
   const t=e.target;
-  if(t.dataset.xsQ){xpSet(st.prov,st.pid,t.dataset.xsQ,t.value);xpSheetTotals();return;}
+  if(t.dataset.xsQ){if(st.buf)st.buf[t.dataset.xsQ]=null;xpSet(st.prov,st.pid,t.dataset.xsQ,String(t.value).replace(',','.'));xpSheetTotals();return;}
   if(t.hasAttribute('data-xs-price')){setPrice(st.prov,st.pid,t.value);updateProvTotals();persist();xpSheetTotals();return;}
   if(t.dataset.xsNote){const prod=xpProd(st.prov,st.pid);if(prod)syncProductNote(st.prov,prod,t.dataset.xsNote,t.value);}
 }
 function xpSheetChange(e){
   const st=XP.sheet;if(!st)return;
   const t=e.target;
-  if(t.hasAttribute('data-xs-unit')){
-    const u=t.value,p=getPedido(st.prov);
-    if(st.prov!=='Otros'){
-      ensureCustomProv(st.prov);
-      const prod=(S.customProviders[st.prov].products||[]).find(x=>x.id===st.pid);
-      if(prod)prod.unit=u;
-    }
-    activeOrderSides().forEach(s=>{const q=+p.qtys[s]?.[st.pid]?.qty||0;if(q>0)xpSet(st.prov,st.pid,s,q,u);});
-    persist();
-    return;
-  }
   if(t.hasAttribute('data-xs-offer')){const [prov,pid]=t.value.split('|');xpMoveTo(prov,pid);}
+}
+// Unidad del producto (kg, unidad o caja): un toque y queda.
+function xpSetUnit(u){
+  const st=XP.sheet;if(!st)return;
+  const p=getPedido(st.prov);
+  if(st.prov!=='Otros'){
+    ensureCustomProv(st.prov);
+    const prod=(S.customProviders[st.prov].products||[]).find(x=>x.id===st.pid);
+    if(prod)prod.unit=u;
+  }
+  activeOrderSides().forEach(s=>{const q=+p.qtys[s]?.[st.pid]?.qty||0;if(q>0)xpSet(st.prov,st.pid,s,q,u);});
+  persist();
+  document.querySelectorAll('#xpSheetBody [data-xs="unit"]').forEach(x=>x.classList.toggle('on',x.dataset.u===u));
+  buzz(6);
 }
 // Pasa las cantidades (y notas) del producto a otro proveedor.
 function xpMoveTo(newProv,newPid){
@@ -604,7 +627,7 @@ function xpMoveTo(newProv,newPid){
     if(v&&+v.qty>0){xpSet(newProv,newPid,side,+v.qty,v.unit);xpSet(st.prov,st.pid,side,0);moved++;}
     if(note){syncProductNote(newProv,toProd,side,note);syncProductNote(st.prov,fromProd,side,'');}
   });
-  XP.sheet={prov:newProv,pid:newPid};
+  XP.sheet={prov:newProv,pid:newPid,buf:{}};
   xpRenderSheet();
   toast(moved?`↪ Ahora se lo pedís a ${newProv}`:`Proveedor: ${newProv}`,'ok');
 }
@@ -828,6 +851,9 @@ const VIEW_MAP={home:'proveedores',express:'proveedores',resumen:'pedido',mercad
 const _switchView=window.switchView;
 window.switchView=function(name){
   name=VIEW_MAP[name]||name;
+  ['xpSheet','xpChain'].forEach(id=>{if($(id)?.classList.contains('open'))xpClose(id);});
+  if(typeof cerrarEditorProv==='function')cerrarEditorProv();
+  $('modalProvList')?.classList.remove('open');
   _switchView(name);
   window.scrollTo(0,0);
   if(name==='pedido')xpRenderPedido();
@@ -840,7 +866,18 @@ wrap('openProv',()=>xpRenderProvSuggest());
 
 // ── Enlaces de eventos ──
 $('pvSum')?.addEventListener('click',()=>{if(xpTotals().items)switchView('pedido');});
-$('providersNavList')?.addEventListener('click',e=>{const c=e.target.closest('[data-prov]');if(c)openProv(c.dataset.prov);});
+$('providersNavList')?.addEventListener('click',e=>{
+  const ed=e.target.closest('[data-edit]');if(ed){abrirEditorProv(ed.dataset.edit);return;}
+  const c=e.target.closest('[data-prov]');if(c)openProv(c.dataset.prov);
+});
+$('pvTop')?.addEventListener('click',e=>{
+  const b=e.target.closest('[data-pv]');if(!b)return;
+  if(b.dataset.pv==='reset')xpResetPedido();
+  if(b.dataset.pv==='undo')xpUndoReset();
+});
+// La altura del menú de abajo: las fichas se abren encima de él, así siempre se puede tocar.
+function xpNavAltura(){const n=document.querySelector('.nav-bottom');if(n)document.documentElement.style.setProperty('--navh',n.offsetHeight+'px');}
+xpNavAltura();addEventListener('resize',xpNavAltura);
 $('pvResults')?.addEventListener('click',e=>{const o=e.target.closest('.pv-offer');if(o)xpOpenSheet(o.dataset.prov,o.dataset.pid);});
 let _st=0;
 $('pvSearch')?.addEventListener('input',()=>{clearTimeout(_st);_st=setTimeout(xpSearchRun,220);});

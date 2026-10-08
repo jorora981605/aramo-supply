@@ -207,3 +207,38 @@ html[data-theme="dark"] .xc-next{color:#0c100e}
 
 /* ── Config ── */
 .app-version{margin:4px 2px 12px;font-size:12px;color:var(--m);text-align:center}
+
+/* ── 2026-10-07: lápiz, teclado, unidad en botones, volver grande ── */
+.pv-item{position:relative;min-width:0;display:flex}
+.pv-item .pv-card{flex:1}
+.pv-edit{position:absolute;top:5px;right:5px;width:32px;height:32px;display:grid;place-items:center;border:1px solid var(--b2);border-radius:11px;background:var(--card);font-size:14px;box-shadow:0 2px 8px rgba(0,0,0,.08);touch-action:manipulation}
+.pv-edit:active{transform:scale(.9)}
+.pv-reset{display:flex;align-items:center;gap:8px;flex-wrap:wrap;width:100%;min-height:46px;padding:10px 14px;margin-bottom:10px;border:1.5px solid color-mix(in srgb,var(--r,#d4451f) 45%,transparent);border-radius:15px;background:var(--card);color:var(--r,#c4321b);font-size:14.5px;font-weight:900;text-align:left}
+.pv-reset small{font-weight:700;color:var(--m);font-size:12px}
+.pv-undo{display:flex;align-items:center;justify-content:space-between;gap:8px;padding:10px 14px;margin-bottom:10px;border-radius:15px;background:var(--gd);font-weight:800}
+.pv-undo button{padding:8px 12px;border:0;border-radius:11px;background:var(--g);color:#fff;font-weight:900}
+.prov-topbar .back-btn.grande{width:auto;height:44px;padding:0 14px;gap:6px;font-size:16px;font-weight:950;border-radius:14px;flex:none}
+.prov-topbar .back-btn.grande span{font-size:15px}
+.prov-edit-btn{flex:none;width:40px;height:40px;display:grid;place-items:center;border:1px solid var(--b2);border-radius:12px;background:var(--card);font-size:17px}
+#view-prov #btnWA,#view-prov #btnWAM,#view-prov #btnWAA,#view-prov #btnPDF{display:none!important}
+.listo-prov{flex:1;min-height:58px;padding:12px 14px;border:0;border-radius:18px;background:var(--g);color:#fff;font-size:17px;font-weight:950;box-shadow:0 8px 20px rgba(14,122,79,.28);touch-action:manipulation}
+html[data-theme="dark"] .listo-prov{color:#0c100e}
+.listo-prov:active{transform:scale(.97)}
+.xs-pad{display:grid;grid-template-columns:repeat(3,1fr);gap:7px;margin-top:9px}
+.xs-pad button{height:54px;border:1.5px solid var(--b2);border-radius:14px;background:var(--card);color:var(--t);font-size:24px;font-weight:950;font-family:var(--mo);touch-action:manipulation}
+.xs-pad button:active{background:var(--g);color:#fff;transform:scale(.95)}
+.xs-side.angeles .xs-pad button:active{background:var(--o)}
+.seg-unit{display:grid;grid-template-columns:repeat(3,1fr);gap:6px}
+.seg-unit button{min-height:48px;border:2px solid var(--b2);border-radius:13px;background:var(--s);color:var(--t);font-size:16px;font-weight:900;touch-action:manipulation}
+.seg-unit button.on{border-color:var(--g);background:var(--g);color:#fff}
+html[data-theme="dark"] .seg-unit button.on{color:#0c100e}
+.prod-cfg-row-content{flex-wrap:wrap}
+.prod-cfg-row-content .prod-cfg-name{flex:1 1 60%}
+.prod-cfg-units{flex:1 1 180px;gap:5px}
+.prod-cfg-units button{min-height:38px;font-size:13.5px;border-radius:11px}
+.prod-cfg-price{display:flex;align-items:center;gap:4px;flex:0 1 120px;font-weight:900;color:var(--m)}
+.prod-cfg-price input{width:100%;min-width:0;height:38px;padding:0 9px;border:1.5px solid var(--b2);border-radius:11px;background:var(--s);color:var(--t);font-size:15px;font-weight:850}
+/* Las fichas se abren encima del menú de abajo: siempre se puede tocar Proveedores */
+.overlay.xp-ov,.overlay.prov-edit-ov{bottom:var(--navh,72px)}
+.overlay.xp-ov .modal,.overlay.prov-edit-ov .modal{max-height:calc(100% - 8px)}
+.prov-prods-tit{margin:14px 0 6px}

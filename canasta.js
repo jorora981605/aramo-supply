@@ -546,9 +546,9 @@ function pagoHtml(o,total,aprox){
   if(m.metodo==='sinpe'){
     if(m.estado==='reportado')return `<div class="card2"><h3>📲 Pago enviado</h3><p>Le avisaste a la tienda que pagaste ${$c(total)}. Lo confirman al entregarte la canasta.</p></div>`;
     if(o.estado==='listo'){
-      const num=telDig(t.sinpe?.numero);
+      const sp=N.sinpeDe(o.sucursal),num=telDig(sp.numero);
       return `<div class="card2 w"><h3>📲 Pagá por SINPE Móvil</h3><div class="monto">${$c(total)}</div>
-        ${num?`<div class="copia"><div><small>Número</small>${esc(fmtTel(num))}${t.sinpe?.nombre?` · ${esc(t.sinpe.nombre)}`:''}</div><button type="button" data-act="copiar" data-v="${num}">Copiar</button></div>`:'<p>La tienda te envía el número por WhatsApp.</p>'}
+        ${num?`<div class="copia"><div><small>Número</small>${esc(fmtTel(num))}${sp.nombre?` · ${esc(sp.nombre)}`:''}</div><button type="button" data-act="copiar" data-v="${num}">Copiar</button></div>`:'<p>La tienda te envía el número por WhatsApp.</p>'}
         <div class="copia"><div><small>Monto</small>${$c(total)}</div><button type="button" data-act="copiar" data-v="${Math.round(total)}">Copiar</button></div>
         <div class="copia"><div><small>Descripción</small>${esc(o.ref)}</div><button type="button" data-act="copiar" data-v="${esc(o.ref)}">Copiar</button></div>
         <div class="acciones"><button type="button" class="btn" data-act="ya-pague">Ya pagué</button><button type="button" class="btn ghost" data-act="comprobante">Enviar comprobante</button></div></div>`;

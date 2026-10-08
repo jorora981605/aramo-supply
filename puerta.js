@@ -229,7 +229,6 @@ function montar(){
         <button type="button" data-mo="recetario"><b>📖</b>Recetario</button>
         <button type="button" data-mo="ajustes"><b>💳</b>Pagos y horarios</button>
         <button type="button" data-mo="compartir"><b>📣</b>Compartir Taller</button>
-        <button type="button" data-mo="receptor"><b>📡</b>Este receptor</button>
         <button type="button" data-mo="prueba"><b>🧪</b>Pedido de prueba</button>
       </div></div>
       <aside class="mo-caja" id="moCaja" aria-label="Caja"></aside></div></div>`;
@@ -416,11 +415,11 @@ function mostrarEnLista(id){
   cerrarPuerta();if(!ocupado)cerrarHoja();
   if(o){
     M.tab=['nuevo','alistando','listo'].includes(o.estado)?o.estado:'hecho';
-    if(M.suc!=='todas'&&o.sucursal!==M.suc)M.suc='todas';
     M.marca={id:o.id,hasta:Date.now()+6000};
   }
   abrirMostrador();
-  if(o&&ocupado)toast(`🛎️ ${o.ref} quedó marcado en la lista · tu ventana sigue igual`);
+  if(o&&M.suc!=='todas'&&o.sucursal!==M.suc)toast(`🛎️ ${o.ref} es de ${sucNom(o.sucursal)}: se atiende desde ese local`);
+  else if(o&&ocupado)toast(`🛎️ ${o.ref} quedó marcado en la lista · tu ventana sigue igual`);
   if(o)requestAnimationFrame(()=>{const c=document.querySelector(`#moLista .mo-card[data-id="${CSS.escape(o.id)}"]`);if(c)c.scrollIntoView({block:'center',behavior:'smooth'});});
 }
 const filtrar=L=>L.filter(o=>M.suc==='todas'||o.sucursal===M.suc);
@@ -515,7 +514,7 @@ function msgCliente(o){
   const hola=`¡Hola ${o.cliente.nombre.split(' ')[0]}! 👋`;
   if(o.estado==='listo'){
     const pago=o.pago.metodo==='sinpe'&&!cobrado(o)
-      ?`\n📲 Pagá ${$c(tot)} por SINPE Móvil${telDig(t.sinpe?.numero)?' al '+fmtTel(t.sinpe.numero)+(t.sinpe.nombre?' ('+t.sinpe.nombre+')':''):''} con la descripción ${o.ref}.`
+      ?`\n📲 Pagá ${$c(tot)} por SINPE Móvil${(sp=>telDig(sp.numero)?' al '+fmtTel(sp.numero)+(sp.nombre?' ('+sp.nombre+')':''):'')(N.sinpeDe(o.sucursal))} con la descripción ${o.ref}.`
       :o.pago.metodo==='link'&&t.linkTarjeta?`\n🔗 Pagá con tarjeta aquí: ${t.linkTarjeta}`:`\n💳 Total exacto: ${$c(tot)} (${(N.PAGOS[o.pago.metodo]?.n||'').toLowerCase()}).`;
     const sin=o.items.filter(i=>i.estado==='nohay');
     const donde=o.retiro.envio?(o.retiro.envio.uber?' y ya va en camino con Uber 🛵':'; ya pedimos el Uber a tu ubicación 🛵'):` en ${s?.n||'ARAMO'} (${s?.zona||''})`;
@@ -883,20 +882,21 @@ function pintarReceta(){
 
 // ── Ajustes ──
 function pintarAjustes(){
-  const t=T();
-  abrirHoja(`<div class="mo-h">⚙️ Pagos y horarios</div><div class="mo-s">Esto es lo que ve el cliente al pagar y al elegir hora.</div>
-    <div class="mo-blk"><h4>Tienda</h4>
-      <label class="mo-field">Nombre<input id="ajNombre" value="${esc(t.nombre)}"></label>
-      <label class="mo-field">WhatsApp general (si una tienda no tiene el suyo)<input id="ajWa" inputmode="tel" placeholder="8888-8888" value="${esc(fmtTel(t.whatsapp))}"></label>
+  const t=T(),k=LOCAL||'moravia',s=(t.sucursales||[]).find(x=>x.k===k)||{k},sp=N.sinpeDe(k);
+  abrirHoja(`<p class="mo-kick">Solo este local</p><div class="mo-h">💳 Pagos y horarios · ${esc(sucNom(k))}</div><div class="mo-s">Lo que ve el cliente de ${esc(sucNom(k))} al pagar y al elegir hora.</div>
+    <div class="mo-blk"><h4>${k==='angeles'?'📍':'🏠'} ${esc(s.n||'')} · ${esc(s.zona||'')}</h4>
+      <label class="mo-sw">Recibe pedidos<input type="checkbox" id="ajAct" ${s.activa!==false?'checked':''}></label>
+      <label class="mo-field">📱 WhatsApp que recibe los pedidos<input id="ajWaSuc" inputmode="tel" placeholder="8888-8888" value="${esc(fmtTel(s.whatsapp))}"></label>
+      <div class="mo-dos"><label class="mo-field">Abre<input type="time" id="ajAbre" value="${esc(s.abre||'')}"></label><label class="mo-field">Cierra<input type="time" id="ajCierra" value="${esc(s.cierra||'')}"></label></div>
+      <button type="button" class="mo-btn w" style="margin-top:10px" data-mo="tienda-gps" data-k="${k}">📍 ${s.lat?'Ubicación guardada · actualizar':'Guardar ubicación de este local (estando aquí)'}</button></div>
+    <div class="mo-blk"><h4>📲 SINPE Móvil de ${esc(sucNom(k))}</h4><div class="mo-dos"><label class="mo-field">Número<input id="ajSinpe" inputmode="tel" placeholder="8888-8888" value="${esc(fmtTel(sp.numero))}"></label><label class="mo-field">A nombre de<input id="ajSinpeN" placeholder="Ej.: ARAMO S.A." value="${esc(sp.nombre||'')}"></label></div></div>
+    <details class="mo-blk mo-comun"><summary>Igual para los dos locales</summary>
+      <label class="mo-field">Nombre de la tienda<input id="ajNombre" value="${esc(t.nombre)}"></label>
       <label class="mo-field">Minutos para alistar un pedido<input id="ajMin" type="number" min="10" max="240" value="${+t.alistadoMin||40}"></label>
       <label class="mo-sw">Ofrecer "me la llevan al carro"<input type="checkbox" id="ajCarro" ${t.alCarro?'checked':''}></label>
-      <label class="mo-sw">Ofrecer envío a domicilio con Uber<input type="checkbox" id="ajEnvio" ${t.envio!==false?'checked':''}></label></div>
-    <div class="mo-blk"><h4>📲 SINPE Móvil</h4><div class="mo-dos"><label class="mo-field">Número<input id="ajSinpe" inputmode="tel" placeholder="8888-8888" value="${esc(fmtTel(t.sinpe?.numero))}"></label><label class="mo-field">A nombre de<input id="ajSinpeN" placeholder="Ej.: ARAMO S.A." value="${esc(t.sinpe?.nombre||'')}"></label></div></div>
-    <div class="mo-blk"><h4>🔗 Tarjeta en línea (opcional)</h4><label class="mo-field">Link de pago (Tilopay, ONVO, BAC…)<input id="ajLink" type="url" placeholder="https://…" value="${esc(t.linkTarjeta||'')}"></label><div class="mo-s">Si lo dejás vacío, la tarjeta se cobra con datáfono al recoger.</div></div>
-    ${(t.sucursales||[]).map(s=>`<div class="mo-blk"><h4>${esc(s.n)} · ${esc(s.zona)}</h4><label class="mo-sw">Recibe pedidos<input type="checkbox" data-aj-act="${s.k}" ${s.activa!==false?'checked':''}></label>
-      <label class="mo-field">📱 WhatsApp que recibe los pedidos de esta tienda<input data-aj-wa="${s.k}" inputmode="tel" placeholder="8888-8888" value="${esc(fmtTel(s.whatsapp))}"></label>
-      <div class="mo-dos"><label class="mo-field">Abre<input type="time" data-aj-abre="${s.k}" value="${esc(s.abre)}"></label><label class="mo-field">Cierra<input type="time" data-aj-cierra="${s.k}" value="${esc(s.cierra)}"></label></div>
-      <button type="button" class="mo-btn w" style="margin-top:10px" data-mo="tienda-gps" data-k="${s.k}">📍 ${s.lat?'Ubicación guardada · actualizar':'Guardar ubicación de la tienda (estando aquí)'}</button></div>`).join('')}
+      <label class="mo-sw">Ofrecer envío a domicilio con Uber<input type="checkbox" id="ajEnvio" ${t.envio!==false?'checked':''}></label>
+      <label class="mo-field">🔗 Link de pago con tarjeta (opcional)<input id="ajLink" type="url" placeholder="https://…" value="${esc(t.linkTarjeta||'')}"></label>
+      <div class="mo-s">Sin link, la tarjeta se cobra con datáfono al recoger.</div></details>
     <button type="button" class="mo-btn p w" style="margin-top:12px" data-mo="aj-ok">Guardar</button>`);
 }
 
@@ -904,18 +904,17 @@ function pintarAjustes(){
 function pintarAjustesApp(){
   const a=acceso(),perm=N.avisos.permiso();
   abrirHoja(`<p class="mo-kick">Pantalla principal · este equipo</p><div class="mo-h">⚙️ Ajustes</div>
-    <div class="mo-blk"><h4>Local de este equipo</h4><div class="mo-row"><span style="flex:1"><b style="font-size:16px">${LOCAL==='angeles'?'📍':'🏠'} ${esc(sucNom(LOCAL||'moravia'))}</b><br><small style="color:var(--m)">Pedidos, avisos y Surtido de este local</small></span><button type="button" class="mo-btn" data-mo="local">Cambiar</button></div></div>
-    <div class="mo-blk"><h4>🔒 Contraseña de cada local</h4>
+    <div class="mo-blk"><h4>🔒 Contraseña de ${esc(sucNom(LOCAL||'moravia'))}</h4>
       <label class="mo-sw">Pedir contraseña al abrir la app<input type="checkbox" ${a.activo?'checked':''} data-mo="acceso-sw"></label>
-      <div class="mo-s">${a.activo?'Está activa: cada local pide su contraseña al entrar.':'Apagada por ahora: se entra directo. La contraseña de fábrica de los dos locales es 12345.'}</div>
-      <div class="mo-dos" style="margin-top:8px"><label class="mo-field">Local<select id="acLocal">${['moravia','angeles'].map(k=>`<option value="${k}"${(LOCAL||'moravia')===k?' selected':''}>${esc(sucNom(k))}</option>`).join('')}</select></label><label class="mo-field">Contraseña actual<input id="acActual" type="password" inputmode="numeric" autocomplete="off" placeholder="12345"></label></div>
+      <div class="mo-s">${a.activo?'Está activa: al abrir la app se pide la contraseña del local.':'Apagada por ahora: se entra directo. La contraseña de fábrica es 12345.'}</div>
+      <label class="mo-field" style="margin-top:8px">Contraseña actual<input id="acActual" type="password" inputmode="numeric" autocomplete="off" placeholder="12345"></label>
       <div class="mo-dos"><label class="mo-field">Nueva (4 a 8 números)<input id="acNueva" type="password" inputmode="numeric" autocomplete="new-password"></label><label class="mo-field">Repetila<input id="acRepite" type="password" inputmode="numeric" autocomplete="new-password"></label></div>
       <button type="button" class="mo-btn w" style="margin-top:10px" data-mo="clave-ok">Cambiar contraseña</button></div>
     <div class="mo-blk"><h4>🔔 Avisos de pedidos nuevos</h4>
       <div class="mo-row"><span style="flex:1"><small style="color:var(--m)">${!N.avisos.soportado()?'Este navegador no permite notificaciones; queda el sonido y WhatsApp.':perm==='granted'?'Activados ✓ · te llegan estés en Surtido, Taller o el POS.':perm==='denied'?'Bloqueados: permitilos en la configuración del sitio.':'Activalos para que te avise en cualquier pantalla.'}</small></span>${perm==='granted'?'<button type="button" class="mo-btn" data-mo="probar-aviso">Probar</button>':'<button type="button" class="mo-btn p" data-mo="avisos-on">Activar</button>'}</div>
       <label class="mo-sw">🔊 Sonido que se repite hasta abrir el pedido<input type="checkbox" id="rSon" ${R.sonido?'checked':''}></label>
       <label class="mo-sw">💡 Mantener la pantalla encendida<input type="checkbox" id="rPan" ${R.pantalla?'checked':''}></label></div>
-    <div class="mo-btns"><button type="button" class="mo-btn" data-mo="ajustes">💳 Pagos y horarios</button><button type="button" class="mo-btn" data-mo="portada">🎨 Portada</button></div>`);
+    <div class="mo-btns"><button type="button" class="mo-btn" data-mo="ajustes">💳 Pagos y horarios de ${esc(sucNom(LOCAL||'moravia'))}</button></div>`);
   $('rSon').addEventListener('change',e=>{R.sonido=e.target.checked;guardarR();});
   $('rPan').addEventListener('change',e=>{R.pantalla=e.target.checked;guardarR();pantallaEncendida();});
 }
@@ -988,7 +987,7 @@ const ACT={
     }else{N.guardarTienda({acceso:{...a,activo:true}});toast('🔒 Cada local pide su contraseña al abrir');repintar(pintarAjustesApp);}
   },
   'clave-ok'(){
-    const k=$('acLocal').value,act=$('acActual').value,n1=$('acNueva').value,n2=$('acRepite').value;
+    const k=LOCAL||'moravia',act=$('acActual').value,n1=$('acNueva').value,n2=$('acRepite').value;
     if(!/^\d{4,8}$/.test(n1)){toast('La nueva contraseña: de 4 a 8 números');return;}
     if(n1!==n2){toast('Las contraseñas nuevas no coinciden');return;}
     claveOk(k,act).then(async ok=>{
@@ -1153,10 +1152,10 @@ const ACT={
     },()=>toast('No se pudo tomar la ubicación'),{enableHighAccuracy:true,timeout:15000});
   },
   'aj-ok'(){
-    const t=T(),v=id=>$(id)?.value.trim()||'',q=s=>document.querySelector(s);
-    const sucs=(t.sucursales||[]).map(s=>({...s,activa:!!q(`[data-aj-act="${s.k}"]`)?.checked,whatsapp:telDig(q(`[data-aj-wa="${s.k}"]`)?.value),abre:q(`[data-aj-abre="${s.k}"]`)?.value||s.abre,cierra:q(`[data-aj-cierra="${s.k}"]`)?.value||s.cierra}));
-    N.guardarTienda({nombre:v('ajNombre')||'ARAMO',whatsapp:telDig(v('ajWa')),alistadoMin:Math.max(10,+v('ajMin')||40),alCarro:$('ajCarro').checked,envio:$('ajEnvio').checked,sinpe:{numero:telDig(v('ajSinpe')),nombre:v('ajSinpeN')},linkTarjeta:v('ajLink'),sucursales:sucs});
-    cerrarHoja();toast('⚙️ Guardado');
+    const t=T(),v=id=>$(id)?.value.trim()||'',k=LOCAL||'moravia';
+    const sucs=(t.sucursales||[]).map(s=>s.k!==k?s:{...s,activa:!!$('ajAct')?.checked,whatsapp:telDig(v('ajWaSuc')),abre:v('ajAbre')||s.abre,cierra:v('ajCierra')||s.cierra,sinpe:{numero:telDig(v('ajSinpe')),nombre:v('ajSinpeN')}});
+    N.guardarTienda({nombre:v('ajNombre')||'ARAMO',alistadoMin:Math.max(10,+v('ajMin')||40),alCarro:$('ajCarro').checked,envio:$('ajEnvio').checked,linkTarjeta:v('ajLink'),sucursales:sucs});
+    cerrarHoja();toast('⚙️ Guardado · '+sucNom(k));
   },
   copiar(el){navigator.clipboard?.writeText(el.dataset.v).then(()=>toast('📋 Copiado'),()=>toast(el.dataset.v));},
   'wa-share'(){abrir(N.wa('',`🧺 ¡Ya podés pedir en ${T().nombre||'ARAMO'} desde el celular! Entrá al Taller, armá tu canasta de frutas y verduras y la recogés lista o te llega a casa 👉 ${linkTaller()}`));},

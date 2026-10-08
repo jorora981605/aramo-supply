@@ -690,12 +690,12 @@ html[data-theme="dark"] .today-money-card{background:linear-gradient(145deg,#125
   .nav-bottom{left:50%;right:auto;transform:translateX(-50%)!important;width:min(720px,100%);border-radius:22px 22px 0 0}
 }
 </style>
-<link rel="stylesheet" href="express.css">
+<link rel="stylesheet" href="express.css?v=20261007-surtido-1">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Caveat:wght@600;700&family=Chakra+Petch:wght@500;600;700&family=JetBrains+Mono:wght@500;600&display=swap">
-<link rel="stylesheet" href="puerta.css?v=20261006-reinicio-1">
-<link rel="stylesheet" href="portadas.css?v=20261006-reinicio-1">
+<link rel="stylesheet" href="puerta.css?v=20261007-surtido-1">
+<link rel="stylesheet" href="portadas.css?v=20261007-surtido-1">
 </head>
 <body>
 
@@ -776,6 +776,7 @@ html[data-theme="dark"] .today-money-card{background:linear-gradient(145deg,#125
 <div class="view" id="view-proveedores">
   <div class="scroll">
     <div class="pv-wrap">
+      <div id="pvTop"></div>
       <button type="button" class="pv-sum" id="pvSum"></button>
       <div class="pv-search">
         <span class="pv-search-ico">🔍</span>
@@ -792,8 +793,9 @@ html[data-theme="dark"] .today-money-card{background:linear-gradient(145deg,#125
 <!-- ═══ UN PROVEEDOR: todos sus productos ═══ -->
 <div class="view" id="view-prov">
   <div class="prov-topbar">
-    <button class="back-btn" id="backBtn" aria-label="Volver a proveedores" title="Volver">←</button>
+    <button class="back-btn grande" id="backBtn" aria-label="Volver a proveedores" title="Volver a proveedores">← <span>Proveedores</span></button>
     <div class="prov-topbar-name" id="provTitle"></div>
+    <button class="prov-edit-btn" id="provEditBtn" type="button" aria-label="Editar proveedor" title="Editar nombre, WhatsApp y productos">✏️</button>
     <span class="status-badge sb-empty" id="provStatusBadge">Sin pedido</span>
     <button class="prov-nav-btn" id="prevProvBtn" aria-label="Proveedor anterior" title="Proveedor anterior">‹</button>
     <button class="prov-nav-btn" id="nextProvBtn" aria-label="Proveedor siguiente" title="Proveedor siguiente">›</button>
@@ -855,6 +857,7 @@ html[data-theme="dark"] .today-money-card{background:linear-gradient(145deg,#125
   <div class="wa-bar">
     <div class="pp-total"><small>Total</small><strong class="prov-total-quick" id="provTotalQuick">₡0</strong></div>
     <button class="wa-btn" id="btnWA" type="button"><span style="font-size:20px">💬</span> Enviar por WhatsApp</button>
+    <button class="listo-prov" id="btnListoProv" type="button">✓ Listo · volver a proveedores</button>
   </div>
 </div>
 
@@ -975,7 +978,7 @@ html[data-theme="dark"] .today-money-card{background:linear-gradient(145deg,#125
         </div>
       </div>
 
-      <div class="app-version">ARAMO · versión <b>2026-10-06 · Reiniciar Mostrador</b> · se actualiza sola</div>
+      <div class="app-version">ARAMO · versión <b>2026-10-07 · Surtido rápido y ajustes por local</b> · se actualiza sola</div>
 
       <div class="cfg-acc" data-acc="datos">
         <button class="cfg-acc-hdr">⚠️ Borrar TODA la aplicación <span class="cfg-acc-arrow">▾</span></button>
@@ -1019,6 +1022,16 @@ html[data-theme="dark"] .today-money-card{background:linear-gradient(145deg,#125
     <div style="font-size:14px;color:var(--m);margin:-6px 0 12px">Compará y editá. Los cambios se guardan automáticamente.</div>
     <div id="priceCompareList"></div>
     <button class="btn btn-g btn-full" type="button" onclick="closePriceModal()">Listo</button>
+  </div>
+</div>
+
+<div class="overlay prov-edit-ov" id="modalProvEdit">
+  <div class="modal">
+    <div class="modal-handle"></div>
+    <div class="modal-title" id="provEditTitle">✏️ Proveedor</div>
+    <div class="cfg-acc-sub">Nombre, WhatsApp, productos, unidad y precio. Todo se guarda solo.</div>
+    <div id="provEditBody"></div>
+    <button class="btn btn-g btn-full" type="button" onclick="cerrarEditorProv()">Listo ✓</button>
   </div>
 </div>
 
@@ -2273,6 +2286,8 @@ function openProv(name){
 }
 
 document.getElementById('backBtn').addEventListener('click',()=>switchView('proveedores'));
+document.getElementById('btnListoProv').addEventListener('click',()=>{switchView('proveedores');toast('✓ Pedido a '+(S.currentProv||'')+' guardado · se envía desde 🧺 Pedido','ok');});
+document.getElementById('provEditBtn').addEventListener('click',()=>abrirEditorProv(S.currentProv));
 document.getElementById('provSearch').addEventListener('input',()=>renderProdTable());
 document.getElementById('prevProvBtn').addEventListener('click',()=>{
   const names=getProvNames();const i=names.indexOf(S.currentProv);
@@ -3108,7 +3123,6 @@ function attachSwipeToDelete(rowEl,onDelete){
   let startX=0,startY=0,dx=0,dragging=false,decided=false,isHorizontal=false;
   content.addEventListener('pointerdown',e=>{
     startX=e.clientX;startY=e.clientY;dx=0;dragging=true;decided=false;
-    content.setPointerCapture(e.pointerId);
     content.style.transition='none';
   });
   content.addEventListener('pointermove',e=>{
@@ -3116,7 +3130,8 @@ function attachSwipeToDelete(rowEl,onDelete){
     dx=e.clientX-startX;
     const dy=e.clientY-startY;
     if(!decided){
-      if(Math.abs(dx)>8||Math.abs(dy)>8){decided=true;isHorizontal=Math.abs(dx)>Math.abs(dy);}
+      // Se agarra el dedo solo al deslizar de lado: así los botones de la fila reciben el toque.
+      if(Math.abs(dx)>8||Math.abs(dy)>8){decided=true;isHorizontal=Math.abs(dx)>Math.abs(dy);if(isHorizontal)try{content.setPointerCapture(e.pointerId);}catch{}}
       else return;
     }
     if(!isHorizontal)return;
@@ -3141,14 +3156,35 @@ function attachSwipeToDelete(rowEl,onDelete){
   content.addEventListener('pointercancel',finish);
 }
 
+// ✏️ Editar un proveedor desde su tarjeta (sin ir a Config): se usa el mismo editor.
+let cfgModalProv=null;
+function abrirEditorProv(name){
+  if(!name||!getAllProviders()[name])return;
+  cfgModalProv=name;
+  document.getElementById('provEditTitle').textContent='✏️ '+name;
+  document.getElementById('modalProvEdit').classList.add('open');
+  document.documentElement.classList.add('modal-open');document.body.classList.add('modal-open');
+  renderCfgProveedores();
+}
+function cerrarEditorProv(){
+  const m=document.getElementById('modalProvEdit');
+  if(!m.classList.contains('open'))return;
+  cfgModalProv=null;m.classList.remove('open');
+  if(!document.querySelector('.overlay.open')){document.documentElement.classList.remove('modal-open');document.body.classList.remove('modal-open');}
+  if(S.currentProv&&getAllProviders()[S.currentProv]&&document.getElementById('view-prov').classList.contains('active'))openProv(S.currentProv);
+  else if(typeof xpRefresh==='function')xpRefresh();
+}
+document.getElementById('modalProvEdit').addEventListener('click',e=>{if(e.target.id==='modalProvEdit')cerrarEditorProv();});
 function renderCfgProveedores(){
-  const container=document.getElementById('cfgProveedores');
+  const enModal=!!cfgModalProv&&document.getElementById('modalProvEdit').classList.contains('open');
+  const container=document.getElementById(enModal?'provEditBody':'cfgProveedores');
   container.innerHTML='';
   const providersData=getAllProviders();
   Object.keys(providersData).forEach(name=>{
+    if(enModal&&name!==cfgModalProv)return;
     const provData=providersData[name];
     const isCustom=!!S.customProviders[name];
-    const isOpen=cfgOpenProv===name;
+    const isOpen=enModal||cfgOpenProv===name;
 
     const item=document.createElement('div');
     item.className='prov-cfg-item';
@@ -3169,7 +3205,7 @@ function renderCfgProveedores(){
     `;
 
     item.querySelector('.prov-cfg-hdr').addEventListener('click',e=>{
-      if(e.target.tagName==='BUTTON')return;
+      if(e.target.tagName==='BUTTON'||enModal)return;
       cfgOpenProv=cfgOpenProv===name?null:name;
       renderCfgProveedores();
     });
@@ -3185,6 +3221,7 @@ function renderCfgProveedores(){
         delete S.phones[name];
         delete S.waContacts[name];
         if(S.currentProv===name)S.currentProv=null;
+        if(cfgModalProv===name){cerrarEditorProv();if(document.getElementById('view-prov').classList.contains('active'))switchView('proveedores');}
         const localPrices=LS.get('aramo_prices',{});
         Object.keys(localPrices).filter(key=>key.startsWith(name+'_')).forEach(key=>delete localPrices[key]);
         LS.set('aramo_prices',localPrices);
@@ -3249,7 +3286,9 @@ function renderCfgProveedores(){
       };
       renderWaRows();
       body.appendChild(waBox);
-      renderProductPicker(name,body);
+      // Primero los productos que ya tiene (para editarlos), después la lista para añadir más.
+      const tit=document.createElement('div');tit.className='provider-list-title prov-prods-tit';
+      tit.textContent=`Productos de ${name} (${products.length})`;body.appendChild(tit);
       products
         .map((prod,idx)=>({prod,idx}))
         .sort((a,b)=>a.prod.name.localeCompare(b.prod.name,'es',{sensitivity:'base'}))
@@ -3260,8 +3299,9 @@ function renderCfgProveedores(){
           <div class="prod-cfg-row-bg">Eliminar</div>
           <div class="prod-cfg-row-content">
             <input class="prod-cfg-name" type="text" value="${prod.name}" placeholder="Nombre producto">
-            <select class="prod-cfg-unit">${UNITS.map(u=>`<option value="${u}"${u===normUnit(prod.unit)?' selected':''}>${u}</option>`).join('')}</select>
             <button class="prod-cfg-rm" title="Eliminar producto">×</button>
+            <div class="seg-unit prod-cfg-units" role="group" aria-label="Unidad">${UNITS.map(u=>`<button type="button" data-u="${u}" class="${u===normUnit(prod.unit)?'on':''}">${u==='unidad'?'unid.':u}</button>`).join('')}</div>
+            <label class="prod-cfg-price">₡<input type="number" inputmode="decimal" min="0" value="${getPrice(name,prod.id)||''}" placeholder="Precio"></label>
           </div>
         `;
         row.querySelector('.prod-cfg-name').addEventListener('input',e=>{
@@ -3269,10 +3309,15 @@ function renderCfgProveedores(){
           S.customProviders[name].products[idx].name=e.target.value;
           persist();
         });
-        row.querySelector('.prod-cfg-unit').addEventListener('change',e=>{
+        row.querySelectorAll('.prod-cfg-units button').forEach(b=>b.addEventListener('click',e=>{
+          e.stopPropagation();
           ensureCustomProv(name);
-          S.customProviders[name].products[idx].unit=e.target.value;
+          S.customProviders[name].products[idx].unit=b.dataset.u;
+          row.querySelectorAll('.prod-cfg-units button').forEach(x=>x.classList.toggle('on',x===b));
           persist();
+        }));
+        row.querySelector('.prod-cfg-price input').addEventListener('input',e=>{
+          setPrice(name,prod.id,e.target.value);persist();
         });
         const removeProduct=()=>{
           ensureCustomProv(name);
@@ -3286,6 +3331,7 @@ function renderCfgProveedores(){
         attachSwipeToDelete(row,removeProduct);
         body.appendChild(row);
       });
+      renderProductPicker(name,body);
     }
 
     container.appendChild(item);
@@ -3401,6 +3447,8 @@ function renameProveedor(oldName, newName){
   if(S.customProviders[oldName])S.customProviders[newName]=S.customProviders[oldName];
   else{ensureCustomProv(oldName);S.customProviders[newName]=S.customProviders[oldName];}
   delete S.customProviders[oldName];
+  if(DEFAULT_PROVIDERS[oldName])S.customProviders[oldName]={deleted:true};
+  if(cfgModalProv===oldName){cfgModalProv=newName;document.getElementById('provEditTitle').textContent='✏️ '+newName;}
   if(S.pedidos[oldName]){S.pedidos[newName]=S.pedidos[oldName];delete S.pedidos[oldName];}
   if(S.phones[oldName]){S.phones[newName]=S.phones[oldName];delete S.phones[oldName];}
   if(S.waContacts[oldName]){S.waContacts[newName]=S.waContacts[oldName];delete S.waContacts[oldName];}
@@ -3727,11 +3775,11 @@ if(isIOS && !isInStandalone && !dismissed){
   },3000);
 }
 </script>
-<script src="express.js"></script>
+<script src="express.js?v=20261007-surtido-1"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcode-generator/1.4.4/qrcode.min.js"></script>
-<script src="canasta-config.js?v=20261006-reinicio-1"></script>
-<script src="aramo-nube.js?v=20261006-reinicio-1"></script>
-<script src="portadas.js?v=20261006-reinicio-1"></script>
-<script src="puerta.js?v=20261006-reinicio-1"></script>
+<script src="canasta-config.js?v=20261007-surtido-1"></script>
+<script src="aramo-nube.js?v=20261007-surtido-1"></script>
+<script src="portadas.js?v=20261007-surtido-1"></script>
+<script src="puerta.js?v=20261007-surtido-1"></script>
 </body>
 </html>
