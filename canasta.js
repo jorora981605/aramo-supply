@@ -1,7 +1,7 @@
 /* ══════════════════════════════════════════════════════════════════════
-   ARAMO Taller de pedidos — mercado vivo (2026-10-09), con el ciclo del
-   Taller de GENOSIM: lo primero son los productos; el recorrido va en una
-   barra fija arriba y la canasta flota abajo con su total.
+   ARAMO Taller de pedidos — mercado vivo, simple al máximo (2026-10-09).
+   Tres pasos: 🧺 Canasta → ✅ Confirmar (todo en una página) → 🛍️ Recogés.
+   Un solo botón abajo dice siempre qué sigue.
 
    A la izquierda, el ciclo completo numerado (siempre visible):
      1 Armar canasta → 2 Entrega → 3 Pago → 4 Sellar pedido
@@ -187,8 +187,8 @@ const fmtTel=t=>{const d=telDig(t);return d.length===8?d.slice(0,4)+'-'+d.slice(
 const perfilOk=()=>C.perfil.nombre.trim().length>=2&&telDig(C.perfil.tel).length===8;
 function faltaArmar(){return cestaN()?null:{m:'Agregá al menos un producto',p:'armar',f:'tlQ'};}
 function faltaRetiro(){
-  if(!suc(C.retiro.suc))return{m:'Elegí la tienda',p:'entrega'};
-  if(!horaRetiro())return{m:'Elegí la hora',p:'entrega'};
+  if(!suc(C.retiro.suc))return{m:'Elegí la tienda',p:'entrega',f:'tlSecEntrega'};
+  if(!horaRetiro())return{m:'Elegí la hora',p:'entrega',f:'tlSecEntrega'};
   if(esEnvio()&&!C.retiro.ubi)return{m:'Falta tu ubicación para el envío',p:'entrega',f:'tlUbiBtn'};
   return null;
 }
@@ -201,8 +201,9 @@ const faltaAlgo=()=>faltaArmar()||faltaRetiro()||faltaPago();
 function avisarFalta(x){
   toast(x.m);buzz([40,40,40]);
   if(x.f==='tlNombre'||x.f==='tlTel')C.editPerfil=true;
-  if(C.actual||C.paso!==x.p)ir(x.p);else render();
-  setTimeout(()=>{const el=x.f&&$(x.f);if(el){el.scrollIntoView({block:'center',behavior:'smooth'});if(el.tagName==='INPUT')el.focus({preventScroll:true});el.classList.add('falta');setTimeout(()=>el.classList.remove('falta'),1600);}},140);
+  const dest=normPaso(x.p);
+  if(C.actual||C.paso!==dest)ir(dest);else render();
+  setTimeout(()=>{const el=x.f&&$(x.f);if(el){el.scrollIntoView({block:'center',behavior:'smooth'});if(el.tagName==='INPUT')el.focus({preventScroll:true});el.classList.add('falta');setTimeout(()=>el.classList.remove('falta'),1600);}},160);
 }
 
 // ══════════════ Lista escrita o dictada ══════════════
@@ -257,137 +258,52 @@ function ingredientes(r,personas,off){
 }
 const costoReceta=(r,per)=>N.redondear5(ingredientes(r,per).filter(x=>x.on).reduce((t,x)=>t+x.q*x.p.p,0));
 
-// ══════════════ El ciclo ══════════════
-const ARMANDO=['armar','entrega','pago','sellar'];
-const NOMBRE={armar:'Canasta',entrega:'Entrega',pago:'Pago',sellar:'Sellar'};
-const STEPS=[
-  {n:'Canasta',d:'Escribí tu lista, elegí una receta o tocá productos.'},
-  {n:'Entrega',d:'En la tienda, al carro o a tu casa con Uber.'},
-  {n:'Pago',d:'SINPE, tarjeta o efectivo. Siempre el total exacto.'},
-  {n:'Sellar',d:'Revisás el comprobante y recibís tu código de retiro.'},
-  {n:'Alistamos',d:'Escogemos y pesamos cada producto; lo ves en vivo.'},
-  {n:'Recogés',d:'Te avisamos y lo recogés con tu código.'},
-];
+// ══════════════ El recorrido: Canasta → Confirmar → Recogés ══════════════
+// Entrega, datos, pago y sellar viven juntos en "Confirmar" (una sola página).
+const normPaso=p=>p==='armar'?'armar':'confirmar';
 const pedidoVisto=()=>C.actual?N.get(C.actual):null;
-function listoArmando(i){return [!faltaArmar(),C.retiro.visto&&!faltaRetiro(),!faltaPago(),false][i];}
-function activoIdx(){
-  const o=pedidoVisto();
-  if(o)return ['listo','entregado'].includes(o.estado)?5:4;
-  return ARMANDO.indexOf(C.paso);
-}
-function siguientePaso(){
-  const a=ARMANDO.indexOf(C.paso);
-  for(let j=a+1;j<3;j++)if(!listoArmando(j))return ARMANDO[j];
-  return 'sellar';
-}
-function puedeIr(paso){
-  const j=ARMANDO.indexOf(paso);
-  if(j>=1){const f=faltaArmar();if(f)return f;}
-  if(j>=2&&!(C.paso==='entrega'||C.retiro.visto)){return{m:'Primero elegí cómo la recibís',p:'entrega'};}
-  if(j>=2){const f=faltaRetiro();if(f)return f;}
-  if(j>=3){const f=faltaPago();if(f)return f;}
-  return null;
-}
-function pasos(){
-  const o=pedidoVisto(),envio=o?!!o.retiro?.envio:esEnvio(),a=activoIdx();
-  return STEPS.map((s,i)=>{
-    const r={...s,i};
-    if(i===5&&envio){r.n='Te llega';r.d='Sale con Uber a tu ubicación y te avisamos.';}
-    if(o){
-      const E=o.estado;
-      r.st=i<4?'done':i===4?(E==='cancelado'?'bad':E==='nuevo'||E==='alistando'?'on':'done'):(E==='listo'?'on':E==='entregado'?'done':'fut');
-      r.sum=resumenPedido(o,i,r.d);r.nav=i===5&&['listo','entregado'].includes(E);
-    }else{
-      r.st=i===a?'on':(i<4&&listoArmando(i))?'done':'fut';
-      r.sum=resumenArmando(i,r);r.nav=i<4&&i!==a;
-    }
-    return r;
-  });
-}
+function puedeIr(paso){return normPaso(paso)==='confirmar'?faltaArmar():null;}
 function emojis(items,n=7){const e=items.map(x=>x.e||x.p?.e).filter(Boolean);return e.slice(0,n).join('')+(e.length>n?'…':'');}
-function resumenArmando(i,r){
-  if(i===0&&cestaN())return `<b>${cestaN()} productos</b> · ${$c(cestaTotal())} aprox. <span class="emo">${emojis(cestaItems())}</span>`;
-  if(i===1&&listoArmando(1)){const s=suc(C.retiro.suc),h=horaRetiro();return `${esc(entregaTxt(C.retiro))} · <b>${esc(s.n)}</b> · ${esc(cuando(h))}`;}
-  if(i===2&&listoArmando(2))return `<b>${esc(C.perfil.nombre.trim())}</b> · ${esc(fmtTel(C.perfil.tel))} · ${esc(N.PAGOS[C.pago.metodo]?.n||'')}`;
-  if(i===3&&r.st==='on')return 'Revisá el comprobante y sellalo.';
-  return esc(r.d);
-}
-function resumenPedido(o,i,d){
-  const s=suc(o.sucursal),{r,n}=avance(o);
-  if(i===0)return `<b>${o.items.length} productos</b> <span class="emo">${emojis(o.items)}</span>`;
-  if(i===1)return `${esc(entregaTxt(o.retiro))} · <b>${esc(s?.n||'')}</b> · ${esc(cuando(o.retiro.at))}`;
-  if(i===2)return `<b>${esc(o.cliente.nombre)}</b> · ${esc(N.PAGOS[o.pago.metodo]?.n||'')}${o.pago.estado==='verificado'?' · <b>pagado</b>':''}`;
-  if(i===3)return `Sellado ${esc(fdia(o.created))} ${esc(fh(o.created))} · <code>${esc(o.ref)}</code>`;
-  if(i===4){
-    if(o.estado==='cancelado')return `<b>Cancelado</b>${o.motivo?' · '+esc(o.motivo):''}`;
-    if(o.estado==='nuevo'){
-      if(N.modo()!=='nube'&&!o.avisado)return o.waPendiente?'<b>WhatsApp abierto</b> · confirmá el envío.':'<b>Falta avisar a la tienda</b> por WhatsApp.';
-      return N.modo()!=='nube'&&o.avisado?'<b>Pendiente de aceptación</b> por la tienda.':'<b>Recibido</b> · pendiente de aceptación.';
-    }
-    if(o.estado==='alistando')return `<b>${r} de ${n}</b> escogidos`;
-    const p=pesoReal(o);return `Escogido y pesado${p?` · ${kg(p)} kg`:''}`;
+function resumenPedido(o){
+  const {r,n}=avance(o),s=suc(o.sucursal);
+  if(o.estado==='cancelado')return 'Cancelado';
+  if(o.estado==='nuevo'){
+    if(N.modo()!=='nube'&&!o.avisado)return o.waPendiente?'WhatsApp abierto · confirmá el envío':'Falta avisar a la tienda';
+    return 'Recibido · pendiente de aceptación';
   }
-  if(i===5&&o.estado==='alistando')return '<b>Esperando</b> · se habilita cuando la tienda marque el pedido como listo.';
-  if(o.estado==='listo')return o.retiro.envio?(o.retiro.envio.uber?'<b>Va en camino</b> con Uber.':'<b>Lista</b> · pidiendo el Uber.'):`<b>Lista</b> · te espera en ${esc(s?.n||'')}.`;
-  if(o.estado==='entregado')return `<b>Entregado</b> ${esc(fdia(o.entregado||o.updated))} ${esc(fh(o.entregado||o.updated))}`;
-  return esc(d);
+  if(o.estado==='alistando')return `Escogiendo · ${r} de ${n}`;
+  if(o.estado==='listo')return o.retiro.envio?(o.retiro.envio.uber?'Va en camino':'Lista · pidiendo el Uber'):`Lista · te espera en ${s?.n||'ARAMO'}`;
+  if(o.estado==='entregado')return 'Entregado';
+  return '';
 }
 
 // ══════════════ Navegación ══════════════
 function ir(paso){
-  C.actual=null;C.paso=paso;C.animGrid=true;
-  if(paso==='entrega'){asegurarRetiro();C.retiro.visto=true;guardar();}
+  C.actual=null;C.paso=normPaso(paso);C.animGrid=true;
+  if(C.paso==='confirmar'){asegurarRetiro();C.retiro.visto=true;guardar();}
   empujar();render(true);arriba();
 }
 function ver(id){C.actual=id;empujar();render(true);arriba();}
 function empujar(){if(!MINI)history.pushState({paso:C.paso,id:C.actual},'',location.pathname+location.search);}
-function arriba(){
-  if(MINI)return;
-  requestAnimationFrame(()=>{
-    const actual=document.querySelector('.step.on'),rail=document.querySelector('.steps');
-    if(actual&&rail&&rail.scrollWidth>rail.clientWidth)rail.scrollTo({left:actual.offsetLeft-rail.clientWidth/2+actual.clientWidth/2,behavior:'smooth'});
-    if(DESK.matches||window.scrollY<10){window.scrollTo({top:0,behavior:'smooth'});return;}
-    const m=$('tlMesa'),alto=document.querySelector('.spine')?.offsetHeight||0;
-    window.scrollTo({top:Math.max(0,m.getBoundingClientRect().top+window.scrollY-alto-8),behavior:'smooth'});
-  });
-}
+function arriba(){if(!MINI)requestAnimationFrame(()=>window.scrollTo({top:0,behavior:'smooth'}));}
 window.addEventListener('popstate',e=>{
   if(H){cerrarHoja(true);return;}
-  C.paso=e.state?.paso||'armar';C.actual=e.state?.id||null;
+  C.paso=normPaso(e.state?.paso||'armar');C.actual=e.state?.id||null;
   render(true);
 });
 
-// ══════════════ Mesa de trabajo ══════════════
-function cab(n,titulo,verdict,cls){return `<div class="mesa-h"><div><p class="kicker">Paso ${n} de 6</p><h2>${titulo}</h2></div><span class="verdict ${cls||''}">${esc(verdict)}</span></div>`;}
-function metric(l,v){return `<div class="metric"><span>${l}</span><b>${v}</b></div>`;}
-function dual(a,b,c,d){return `<div class="dual"><div><h4>${a}</h4><p>${b}</p></div><div><h4 class="w">${c}</h4>${d}</div></div>`;}
-function siguienteBtn(){
-  const sig=siguientePaso();
-  return `<button type="button" class="btn big${puedeIr(sig)?' apagado':''}" data-act="siguiente">Siguiente: ${NOMBRE[sig]} →</button>`;
-}
+// ══════════════ Pantallas ══════════════
+function cab(n,titulo,verdict,cls){return `<div class="mesa-h"><h2>${titulo}</h2><span class="verdict ${cls||''}">${esc(verdict)}</span></div>`;}
+function saludo(){const nom=C.perfil.nombre.trim().split(/\s+/)[0],h=new Date().getHours();return nom?`${h<12?'Buenos días':h<18?'Buenas tardes':'Buenas noches'}, ${esc(nom)} 👋`:'¡Pura vida! 👋';}
 
 function mesaArmar(){
-  const it=cestaItems(),n=it.length,u=ultimoPedido();
-  const todas=RECETAS(),cats=(CFG.categoriasRecetas||[]).filter(c=>todas.some(r=>r.c===c.k));
-  const filtradas=C.recCat==='todas'?todas:todas.filter(r=>r.c===C.recCat);
-  const repetir=u&&!n?`<button type="button" class="preset hi" data-act="repetir" data-id="${u.id}" data-express="1"><span class="e">⚡</span><span class="t">Repetir mi última canasta</span><small>${u.items.length} productos · ${$c(N.totalDe(u))}</small></button>`:'';
-  const recetas=repetir+filtradas.map(r=>`<button type="button" class="preset rc-${esc(r.c)}" data-act="receta" data-k="${r.k}"><span class="e">${r.e}</span><span class="t">${esc(r.n)}</span><small>${r.items.length} ingredientes · ${$c(costoReceta(r,C.personas))}</small></button>`).join('');
-  const sug=sugerencias();
-  return cab(1,n?'Tu canasta va tomando forma':'¿Qué llevamos hoy?',n?`${n} en la canasta`:'Vacía',n?'run':'')
-  +`<div class="hero-ask">
-    <form class="ask" id="tlAsk" autocomplete="off"><input id="tlQ" type="search" enterkeyhint="go" placeholder="¿Qué necesitás?" value="${esc(C.q)}" aria-label="Escribí tu lista o buscá un producto"><button type="button" class="mic" id="tlMic" aria-label="Dictar lista">🎙️</button><button type="submit" class="btn">Armar</button></form>
-    <p class="ask-hint">Buscá un producto o escribí/dictá tu lista: <b>«2 kg de tomate y 3 aguacates»</b></p>
-    <div id="tlParse">${parseHtml()}</div></div>
-  ${n?`<div class="stage${C.pulso?' pulse':''}"><span class="tag">Tu canasta · en vivo</span><span class="tag r">Precio de referencia</span><div class="scan"></div>
-    <div class="holo">${it.map(x=>`<button type="button" class="holo-it${x.k===C.ultimo?' nuevo':''}" data-act="info" data-k="${x.k}" aria-label="${esc(x.p.n)}"><b>${x.p.e}</b><em>${esc(x.p.n)}</em><small>${esc(qtxt(x.q,x.p.u))}</small></button>`).join('')}</div>
-    <div class="metrics">${metric('Productos',n)}${metric('Peso aprox.',cestaPeso()?kg(cestaPeso())+' kg':'—')}${metric('Total aprox.',$c(cestaTotal()))}</div></div>`:''}
-  ${sug.length?`<div class="sec"><div class="sec-t"><h3>✨ Para completar</h3><small>suele ir con lo tuyo</small></div><div class="quick">${sug.map(p=>`<button type="button" class="tg sug" data-act="sumar" data-k="${p.k}">＋ ${p.e} ${esc(p.n)} <small>${porU(p)}</small></button>`).join('')}</div></div>`:''}
-  <div class="sec"><div class="sec-t"><h3>📖 Recetario</h3><small>${todas.length} recetas · para ${C.personas} ${C.personas===1?'persona':'personas'}</small></div>
-    <div class="pasillos" style="margin-bottom:10px">${[{k:'todas',n:'Todas',e:'📖'},...cats].map(c=>`<button type="button" class="tg${C.recCat===c.k?' on':''}" data-act="rec-cat" data-k="${c.k}">${c.e} ${esc(c.n)}</button>`).join('')}</div>
-    <div class="presets">${recetas}</div></div>
-  <div class="sec"><div class="sec-t"><h3 id="tlGridT">Pasillos</h3><small>tocá para agregar</small></div><div class="pasillos" id="tlPasillos"></div><div class="prods" id="tlGrid"></div></div>
-  ${dual('Se paga lo que pese','1 kg puede pesar 1,050 kg o 0,980 kg. Lo pesamos al alistar y pagás el monto exacto.','Si algo no hay',`<div class="tgs">${Object.entries(SUST).map(([k,s])=>`<button type="button" class="tg${C.sust===k?' on':''}" data-act="sust" data-k="${k}">${s.e} ${s.n}</button>`).join('')}</div>`)}
-  <div class="next">${siguienteBtn()}</div>`;
+  const n=cestaN(),u=ultimoPedido();
+  return `<div class="hola"><p>${saludo()}</p><h2>¿Qué llevamos hoy?</h2></div>
+  <form class="ask" id="tlAsk" autocomplete="off"><input id="tlQ" type="search" enterkeyhint="go" placeholder="Buscá o dictá tu lista" value="${esc(C.q)}" aria-label="Buscá un producto o escribí tu lista"><button type="button" class="mic" id="tlMic" aria-label="Dictar lista">🎙️</button><button type="submit" class="ir-q" aria-label="Agregar la lista">→</button></form>
+  <div id="tlParse">${parseHtml()}</div>
+  ${u&&!n&&!C.q?`<button type="button" class="repetir" data-act="repetir" data-id="${u.id}" data-express="1"><span class="e">⚡</span><span class="t"><b>Repetir mi última canasta</b><small>${emojis(u.items,7)} · ${$c(N.totalDe(u))}</small></span><span class="go">→</span></button>`:''}
+  <div class="pasillos" id="tlPasillos"></div>
+  <div class="prods" id="tlGrid"></div>`;
 }
 function parseHtml(){
   const P=C.parse;if(!P)return '';
@@ -404,79 +320,61 @@ function tile(p,i){
       :`<span class="pt-f"><span class="pt-p">${porU(p)}</span>${p.agotado?'':'<span class="pt-add" aria-hidden="true">+</span>'}</span>`}
   </div>`;
 }
+function receta(r){return `<button type="button" class="preset rc-${esc(r.c)}" data-act="receta" data-k="${r.k}"><span class="e">${r.e}</span><span class="t">${esc(r.n)}</span><small>${r.items.length} ingredientes · ${$c(costoReceta(r,C.personas))}</small></button>`;}
 function pintarGrid(){
   const g=$('tlGrid');if(!g)return;
   const q=norm(C.q).replace(/[\d.,]+/g,' ').replace(/\b(kg|kilos?|unid\w*|rollos?)\b/g,' ').trim();
   const pas=$('tlPasillos');pas.hidden=!!q;
-  const pasillos=(favoritos().length>=3?[{k:'fav',n:'Tus favoritos',e:'💚'}]:[]).concat(CFG.pasillos);
+  const fav=favoritos();
+  const pasillos=(fav.length>=3?[{k:'fav',n:'Tus favoritos',e:'💚'}]:[]).concat(CFG.pasillos,[{k:'recetas',n:'Recetas',e:'📖'}]);
+  if(!C.pasillo)C.pasillo=fav.length>=3?'fav':'top';
   pas.innerHTML=pasillos.map(p=>`<button type="button" class="tg${C.pasillo===p.k?' on':''}" data-act="pasillo" data-k="${p.k}">${p.e} ${esc(p.n)}</button>`).join('');
+  g.classList.toggle('entra',!!C.animGrid);C.animGrid=false;
+  g.classList.toggle('con-recetas',!q&&C.pasillo==='recetas');
+  if(!q&&C.pasillo==='recetas'){g.innerHTML=RECETAS().map(receta).join('');return;}
   let lista;
   if(q){
     const w=q.split(/\s+/).filter(t=>!VACIAS.has(t));
     lista=cat().filter(p=>{const n=norm(p.n);return w.every(t=>n.includes(t.replace(/(es|s)$/,'')));});
-    $('tlGridT').textContent=`Resultados · ${lista.length}`;
-  }else{
-    const fav=favoritos();
-    if(!C.pasillo)C.pasillo=fav.length>=3?'fav':'top';
-    lista=C.pasillo==='fav'?fav:cat().filter(p=>C.pasillo==='top'?p.top:p.c===C.pasillo);
-    $('tlGridT').textContent='Pasillos · '+(C.pasillo==='fav'?'Tus favoritos':CFG.pasillos.find(p=>p.k===C.pasillo)?.n||'');
-  }
-  g.classList.toggle('entra',!!C.animGrid);C.animGrid=false;
-  g.innerHTML=lista.length?lista.map((p,i)=>tile(p,i)).join(''):`<div class="vacio">No encontramos “${esc(C.q)}”. <button type="button" class="link" data-act="limpiar-q">Ver todos los pasillos</button></div>`;
+  }else lista=C.pasillo==='fav'?fav:cat().filter(p=>C.pasillo==='top'?p.top:p.c===C.pasillo);
+  g.innerHTML=lista.length?lista.map((p,i)=>tile(p,i)).join(''):`<div class="vacio">No encontramos “${esc(C.q)}”. <button type="button" class="link" data-act="limpiar-q">Ver todo</button></div>`;
 }
 
-function mesaEntrega(){
+function mesaConfirmar(){
   asegurarRetiro();
-  const r=C.retiro,s=suc(r.suc),t=T(),env=r.entrega==='envio',h=horaRetiro(),f=faltaRetiro();
+  const it=cestaItems(),r=C.retiro,s=suc(r.suc),t=T(),env=r.entrega==='envio',h=horaRetiro(),tot=cestaTotal(),P=C.perfil,f=faltaAlgo();
   const modos=[['tienda','🚶','En la tienda'],...(t.alCarro?[['carro','🚗','Al carro']]:[]),...(t.envio!==false?[['envio','🛵','A mi casa']]:[])];
-  const destino=env?['🛵','Tu casa',r.ubi?'ubicación lista':'falta ubicación']:r.entrega==='carro'?['🚗','Tu carro',r.placa||'te la llevamos']:['🚶','Mostrador','pasás adentro'];
-  const opcSuc=sucs().map(x=>{
-    const ab=abierta(x),a=asap(x);
-    return `<button type="button" class="opt${r.suc===x.k?' on':''}" data-act="suc" data-k="${x.k}"><span class="oi">${x.k==='moravia'?'🏠':'📍'}</span><span class="ot"><strong>${esc(x.n)} · ${esc(x.zona)}</strong><small><span class="${ab?'abierto':'cerrado'}">${ab?'Abierto':'Cerrado'}</span> · ${ab?'cierra '+fh(aFecha(0,hm(x.cierra))):'abre '+fh(aFecha(0,hm(x.abre)))}${a?' · lista '+fh(a):''}</small></span><span class="ok">✓</span></button>`;
-  }).join('');
-  let horaH='';
-  if(s){
-    const a=asap(s);
-    horaH=`<div class="opts">
-      <button type="button" class="opt${r.modo==='asap'?' on':''}" data-act="cuando" data-v="asap" ${a?'':'disabled'}>${a?'<span class="star">RECOMENDADO</span>':''}<span class="oi">⚡</span><span class="ot"><strong>Lo antes posible</strong><small>${a?`Lista hoy a las ${fh(a)} · unos ${lead()} min`:'Hoy ya no da tiempo; programala'}</small></span><span class="ok">✓</span></button>
-      <button type="button" class="opt${r.modo==='prog'?' on':''}" data-act="cuando" data-v="prog"><span class="oi">🗓️</span><span class="ot"><strong>Programar</strong><small>${r.modo==='prog'&&h?'Para '+cuando(h):'Elegí día y hora'}</small></span><span class="ok">✓</span></button>
-    </div>
-    ${r.modo==='prog'?`<div class="card2" style="margin-top:10px"><div class="tgs">${[0,1,2].map(d=>`<button type="button" class="tg${r.dia===d?' on':''}" data-act="dia" data-d="${d}">${d===0?'Hoy':d===1?'Mañana':aFecha(2,0).toLocaleDateString('es-CR',{weekday:'long'})}</button>`).join('')}</div><div class="slots">${slots(s,r.dia).map(x=>`<button type="button" class="tg${r.hora&&+new Date(r.hora)===+x?' on':''}" data-act="hora" data-h="${x.toISOString()}">${fh(x)}</button>`).join('')||'<span class="note">Ese día ya no hay horas. Probá otro.</span>'}</div></div>`:''}`;
-  }
-  const u=r.ubi;
-  const ubiH=env?`<div class="card2">
-      ${u?`<iframe class="ubi-mapa" title="Tu ubicación" src="${mapaEmbed(u)}" loading="lazy"></iframe><div class="ubi-ok"><span>📍 <b>Ubicación lista</b>${u.acc?` · ±${u.acc} m`:''}</span><button type="button" class="link" data-act="ubi-gps">Volver a tomar</button></div>`
-        :`<button type="button" class="btn w" id="tlUbiBtn" data-act="ubi-gps">📍 Usar mi ubicación actual</button><input class="inp" id="tlUbiLink" style="margin-top:10px" placeholder="…o pegá un link de Google Maps" autocomplete="off">`}
-      <input class="inp" id="tlSenas" style="margin-top:10px" placeholder="Señas: casa verde, portón negro…" value="${esc(r.senas||'')}" autocomplete="street-address"></div>`:'';
-  return cab(2,env?'¿Cuándo y adónde te la enviamos?':'¿Dónde y cuándo la recogés?',f?'Falta '+f.m.replace(/^Elegí |^Falta /,'').replace(' para el envío',''):'Listo',f?'warn':'ok')
-  +`<div class="stage${C.pulso?' pulse':''}"><span class="tag">Ruta del pedido</span><div class="scan"></div>
-    <div class="ruta"><div class="n on"><b>🏪</b><strong>${esc(s?.n||'Tienda')}</strong>${esc(s?.zona||'')}</div><i></i>
-      <div class="n${h?' on':''}"><b>🕐</b><strong>${h?esc(fh(h)):'—'}</strong>${h?esc(fdia(h)):'elegí hora'}</div><i></i>
-      <div class="n${f?'':' on'}"><b>${destino[0]}</b><strong>${destino[1]}</strong>${esc(destino[2])}</div></div></div>
-  <div class="sec"><p class="kicker">¿Cómo la recibís?</p><div class="seg" style="grid-template-columns:repeat(${modos.length},minmax(0,1fr))">${modos.map(([k,e,n])=>`<button type="button" class="${r.entrega===k?'on':''}" data-act="entrega" data-v="${k}">${k==='envio'?'<span class="star">UBER</span>':''}<b>${e}</b>${n}</button>`).join('')}</div>
-    ${r.entrega==='carro'?`<input class="inp" id="tlPlaca" style="margin-top:10px" placeholder="Placa o color del carro (opcional)" value="${esc(r.placa)}" autocomplete="off">`:''}${ubiH}</div>
-  <div class="sec"><p class="kicker">${env?'Sale desde':'Tienda'}</p><div class="opts">${opcSuc}</div></div>
-  <div class="sec"><p class="kicker">${env?'Hora de salida':'Hora'}</p>${horaH}</div>
-  ${dual('Te avisamos','Cuando esté lista te avisamos aquí mismo y por WhatsApp.',env?'Envío':'Si llegás antes',`<p>${env?'Uber cobra aparte según su tarifa; te confirmamos el monto antes de pagar.':'Te la terminamos ahí mismo, sin hacer fila.'}</p>`)}
-  <div class="next"><button type="button" class="btn ghost" data-act="ir" data-p="armar">← Canasta</button>${siguienteBtn()}</div>`;
-}
-
-function mesaPago(){
-  const P=C.perfil,t=T(),tot=cestaTotal(),f=faltaPago();
   const metodos=Object.entries(N.PAGOS).filter(([k])=>k!=='link'||t.linkTarjeta);
   if(!metodos.some(([k])=>k===C.pago.metodo))C.pago.metodo='sinpe';
-  const M=N.PAGOS[C.pago.metodo];
+  const a=s?asap(s):null,sug=sugerencias();
+  const u=r.ubi;
+  const ubiH=env?`<div class="ubi">${u?`<iframe class="ubi-mapa" title="Tu ubicación" src="${mapaEmbed(u)}" loading="lazy"></iframe><div class="ubi-ok"><span>📍 <b>Ubicación lista</b>${u.acc?` · ±${u.acc} m`:''}</span><button type="button" class="link" data-act="ubi-gps">Volver a tomar</button></div>`
+      :`<button type="button" class="btn w" id="tlUbiBtn" data-act="ubi-gps">📍 Usar mi ubicación</button><input class="inp" id="tlUbiLink" placeholder="…o pegá un link de Google Maps" autocomplete="off">`}
+      <input class="inp" id="tlSenas" placeholder="Señas: casa verde, portón negro…" value="${esc(r.senas||'')}" autocomplete="street-address"></div>`:'';
   const quien=perfilOk()&&!C.editPerfil
     ?`<div class="yo"><span class="av">${esc(P.nombre.trim()[0]?.toUpperCase()||'·')}</span><div class="t"><strong>${esc(P.nombre)}</strong><small>${esc(fmtTel(P.tel))} · aquí te avisamos</small></div><button type="button" class="link" data-act="edit-perfil">Cambiar</button></div>`
     :`<div class="dos"><label><span class="vh">Nombre</span><input class="inp" id="tlNombre" placeholder="Tu nombre" autocomplete="given-name" value="${esc(P.nombre)}"></label><label><span class="vh">Teléfono</span><input class="inp" id="tlTel" placeholder="Teléfono" inputmode="tel" autocomplete="tel" maxlength="20" value="${esc(P.tel)}"></label></div><div class="err" id="tlPerfilErr"></div>`;
-  const ef=C.pago.metodo==='efectivo'?`<div class="card2"><p class="kicker" style="margin-bottom:8px">¿Con cuánto pagás?</p><div class="tgs">${[0,...billetes(tot)].map(v=>`<button type="button" class="tg${(+C.pago.conCuanto||0)===v?' on':''}" data-act="con" data-v="${v}">${v?$c(v):'Exacto'}</button>`).join('')}</div></div>`:'';
-  return cab(3,'¿A nombre de quién y cómo pagás?',f?'Faltan datos':'Listo',f?'warn':'ok')
-  +`<div class="stage${C.pulso?' pulse':''}"><span class="tag">Así vas a pagar</span><div class="scan"></div>
-    <div class="holo-vacio" style="color:var(--ink)"><b style="opacity:1;filter:none">${M.e}</b><span style="font-family:var(--display);font-size:20px;font-weight:600;letter-spacing:.03em">${$c(tot)} aprox.${esEnvio()?' + envío':''}</span><br><span style="color:var(--muted)">${esc(M.n)} · ${esc(M.txt)}</span></div></div>
-  <div class="sec"><p class="kicker">A nombre de</p>${quien}</div>
-  <div class="sec"><p class="kicker">Forma de pago</p><div class="opts">${metodos.map(([k,m])=>`<button type="button" class="opt${C.pago.metodo===k?' on':''}" data-act="metodo" data-k="${k}">${k==='sinpe'?'<span class="star">MÁS RÁPIDO</span>':''}<span class="oi">${m.e}</span><span class="ot"><strong>${m.n}</strong><small>${m.txt}</small></span><span class="ok">✓</span></button>`).join('')}</div>${ef}</div>
-  ${dual('Total exacto','Pagás lo que pesó tu canasta, ni un colón más.','Nada por adelantado','<p>No pagás nada hasta que tu canasta esté lista.</p>')}
-  <div class="next"><button type="button" class="btn ghost" data-act="ir" data-p="entrega">← Entrega</button>${siguienteBtn()}</div>`;
+  return `<div class="hola"><p>Casi listo · revisá y sellá</p><h2>Confirmá tu pedido</h2></div>
+  <section class="bloque" id="tlSecCesta"><div class="bl-h"><h3>🧺 Tu canasta</h3><button type="button" class="link" data-act="ir" data-p="armar">＋ Agregar</button></div>
+    <div class="lineas">${it.map(x=>`<div class="linea"><span class="e">${x.p.e}</span><span class="t"><b>${esc(x.p.n)}</b><small>${esc(porU(x.p))}</small></span><span class="mini-q"><button type="button" data-act="menos" data-k="${x.k}" aria-label="Menos ${esc(x.p.n)}">−</button><em>${esc(qtxt(x.q,x.p.u))}</em><button type="button" data-act="mas" data-k="${x.k}" aria-label="Más ${esc(x.p.n)}">+</button></span><span class="pz">${$c(x.q*x.p.p)}</span></div>`).join('')}</div>
+    ${sug.length?`<div class="sug"><small>¿Te falta algo?</small><div class="quick">${sug.map(p=>`<button type="button" class="tg sug" data-act="sumar" data-k="${p.k}">＋ ${p.e} ${esc(p.n)}</button>`).join('')}</div></div>`:''}</section>
+  <section class="bloque" id="tlSecEntrega"><h3>📍 ¿Cómo la recibís?</h3>
+    <div class="seg" style="grid-template-columns:repeat(${modos.length},minmax(0,1fr))">${modos.map(([k,e,n])=>`<button type="button" class="${r.entrega===k?'on':''}" data-act="entrega" data-v="${k}"><b>${e}</b>${n}</button>`).join('')}</div>
+    ${r.entrega==='carro'?`<input class="inp" id="tlPlaca" placeholder="Placa o color del carro (opcional)" value="${esc(r.placa)}" autocomplete="off">`:''}${ubiH}
+    ${sucs().length>1?`<div class="mini-seg">${sucs().map(x=>`<button type="button" class="${r.suc===x.k?'on':''}" data-act="suc" data-k="${x.k}">${x.k==='moravia'?'🏠':'📍'} ${esc(x.n)}<small class="${abierta(x)?'abierto':'cerrado'}">${abierta(x)?'abierto':'cerrado'}</small></button>`).join('')}</div>`:''}
+    ${s?`<div class="tgs cuando"><button type="button" class="tg${r.modo==='asap'?' on':''}" data-act="cuando" data-v="asap" ${a?'':'disabled'}>⚡ ${a?`Lo antes posible · ${fh(a)}`:'Hoy ya no da tiempo'}</button><button type="button" class="tg${r.modo==='prog'?' on':''}" data-act="cuando" data-v="prog">🗓️ ${r.modo==='prog'&&h?esc(cuando(h)):'Programar'}</button></div>
+      ${r.modo==='prog'?`<div class="tgs" style="margin-top:8px">${[0,1,2].map(d=>`<button type="button" class="tg${r.dia===d?' on':''}" data-act="dia" data-d="${d}">${d===0?'Hoy':d===1?'Mañana':aFecha(2,0).toLocaleDateString('es-CR',{weekday:'long'})}</button>`).join('')}</div><div class="slots">${slots(s,r.dia).map(x=>`<button type="button" class="tg${r.hora&&+new Date(r.hora)===+x?' on':''}" data-act="hora" data-h="${x.toISOString()}">${fh(x)}</button>`).join('')||'<span class="note">Ese día ya no hay horas. Probá otro.</span>'}</div>`:''}`:''}</section>
+  <section class="bloque" id="tlSecDatos"><h3>👤 A nombre de</h3>${quien}</section>
+  <section class="bloque" id="tlSecPago"><h3>💳 ¿Cómo pagás?</h3>
+    <div class="pagos">${metodos.map(([k,m])=>`<button type="button" class="${C.pago.metodo===k?'on':''}" data-act="metodo" data-k="${k}"><b>${m.e}</b>${esc(m.n.replace(' al recoger','').replace(' Móvil',''))}</button>`).join('')}</div>
+    ${C.pago.metodo==='efectivo'?`<div class="tgs" style="margin-top:10px">${[0,...billetes(tot)].map(v=>`<button type="button" class="tg${(+C.pago.conCuanto||0)===v?' on':''}" data-act="con" data-v="${v}">${v?'Pago con '+$c(v):'Exacto'}</button>`).join('')}</div>`:''}
+    <p class="note">No pagás nada hasta que tu canasta esté lista.</p></section>
+  <details class="bloque mas"${C.nota?' open':''}><summary>⚙️ Si algo no hay: <b>${SUST[C.sust].n.toLowerCase()}</b>${C.nota?' · con nota':''}</summary>
+    <div class="tgs" style="margin-top:10px">${Object.entries(SUST).map(([k,x])=>`<button type="button" class="tg${C.sust===k?' on':''}" data-act="sust" data-k="${k}">${x.e} ${x.n}</button>`).join('')}</div>
+    <textarea class="inp" id="tlNota" style="margin-top:10px" placeholder="Nota para quien alista (opcional)">${esc(C.nota)}</textarea></details>
+  <div class="total-final"><span>Total aprox.<small>pagás lo que pese de verdad</small></span><b>${$c(tot)}${env?' <small>+ envío</small>':''}</b></div>
+  <button type="button" class="btn big w sellar${f?' apagado':''}" data-act="pedir" id="tlSellar">🔒 Sellar pedido · ${$c(tot)}</button>
+  ${N.modo()!=='nube'?'<p class="note c">💬 Al sellar te aparece un botón para avisarle a la tienda por WhatsApp.</p>':'<p class="note c">Podés cancelarlo mientras no lo empiecen a alistar.</p>'}`;
 }
 function billetes(t){
   const out=[];
@@ -484,56 +382,37 @@ function billetes(t){
   return out;
 }
 
-function mesaSellar(){
-  const it=cestaItems(),s=suc(C.retiro.suc),h=horaRetiro(),f=faltaAlgo(),tot=cestaTotal(),M=N.PAGOS[C.pago.metodo];
-  return cab(4,'Revisá y sellá tu pedido',f?'Falta: '+f.m.toLowerCase():'Listo para sellar',f?'warn':'ok')
-  +`<div class="stage"><span class="tag">Comprobante</span><span class="tag r">Aproximado</span>
-    <div class="ticket">${it.map(x=>`<div class="l"><span>${x.p.e} ${esc(qtxt(x.q,x.p.u))} ${esc(x.p.n)}${x.mad?' · '+esc(MAD[x.mad].toLowerCase()):''}</span><span>${$c(x.q*x.p.p)}</span></div>`).join('')||'<div class="l m"><span>Sin productos</span><span></span></div>'}
-      <hr><div class="l m"><span>${esc(entregaTxt(C.retiro))} · ${esc(s?.n||'—')}</span><span>${h?esc(fh(h)):'—'}</span></div>
-      <div class="l m"><span>${M.e} ${esc(M.n)}</span><span>${esc(C.perfil.nombre.trim()||'—')}</span></div>
-      <div class="l m"><span>${SUST[C.sust].e} Si algo no hay: ${SUST[C.sust].n.toLowerCase()}</span><span></span></div>
-      ${esEnvio()?'<div class="l m"><span>🛵 Envío Uber</span><span>se confirma</span></div>':''}
-      <hr><div class="l t"><span>TOTAL APROX.</span><span>${$c(tot)}</span></div></div></div>
-  <details class="sec"${C.nota?' open':''}><summary class="link">📝 Nota para quien alista (opcional)</summary><textarea class="inp" id="tlNota" style="margin-top:10px" placeholder="Ej.: los aguacates para el domingo, bolsas aparte…">${esc(C.nota)}</textarea></details>
-  ${dual('Al sellar','La tienda lo recibe al instante y te damos tu código de retiro.','Podés cancelar','<p>Mientras no lo empiecen a alistar, sin costo.</p>')}
-  ${N.modo()!=='nube'?'<p class="note">💬 Después de sellar te aparece un botón para avisarle a la tienda por WhatsApp.</p>':''}
-  <div class="next"><button type="button" class="btn ghost" data-act="ir" data-p="pago">← Pago</button><button type="button" class="btn big${f?' apagado':''}" data-act="pedir" id="tlSellar">🔒 Sellar pedido · ${$c(tot)}</button></div>`;
-}
-
 function mesaPedido(o){
   const s=suc(o.sucursal),{r,n}=avance(o),t=T(),total=N.totalDe(o),aprox=N.esAprox(o),E=o.estado,env=o.retiro.envio;
   const fin=E==='entregado'||E==='cancelado',local=N.modo()!=='nube';
   const waPendiente=!!o.waPendiente&&!o.avisado;
-  const V={nuevo:local&&!o.avisado?(waPendiente?['WhatsApp abierto','warn']:['Falta avisar','warn']):local&&o.avisado?['Pendiente de aceptación','run']:['Pendiente de aceptación','run'],alistando:[`Alistando ${r}/${n}`,'run'],listo:[env?(env.uber?'En camino':'Lista'):'Lista','ok'],entregado:['Entregado','ok'],cancelado:['Cancelado','bad']}[E]||['—',''];
-  const titulo={nuevo:local&&!o.avisado?(waPendiente?'Confirmá el envío por WhatsApp':'Recibimos tu pedido'):local&&o.avisado?'Pedido enviado a la tienda':'Pedido recibido',alistando:'Estamos escogiendo tu canasta',listo:env?'Tu canasta va en camino':'¡Tu canasta está lista!',entregado:'¡Que la disfrutés!',cancelado:'Pedido cancelado'}[E]||'Tu pedido';
+  const V={nuevo:local&&!o.avisado?(waPendiente?['WhatsApp abierto','warn']:['Falta avisar','warn']):['Pendiente de aceptación','run'],alistando:[`Alistando ${r}/${n}`,'run'],listo:[env?(env.uber?'En camino':'Lista'):'Lista','ok'],entregado:['Entregado','ok'],cancelado:['Cancelado','bad']}[E]||['—',''];
+  const titulo={nuevo:local&&!o.avisado?(waPendiente?'Confirmá el envío':'Avisale a la tienda'):'¡Pedido recibido!',alistando:'Escogiendo tu canasta',listo:env?'¡Va en camino!':'¡Tu canasta está lista!',entregado:'¡Que la disfrutés!',cancelado:'Pedido cancelado'}[E]||'Tu pedido';
+  const ahora={nuevo:local&&!o.avisado?(waPendiente?'Confirmá solo después de tocar Enviar en WhatsApp.':'Mandale el pedido a la tienda por WhatsApp.'):'La tienda lo acepta y empieza a escoger.',alistando:'Escogemos y pesamos cada producto. Los ✓ ya están en tu canasta.',listo:env?'Salió con Uber hacia tu ubicación.':`Te espera en ${esc(s?.n||'')} · ${esc(cuando(o.retiro.at))}.`,entregado:'Gracias por comprar en ARAMO.',cancelado:esc(o.motivo||'El pedido no siguió.')}[E];
+  const pct={nuevo:12,alistando:15+Math.round(70*(n?r/n:0)),listo:92,entregado:100,cancelado:0}[E]??0;
+  const icoE={nuevo:'📥',alistando:'🧑‍🌾',listo:env?'🛵':'✅',entregado:'🛍️',cancelado:'✖️'}[E]||'🧺';
+  const hora=k=>{const l=(o.log||[]).find(x=>x.s===k);return l?fh(l.t):'';};
+  const orden=['nuevo','alistando','listo','entregado'],idx=orden.indexOf(E);
+  const linea=E==='cancelado'?'':`<ol class="tr-line">${[['nuevo','Recibido',o.created?fh(o.created):''],['alistando','Alistando',hora('alistando')],['listo',env?'En camino':'Lista',hora('listo')],['entregado','Entregado',hora('entregado')]].map(([k,tt,h],i)=>`<li class="${i<idx?'si':i===idx?(E==='entregado'?'si':'ya'):''}">${tt}<small>${esc(h||'—')}</small></li>`).join('')}</ol>`;
   const holo=o.items.map(i=>{
     const cls=i.estado==='listo'?'ok':i.estado==='nohay'?'no':E==='alistando'?'wait':'';
     const q=i.qr!=null&&i.qr!==''?+i.qr:i.q;
     return `<div class="holo-it ${cls}" title="${esc(i.n)}"><b>${i.e}</b><em>${esc(i.n)}</em><small>${esc(qtxt(q,i.u))}</small></div>`;
   }).join('');
-  const ahora={nuevo:local&&!o.avisado?(waPendiente?'WhatsApp quedó abierto. Regresá aquí y confirmá únicamente después de tocar Enviar.':'Tu pedido está sellado en este teléfono; falta mandárselo a la tienda.'):(local?'La tienda recibió el WhatsApp y el pedido está pendiente de aceptación.':'La tienda recibió tu pedido y está pendiente de aceptarlo.'),alistando:'Están escogiendo y pesando cada producto. Los ✓ verdes ya están en tu canasta.',listo:env?'Tu canasta salió con Uber hacia tu ubicación.':`Te espera en ${esc(s?.n||'')} (${esc(s?.zona||'')}).`,entregado:'Tu pedido quedó entregado.',cancelado:esc(o.motivo||'El pedido no siguió.')}[E];
-  const sigue={nuevo:'La tienda lo acepta y empieza a escoger.',alistando:'Cuando la tienda marque “Lista”, el paso 6 se desbloquea automáticamente.',listo:env?'Recibís tu canasta en tu casa.':`Pasá ${esc(cuando(o.retiro.at))} con tu código.`,entregado:'Calificá y repetila cuando querás.',cancelado:'Podés armar otro pedido cuando querás.'}[E];
-  const pct={nuevo:12,alistando:15+Math.round(70*(n?r/n:0)),listo:92,entregado:100,cancelado:0}[E]??0;
-  const icoE={nuevo:'📥',alistando:'🧑‍🌾',listo:env?'🛵':'✅',entregado:'🛍️',cancelado:'✖️'}[E]||'🧺';
-  const hora=s=>{const l=(o.log||[]).find(x=>x.s===s);return l?fh(l.t):'';};
-  const orden=['nuevo','alistando','listo','entregado'],idx=orden.indexOf(E);
-  const linea=E==='cancelado'?'':`<ol class="tr-line">${[['nuevo','Recibido',o.created?fh(o.created):''],['alistando','Alistando',hora('alistando')],['listo',env?'En camino':'Lista',hora('listo')],['entregado','Entregado',hora('entregado')]].map(([k,t,h],i)=>`<li class="${i<idx?'si':i===idx?(E==='entregado'?'si':'ya'):''}">${t}<small>${esc(h||'—')}</small></li>`).join('')}</ol>`;
-  return cab(E==='listo'||E==='entregado'?6:5,titulo,V[0],V[1])
-  +`<div class="tracker est-${E}"><div class="tr-ring" style="--p:${pct}"><b>${icoE}</b>${E==='alistando'?`<span>${r}/${n}</span>`:''}</div><div class="tr-t"><strong>${esc(o.ref)} · ${esc({nuevo:'esperando a la tienda',alistando:'escogiendo tu canasta',listo:env?'va en camino':'lista para vos',entregado:'entregado',cancelado:'cancelado'}[E]||'')}</strong><p>${ahora}</p></div></div>${linea}
-  <div class="stage${E==='alistando'?' running':''}"><span class="tag">Pedido ${esc(o.ref)} · en vivo desde la tienda</span><div class="scan"></div><div class="holo envuelve">${holo}</div></div>
-  <div class="metrics">${metric('Escogidos',`${r}/${n}`)}${metric('Peso real',pesoReal(o)?kg(pesoReal(o))+' kg':'—')}${metric(aprox?'Total aprox.':'Total exacto',$c(total))}</div>
-  ${detallePeso(o)}
-  ${!fin&&N.avisos.soportado()&&N.avisos.permiso()==='default'?`<div class="card2"><h3>🔔 ¿Te avisamos en el teléfono?</h3><p>Te llega una notificación cuando tu canasta esté lista, aunque estés en otra app.</p><button type="button" class="btn ghost w" style="margin-top:10px" data-act="avisame">Avisarme cuando esté lista</button></div>`:''}
-  ${E==='alistando'?`<div class="card2 t"><h3>⏳ Paso 5 en curso</h3><p>La tienda está escogiendo y pesando tu pedido. Cuando lo marque como listo, se habilita el paso 6.</p>${local?`<p>Este pedido se comparte por WhatsApp. Pedile a la tienda que te mande el enlace de seguimiento actualizado para abrir el paso 6.</p><button type="button" class="btn ghost w" style="margin-top:10px" data-act="wa-estado">💬 Pedir actualización a la tienda</button>`:`<button type="button" class="btn ghost w" style="margin-top:10px" data-act="actualizar-pedido">🔄 Revisar estado</button>`}</div>`:''}
-  ${E==='listo'?`<div class="card2"><h3>✅ Paso 6 desbloqueado</h3><p>La tienda confirmó que tu pedido está listo. Continuá para ver tu código de retiro o los detalles de entrega.</p><button type="button" class="btn w" style="margin-top:10px" data-act="paso6">Continuar al paso 6 →</button></div>`:''}
-  ${E==='nuevo'&&local&&!o.avisado?(waPendiente?`<div class="card2 t"><h3>💬 Confirmá el envío</h3><p>WhatsApp ya se abrió, pero ARAMO no puede saber si tocaste <b>Enviar</b>. Confirmalo solo después de verlo enviado.</p><div class="acciones"><button type="button" class="btn w" data-act="wa-enviar">Abrir WhatsApp de nuevo</button><button type="button" class="btn" data-act="wa-confirmar">✅ Ya lo envié</button></div></div>`:`<div class="card2 t"><h3>💬 Último paso: avisale a la tienda</h3><p>WhatsApp se abrirá con el pedido listo. Después regresá y confirmá el envío.</p><button type="button" class="btn w" style="margin-top:10px" data-act="wa-enviar">Abrir WhatsApp</button></div>`):''}
-  ${!fin?`<div class="sello" id="tlStep6"><div class="qr" id="tlQR" aria-label="Código QR de retiro"></div><div><p class="kicker" style="margin:0">Código de retiro</p><div class="pin">${esc(o.pin)}</div><small>${env?'Dáselo al repartidor si te lo pide':'Mostralo al recoger'}${o.retiro.carro?' · te la llevamos al carro':''}</small><small class="mono">Pedido ${esc(o.ref)} · sellado ${esc(fh(o.created))}</small></div></div>`:''}
+  return cab(E==='listo'||E==='entregado'?3:2,titulo,V[0],V[1])
+  +`<div class="tracker est-${E}"><div class="tr-ring" style="--p:${pct}"><b>${icoE}</b>${E==='alistando'?`<span>${r}/${n}</span>`:''}</div><div class="tr-t"><strong>Pedido ${esc(o.ref)}</strong><p>${ahora}</p><p class="tr-tot">${aprox?'Total aprox.':'Total'} <b>${$c(total)}</b></p></div></div>${linea}
+  ${E==='nuevo'&&local&&!o.avisado?(waPendiente?`<div class="card2 t"><h3>💬 ¿Ya lo enviaste?</h3><p>WhatsApp no le avisa a ARAMO si tocaste <b>Enviar</b>.</p><div class="acciones"><button type="button" class="btn ghost" data-act="wa-enviar">Abrir de nuevo</button><button type="button" class="btn" data-act="wa-confirmar">✅ Ya lo envié</button></div></div>`:`<div class="card2 t"><h3>💬 Último paso</h3><p>WhatsApp se abre con tu pedido listo para enviar.</p><button type="button" class="btn w big" style="margin-top:10px" data-act="wa-enviar">Avisar a la tienda por WhatsApp</button></div>`):''}
+  ${!fin?`<div class="sello" id="tlStep6"><div class="qr" id="tlQR" aria-label="Código QR de retiro"></div><div><p class="kicker" style="margin:0">Código de retiro</p><div class="pin">${esc(o.pin)}</div><small>${env?'Dáselo al repartidor si te lo pide':'Mostralo al recoger'}${o.retiro.carro?' · te la llevamos al carro':''}</small></div></div>`:''}
   ${pagoHtml(o,total,aprox)}
-  ${env?`<div class="card2"><h3>🛵 Envío con Uber</h3><p>${env.uber?`Pedido a las ${esc(fh(env.uber))} · va en camino.`:'Lo pedimos apenas tu canasta esté lista.'}${+env.costo?` Envío: ${$c(env.costo)} (incluido en el total).`:''}</p></div>`:''}
-  ${dual('Qué pasa ahora',ahora,'Qué sigue',`<p>${sigue}</p>`)}
+  ${env&&!fin?`<div class="card2"><h3>🛵 Envío con Uber</h3><p>${env.uber?`Pedido a las ${esc(fh(env.uber))} · va en camino.`:'Lo pedimos apenas tu canasta esté lista.'}${+env.costo?` Envío: ${$c(env.costo)} (incluido).`:''}</p></div>`:''}
+  ${E!=='cancelado'?`<div class="stage${E==='alistando'?' running':''}"><span class="tag">Tu canasta · en vivo</span><div class="scan"></div><div class="holo envuelve">${holo}</div></div>`:''}
+  ${detallePeso(o)}
+  ${!fin&&N.avisos.soportado()&&N.avisos.permiso()==='default'?`<button type="button" class="btn ghost w" style="margin-top:14px" data-act="avisame">🔔 Avisarme en el teléfono cuando esté lista</button>`:''}
+  ${E==='alistando'&&local?`<button type="button" class="btn ghost w" style="margin-top:10px" data-act="wa-estado">💬 Pedir el estado a la tienda</button>`:''}
+  ${E==='alistando'&&!local?`<button type="button" class="btn ghost w" style="margin-top:10px" data-act="actualizar-pedido">🔄 Revisar estado</button>`:''}
   ${E==='entregado'?`<div class="card2" style="text-align:center"><h3>¿Qué tal estuvo todo?</h3><div class="caritas">${['😍','🙂','😐'].map((c,i)=>`<button type="button" class="${o.rating===3-i?'on':''}" data-act="rating" data-v="${3-i}" aria-label="Calificar ${3-i}">${c}</button>`).join('')}</div><button type="button" class="btn w" style="margin-top:12px" data-act="repetir" data-id="${o.id}">🔁 Repetir esta canasta</button></div>`:''}
   <div class="acciones">${s&&!env&&!fin?`<button type="button" class="btn ghost" data-act="mapa">🗺️ Cómo llegar</button>`:''}<button type="button" class="btn ghost" data-act="wa-tienda">💬 Escribir a la tienda</button>${E==='nuevo'?`<button type="button" class="btn bad" style="grid-column:1/-1" data-act="cancelar">Cancelar pedido</button>`:''}</div>
-  <div class="next"><button type="button" class="btn${fin?'':' ghost'}" data-act="nuevo">＋ Nuevo pedido</button></div>`;
+  <div class="next"><button type="button" class="btn${fin?' big w':' ghost'}" data-act="nuevo">＋ Nuevo pedido</button></div>`;
 }
 // Lista con nombres: lo que pediste contra lo que pesó (el monto final sale de aquí)
 function detallePeso(o){
@@ -546,7 +425,7 @@ function detallePeso(o){
     return `<div class="l"><span>${i.e} ${esc(i.n)} · ${d?`pediste ${esc(qtxt(i.q,i.u))} → <b>pesó ${esc(kg(q))} kg</b>`:esc(qtxt(q,i.u))}</span><span>${$c(q*pr)}</span></div>`;
   }).join('');
   const env=+o.retiro?.envio?.costo||0;
-  return `<div class="card2"><p class="kicker" style="margin-bottom:6px">Tu canasta · lo que pesó cada producto</p><div class="ticket">${filas}${env?`<div class="l m"><span>🛵 Envío Uber</span><span>${$c(env)}</span></div>`:''}<hr>${Math.abs(dif)>=1?`<div class="l m"><span>Ajuste por peso real</span><span>${dif>0?'+':'−'}${$c(Math.abs(dif))}</span></div>`:''}<div class="l t"><span>${N.esAprox(o)?'TOTAL APROX.':'TOTAL EXACTO'}</span><span>${$c(N.totalDe(o))}</span></div></div></div>`;
+  return `<details class="card2 pesos"${o.estado==='listo'?' open':''}><summary>⚖️ Lo que pesó cada producto</summary><div class="ticket">${filas}${env?`<div class="l m"><span>🛵 Envío Uber</span><span>${$c(env)}</span></div>`:''}<hr>${Math.abs(dif)>=1?`<div class="l m"><span>Ajuste por peso real</span><span>${dif>0?'+':'−'}${$c(Math.abs(dif))}</span></div>`:''}<div class="l t"><span>${N.esAprox(o)?'TOTAL APROX.':'TOTAL EXACTO'}</span><span>${$c(N.totalDe(o))}</span></div></div></details>`;
 }
 function pagoHtml(o,total,aprox){
   const t=T(),m=o.pago||{},M=N.PAGOS[m.metodo]||N.PAGOS.efectivo;
@@ -572,26 +451,25 @@ function pagoHtml(o,total,aprox){
 
 // ══════════════ Pintar ══════════════
 function pintarChips(){
-  const t=T(),en=N.modo()==='nube',h=new Date().getHours(),nom=C.perfil.nombre.trim().split(/\s+/)[0];
-  const sal=$('tlSaludo');if(sal)sal.textContent=nom?`${h<12?'Buenos días':h<18?'Buenas tardes':'Buenas noches'}, ${nom} 👋`:'Frutas y verduras escogidas a mano';
-  $('tlChips').innerHTML=`${MINI?'':`<span class="chip${en?' ok':''}"><i></i>${en?'Tienda en vivo':'Por WhatsApp'}</span>`}<span class="chip warn">⚖️ Se pesa al alistar</span><span class="chip">📲 SINPE · 💳 tarjeta · 💵 efectivo</span>${t.envio!==false?'<span class="chip">🛵 Envío a tu casa</span>':''}`;
+  const v=$('tlVivo');if(!v)return;
+  const en=N.modo()==='nube';v.classList.toggle('on',en);v.title=en?'Tienda en vivo':'Pedidos por WhatsApp';
 }
 function pintarSpine(){
-  const o=pedidoVisto(),L=pasos(),act=activoIdx(),envio=o?!!o.retiro?.envio:esEnvio();
-  const ico=['🧺',envio?'🛵':'🏪','💳','🔒','🧑‍🌾',envio?'🏠':'🛍️'];
-  const fin=o&&o.estado==='entregado';
-  const prog=Math.max(0,Math.min(100,(fin?5:act)/5*100));
-  $('tlSpine').innerHTML=`<p class="kicker">${o?'Pedido '+esc(o.ref):'Tu pedido, paso a paso'}</p>
-     <ol class="steps" style="--prog:${prog}%">${L.map(r=>`<li class="step ${r.st}" data-i="${r.i}"><button type="button" class="step-h" data-act="paso" data-i="${r.i}" ${r.nav?'':'disabled'} aria-label="Paso ${r.i+1}: ${esc(r.n)}"><span class="dot"><em>${r.st==='bad'?'✕':ico[r.i]}</em></span><span class="step-t"><h3>${esc(r.n)}</h3><p>${r.sum}</p></span>${r.nav?`<span class="go">${r.st==='done'?'editar':'ir'}</span>`:''}</button></li>`).join('')}</ol>`;
+  const o=pedidoVisto(),envio=o?!!o.retiro?.envio:esEnvio(),E=o?.estado;
+  const a=o?2:C.paso==='armar'?0:1;
+  const L=[['🧺','Canasta'],['✅','Confirmar'],[envio?'🛵':'🛍️',envio?'Te llega':'Recogés']];
+  const st=i=>o?(i<2?'done':E==='cancelado'?'bad':E==='entregado'?'done':'on'):(i<a?'done':i===a?'on':'fut');
+  const nav=i=>o?i===2:(i!==a&&(i===0||!faltaArmar()));
+  $('tlSpine').innerHTML=`<ol class="steps" style="--prog:${a*50}%">${L.map(([e,nm],i)=>`<li class="step ${st(i)}" data-i="${i}"><button type="button" class="step-h" data-act="paso" data-i="${i}" ${nav(i)?'':'disabled'}><span class="dot"><em>${st(i)==='bad'?'✕':e}</em></span><h3>${nm}</h3></button></li>`).join('')}</ol>`;
 }
 function pedidoEnCurso(){
   const o=pedidoVisto(),a=activo();
-  return !o&&a?`<button type="button" class="encurso" data-act="ver" data-id="${a.id}"><span>🛎️</span><span><b>${esc(a.ref)}</b><small>${esc(resumenPedido(a,a.estado==='listo'?5:4,'').replace(/<[^>]+>/g,''))}</small></span><span>VER →</span></button>`:'';
+  return !o&&a?`<button type="button" class="encurso" data-act="ver" data-id="${a.id}"><span>🛎️</span><span><b>Tu pedido ${esc(a.ref)}</b><small>${esc(resumenPedido(a))}</small></span><span>Ver →</span></button>`:'';
 }
 function pintarMesa(anim){
   const m=$('tlMesa'),o=pedidoVisto();
-  m.innerHTML=C.actual&&!o?cab(5,'No encontramos ese pedido en este teléfono','—','')+'<div class="next"><button type="button" class="btn" data-act="nuevo">＋ Nuevo pedido</button></div>'
-    :o?mesaPedido(o):pedidoEnCurso()+{armar:mesaArmar,entrega:mesaEntrega,pago:mesaPago,sellar:mesaSellar}[C.paso]();
+  m.innerHTML=C.actual&&!o?cab(2,'No encontramos ese pedido en este teléfono','—','')+'<div class="next"><button type="button" class="btn" data-act="nuevo">＋ Nuevo pedido</button></div>'
+    :o?mesaPedido(o):pedidoEnCurso()+(C.paso==='confirmar'?mesaConfirmar():mesaArmar());
   if(anim){m.classList.remove('fade');void m.offsetWidth;m.classList.add('fade');}
   if(!o&&C.paso==='armar')pintarGrid();
   if(o){pintarQR(o);animarAnillo(o.id);}
@@ -615,17 +493,19 @@ function pintarBit(){
   $('tlBitN').hidden=!nAct;$('tlBitN').textContent=nAct;
   const cls={nuevo:'run',alistando:'run',listo:'ok',entregado:'ok',cancelado:'bad'};
   const nom={nuevo:'Recibido',alistando:'Alistando',listo:'Lista',entregado:'Entregado',cancelado:'Cancelado'};
-  $('tlBit').innerHTML=`<p class="kicker">Bitácora · pedidos sellados en este teléfono</p>
+  $('tlBit').innerHTML=`<p class="kicker">🧾 Mis pedidos</p>
     ${L.length?`<div class="bit-l">${L.slice(0,20).map(o=>`<button type="button" class="bit-r" data-act="ver" data-id="${o.id}"><span class="t">${esc(fdia(o.created).replace(/^(\w)/,c=>c.toUpperCase()))} ${esc(fh(o.created))}</span><span class="r">${esc(o.ref)}</span><span class="e">${$c(N.totalDe(o))} · ${emojis(o.items,6)}</span><span class="s ${cls[o.estado]||''}">${nom[o.estado]||o.estado}</span></button>`).join('')}</div>`
-      :'<p class="note">Cada pedido que sellés queda aquí con su hora, su código y su estado.</p>'}`;
+      :'<p class="note">Cada pedido que sellés queda aquí con su hora, su código y su estado.</p>'}
+    <button type="button" class="link tema" data-act="tema">${temaActual()==='dark'?'☀️ Usar tema claro':'🌙 Usar tema oscuro'}</button>`;
 }
 function pintarBar(){
   const bar=$('tlBar'),inn=$('tlBarIn'),n=cestaN(),o=pedidoVisto();
   let h='';
   if(!o&&n&&!MINI){
-    const btn=C.paso==='sellar'?`<button type="button" class="btn${faltaAlgo()?' apagado':''}" data-act="pedir">🔒 Sellar · ${$c(cestaTotal())}</button>`
-      :`<button type="button" class="btn${puedeIr(siguientePaso())?' apagado':''}" data-act="siguiente">${NOMBRE[siguientePaso()]} →</button>`;
-    h=`<button type="button" class="tk" data-act="ir" data-p="armar"><span class="tk-ico" id="tlTk">🧺<em>${n}</em></span><span class="tk-t"><small>Tu canasta · paso ${ARMANDO.indexOf(C.paso)+1} de 6</small><strong id="tlTot">${$c(_totBar)}</strong></span></button>${btn}`;
+    const conf=C.paso==='confirmar';
+    const btn=conf?`<button type="button" class="btn${faltaAlgo()?' apagado':''}" data-act="pedir">🔒 Sellar</button>`
+      :`<button type="button" class="btn" data-act="siguiente">Continuar →</button>`;
+    h=`<button type="button" class="tk" data-act="ir" data-p="armar" aria-label="Ver la canasta"><span class="tk-ico" id="tlTk">🧺<em>${n}</em></span><span class="tk-t"><small>${conf?'Total aprox.':n===1?'1 producto':n+' productos'}</small><strong id="tlTot">${$c(_totBar)}</strong></span></button>${btn}`;
   }
   bar.classList.toggle('hide',!h);
   if(h){inn.innerHTML=h;contar($('tlTot'),_totBar,cestaTotal());_totBar=cestaTotal();}
@@ -834,22 +714,25 @@ const ACT={
   avisame(){N.avisos.pedir().then(r=>{toast(r==='granted'?'🔔 Listo: te avisamos en el teléfono':'Tu navegador no permitió avisos; te avisamos por WhatsApp');render();});},
   'limpiar-q'(){C.q='';C.parse=null;const q=$('tlQ');if(q)q.value='';pintarGrid();},
   ir(el){ir(el.dataset.p);},
-  paso(el){const i=+el.dataset.i;if(i===5&&C.actual&&['listo','entregado'].includes(pedidoVisto()?.estado)){ $('tlStep6')?.scrollIntoView({behavior:'smooth',block:'center'});return;}const p=ARMANDO[i];if(!p)return;const f=puedeIr(p);if(f){avisarFalta(f);return;}ir(p);},
-  siguiente(){
-    const a=C.paso,f=a==='armar'?faltaArmar():a==='entrega'?faltaRetiro():a==='pago'?faltaPago():null;
-    if(f){avisarFalta(f);return;}
-    const sig=siguientePaso(),g=puedeIr(sig);if(g){avisarFalta(g);return;}
-    ir(sig);
+  paso(el){
+    const i=+el.dataset.i;
+    if(pedidoVisto()){if(i===2)$('tlStep6')?.scrollIntoView({behavior:'smooth',block:'center'});return;}
+    if(i===0)return ir('armar');
+    const f=faltaArmar();if(f){avisarFalta(f);return;}
+    ir('confirmar');
   },
+  siguiente(){const f=faltaArmar();if(f){avisarFalta(f);return;}ir('confirmar');},
+  tema(){const t=temaActual()==='dark'?'light':'dark';document.documentElement.dataset.theme=t;try{localStorage.setItem('cn_theme',t);}catch{}pintarTema();pintarBit();},
   ver(el){ver(el.dataset.id);},
-  nuevo(){ir('armar');},
+  nuevo(){C.pasillo=null;C.q='';ir('armar');},
   repetir(el){
     const o=N.get(el.dataset.id);if(!o)return;let n=0;
     o.items.forEach(i=>{const p=prod(i.k);if(p&&!p.agotado&&i.estado!=='nohay'){C.cesta[i.k]={q:i.q,mad:i.mad||'',nota:i.nota||''};n++;}});
     guardar();C.pulso=true;
     // Exprés: si ya sabemos entrega y pago, va directo a revisar y sellar
-    if(el.dataset.express&&!puedeIr('sellar')){toast('⚡ '+n+' productos · revisá y sellá');ir('sellar');}
-    else{toast('🔁 '+n+' productos en tu canasta');ir('armar');}
+    const pr=n===1?'1 producto':n+' productos';
+    if(el.dataset.express&&!puedeIr('sellar')){toast('⚡ '+pr+' · revisá y sellá');ir('sellar');}
+    else{toast('🔁 '+pr+' en tu canasta');ir('armar');}
   },
   'parse-t'(el){const x=C.parse[+el.dataset.i];if(x.p&&!x.p.agotado)x.on=!x.on;$('tlParse').innerHTML=parseHtml();},
   'parse-no'(){C.parse=null;$('tlParse').innerHTML='';},
@@ -941,10 +824,9 @@ document.addEventListener('keydown',e=>{
 $('tlSheetBg').addEventListener('click',()=>cerrarHoja());
 $('tlBitBtn').addEventListener('click',()=>$('tlBit').scrollIntoView({behavior:'smooth',block:'start'}));
 
-// Tema (consola oscura por defecto, como el taller de GENOSIM)
+// Tema: el del teléfono (claro u oscuro), o el que el cliente eligió
 function temaActual(){return document.documentElement.dataset.theme==='light'?'light':'dark';}
-function pintarTema(){const d=temaActual()==='dark';$('tlTema').textContent=d?'☀️':'🌙';$('tlTema').setAttribute('aria-label',d?'Usar tema claro':'Usar tema oscuro');document.querySelector('meta[name="theme-color"]').content=d?'#06120d':'#eef4ef';}
-$('tlTema').addEventListener('click',()=>{const t=temaActual()==='dark'?'light':'dark';document.documentElement.dataset.theme=t;try{localStorage.setItem('cn_theme',t);}catch{}pintarTema();});
+function pintarTema(){const d=temaActual()==='dark';document.querySelector('meta[name="theme-color"]').content=d?'#060f0b':'#f5f3ea';}
 pintarTema();
 DESK.addEventListener?.('change',()=>render());
 
@@ -971,6 +853,7 @@ window.addEventListener('hashchange',()=>{if(importarHash()){history.replaceStat
 // Si este teléfono atiende un local (se eligió al abrir ARAMO), el Taller también
 // avisa de cada pedido nuevo de ese local y lleva directo al Mostrador.
 const LOCAL_TIENDA=MINI?null:LS.get('aramo_local',null);
+document.querySelector('.tl-back')?.toggleAttribute('hidden',!LOCAL_TIENDA);
 const avisados=new Set();let tiendaLista=false;
 function vigilarTienda(){
   if(!LOCAL_TIENDA)return;
