@@ -1,15 +1,10 @@
 /* ══════════════════════════════════════════════════════════════════════
-   ARAMO Taller de pedidos — mercado vivo, simple al máximo (2026-10-09).
-   Tres pasos: 🧺 Canasta → ✅ Confirmar (todo en una página) → 🛍️ Recogés.
-   Un solo botón abajo dice siempre qué sigue.
+   ARAMO Taller de pedidos — simple y ordenado (2026-10-10).
+   La tienda es una sola lista ordenada por pasillo; confirmar es un
+   formulario de filas iguales; el seguimiento, una lista que se llena de ✓.
+   Un solo botón abajo dice siempre qué sigue ("Continuar" o "Sellar").
 
-   A la izquierda, el ciclo completo numerado (siempre visible):
-     1 Armar canasta → 2 Entrega → 3 Pago → 4 Sellar pedido
-     → 5 Alistamos → 6 Recogés / Te llega
-   A la derecha (o debajo del paso activo en el celular), la mesa de
-   trabajo de ese paso: veredicto, holograma en vivo, métricas, qué se
-   confirma / qué falta, y la siguiente acción. Abajo, la bitácora de
-   pedidos sellados.
+   Tres pantallas: 🧺 Comprar → ✅ Confirmar → 🛍️ Seguimiento.
 
    La lógica es la de siempre: catálogo de la vitrina, recetas que se
    escalan, lista escrita o dictada, retiro/carro/envío con Uber, pagos,
@@ -283,7 +278,12 @@ function ir(paso){
   if(C.paso==='confirmar'){asegurarRetiro();C.retiro.visto=true;guardar();}
   empujar();render(true);arriba();
 }
-function ver(id){C.actual=id;empujar();render(true);arriba();}
+function ver(id){
+  C.actual=id;
+  if(H){cerrarHoja(true);if(!MINI)history.replaceState({paso:C.paso,id},'',location.pathname+location.search);}
+  else empujar();
+  render(true);arriba();
+}
 function empujar(){if(!MINI)history.pushState({paso:C.paso,id:C.actual},'',location.pathname+location.search);}
 function arriba(){if(!MINI)requestAnimationFrame(()=>window.scrollTo({top:0,behavior:'smooth'}));}
 window.addEventListener('popstate',e=>{
@@ -293,88 +293,125 @@ window.addEventListener('popstate',e=>{
 });
 
 // ══════════════ Pantallas ══════════════
-function cab(n,titulo,verdict,cls){return `<div class="mesa-h"><h2>${titulo}</h2><span class="verdict ${cls||''}">${esc(verdict)}</span></div>`;}
-function saludo(){const nom=C.perfil.nombre.trim().split(/\s+/)[0],h=new Date().getHours();return nom?`${h<12?'Buenos días':h<18?'Buenas tardes':'Buenas noches'}, ${esc(nom)} 👋`:'¡Pura vida! 👋';}
+// Todo es una lista ordenada: filas iguales, grupos con el mismo borde y un solo botón principal (abajo).
+function saludo(){const nom=C.perfil.nombre.trim().split(/\s+/)[0],h=new Date().getHours();return nom?`${h<12?'Buenos días':h<18?'Buenas tardes':'Buenas noches'}, ${esc(nom)}`:'¡Pura vida!';}
+function titulo(t,o={}){return `<div class="titulo">${o.volver?`<button type="button" class="volver" data-act="ir" data-p="${o.volver}" aria-label="Volver">‹</button>`:''}<h2>${t}</h2>${o.verdict?`<span class="verdict ${o.cls||''}">${esc(o.verdict)}</span>`:''}</div>`;}
+function fila(e,t,s,act,attrs=''){return `<button type="button" class="fila-link" data-act="${act}" ${attrs}><span class="e">${e}</span><span class="t"><b>${t}</b>${s?`<small>${s}</small>`:''}</span><span class="go" aria-hidden="true">›</span></button>`;}
+const seg=(botones,cls='')=>`<div class="segm ${cls}">${botones}</div>`;
 
+// ── 1 · Comprar ──
 function mesaArmar(){
-  const n=cestaN(),u=ultimoPedido();
-  return `<div class="hola"><p>${saludo()}</p><h2>¿Qué llevamos hoy?</h2></div>
-  <form class="ask" id="tlAsk" autocomplete="off"><input id="tlQ" type="search" enterkeyhint="go" placeholder="Buscá o dictá tu lista" value="${esc(C.q)}" aria-label="Buscá un producto o escribí tu lista"><button type="button" class="mic" id="tlMic" aria-label="Dictar lista">🎙️</button><button type="submit" class="ir-q" aria-label="Agregar la lista">→</button></form>
+  const n=cestaN(),u=ultimoPedido(),a=activo();
+  return `<p class="hola">${saludo()} 👋<b>¿Qué llevamos hoy?</b></p>
+  <div class="buscar" id="tlBuscar">
+    <form class="ask" id="tlAsk" autocomplete="off" role="search"><span class="lupa" aria-hidden="true">🔎</span><input id="tlQ" type="search" enterkeyhint="search" placeholder="Buscá o dictá tu lista" value="${esc(C.q)}" aria-label="Buscá un producto o escribí tu lista"><button type="button" class="mic" id="tlMic" aria-label="Dictar lista"${C.q?' hidden':''}>🎙️</button><button type="button" class="limpiar" id="tlLimpiar" data-act="limpiar-q" aria-label="Borrar"${C.q?'':' hidden'}>✕</button></form>
+    <nav class="tabs" id="tlPasillos" aria-label="Pasillos"></nav>
+  </div>
   <div id="tlParse">${parseHtml()}</div>
-  ${u&&!n&&!C.q?`<button type="button" class="repetir" data-act="repetir" data-id="${u.id}" data-express="1"><span class="e">⚡</span><span class="t"><b>Repetir mi última canasta</b><small>${emojis(u.items,7)} · ${$c(N.totalDe(u))}</small></span><span class="go">→</span></button>`:''}
-  <div class="pasillos" id="tlPasillos"></div>
-  <div class="prods" id="tlGrid"></div>`;
+  <div class="grupo atajos" id="tlAtajos">
+    ${a?fila('🛎️',`Tu pedido ${esc(a.ref)}`,esc(resumenPedido(a)),'ver',`data-id="${a.id}"`):''}
+    ${u&&!n?fila('⚡','Repetir mi última canasta',`${emojis(u.items,8)} · ${$c(N.totalDe(u))}`,'repetir',`data-id="${u.id}" data-express="1"`):''}
+    ${fila('📖','Recetas',`Elegí un plato y te ponemos los ingredientes`,'recetas')}
+  </div>
+  <div class="lista" id="tlGrid"></div>`;
 }
 function parseHtml(){
   const P=C.parse;if(!P)return '';
   const ok=P.filter(x=>x.p&&x.on);
-  return `<div class="parse fade"><p class="kicker" style="margin:0">Entendí esto · tocá para quitar o poner</p><div class="parse-l">${P.map((x,i)=>x.p?`<button type="button" class="tg${x.on?' on':''}" data-act="parse-t" data-i="${i}">${x.p.e} ${esc(qtxt(x.q,x.p.u))} ${esc(x.p.n)}${x.p.agotado?' <small>agotado</small>':''}</button>`:`<span class="tg bad">❓ “${esc(x.txt)}”</span>`).join('')}</div><div class="row"><button type="button" class="btn" data-act="parse-ok" ${ok.length?'':'disabled'}>Agregar ${ok.length} a la canasta</button><button type="button" class="btn ghost" data-act="parse-no">Cancelar</button></div></div>`;
+  return `<div class="parse fade"><p class="parse-h">✨ Entendí esto · tocá para quitar o poner</p><div class="chips">${P.map((x,i)=>x.p?`<button type="button" class="chip${x.on?' on':''}" data-act="parse-t" data-i="${i}">${x.p.e} ${esc(qtxt(x.q,x.p.u))} ${esc(x.p.n)}${x.p.agotado?' · agotado':''}</button>`:`<span class="chip no">❓ ${esc(x.txt)}</span>`).join('')}</div><div class="parse-a"><button type="button" class="btn" data-act="parse-ok" ${ok.length?'':'disabled'}>Agregar ${ok.length} a la canasta</button><button type="button" class="btn ghost" data-act="parse-no">Cancelar</button></div></div>`;
 }
+// Una fila por producto: emoji · nombre y precio · botón
 function tile(p,i){
   const q=C.cesta[p.k]?.q||0;
-  return `<div class="pt c-${esc(p.c||'')}${q?' in':''}${p.agotado?' off':''}${p.k===C.ultimo?' pop':''}" style="--i:${i||0}" role="button" tabindex="0" data-act="tile" data-k="${p.k}" aria-label="${esc(p.n)}">
-    ${p.agotado?'<span class="pt-q r">AGOTADO</span>':q?`<span class="pt-q">${esc(qtxt(q,p.u))}</span>`:''}
-    <span class="pt-plato"><span class="pt-e">${p.e}</span></span>
-    <span class="pt-n">${esc(p.n)}</span>${p.d?`<span class="pt-d">${esc(p.d)}</span>`:''}
-    ${q?`<span class="pt-f"><span class="pt-p">${porU(p)}</span></span><div class="step-q"><button type="button" data-act="menos" data-k="${p.k}" aria-label="Menos">−</button><span>${$c(q*p.p)}</span><button type="button" data-act="mas" data-k="${p.k}" aria-label="Más">+</button></div>`
-      :`<span class="pt-f"><span class="pt-p">${porU(p)}</span>${p.agotado?'':'<span class="pt-add" aria-hidden="true">+</span>'}</span>`}
+  return `<div class="pt c-${esc(p.c||'')}${q?' in':''}${p.agotado?' off':''}${p.k===C.ultimo?' pop':''}" style="--i:${Math.min(i||0,14)}" role="button" tabindex="0" data-act="tile" data-k="${p.k}" aria-label="${esc(p.n)}">
+    <span class="pt-e">${p.e}</span>
+    <span class="pt-t"><span class="pt-n">${esc(p.n)}</span><span class="pt-s"><span class="pt-p">${porU(p)}</span>${p.d?` · <span class="pt-d">${esc(p.d)}</span>`:''}</span></span>
+    ${p.agotado?'<span class="pt-agotado">Agotado</span>':q?`<span class="step-q"><button type="button" data-act="menos" data-k="${p.k}" aria-label="Menos ${esc(p.n)}">−</button><em>${esc(qtxt(q,p.u))}</em><button type="button" data-act="mas" data-k="${p.k}" aria-label="Más ${esc(p.n)}">+</button></span>`:'<span class="pt-add" aria-hidden="true">+</span>'}
   </div>`;
 }
-function receta(r){return `<button type="button" class="preset rc-${esc(r.c)}" data-act="receta" data-k="${r.k}"><span class="e">${r.e}</span><span class="t">${esc(r.n)}</span><small>${r.items.length} ingredientes · ${$c(costoReceta(r,C.personas))}</small></button>`;}
+const NUM_RX=/\b(un|una|dos|tres|cuatro|cinco|seis|siete|ocho|nueve|diez|doce|media|medio|kilo|kilos|docena)\b/;
+const pareceLista=t=>/\d|,|;|\n/.test(t)||NUM_RX.test(norm(t));
+// La tienda entera en una lista: secciones por pasillo y pestañas que saltan a cada una
 function pintarGrid(){
   const g=$('tlGrid');if(!g)return;
-  const q=norm(C.q).replace(/[\d.,]+/g,' ').replace(/\b(kg|kilos?|unid\w*|rollos?)\b/g,' ').trim();
-  const pas=$('tlPasillos');pas.hidden=!!q;
-  const fav=favoritos();
-  const pasillos=(fav.length>=3?[{k:'fav',n:'Tus favoritos',e:'💚'}]:[]).concat(CFG.pasillos,[{k:'recetas',n:'Recetas',e:'📖'}]);
-  if(!C.pasillo)C.pasillo=fav.length>=3?'fav':'top';
-  pas.innerHTML=pasillos.map(p=>`<button type="button" class="tg${C.pasillo===p.k?' on':''}" data-act="pasillo" data-k="${p.k}">${p.e} ${esc(p.n)}</button>`).join('');
-  g.classList.toggle('entra',!!C.animGrid);C.animGrid=false;
-  g.classList.toggle('con-recetas',!q&&C.pasillo==='recetas');
-  if(!q&&C.pasillo==='recetas'){g.innerHTML=RECETAS().map(receta).join('');return;}
-  let lista;
+  const modoLista=!!C.parse;
+  const q=modoLista?'':norm(C.q).replace(/[\d.,]+/g,' ').replace(/\b(kg|kilos?|unid\w*|rollos?)\b/g,' ').trim();
+  const secs=[];
   if(q){
     const w=q.split(/\s+/).filter(t=>!VACIAS.has(t));
-    lista=cat().filter(p=>{const n=norm(p.n);return w.every(t=>n.includes(t.replace(/(es|s)$/,'')));});
-  }else lista=C.pasillo==='fav'?fav:cat().filter(p=>C.pasillo==='top'?p.top:p.c===C.pasillo);
-  g.innerHTML=lista.length?lista.map((p,i)=>tile(p,i)).join(''):`<div class="vacio">No encontramos “${esc(C.q)}”. <button type="button" class="link" data-act="limpiar-q">Ver todo</button></div>`;
+    const res=cat().filter(p=>{const n=norm(p.n);return w.every(t=>n.includes(t.replace(/(es|s)$/,'')));});
+    secs.push({k:'res',n:res.length?`${res.length} ${res.length===1?'resultado':'resultados'}`:'',L:res});
+  }else if(!modoLista){
+    const fav=favoritos();
+    if(fav.length>=3)secs.push({k:'fav',n:'Tus favoritos',e:'💚',L:fav});
+    secs.push({k:'top',n:'Lo más pedido',e:'⭐',L:cat().filter(p=>p.top)});
+    (CFG.pasillos||[]).filter(p=>p.k!=='top').forEach(p=>{const L=cat().filter(x=>x.c===p.k);if(L.length)secs.push({k:p.k,n:p.n,e:p.e,L});});
+  }
+  const tabs=$('tlPasillos'),at=$('tlAtajos');
+  if(tabs){tabs.hidden=!!q||modoLista;tabs.innerHTML=secs.map(s=>`<button type="button" class="tab" data-act="pasillo" data-k="${s.k}">${s.e||''} ${esc(s.n)}</button>`).join('');}
+  if(at)at.hidden=!!q||modoLista;
+  g.classList.toggle('entra',!!C.animGrid);C.animGrid=false;
+  let i=0;
+  g.innerHTML=q&&!secs[0].L.length
+    ?`<div class="vacio">No encontramos “${esc(C.q)}”.<button type="button" class="link" data-act="limpiar-q">Ver toda la tienda</button></div>`
+    :secs.map(s=>`<section class="sec" id="pas-${s.k}" data-k="${s.k}">${s.n?`<h3 class="sec-h">${s.e?s.e+' ':''}${esc(s.n)}</h3>`:''}<div class="grupo">${s.L.map(p=>tile(p,i++)).join('')}</div></section>`).join('');
+  activarTab();
 }
+function activarTab(){
+  const secs=document.querySelectorAll('#tlGrid .sec');if(!secs.length)return;
+  const tope=($('tlBuscar')?.getBoundingClientRect().bottom||0)+24;
+  let k=secs[0].dataset.k;
+  secs.forEach(s=>{if(s.getBoundingClientRect().top<=tope)k=s.dataset.k;});
+  marcarTab(k);
+}
+function marcarTab(k){
+  const tabs=$('tlPasillos');if(!tabs)return;
+  tabs.querySelectorAll('.tab').forEach(b=>{
+    const on=b.dataset.k===k;if(on===b.classList.contains('on'))return;
+    b.classList.toggle('on',on);
+    if(on)tabs.scrollTo({left:b.offsetLeft-tabs.clientWidth/2+b.clientWidth/2,behavior:'smooth'});
+  });
+}
+let _spy=0;
+window.addEventListener('scroll',()=>{if(C.actual||C.paso!=='armar')return;cancelAnimationFrame(_spy);_spy=requestAnimationFrame(activarTab);},{passive:true});
 
+// ── 2 · Confirmar ──
 function mesaConfirmar(){
   asegurarRetiro();
-  const it=cestaItems(),r=C.retiro,s=suc(r.suc),t=T(),env=r.entrega==='envio',h=horaRetiro(),tot=cestaTotal(),P=C.perfil,f=faltaAlgo();
-  const modos=[['tienda','🚶','En la tienda'],...(t.alCarro?[['carro','🚗','Al carro']]:[]),...(t.envio!==false?[['envio','🛵','A mi casa']]:[])];
+  const it=cestaItems(),r=C.retiro,s=suc(r.suc),t=T(),env=r.entrega==='envio',tot=cestaTotal(),P=C.perfil,n=it.length;
+  const modos=[['tienda','🚶','En tienda'],...(t.alCarro?[['carro','🚗','Al carro']]:[]),...(t.envio!==false?[['envio','🛵','A casa']]:[])];
   const metodos=Object.entries(N.PAGOS).filter(([k])=>k!=='link'||t.linkTarjeta);
   if(!metodos.some(([k])=>k===C.pago.metodo))C.pago.metodo='sinpe';
-  const a=s?asap(s):null,sug=sugerencias();
-  const u=r.ubi;
-  const ubiH=env?`<div class="ubi">${u?`<iframe class="ubi-mapa" title="Tu ubicación" src="${mapaEmbed(u)}" loading="lazy"></iframe><div class="ubi-ok"><span>📍 <b>Ubicación lista</b>${u.acc?` · ±${u.acc} m`:''}</span><button type="button" class="link" data-act="ubi-gps">Volver a tomar</button></div>`
-      :`<button type="button" class="btn w" id="tlUbiBtn" data-act="ubi-gps">📍 Usar mi ubicación</button><input class="inp" id="tlUbiLink" placeholder="…o pegá un link de Google Maps" autocomplete="off">`}
-      <input class="inp" id="tlSenas" placeholder="Señas: casa verde, portón negro…" value="${esc(r.senas||'')}" autocomplete="street-address"></div>`:'';
-  const quien=perfilOk()&&!C.editPerfil
-    ?`<div class="yo"><span class="av">${esc(P.nombre.trim()[0]?.toUpperCase()||'·')}</span><div class="t"><strong>${esc(P.nombre)}</strong><small>${esc(fmtTel(P.tel))} · aquí te avisamos</small></div><button type="button" class="link" data-act="edit-perfil">Cambiar</button></div>`
-    :`<div class="dos"><label><span class="vh">Nombre</span><input class="inp" id="tlNombre" placeholder="Tu nombre" autocomplete="given-name" value="${esc(P.nombre)}"></label><label><span class="vh">Teléfono</span><input class="inp" id="tlTel" placeholder="Teléfono" inputmode="tel" autocomplete="tel" maxlength="20" value="${esc(P.tel)}"></label></div><div class="err" id="tlPerfilErr"></div>`;
-  return `<div class="hola"><p>Casi listo · revisá y sellá</p><h2>Confirmá tu pedido</h2></div>
-  <section class="bloque" id="tlSecCesta"><div class="bl-h"><h3>🧺 Tu canasta</h3><button type="button" class="link" data-act="ir" data-p="armar">＋ Agregar</button></div>
-    <div class="lineas">${it.map(x=>`<div class="linea"><span class="e">${x.p.e}</span><span class="t"><b>${esc(x.p.n)}</b><small>${esc(porU(x.p))}</small></span><span class="mini-q"><button type="button" data-act="menos" data-k="${x.k}" aria-label="Menos ${esc(x.p.n)}">−</button><em>${esc(qtxt(x.q,x.p.u))}</em><button type="button" data-act="mas" data-k="${x.k}" aria-label="Más ${esc(x.p.n)}">+</button></span><span class="pz">${$c(x.q*x.p.p)}</span></div>`).join('')}</div>
-    ${sug.length?`<div class="sug"><small>¿Te falta algo?</small><div class="quick">${sug.map(p=>`<button type="button" class="tg sug" data-act="sumar" data-k="${p.k}">＋ ${p.e} ${esc(p.n)}</button>`).join('')}</div></div>`:''}</section>
-  <section class="bloque" id="tlSecEntrega"><h3>📍 ¿Cómo la recibís?</h3>
-    <div class="seg" style="grid-template-columns:repeat(${modos.length},minmax(0,1fr))">${modos.map(([k,e,n])=>`<button type="button" class="${r.entrega===k?'on':''}" data-act="entrega" data-v="${k}"><b>${e}</b>${n}</button>`).join('')}</div>
-    ${r.entrega==='carro'?`<input class="inp" id="tlPlaca" placeholder="Placa o color del carro (opcional)" value="${esc(r.placa)}" autocomplete="off">`:''}${ubiH}
-    ${sucs().length>1?`<div class="mini-seg">${sucs().map(x=>`<button type="button" class="${r.suc===x.k?'on':''}" data-act="suc" data-k="${x.k}">${x.k==='moravia'?'🏠':'📍'} ${esc(x.n)}<small class="${abierta(x)?'abierto':'cerrado'}">${abierta(x)?'abierto':'cerrado'}</small></button>`).join('')}</div>`:''}
-    ${s?`<div class="tgs cuando"><button type="button" class="tg${r.modo==='asap'?' on':''}" data-act="cuando" data-v="asap" ${a?'':'disabled'}>⚡ ${a?`Lo antes posible · ${fh(a)}`:'Hoy ya no da tiempo'}</button><button type="button" class="tg${r.modo==='prog'?' on':''}" data-act="cuando" data-v="prog">🗓️ ${r.modo==='prog'&&h?esc(cuando(h)):'Programar'}</button></div>
-      ${r.modo==='prog'?`<div class="tgs" style="margin-top:8px">${[0,1,2].map(d=>`<button type="button" class="tg${r.dia===d?' on':''}" data-act="dia" data-d="${d}">${d===0?'Hoy':d===1?'Mañana':aFecha(2,0).toLocaleDateString('es-CR',{weekday:'long'})}</button>`).join('')}</div><div class="slots">${slots(s,r.dia).map(x=>`<button type="button" class="tg${r.hora&&+new Date(r.hora)===+x?' on':''}" data-act="hora" data-h="${x.toISOString()}">${fh(x)}</button>`).join('')||'<span class="note">Ese día ya no hay horas. Probá otro.</span>'}</div>`:''}`:''}</section>
-  <section class="bloque" id="tlSecDatos"><h3>👤 A nombre de</h3>${quien}</section>
-  <section class="bloque" id="tlSecPago"><h3>💳 ¿Cómo pagás?</h3>
-    <div class="pagos">${metodos.map(([k,m])=>`<button type="button" class="${C.pago.metodo===k?'on':''}" data-act="metodo" data-k="${k}"><b>${m.e}</b>${esc(m.n.replace(' al recoger','').replace(' Móvil',''))}</button>`).join('')}</div>
-    ${C.pago.metodo==='efectivo'?`<div class="tgs" style="margin-top:10px">${[0,...billetes(tot)].map(v=>`<button type="button" class="tg${(+C.pago.conCuanto||0)===v?' on':''}" data-act="con" data-v="${v}">${v?'Pago con '+$c(v):'Exacto'}</button>`).join('')}</div>`:''}
-    <p class="note">No pagás nada hasta que tu canasta esté lista.</p></section>
-  <details class="bloque mas"${C.nota?' open':''}><summary>⚙️ Si algo no hay: <b>${SUST[C.sust].n.toLowerCase()}</b>${C.nota?' · con nota':''}</summary>
-    <div class="tgs" style="margin-top:10px">${Object.entries(SUST).map(([k,x])=>`<button type="button" class="tg${C.sust===k?' on':''}" data-act="sust" data-k="${k}">${x.e} ${x.n}</button>`).join('')}</div>
-    <textarea class="inp" id="tlNota" style="margin-top:10px" placeholder="Nota para quien alista (opcional)">${esc(C.nota)}</textarea></details>
-  <div class="total-final"><span>Total aprox.<small>pagás lo que pese de verdad</small></span><b>${$c(tot)}${env?' <small>+ envío</small>':''}</b></div>
-  <button type="button" class="btn big w sellar${f?' apagado':''}" data-act="pedir" id="tlSellar">🔒 Sellar pedido · ${$c(tot)}</button>
-  ${N.modo()!=='nube'?'<p class="note c">💬 Al sellar te aparece un botón para avisarle a la tienda por WhatsApp.</p>':'<p class="note c">Podés cancelarlo mientras no lo empiecen a alistar.</p>'}`;
+  const a=s?asap(s):null,sug=sugerencias(),u=r.ubi;
+  const corto=m=>m.n.replace(' al recoger','').replace(' Móvil','').replace('Tarjeta en línea','Link');
+  return titulo('Confirmá tu pedido',{volver:'armar'})
+  +`<p class="grupo-h">Tu canasta · ${n} ${n===1?'producto':'productos'}<button type="button" class="link" data-act="ir" data-p="armar">＋ Agregar</button></p>
+  <div class="grupo" id="tlSecCesta">${it.map(x=>`<div class="linea"><span class="e">${x.p.e}</span><span class="t"><b>${esc(x.p.n)}</b><small>${esc(porU(x.p))}</small></span><span class="step-q"><button type="button" data-act="menos" data-k="${x.k}" aria-label="Menos ${esc(x.p.n)}">−</button><em>${esc(qtxt(x.q,x.p.u))}</em><button type="button" data-act="mas" data-k="${x.k}" aria-label="Más ${esc(x.p.n)}">+</button></span><span class="pz">${$c(x.q*x.p.p)}</span></div>`).join('')}</div>
+  ${sug.length?`<div class="sug"><span>¿Te falta algo?</span>${sug.map(p=>`<button type="button" class="chip" data-act="sumar" data-k="${p.k}">＋ ${p.e} ${esc(p.n)}</button>`).join('')}</div>`:''}
+  <p class="grupo-h">Entrega</p>
+  <div class="grupo" id="tlSecEntrega">
+    <div class="g-fila">${seg(modos.map(([k,e,nm])=>`<button type="button" class="${r.entrega===k?'on':''}" data-act="entrega" data-v="${k}">${e} ${nm}</button>`).join(''))}</div>
+    ${r.entrega==='carro'?`<label class="g-fila"><span class="g-l">Carro</span><input id="tlPlaca" placeholder="Placa o color (opcional)" value="${esc(r.placa)}" autocomplete="off"></label>`:''}
+    ${env?(u?`<div class="g-fila col"><iframe class="ubi-mapa" title="Tu ubicación" src="${mapaEmbed(u)}" loading="lazy"></iframe><div class="ubi-ok"><span>📍 Ubicación lista${u.acc?` · ±${u.acc} m`:''}</span><button type="button" class="link" data-act="ubi-gps">Volver a tomar</button></div></div>`
+      :`<div class="g-fila col"><button type="button" class="btn ghost w" id="tlUbiBtn" data-act="ubi-gps">📍 Usar mi ubicación</button><input id="tlUbiLink" class="inp" placeholder="…o pegá un link de Google Maps" autocomplete="off"></div>`)
+      +`<label class="g-fila"><span class="g-l">Señas</span><input id="tlSenas" placeholder="Casa verde, portón negro…" value="${esc(r.senas||'')}" autocomplete="street-address"></label>`:''}
+    ${sucs().length>1?`<div class="g-fila"><span class="g-l">${env?'Sale de':'Tienda'}</span>${seg(sucs().map(x=>`<button type="button" class="${r.suc===x.k?'on':''}" data-act="suc" data-k="${x.k}">${esc(x.n)}</button>`).join(''),'chico')}</div>`:''}
+    ${s?`<div class="g-fila"><span class="g-l">Hora</span>${seg(`<button type="button" class="${r.modo==='asap'?'on':''}" data-act="cuando" data-v="asap" ${a?'':'disabled'}>${a?'⚡ '+fh(a):'Hoy no da'}</button><button type="button" class="${r.modo==='prog'?'on':''}" data-act="cuando" data-v="prog">🗓️ Otra hora</button>`,'chico')}</div>
+      ${r.modo==='prog'?`<div class="g-fila col"><div class="chips">${[0,1,2].map(d=>`<button type="button" class="chip${r.dia===d?' on':''}" data-act="dia" data-d="${d}">${d===0?'Hoy':d===1?'Mañana':aFecha(2,0).toLocaleDateString('es-CR',{weekday:'long'})}</button>`).join('')}</div><div class="chips">${slots(s,r.dia).map(x=>`<button type="button" class="chip${r.hora&&+new Date(r.hora)===+x?' on':''}" data-act="hora" data-h="${x.toISOString()}">${fh(x)}</button>`).join('')||'<span class="nota">Ese día ya no hay horas. Probá otro.</span>'}</div></div>`:''}`:''}
+  </div>
+  <p class="grupo-h">A nombre de</p>
+  <div class="grupo" id="tlSecDatos">${perfilOk()&&!C.editPerfil
+    ?`<div class="g-fila"><span class="av">${esc(P.nombre.trim()[0]?.toUpperCase()||'·')}</span><span class="t"><b>${esc(P.nombre)}</b><small>${esc(fmtTel(P.tel))} · aquí te avisamos</small></span><button type="button" class="link" data-act="edit-perfil">Cambiar</button></div>`
+    :`<label class="g-fila"><span class="g-l">Nombre</span><input id="tlNombre" placeholder="Tu nombre" autocomplete="given-name" value="${esc(P.nombre)}"></label><label class="g-fila"><span class="g-l">Teléfono</span><input id="tlTel" placeholder="8888-8888" inputmode="tel" autocomplete="tel" maxlength="20" value="${esc(P.tel)}"></label><div class="err" id="tlPerfilErr"></div>`}</div>
+  <p class="grupo-h">Pago <small>nada hasta que esté lista</small></p>
+  <div class="grupo" id="tlSecPago">
+    <div class="g-fila">${seg(metodos.map(([k,m])=>`<button type="button" class="${C.pago.metodo===k?'on':''}" data-act="metodo" data-k="${k}">${m.e} ${esc(corto(m))}</button>`).join(''))}</div>
+    ${C.pago.metodo==='efectivo'?`<div class="g-fila"><span class="g-l">Pagás con</span>${seg([0,...billetes(tot)].map(v=>`<button type="button" class="${(+C.pago.conCuanto||0)===v?'on':''}" data-act="con" data-v="${v}">${v?$c(v):'Exacto'}</button>`).join(''),'chico')}</div>`:''}
+  </div>
+  <p class="grupo-h">Si algo no hay</p>
+  <div class="grupo"><div class="g-fila">${seg(Object.entries(SUST).map(([k,x])=>`<button type="button" class="${C.sust===k?'on':''}" data-act="sust" data-k="${k}">${x.e} ${{avisar:'Avisame',similar:'Parecido',quitar:'Quitalo'}[k]||x.n}</button>`).join(''),'chico')}</div>
+    <label class="g-fila"><span class="g-l">Nota</span><input id="tlNota" placeholder="Opcional: bolsas aparte…" value="${esc(C.nota)}" autocomplete="off"></label></div>
+  <p class="pie">Total aprox. <b>${$c(tot)}</b>${env?' + envío':''} · pagás lo que pese de verdad.<br>${N.modo()!=='nube'?'Al sellar, le avisás a la tienda por WhatsApp.':'Podés cancelarlo mientras no lo empiecen a alistar.'}</p>`;
 }
 function billetes(t){
   const out=[];
@@ -382,50 +419,54 @@ function billetes(t){
   return out;
 }
 
+// ── 3 · Seguimiento ──
+const _okAntes={};
 function mesaPedido(o){
-  const s=suc(o.sucursal),{r,n}=avance(o),t=T(),total=N.totalDe(o),aprox=N.esAprox(o),E=o.estado,env=o.retiro.envio;
+  const s=suc(o.sucursal),{r,n}=avance(o),total=N.totalDe(o),aprox=N.esAprox(o),E=o.estado,env=o.retiro.envio;
   const fin=E==='entregado'||E==='cancelado',local=N.modo()!=='nube';
   const waPendiente=!!o.waPendiente&&!o.avisado;
   const V={nuevo:local&&!o.avisado?(waPendiente?['WhatsApp abierto','warn']:['Falta avisar','warn']):['Pendiente de aceptación','run'],alistando:[`Alistando ${r}/${n}`,'run'],listo:[env?(env.uber?'En camino':'Lista'):'Lista','ok'],entregado:['Entregado','ok'],cancelado:['Cancelado','bad']}[E]||['—',''];
-  const titulo={nuevo:local&&!o.avisado?(waPendiente?'Confirmá el envío':'Avisale a la tienda'):'¡Pedido recibido!',alistando:'Escogiendo tu canasta',listo:env?'¡Va en camino!':'¡Tu canasta está lista!',entregado:'¡Que la disfrutés!',cancelado:'Pedido cancelado'}[E]||'Tu pedido';
-  const ahora={nuevo:local&&!o.avisado?(waPendiente?'Confirmá solo después de tocar Enviar en WhatsApp.':'Mandale el pedido a la tienda por WhatsApp.'):'La tienda lo acepta y empieza a escoger.',alistando:'Escogemos y pesamos cada producto. Los ✓ ya están en tu canasta.',listo:env?'Salió con Uber hacia tu ubicación.':`Te espera en ${esc(s?.n||'')} · ${esc(cuando(o.retiro.at))}.`,entregado:'Gracias por comprar en ARAMO.',cancelado:esc(o.motivo||'El pedido no siguió.')}[E];
+  const tit={nuevo:local&&!o.avisado?(waPendiente?'Confirmá el envío':'Avisale a la tienda'):'¡Pedido recibido!',alistando:'Escogiendo tu canasta',listo:env?'¡Va en camino!':'¡Tu canasta está lista!',entregado:'¡Que la disfrutés!',cancelado:'Pedido cancelado'}[E]||'Tu pedido';
+  const ahora={nuevo:local&&!o.avisado?(waPendiente?'Confirmá solo después de tocar Enviar en WhatsApp.':'Mandale el pedido a la tienda por WhatsApp.'):'La tienda lo acepta y empieza a escoger.',alistando:'Escogemos y pesamos cada producto.',listo:env?'Salió con Uber hacia tu ubicación.':`Te espera en ${esc(s?.n||'ARAMO')} · ${esc(cuando(o.retiro.at))}.`,entregado:'Gracias por comprar en ARAMO.',cancelado:esc(o.motivo||'El pedido no siguió.')}[E];
   const pct={nuevo:12,alistando:15+Math.round(70*(n?r/n:0)),listo:92,entregado:100,cancelado:0}[E]??0;
   const icoE={nuevo:'📥',alistando:'🧑‍🌾',listo:env?'🛵':'✅',entregado:'🛍️',cancelado:'✖️'}[E]||'🧺';
   const hora=k=>{const l=(o.log||[]).find(x=>x.s===k);return l?fh(l.t):'';};
-  const orden=['nuevo','alistando','listo','entregado'],idx=orden.indexOf(E);
-  const linea=E==='cancelado'?'':`<ol class="tr-line">${[['nuevo','Recibido',o.created?fh(o.created):''],['alistando','Alistando',hora('alistando')],['listo',env?'En camino':'Lista',hora('listo')],['entregado','Entregado',hora('entregado')]].map(([k,tt,h],i)=>`<li class="${i<idx?'si':i===idx?(E==='entregado'?'si':'ya'):''}">${tt}<small>${esc(h||'—')}</small></li>`).join('')}</ol>`;
-  const holo=o.items.map(i=>{
-    const cls=i.estado==='listo'?'ok':i.estado==='nohay'?'no':E==='alistando'?'wait':'';
-    const q=i.qr!=null&&i.qr!==''?+i.qr:i.q;
-    return `<div class="holo-it ${cls}" title="${esc(i.n)}"><b>${i.e}</b><em>${esc(i.n)}</em><small>${esc(qtxt(q,i.u))}</small></div>`;
-  }).join('');
-  return cab(E==='listo'||E==='entregado'?3:2,titulo,V[0],V[1])
-  +`<div class="tracker est-${E}"><div class="tr-ring" style="--p:${pct}"><b>${icoE}</b>${E==='alistando'?`<span>${r}/${n}</span>`:''}</div><div class="tr-t"><strong>Pedido ${esc(o.ref)}</strong><p>${ahora}</p><p class="tr-tot">${aprox?'Total aprox.':'Total'} <b>${$c(total)}</b></p></div></div>${linea}
-  ${E==='nuevo'&&local&&!o.avisado?(waPendiente?`<div class="card2 t"><h3>💬 ¿Ya lo enviaste?</h3><p>WhatsApp no le avisa a ARAMO si tocaste <b>Enviar</b>.</p><div class="acciones"><button type="button" class="btn ghost" data-act="wa-enviar">Abrir de nuevo</button><button type="button" class="btn" data-act="wa-confirmar">✅ Ya lo envié</button></div></div>`:`<div class="card2 t"><h3>💬 Último paso</h3><p>WhatsApp se abre con tu pedido listo para enviar.</p><button type="button" class="btn w big" style="margin-top:10px" data-act="wa-enviar">Avisar a la tienda por WhatsApp</button></div>`):''}
-  ${!fin?`<div class="sello" id="tlStep6"><div class="qr" id="tlQR" aria-label="Código QR de retiro"></div><div><p class="kicker" style="margin:0">Código de retiro</p><div class="pin">${esc(o.pin)}</div><small>${env?'Dáselo al repartidor si te lo pide':'Mostralo al recoger'}${o.retiro.carro?' · te la llevamos al carro':''}</small></div></div>`:''}
-  ${pagoHtml(o,total,aprox)}
-  ${env&&!fin?`<div class="card2"><h3>🛵 Envío con Uber</h3><p>${env.uber?`Pedido a las ${esc(fh(env.uber))} · va en camino.`:'Lo pedimos apenas tu canasta esté lista.'}${+env.costo?` Envío: ${$c(env.costo)} (incluido).`:''}</p></div>`:''}
-  ${E!=='cancelado'?`<div class="stage${E==='alistando'?' running':''}"><span class="tag">Tu canasta · en vivo</span><div class="scan"></div><div class="holo envuelve">${holo}</div></div>`:''}
-  ${detallePeso(o)}
-  ${!fin&&N.avisos.soportado()&&N.avisos.permiso()==='default'?`<button type="button" class="btn ghost w" style="margin-top:14px" data-act="avisame">🔔 Avisarme en el teléfono cuando esté lista</button>`:''}
-  ${E==='alistando'&&local?`<button type="button" class="btn ghost w" style="margin-top:10px" data-act="wa-estado">💬 Pedir el estado a la tienda</button>`:''}
-  ${E==='alistando'&&!local?`<button type="button" class="btn ghost w" style="margin-top:10px" data-act="actualizar-pedido">🔄 Revisar estado</button>`:''}
-  ${E==='entregado'?`<div class="card2" style="text-align:center"><h3>¿Qué tal estuvo todo?</h3><div class="caritas">${['😍','🙂','😐'].map((c,i)=>`<button type="button" class="${o.rating===3-i?'on':''}" data-act="rating" data-v="${3-i}" aria-label="Calificar ${3-i}">${c}</button>`).join('')}</div><button type="button" class="btn w" style="margin-top:12px" data-act="repetir" data-id="${o.id}">🔁 Repetir esta canasta</button></div>`:''}
-  <div class="acciones">${s&&!env&&!fin?`<button type="button" class="btn ghost" data-act="mapa">🗺️ Cómo llegar</button>`:''}<button type="button" class="btn ghost" data-act="wa-tienda">💬 Escribir a la tienda</button>${E==='nuevo'?`<button type="button" class="btn bad" style="grid-column:1/-1" data-act="cancelar">Cancelar pedido</button>`:''}</div>
-  <div class="next"><button type="button" class="btn${fin?' big w':' ghost'}" data-act="nuevo">＋ Nuevo pedido</button></div>`;
-}
-// Lista con nombres: lo que pediste contra lo que pesó (el monto final sale de aquí)
-function detallePeso(o){
-  if(o.estado==='nuevo'||o.estado==='cancelado')return '';
-  let dif=0;
-  const filas=o.items.map(i=>{
+  const idx=['nuevo','alistando','listo','entregado'].indexOf(E);
+  const linea=E==='cancelado'?'':`<ol class="tr-line">${[['Recibido',o.created?fh(o.created):''],['Alistando',hora('alistando')],[env?'En camino':'Lista',hora('listo')],['Entregado',hora('entregado')]].map(([tt,h],i)=>`<li class="${i<idx||(i===idx&&E==='entregado')?'si':i===idx?'ya':''}">${tt}<small>${esc(h||'—')}</small></li>`).join('')}</ol>`;
+  // la canasta: lo que se pidió, lo que pesó y si ya está lista (✓ al momento)
+  const antes=_okAntes[o.id]||new Set(),ahoraOk=new Set();let dif=0;
+  const items=o.items.map((i,j)=>{
     const real=i.qr!=null&&i.qr!=='',q=real?+i.qr:+i.q,pr=i.pr!=null&&i.pr!==''?+i.pr:+i.p;
-    if(i.estado==='nohay')return `<div class="l m"><span>${i.e} ${esc(i.n)} · no hubo</span><span>₡0</span></div>`;
-    const d=real&&i.u==='kg'&&Math.abs(q-i.q)>1e-9?q-i.q:0;dif+=(q-i.q)*pr;
-    return `<div class="l"><span>${i.e} ${esc(i.n)} · ${d?`pediste ${esc(qtxt(i.q,i.u))} → <b>pesó ${esc(kg(q))} kg</b>`:esc(qtxt(q,i.u))}</span><span>${$c(q*pr)}</span></div>`;
+    const st=i.estado==='listo'?'ok':i.estado==='nohay'?'no':E==='alistando'?'wait':'';
+    if(st==='ok')ahoraOk.add(j);
+    if(i.estado!=='nohay')dif+=(q-i.q)*pr;else dif-=i.q*pr;
+    const pesoDistinto=real&&i.u==='kg'&&Math.abs(q-i.q)>1e-9;
+    const det=i.estado==='nohay'?'no hubo':pesoDistinto?`pediste ${qtxt(i.q,i.u)} → pesó ${kg(q)} kg`:qtxt(q,i.u);
+    return `<div class="it ${st}${st==='ok'&&!antes.has(j)&&_okAntes[o.id]?' recien':''}"><span class="e">${i.e}</span><span class="t"><b>${esc(i.n)}</b><small>${esc(det)}</small></span><span class="pz">${i.estado==='nohay'?'₡0':$c(q*pr)}</span><span class="ck" aria-hidden="true">${st==='ok'?'✓':st==='no'?'✕':''}</span></div>`;
   }).join('');
-  const env=+o.retiro?.envio?.costo||0;
-  return `<details class="card2 pesos"${o.estado==='listo'?' open':''}><summary>⚖️ Lo que pesó cada producto</summary><div class="ticket">${filas}${env?`<div class="l m"><span>🛵 Envío Uber</span><span>${$c(env)}</span></div>`:''}<hr>${Math.abs(dif)>=1?`<div class="l m"><span>Ajuste por peso real</span><span>${dif>0?'+':'−'}${$c(Math.abs(dif))}</span></div>`:''}<div class="l t"><span>${N.esAprox(o)?'TOTAL APROX.':'TOTAL EXACTO'}</span><span>${$c(N.totalDe(o))}</span></div></div></details>`;
+  _okAntes[o.id]=ahoraOk;
+  const costoEnvio=+env?.costo||0,pesado=['listo','entregado'].includes(E)||o.items.some(i=>i.qr!=null&&i.qr!=='');
+  const acc=[
+    s&&!env&&!fin?fila('🗺️','Cómo llegar',esc(s.n),'mapa'):'',
+    fila('💬','Escribir a la tienda','Por WhatsApp','wa-tienda'),
+    E==='alistando'&&local?fila('🔄','Pedir el estado','Por WhatsApp','wa-estado'):'',
+    E==='alistando'&&!local?fila('🔄','Revisar estado','','actualizar-pedido'):'',
+    !fin&&N.avisos.soportado()&&N.avisos.permiso()==='default'?fila('🔔','Avisarme cuando esté lista','Notificación en el teléfono','avisame'):'',
+    E==='nuevo'?`<button type="button" class="fila-link rojo" data-act="cancelar"><span class="e">✖️</span><span class="t"><b>Cancelar pedido</b></span></button>`:'',
+  ].join('');
+  return titulo(tit,{verdict:V[0],cls:V[1]})
+  +`<div class="tracker est-${E}"><div class="tr-ring" style="--p:${pct}"><b>${icoE}</b>${E==='alistando'?`<span>${r}/${n}</span>`:''}</div><div class="tr-t"><strong>Pedido ${esc(o.ref)}</strong><p>${ahora}</p></div></div>${linea}
+  ${E==='nuevo'&&local&&!o.avisado?(waPendiente
+    ?`<div class="aviso"><b>💬 ¿Ya lo enviaste?</b><p>WhatsApp no le avisa a ARAMO si tocaste Enviar.</p><div class="dos-b"><button type="button" class="btn ghost" data-act="wa-enviar">Abrir de nuevo</button><button type="button" class="btn" data-act="wa-confirmar">✅ Ya lo envié</button></div></div>`
+    :`<div class="aviso"><b>💬 Último paso</b><p>WhatsApp se abre con tu pedido listo para enviar.</p><button type="button" class="btn big w" data-act="wa-enviar">Avisar a la tienda por WhatsApp</button></div>`):''}
+  ${!fin?`<div class="sello" id="tlStep6"><div class="qr" id="tlQR" aria-label="Código QR de retiro"></div><div><small>Código de retiro</small><div class="pin">${esc(o.pin)}</div><small>${env?'Dáselo al repartidor si te lo pide':'Mostralo al recoger'}${o.retiro.carro?' · te la llevamos al carro':''}</small></div></div>`:''}
+  ${pagoHtml(o,total,aprox)}
+  ${env&&!fin?`<div class="card2"><h3>🛵 Envío con Uber</h3><p>${env.uber?`Pedido a las ${esc(fh(env.uber))} · va en camino.`:'Lo pedimos apenas tu canasta esté lista.'}${costoEnvio?` Envío: ${$c(costoEnvio)} (incluido).`:''}</p></div>`:''}
+  ${E!=='cancelado'?`<p class="grupo-h">Tu canasta${E==='alistando'?` · ${r} de ${n} listos`:''}</p>
+  <div class="grupo items">${items}${costoEnvio?`<div class="it"><span class="e">🛵</span><span class="t"><b>Envío Uber</b></span><span class="pz">${$c(costoEnvio)}</span><span class="ck"></span></div>`:''}${pesado&&Math.abs(dif)>=1?`<div class="it ajuste"><span class="e">⚖️</span><span class="t"><b>Ajuste por peso real</b></span><span class="pz">${dif>0?'+':'−'}${$c(Math.abs(dif))}</span><span class="ck"></span></div>`:''}<div class="it total"><span class="e"></span><span class="t"><b>${aprox?'Total aprox.':'Total exacto'}</b></span><span class="pz">${$c(total)}</span><span class="ck"></span></div></div>`:''}
+  ${E==='entregado'?`<div class="card2 centro"><h3>¿Qué tal estuvo todo?</h3><div class="caritas">${['😍','🙂','😐'].map((c,i)=>`<button type="button" class="${o.rating===3-i?'on':''}" data-act="rating" data-v="${3-i}" aria-label="Calificar ${3-i}">${c}</button>`).join('')}</div><button type="button" class="btn w" style="margin-top:12px" data-act="repetir" data-id="${o.id}">🔁 Repetir esta canasta</button></div>`:''}
+  <div class="grupo acciones-l">${acc}</div>
+  <button type="button" class="btn w ${fin?'big':'ghost'} nuevo" data-act="nuevo">＋ Nuevo pedido</button>`;
 }
 function pagoHtml(o,total,aprox){
   const t=T(),m=o.pago||{},M=N.PAGOS[m.metodo]||N.PAGOS.efectivo;
@@ -439,12 +480,12 @@ function pagoHtml(o,total,aprox){
         ${num?`<div class="copia"><div><small>Número</small>${esc(fmtTel(num))}${sp.nombre?` · ${esc(sp.nombre)}`:''}</div><button type="button" data-act="copiar" data-v="${num}">Copiar</button></div>`:'<p>La tienda te envía el número por WhatsApp.</p>'}
         <div class="copia"><div><small>Monto</small>${$c(total)}</div><button type="button" data-act="copiar" data-v="${Math.round(total)}">Copiar</button></div>
         <div class="copia"><div><small>Descripción</small>${esc(o.ref)}</div><button type="button" data-act="copiar" data-v="${esc(o.ref)}">Copiar</button></div>
-        <div class="acciones"><button type="button" class="btn" data-act="ya-pague">Ya pagué</button><button type="button" class="btn ghost" data-act="comprobante">Enviar comprobante</button></div></div>`;
+        <div class="dos-b" style="margin-top:12px"><button type="button" class="btn" data-act="ya-pague">Ya pagué</button><button type="button" class="btn ghost" data-act="comprobante">Enviar comprobante</button></div></div>`;
     }
     return `<div class="card2"><h3>📲 SINPE Móvil</h3><p>Cuando esté lista te mostramos aquí el monto exacto, ya pesado, para pagar en un toque.</p></div>`;
   }
   if(m.metodo==='link'&&o.estado==='listo'&&t.linkTarjeta)
-    return `<div class="card2 w"><h3>🔗 Pagá con tarjeta</h3><div class="monto">${$c(total)}</div><button type="button" class="btn w" data-act="link-pago">Abrir pago seguro</button><p style="text-align:center;margin-top:8px"><button type="button" class="link" data-act="ya-pague">Ya pagué</button></p></div>`;
+    return `<div class="card2 w"><h3>🔗 Pagá con tarjeta</h3><div class="monto">${$c(total)}</div><button type="button" class="btn w" data-act="link-pago">Abrir pago seguro</button><p class="centro" style="margin-top:8px"><button type="button" class="link" data-act="ya-pague">Ya pagué</button></p></div>`;
   const vuelto=m.metodo==='efectivo'&&+m.conCuanto>total?` Llevás ${$c(m.conCuanto)}: tu vuelto es ${$c(+m.conCuanto-total)}.`:'';
   return `<div class="card2"><h3>${M.e} ${M.n}</h3><p>${aprox?'Total aproximado':'Total'} ${$c(total)}.${vuelto}</p></div>`;
 }
@@ -454,22 +495,11 @@ function pintarChips(){
   const v=$('tlVivo');if(!v)return;
   const en=N.modo()==='nube';v.classList.toggle('on',en);v.title=en?'Tienda en vivo':'Pedidos por WhatsApp';
 }
-function pintarSpine(){
-  const o=pedidoVisto(),envio=o?!!o.retiro?.envio:esEnvio(),E=o?.estado;
-  const a=o?2:C.paso==='armar'?0:1;
-  const L=[['🧺','Canasta'],['✅','Confirmar'],[envio?'🛵':'🛍️',envio?'Te llega':'Recogés']];
-  const st=i=>o?(i<2?'done':E==='cancelado'?'bad':E==='entregado'?'done':'on'):(i<a?'done':i===a?'on':'fut');
-  const nav=i=>o?i===2:(i!==a&&(i===0||!faltaArmar()));
-  $('tlSpine').innerHTML=`<ol class="steps" style="--prog:${a*50}%">${L.map(([e,nm],i)=>`<li class="step ${st(i)}" data-i="${i}"><button type="button" class="step-h" data-act="paso" data-i="${i}" ${nav(i)?'':'disabled'}><span class="dot"><em>${st(i)==='bad'?'✕':e}</em></span><h3>${nm}</h3></button></li>`).join('')}</ol>`;
-}
-function pedidoEnCurso(){
-  const o=pedidoVisto(),a=activo();
-  return !o&&a?`<button type="button" class="encurso" data-act="ver" data-id="${a.id}"><span>🛎️</span><span><b>Tu pedido ${esc(a.ref)}</b><small>${esc(resumenPedido(a))}</small></span><span>Ver →</span></button>`:'';
-}
 function pintarMesa(anim){
   const m=$('tlMesa'),o=pedidoVisto();
-  m.innerHTML=C.actual&&!o?cab(2,'No encontramos ese pedido en este teléfono','—','')+'<div class="next"><button type="button" class="btn" data-act="nuevo">＋ Nuevo pedido</button></div>'
-    :o?mesaPedido(o):pedidoEnCurso()+(C.paso==='confirmar'?mesaConfirmar():mesaArmar());
+  m.innerHTML=C.actual&&!o?titulo('No encontramos ese pedido en este teléfono',{volver:'armar'})
+    :o?mesaPedido(o):C.paso==='confirmar'?mesaConfirmar():mesaArmar();
+  document.body.dataset.pantalla=o?'pedido':C.paso;
   if(anim){m.classList.remove('fade');void m.offsetWidth;m.classList.add('fade');}
   if(!o&&C.paso==='armar')pintarGrid();
   if(o){pintarQR(o);animarAnillo(o.id);}
@@ -483,27 +513,18 @@ function animarAnillo(id){
   _anillo[id]=meta;if(antes===meta||MINI)return;
   el.style.setProperty('--p',antes);requestAnimationFrame(()=>requestAnimationFrame(()=>el.style.setProperty('--p',meta)));
 }
-function colocarMesa(){
-  const m=$('tlMesa'),grid=document.querySelector('.grid');
-  if(m.parentElement!==grid)grid.appendChild(m);
-}
 function pintarBit(){
-  const L=misPedidos();
-  const nAct=L.filter(o=>!['entregado','cancelado'].includes(o.estado)).length;
+  const nAct=misPedidos().filter(o=>!['entregado','cancelado'].includes(o.estado)).length;
   $('tlBitN').hidden=!nAct;$('tlBitN').textContent=nAct;
-  const cls={nuevo:'run',alistando:'run',listo:'ok',entregado:'ok',cancelado:'bad'};
-  const nom={nuevo:'Recibido',alistando:'Alistando',listo:'Lista',entregado:'Entregado',cancelado:'Cancelado'};
-  $('tlBit').innerHTML=`<p class="kicker">🧾 Mis pedidos</p>
-    ${L.length?`<div class="bit-l">${L.slice(0,20).map(o=>`<button type="button" class="bit-r" data-act="ver" data-id="${o.id}"><span class="t">${esc(fdia(o.created).replace(/^(\w)/,c=>c.toUpperCase()))} ${esc(fh(o.created))}</span><span class="r">${esc(o.ref)}</span><span class="e">${$c(N.totalDe(o))} · ${emojis(o.items,6)}</span><span class="s ${cls[o.estado]||''}">${nom[o.estado]||o.estado}</span></button>`).join('')}</div>`
-      :'<p class="note">Cada pedido que sellés queda aquí con su hora, su código y su estado.</p>'}
-    <button type="button" class="link tema" data-act="tema">${temaActual()==='dark'?'☀️ Usar tema claro':'🌙 Usar tema oscuro'}</button>`;
+  if(H?.tipo==='pedidos')pintarHoja();
 }
+// Abajo, siempre un solo botón: "Continuar" mientras comprás, "Sellar" al confirmar.
 function pintarBar(){
   const bar=$('tlBar'),inn=$('tlBarIn'),n=cestaN(),o=pedidoVisto();
   let h='';
   if(!o&&n&&!MINI){
     const conf=C.paso==='confirmar';
-    const btn=conf?`<button type="button" class="btn${faltaAlgo()?' apagado':''}" data-act="pedir">🔒 Sellar</button>`
+    const btn=conf?`<button type="button" class="btn${faltaAlgo()?' apagado':''}" data-act="pedir" id="tlSellar">🔒 Sellar pedido</button>`
       :`<button type="button" class="btn" data-act="siguiente">Continuar →</button>`;
     h=`<button type="button" class="tk" data-act="ir" data-p="armar" aria-label="Ver la canasta"><span class="tk-ico" id="tlTk">🧺<em>${n}</em></span><span class="tk-t"><small>${conf?'Total aprox.':n===1?'1 producto':n+' productos'}</small><strong id="tlTot">${$c(_totBar)}</strong></span></button>${btn}`;
   }
@@ -527,45 +548,57 @@ function pintarQR(o){
 }
 function render(anim){
   const y=window.scrollY,fa=document.activeElement,foco=fa&&fa.id&&fa.matches('input,textarea')?{id:fa.id,s:fa.selectionStart,e:fa.selectionEnd}:null;
-  const grid=document.querySelector('.grid'),mesa=$('tlMesa');if(mesa.parentElement!==grid)grid.appendChild(mesa); // sacarla antes de repintar el ciclo
-  pintarChips();pintarSpine();pintarMesa(anim);colocarMesa();pintarBit();pintarBar();ligar();
+  pintarChips();pintarMesa(anim);pintarBit();pintarBar();ligar();
   if(!anim)window.scrollTo(0,y);
   if(foco){const el=$(foco.id);if(el){el.focus({preventScroll:true});try{el.setSelectionRange(foco.s,foco.e);}catch{}}}
 }
 
-// ══════════════ Hojas (producto y receta) ══════════════
+// ══════════════ Hojas (producto, receta, recetas y mis pedidos) ══════════════
 let H=null;
 function abrirHoja(h){
-  H=h;pintarHoja();
-  $('tlSheet').classList.add('open');$('tlSheetBg').classList.add('open');
-  if(!MINI)history.pushState({paso:C.paso,id:C.actual,hoja:1},'',location.pathname+location.search);
+  const ya=!!H;H=h;pintarHoja();
+  $('tlSheet').classList.add('open');$('tlSheetBg').classList.add('open');$('tlSheet').scrollTop=0;
+  if(!MINI&&!ya)history.pushState({paso:C.paso,id:C.actual,hoja:1},'',location.pathname+location.search);
 }
 function cerrarHoja(desdeHist){
   if(!H)return;H=null;
   $('tlSheet').classList.remove('open');$('tlSheetBg').classList.remove('open');
   if(!desdeHist&&!MINI)history.back();
 }
+const CERRAR='<div class="sheet-grip"></div><button type="button" class="sheet-x" data-act="h-x" aria-label="Cerrar">✕</button>';
+function filaReceta(r){return fila(r.e,esc(r.n),`${r.items.length} ingredientes · ${$c(costoReceta(r,C.personas))}`,'receta',`data-k="${r.k}"`);}
 function pintarHoja(){
   const el=$('tlSheet');if(!H)return;
   if(H.tipo==='prod'){
     const p=prod(H.k),en=!!C.cesta[H.k],rapidos=p.u==='kg'?[.5,1,2,3]:[1,2,3,6,12];
-    el.innerHTML=`<div class="sheet-grip"></div><button type="button" class="sheet-x" data-act="h-x" aria-label="Cerrar">✕</button>
-      <div class="rc-hero es-prod c-${esc(p.c||'')}"><b>${p.e}</b><div><p class="kicker" style="margin:0">${esc((CFG.pasillos||[]).find(x=>x.k===p.c)?.n||'Producto')}</p><h2>${esc(p.n)}</h2><p class="sub mono">${porU(p)}</p></div></div>
+    el.innerHTML=`${CERRAR}
+      <div class="ficha c-${esc(p.c||'')}"><span class="ficha-e">${p.e}</span><h2>${esc(p.n)}</h2><p class="sub">${p.d?esc(p.d)+' · ':''}${porU(p)}</p></div>
       <div class="big-step"><button type="button" data-act="h-menos" aria-label="Menos">−</button><output>${esc(fq(H.q))}<small>${esc(fu(p.u,H.q))}</small></output><button type="button" data-act="h-mas" aria-label="Más">+</button></div>
-      <div class="tgs" style="justify-content:center">${rapidos.map(v=>`<button type="button" class="tg${H.q===v?' on':''}" data-act="h-set" data-v="${v}">${esc(qtxt(v,p.u))}</button>`).join('')}</div>
-      ${p.mad?`<span class="lbl">¿Para cuándo?</span><div class="tgs">${Object.entries(MAD).map(([k,n])=>`<button type="button" class="tg${H.mad===k?' on':''}" data-act="h-mad" data-v="${k}">${n}</button>`).join('')}</div>`:''}
-      <span class="lbl">Nota (opcional)</span><input class="inp" id="tlHNota" placeholder="Ej.: grandes, bien rojos…" value="${esc(H.nota)}" autocomplete="off">
-      <div style="display:flex;gap:8px;margin-top:18px">${en?`<button type="button" class="btn bad" data-act="h-quitar">Quitar</button>`:''}<button type="button" class="btn" style="flex:1" data-act="h-ok">${en?'Listo':'Agregar'} · ${$c(H.q*p.p)}</button></div>`;
+      ${seg(rapidos.map(v=>`<button type="button" class="${H.q===v?'on':''}" data-act="h-set" data-v="${v}">${esc(qtxt(v,p.u))}</button>`).join(''),'chico')}
+      ${p.mad?`<p class="grupo-h">¿Para cuándo?</p>${seg(Object.entries(MAD).map(([k,n])=>`<button type="button" class="${H.mad===k?'on':''}" data-act="h-mad" data-v="${k}">${n}</button>`).join(''),'chico')}`:''}
+      <input class="inp" id="tlHNota" placeholder="Nota (opcional): grandes, bien rojos…" value="${esc(H.nota)}" autocomplete="off">
+      <div class="hoja-a">${en?`<button type="button" class="btn ghost rojo" data-act="h-quitar">Quitar</button>`:''}<button type="button" class="btn" data-act="h-ok">${en?'Listo':'Agregar'} · ${$c(H.q*p.p)}</button></div>`;
     $('tlHNota').addEventListener('input',e=>{H.nota=e.target.value;});
-  }else{
+  }else if(H.tipo==='receta'){
     const r=RECETAS().find(x=>x.k===H.k),L=ingredientes(r,H.personas,H.off),tot=N.redondear5(L.filter(x=>x.on).reduce((t,x)=>t+x.q*x.p.p,0));
-    el.innerHTML=`<div class="sheet-grip"></div><button type="button" class="sheet-x" data-act="h-x" aria-label="Cerrar">✕</button>
-      <div class="rc-hero es-rec rc-${esc(r.c||'')}"><b>${r.e}</b><div><p class="kicker" style="margin:0">Receta</p><h2>${esc(r.n)}</h2><p class="sub">${esc(r.desc)}</p></div></div>
-      <span class="lbl">¿Para cuántas personas? · ${H.personas}</span>
-      <div class="gente">${[1,2,3,4,5,6,7,8].map(i=>`<button type="button" class="${i<=H.personas?'on':''}" data-act="h-per" data-v="${i}" aria-label="${i} personas">🧑<small>${i}</small></button>`).join('')}</div>
-      <span class="lbl">Ingredientes · se escalan solos</span>
-      <div>${L.map(x=>`<button type="button" class="ing${x.on?' on':''}" data-act="h-ing" data-k="${x.p.k}" ${x.p.agotado?'disabled':''}><span class="ck">${x.on?'✓':''}</span><span class="e">${x.p.e}</span><span><strong>${esc(x.p.n)}</strong><small>${x.p.agotado?'Agotado hoy':esc(qtxt(x.q,x.p.u))}</small></span><span class="pz">${$c(x.q*x.p.p)}</span></button>`).join('')}</div>
-      <button type="button" class="btn w big" style="margin-top:16px" data-act="h-receta" ${L.some(x=>x.on)?'':'disabled'}>Agregar a mi canasta · ${$c(tot)}</button>`;
+    el.innerHTML=`${CERRAR}
+      <div class="ficha"><span class="ficha-e">${r.e}</span><h2>${esc(r.n)}</h2><p class="sub">${esc(r.desc||'')}</p></div>
+      <div class="grupo"><div class="g-fila"><span class="g-l">Personas</span><span class="relleno"></span><span class="step-q"><button type="button" data-act="h-per" data-v="${Math.max(1,H.personas-1)}" aria-label="Menos personas">−</button><em>${H.personas}</em><button type="button" data-act="h-per" data-v="${Math.min(12,H.personas+1)}" aria-label="Más personas">+</button></span></div></div>
+      <p class="grupo-h">Ingredientes · tocá para quitar</p>
+      <div class="grupo">${L.map(x=>`<button type="button" class="ing${x.on?' on':''}" data-act="h-ing" data-k="${x.p.k}" ${x.p.agotado?'disabled':''}><span class="ck">${x.on?'✓':''}</span><span class="e">${x.p.e}</span><span class="t"><b>${esc(x.p.n)}</b><small>${x.p.agotado?'Agotado hoy':esc(qtxt(x.q,x.p.u))}</small></span><span class="pz">${$c(x.q*x.p.p)}</span></button>`).join('')}</div>
+      <button type="button" class="btn big w hoja-b" data-act="h-receta" ${L.some(x=>x.on)?'':'disabled'}>Agregar a mi canasta · ${$c(tot)}</button>`;
+  }else if(H.tipo==='recetas'){
+    const todas=RECETAS(),cats=(CFG.categoriasRecetas||[]).filter(c=>todas.some(r=>r.c===c.k)),otras=todas.filter(r=>!cats.some(c=>c.k===r.c));
+    el.innerHTML=`${CERRAR}<h2 class="sheet-t">📖 Recetas</h2><p class="sub">Tocá una y elegís para cuántas personas.</p>
+      ${cats.map(c=>`<p class="grupo-h">${c.e} ${esc(c.n)}</p><div class="grupo">${todas.filter(r=>r.c===c.k).map(filaReceta).join('')}</div>`).join('')}
+      ${otras.length?`<p class="grupo-h">Más recetas</p><div class="grupo">${otras.map(filaReceta).join('')}</div>`:''}`;
+  }else if(H.tipo==='pedidos'){
+    const L=misPedidos(),dark=temaActual()==='dark';
+    const cls={nuevo:'run',alistando:'run',listo:'ok',entregado:'ok',cancelado:'bad'},nom={nuevo:'Recibido',alistando:'Alistando',listo:'Lista',entregado:'Entregado',cancelado:'Cancelado'};
+    el.innerHTML=`${CERRAR}<h2 class="sheet-t">🧾 Mis pedidos</h2>
+      ${L.length?`<div class="grupo">${L.slice(0,20).map(o=>`<button type="button" class="bit-r" data-act="ver" data-id="${o.id}"><span class="e">${emojis(o.items,3)}</span><span class="t"><b>${esc(o.ref)} · ${$c(N.totalDe(o))}</b><small>${esc(fdia(o.created).replace(/^(\w)/,c=>c.toUpperCase()))} · ${esc(fh(o.created))}</small></span><span class="s ${cls[o.estado]||''}">${nom[o.estado]||o.estado}</span></button>`).join('')}</div>`
+        :'<p class="vacio">Todavía no tenés pedidos. Los que sellés aparecen aquí con su estado.</p>'}
+      <div class="grupo" style="margin-top:14px"><button type="button" class="fila-link" data-act="tema"><span class="e">${dark?'☀️':'🌙'}</span><span class="t"><b>${dark?'Usar tema claro':'Usar tema oscuro'}</b></span></button></div>`;
   }
 }
 function abrirProd(k){const p=prod(k);if(!p)return;const c=C.cesta[k];abrirHoja({tipo:'prod',k,q:c?.q||p.s,mad:c?.mad||'',nota:c?.nota||''});}
@@ -675,18 +708,24 @@ function dictar(){
   try{rec.start();}catch{rec=null;$('tlMic')?.classList.remove('on');}
 }
 function procesarLista(){
+  marcarBusqueda();
   const L=leerLista(C.q);
-  if(!L.length||!L.some(x=>x.p)){pintarGrid();return;}
-  C.parse=L;const el=$('tlParse');if(el)el.innerHTML=parseHtml();
+  C.parse=L.length&&L.some(x=>x.p)?L:null;
+  const el=$('tlParse');if(el)el.innerHTML=parseHtml();
+  pintarGrid();
 }
 
 // ══════════════ Eventos ══════════════
 let _qt=0;
+// El micrófono se cambia por ✕ cuando hay algo escrito.
+function marcarBusqueda(){const v=!!C.q;const m=$('tlMic'),x=$('tlLimpiar');if(m)m.hidden=v;if(x)x.hidden=!v;}
+function limpiarBusqueda(){C.q='';C.parse=null;const q=$('tlQ');if(q)q.value='';marcarBusqueda();const el=$('tlParse');if(el)el.innerHTML='';pintarGrid();}
 function ligar(){
   const f=$('tlAsk'),q=$('tlQ');
   if(f&&q){
-    f.addEventListener('submit',e=>{e.preventDefault();C.q=q.value;procesarLista();q.blur();});
-    q.addEventListener('input',()=>{C.q=q.value;if(C.parse){C.parse=null;$('tlParse').innerHTML='';}clearTimeout(_qt);_qt=setTimeout(pintarGrid,160);});
+    const buscar=()=>{C.q=q.value;marcarBusqueda();const L=pareceLista(C.q)?leerLista(C.q):null;C.parse=L&&L.some(x=>x.p)?L:null;$('tlParse').innerHTML=parseHtml();pintarGrid();};
+    f.addEventListener('submit',e=>{e.preventDefault();clearTimeout(_qt);buscar();q.blur();});
+    q.addEventListener('input',()=>{C.q=q.value;marcarBusqueda();clearTimeout(_qt);_qt=setTimeout(buscar,240);});
     $('tlMic').addEventListener('click',dictar);
   }
   const on=(id,fn)=>{const el=$(id);if(el)el.addEventListener('input',()=>fn(el.value));};
@@ -706,13 +745,15 @@ const ACT={
   mas(el){const p=prod(el.dataset.k);setQ(p.k,(C.cesta[p.k]?.q||0)+p.s);buzz(6);render();},
   menos(el){const p=prod(el.dataset.k);setQ(p.k,(C.cesta[p.k]?.q||0)-p.s);buzz(6);render();},
   info(el){abrirProd(el.dataset.k);},
-  pasillo(el){C.pasillo=el.dataset.k;C.animGrid=true;pintarGrid();el.scrollIntoView({behavior:'smooth',block:'nearest',inline:'center'});},
+  // la pestaña salta a su pasillo dentro de la lista
+  pasillo(el){const sec=$('pas-'+el.dataset.k);if(!sec)return;const tope=$('tlBuscar')?.offsetHeight||0;window.scrollTo({top:sec.getBoundingClientRect().top+window.scrollY-tope-6,behavior:'smooth'});marcarTab(el.dataset.k);},
+  recetas(){abrirHoja({tipo:'recetas'});},
   receta(el){abrirHoja({tipo:'receta',k:el.dataset.k,personas:C.personas,off:new Set()});},
   'mas-recetas'(){C.verRecetas=!C.verRecetas;render();},
   'rec-cat'(el){C.recCat=el.dataset.k;C.verRecetas=false;render();},
   sumar(el){add(el.dataset.k,el);},
   avisame(){N.avisos.pedir().then(r=>{toast(r==='granted'?'🔔 Listo: te avisamos en el teléfono':'Tu navegador no permitió avisos; te avisamos por WhatsApp');render();});},
-  'limpiar-q'(){C.q='';C.parse=null;const q=$('tlQ');if(q)q.value='';pintarGrid();},
+  'limpiar-q'(){limpiarBusqueda();$('tlQ')?.focus();},
   ir(el){ir(el.dataset.p);},
   paso(el){
     const i=+el.dataset.i;
@@ -735,7 +776,7 @@ const ACT={
     else{toast('🔁 '+pr+' en tu canasta');ir('armar');}
   },
   'parse-t'(el){const x=C.parse[+el.dataset.i];if(x.p&&!x.p.agotado)x.on=!x.on;$('tlParse').innerHTML=parseHtml();},
-  'parse-no'(){C.parse=null;$('tlParse').innerHTML='';},
+  'parse-no'(){limpiarBusqueda();},
   'parse-ok'(){
     const ok=C.parse.filter(x=>x.p&&x.on);
     ok.forEach(x=>sumar(x.p.k,x.q));
@@ -822,7 +863,7 @@ document.addEventListener('keydown',e=>{
   if((e.key==='Enter'||e.key===' ')&&e.target.matches?.('[role="button"][data-act]')){e.preventDefault();e.target.click();}
 });
 $('tlSheetBg').addEventListener('click',()=>cerrarHoja());
-$('tlBitBtn').addEventListener('click',()=>$('tlBit').scrollIntoView({behavior:'smooth',block:'start'}));
+$('tlBitBtn').addEventListener('click',()=>abrirHoja({tipo:'pedidos'}));
 
 // Tema: el del teléfono (claro u oscuro), o el que el cliente eligió
 function temaActual(){return document.documentElement.dataset.theme==='light'?'light':'dark';}
