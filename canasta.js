@@ -1,10 +1,11 @@
 /* ══════════════════════════════════════════════════════════════════════
    ARAMO Taller — premium y simple (2026-10-10).
-   Tres pantallas y un solo botón abajo:
-   Inicio: saludo, buscador (o lista dictada), categorías y productos en
-   tarjetas grandes; el + se abre en − cantidad +. El pedido en curso se ve
-   arriba como tarjeta en vivo. Tu canasta: revisar, entrega, datos y pago
-   en una página. Tu pedido: estado en vivo y siempre "‹ Volver a la tienda".
+   Inicio: saludo, buscador (o lista dictada), todas las categorías a la
+   vista y productos en tarjetas grandes; el + se abre en − cantidad +.
+   El pedido en curso se ve arriba como tarjeta en vivo.
+   Después, un paso a la vez: Tu canasta → Entrega → Datos y pago, con un
+   solo botón abajo. "↺ Reiniciar" vacía todo (con Deshacer).
+   Tu pedido: estado en vivo y siempre "‹ Volver a la tienda".
 
    La lógica es la de siempre: catálogo de la vitrina, recetas que se
    escalan, lista escrita o dictada, retiro/carro/envío con Uber, pagos,
@@ -32,9 +33,10 @@ const C={
   nota:LS.get('cn_nota',''),
   mis:LS.get('cn_mis',[]),
   personas:LS.get('cn_personas',4),
-  editPerfil:false,animGrid:true,
+  editPerfil:false,animGrid:true,toque:null,
 };
-if(C.retiro.carro&&C.retiro.entrega==='tienda')C.retiro.entrega='carro';
+// "Al carro" es lo mismo que recoger en tienda: ya no es una opción aparte
+if(C.retiro.entrega==='carro'){C.retiro.entrega='tienda';C.retiro.carro=false;}
 function guardar(){
   LS.set('cn_cesta',C.cesta);LS.set('cn_retiro',C.retiro);LS.set('cn_perfil',C.perfil);LS.set('cn_pago',C.pago);
   LS.set('cn_sust',C.sust);LS.set('cn_nota',C.nota);LS.set('cn_mis',C.mis);LS.set('cn_personas',C.personas);
@@ -145,7 +147,7 @@ function asegurarRetiro(){
       r.hora=(slots(s,r.dia)[0]||null)?.toISOString()||null;
     }
   }
-  if(r.entrega==='carro'&&!T().alCarro)r.entrega='tienda';
+  if(r.entrega==='carro')r.entrega='tienda';
   if(r.entrega==='envio'&&T().envio===false)r.entrega='tienda';
   r.carro=r.entrega==='carro';
 }
@@ -182,8 +184,8 @@ const fmtTel=t=>{const d=telDig(t);return d.length===8?d.slice(0,4)+'-'+d.slice(
 const perfilOk=()=>C.perfil.nombre.trim().length>=2&&telDig(C.perfil.tel).length===8;
 function faltaArmar(){return cestaN()?null:{m:'Agregá al menos un producto',p:'armar',f:'tlQ'};}
 function faltaRetiro(){
-  if(!suc(C.retiro.suc))return{m:'Elegí la tienda',p:'entrega',f:'tlSecEntrega'};
-  if(!horaRetiro())return{m:'Elegí la hora',p:'entrega',f:'tlSecEntrega'};
+  if(!suc(C.retiro.suc))return{m:'Elegí la tienda',p:'entrega',f:'tlSecSuc'};
+  if(!horaRetiro())return{m:'Elegí la hora',p:'entrega',f:'tlSecHora'};
   if(esEnvio()&&!C.retiro.ubi)return{m:'Falta tu ubicación para el envío',p:'entrega',f:'tlUbiBtn'};
   return null;
 }
@@ -253,11 +255,11 @@ function ingredientes(r,personas,off){
 }
 const costoReceta=(r,per)=>N.redondear5(ingredientes(r,per).filter(x=>x.on).reduce((t,x)=>t+x.q*x.p.p,0));
 
-// ══════════════ El recorrido: Canasta → Confirmar → Recogés ══════════════
-// Entrega, datos, pago y sellar viven juntos en "Confirmar" (una sola página).
-const normPaso=p=>p==='armar'?'armar':'confirmar';
+// ══════════════ El recorrido: Inicio → Canasta → Entrega → Datos y pago → Tu pedido ══════════════
+const PASOS=['armar','canasta','entrega','pago'];
+const normPaso=p=>({confirmar:'canasta',sellar:'pago',datos:'pago'})[p]||(PASOS.includes(p)?p:'armar');
 const pedidoVisto=()=>C.actual?N.get(C.actual):null;
-function puedeIr(paso){return normPaso(paso)==='confirmar'?faltaArmar():null;}
+function puedeIr(paso){const p=normPaso(paso);return p==='armar'?null:p==='pago'?faltaArmar()||faltaRetiro():faltaArmar();}
 function emojis(items,n=7){const e=items.map(x=>x.e||x.p?.e).filter(Boolean);return e.slice(0,n).join('')+(e.length>n?'…':'');}
 function resumenPedido(o){
   const {r,n}=avance(o),s=suc(o.sucursal);
@@ -275,7 +277,7 @@ function resumenPedido(o){
 // ══════════════ Navegación ══════════════
 function ir(paso){
   C.actual=null;C.paso=normPaso(paso);C.animGrid=true;
-  if(C.paso==='confirmar'){asegurarRetiro();C.retiro.visto=true;guardar();}
+  if(C.paso!=='armar'){asegurarRetiro();C.retiro.visto=true;guardar();}
   empujar();render(true);arriba();
 }
 function ver(id){
@@ -293,14 +295,19 @@ window.addEventListener('popstate',e=>{
 });
 
 // ══════════════ Pantallas ══════════════
-// Premium y simple: Inicio (productos) → Tu canasta → Tu pedido. Una cosa a la vez, todo con movimiento.
-// Siempre hay cómo volver: "‹ Volver" arriba, "Seguir comprando" abajo y la marca ARAMO lleva al inicio.
+// Premium y simple: Inicio → Tu canasta → Entrega → Datos y pago → Tu pedido.
+// Un paso a la vez y un solo botón abajo. Siempre hay cómo volver: "‹" arriba,
+// la línea de pasos, "Seguir comprando" y la marca ARAMO (lleva al inicio).
 const CHIP={fav:'💚',top:'⭐',frutas:'🍎',verduras:'🥬',raices:'🥔',hierbas:'🌿',despensa:'🥚',recetas:'📖'};
+const CORTO={top:'Más pedido'};
+const PASO_N={canasta:0,entrega:1,pago:2};
 function saludo(){const nom=C.perfil.nombre.trim().split(/\s+/)[0],h=new Date().getHours();const s=h<12?'Buenos días':h<18?'Buenas tardes':'Buenas noches';return nom?`${s}, ${esc(nom)}`:s;}
 function titulo(t,o={}){return `${o.volver?`<button type="button" class="volver" data-act="ir" data-p="${o.volver}"><b aria-hidden="true">‹</b>${esc(o.volverTxt||'Volver')}</button>`:''}<div class="titulo"><h2>${t}</h2>${o.verdict?`<span class="verdict ${o.cls||''}">${esc(o.verdict)}</span>`:''}</div>`;}
 function fila(e,t,s,act,attrs=''){return `<button type="button" class="fila-link" data-act="${act}" ${attrs}><span class="e">${e}</span><span class="t"><b>${t}</b>${s?`<small>${s}</small>`:''}</span><span class="go" aria-hidden="true">›</span></button>`;}
 const seg=(botones,cls='')=>`<div class="segm ${cls}">${botones}</div>`;
 const qcorto=(q,u)=>u==='kg'?fq(q)+' kg':fq(q);
+const zona=s=>s?esc(s.zona||s.n):'';
+const fhm=hhmm=>fh(aFecha(0,hm(hhmm)));
 // Estado de un pedido en palabras cortas, con su ícono y su avance (0-100)
 function estadoDe(o){
   const {r,n}=avance(o),env=o.retiro?.envio,E=o.estado,local=N.modo()!=='nube';
@@ -308,6 +315,14 @@ function estadoDe(o){
   const e={nuevo:'🛎️',alistando:'🧑‍🌾',listo:env?'🛵':'🛍️',entregado:'🛍️',cancelado:'✖️'}[E]||'🧺';
   const p={nuevo:12,alistando:20+Math.round(60*(n?r/n:0)),listo:92,entregado:100,cancelado:0}[E]??0;
   return {t,e,p};
+}
+// Encabezado de los pasos del pedido: volver y la línea Canasta · Entrega · Datos y pago
+let _p3=0;
+function cabPaso(paso){
+  const i=PASO_N[paso]??0,p=i/2,p0=_p3;_p3=p;
+  const [atras,txt]={canasta:['armar','Seguir comprando'],entrega:['canasta','Tu canasta'],pago:['entrega','Entrega']}[paso];
+  return `<button type="button" class="volver" data-act="ir" data-p="${atras}"><b aria-hidden="true">‹</b>${txt}</button>
+  <ol class="pasos3" style="--p0:${p0};--p:${p}" aria-label="Pasos del pedido">${[['canasta','Canasta'],['entrega','Entrega'],['pago','Datos y pago']].map(([k,n],j)=>`<li class="${j<i?'si':j===i?'ya':''}"><button type="button" data-act="ir" data-p="${k}" ${j<i?'':'disabled'} aria-label="${n}"><i>${j<i?'✓':j+1}</i></button>${n}</li>`).join('')}</ol>`;
 }
 
 // ── Inicio ──
@@ -319,8 +334,9 @@ function mesaArmar(){
   ${u&&!n&&!a?`<button type="button" class="repetir" data-act="repetir" data-id="${u.id}" data-express="1"><span class="rp-e">${emojis(u.items,3)}</span><span class="t"><b>Repetir mi último pedido</b><small>${u.items.length} ${u.items.length===1?'producto':'productos'} · ${$c(N.totalDe(u))}</small></span><span class="go" aria-hidden="true">›</span></button>`:''}
   <div class="buscar" id="tlBuscar">
     <form class="ask" id="tlAsk" autocomplete="off" role="search"><svg class="lupa" viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg><input id="tlQ" type="search" enterkeyhint="search" placeholder="Buscá o dictá tu lista" value="${esc(C.q)}" aria-label="Buscá un producto o escribí tu lista"><button type="button" class="mic" id="tlMic" aria-label="Dictar lista"${C.q?' hidden':''}>🎙️</button><button type="button" class="limpiar" id="tlLimpiar" data-act="limpiar-q" aria-label="Borrar"${C.q?'':' hidden'}>✕</button></form>
-    <nav class="tabs" id="tlPasillos" aria-label="Categorías"></nav>
+    <nav class="mini-cats" id="tlMini" aria-label="Categorías"></nav>
   </div>
+  <nav class="cats" id="tlPasillos" aria-label="Categorías"></nav>
   <div id="tlParse">${parseHtml()}</div>
   <div class="prods" id="tlGrid"></div>`;
 }
@@ -332,7 +348,7 @@ function parseHtml(){
 // Tarjeta de producto: el emoji en su plato, nombre y precio. El + flota y se abre en − cantidad +.
 function tile(p,i){
   const q=C.cesta[p.k]?.q||0;
-  return `<div class="pt c-${esc(p.c||'')}${q?' in':''}${p.agotado?' off':''}${p.k===C.ultimo?' pop':''}" style="--i:${Math.min(i||0,18)}" role="button" tabindex="0" data-act="tile" data-k="${p.k}" aria-label="${esc(p.n)}">
+  return `<div class="pt c-${esc(p.c||'')}${q?' in':''}${p.agotado?' off':''}${p.k===C.ultimo?' pop':''}${p.k===C.toque?' toque':''}" style="--i:${Math.min(i||0,18)}" role="button" tabindex="0" data-act="tile" data-k="${p.k}" aria-label="${esc(p.n)}">
     <span class="pt-plato"><span class="pt-e">${p.e}</span>${p.agotado?'<span class="pt-ago">Agotado</span>':q?`<span class="step-q"><button type="button" data-act="menos" data-k="${p.k}" aria-label="Menos ${esc(p.n)}">−</button><em>${esc(qcorto(q,p.u))}</em><button type="button" data-act="mas" data-k="${p.k}" aria-label="Más ${esc(p.n)}">+</button></span>`:'<span class="pt-add" aria-hidden="true">+</span>'}</span>
     <span class="pt-n">${esc(p.n)}</span><span class="pt-p">${porU(p)}</span>
   </div>`;
@@ -343,6 +359,7 @@ function receta(r,i){
 }
 const NUM_RX=/\b(un|una|dos|tres|cuatro|cinco|seis|siete|ocho|nueve|diez|doce|media|medio|kilo|kilos|docena)\b/;
 const pareceLista=t=>/\d|,|;|\n/.test(t)||NUM_RX.test(norm(t));
+// Las categorías se ven todas a la vez; al bajar, una fila compacta se queda arriba.
 function pintarGrid(){
   const g=$('tlGrid');if(!g)return;
   const modoLista=!!C.parse;
@@ -350,53 +367,76 @@ function pintarGrid(){
   const fav=favoritos();
   const cats=(fav.length>=3?[{k:'fav',n:'Favoritos'}]:[]).concat((CFG.pasillos||[]).map(p=>({k:p.k,n:p.k==='top'?'Lo más pedido':p.n})),[{k:'recetas',n:'Recetas'}]);
   if(!C.pasillo||!cats.some(f=>f.k===C.pasillo))C.pasillo=fav.length>=3?'fav':'top';
-  const tabs=$('tlPasillos');
-  if(tabs){tabs.hidden=!!q||modoLista;tabs.innerHTML=cats.map(f=>`<button type="button" class="tab${C.pasillo===f.k?' on'+(C.animGrid?' salta':''):''}" data-act="pasillo" data-k="${f.k}">${CHIP[f.k]||''} ${esc(f.n)}</button>`).join('');}
+  const tabs=$('tlPasillos'),mini=$('tlMini');
+  if(tabs){tabs.hidden=!!q||modoLista;tabs.innerHTML=cats.map(f=>{const on=C.pasillo===f.k;return `<button type="button" class="tab c-${f.k}${on?' on'+(C.animGrid?' salta':''):''}" data-act="pasillo" data-k="${f.k}"><span class="cat-e">${CHIP[f.k]||'🧺'}</span><span class="cat-n">${esc(CORTO[f.k]||f.n)}</span></button>`;}).join('');}
+  if(mini)mini.innerHTML=cats.map(f=>`<button type="button" class="mc c-${f.k}${C.pasillo===f.k?' on':''}" data-act="cat" data-c="${f.k}" aria-label="${esc(f.n)}" title="${esc(f.n)}">${CHIP[f.k]||'🧺'}</button>`).join('');
   const recetas=!q&&!modoLista&&C.pasillo==='recetas';
   g.classList.toggle('entra',!!C.animGrid);C.animGrid=false;
   g.classList.toggle('con-recetas',recetas);
   g.dataset.cat=q?'res':C.pasillo;
-  if(modoLista){g.innerHTML='';return;}
-  if(recetas){g.innerHTML=RECETAS().map((r,i)=>receta(r,i)).join('');return;}
-  let lista;
-  if(q){const w=q.split(/\s+/).filter(t=>!VACIAS.has(t));lista=cat().filter(p=>{const n=norm(p.n);return w.every(t=>n.includes(t.replace(/(es|s)$/,'')));});}
-  else lista=C.pasillo==='fav'?fav:cat().filter(p=>C.pasillo==='top'?p.top:p.c===C.pasillo);
-  g.innerHTML=lista.length?lista.map((p,i)=>tile(p,i)).join(''):`<div class="vacio"><b>🔍</b>No encontramos “${esc(C.q)}”.<button type="button" class="link" data-act="limpiar-q">Ver todo</button></div>`;
+  if(modoLista)g.innerHTML='';
+  else if(recetas)g.innerHTML=RECETAS().map((r,i)=>receta(r,i)).join('');
+  else{
+    let lista;
+    if(q){const w=q.split(/\s+/).filter(t=>!VACIAS.has(t));lista=cat().filter(p=>{const n=norm(p.n);return w.every(t=>n.includes(t.replace(/(es|s)$/,'')));});}
+    else lista=C.pasillo==='fav'?fav:cat().filter(p=>C.pasillo==='top'?p.top:p.c===C.pasillo);
+    g.innerHTML=lista.length?lista.map((p,i)=>tile(p,i)).join(''):`<div class="vacio"><b>🔍</b>No encontramos “${esc(C.q)}”.<button type="button" class="link" data-act="limpiar-q">Ver todo</button></div>`;
+  }
+  pegar();
 }
 
-// ── Tu canasta (revisar y pedir, todo en una página) ──
-function mesaConfirmar(){
+// ── Paso 1 · Tu canasta ──
+const BASURA='<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h16M10 11v6M14 11v6M6 7l1 12a2 2 0 0 0 2 2h6a2 2 0 0 0 2-2l1-12M9 7V4h6v3"/></svg>';
+let _totHero=0;
+function mesaCanasta(){
+  const it=cestaItems(),n=it.length,tot=cestaTotal(),peso=cestaPeso(),sug=sugerencias();
+  if(!n)return cabPaso('canasta')+`<div class="vacia"><span class="va-e">🧺</span><h2>Tu canasta está vacía</h2><p>Agregá frutas y verduras y aquí las vas a ver.</p><button type="button" class="btn big" data-act="nuevo">Ver productos</button></div>`;
+  return cabPaso('canasta')+`<div class="titulo"><h2>Tu canasta</h2></div>
+  <div class="cesta-hero"><span class="ch-deco" aria-hidden="true">🧺</span>
+    <span class="ch-e">${it.slice(-4).reverse().map(x=>`<i>${x.p.e}</i>`).join('')}${n>4?`<i class="mas">+${n-4}</i>`:''}</span>
+    <small>${n} ${n===1?'producto':'productos'}${peso?` · ≈ ${kg(peso)} kg`:''}</small>
+    <b id="tlHeroTot">${$c(_totHero)}</b>
+    <p>Total aproximado · pagás lo que pese de verdad</p></div>
+  <div class="grupo cesta" id="tlSecCesta">${it.map(x=>{const min=x.q<=x.p.s;return `<div class="linea c-${esc(x.p.c||'')}${x.k===C.toque?' toque':''}${x.k===C.ultimo?' nueva':''}" role="button" tabindex="0" data-act="info" data-k="${x.k}" aria-label="${esc(x.p.n)}: detalles"><span class="li-e">${x.p.e}</span><span class="t"><b>${esc(x.p.n)}</b><small>${esc(porU(x.p))}</small>${x.mad||x.nota?`<span class="li-n">${[x.mad?MAD[x.mad]:'',x.nota||''].filter(Boolean).map(esc).join(' · ')}</span>`:''}</span><span class="pz">${$c(x.q*x.p.p)}</span><span class="step-q"><button type="button" class="${min?'quita':''}" data-act="menos" data-k="${x.k}" aria-label="${min?'Quitar':'Menos'} ${esc(x.p.n)}">${min?BASURA:'−'}</button><em>${esc(qtxt(x.q,x.p.u))}</em><button type="button" data-act="mas" data-k="${x.k}" aria-label="Más ${esc(x.p.n)}">+</button></span></div>`;}).join('')}
+    <button type="button" class="agregar-mas" data-act="ir" data-p="armar">＋ Agregar más productos</button></div>
+  ${sug.length?`<p class="grupo-h">¿Te falta algo?</p><div class="sug2">${sug.map(p=>`<button type="button" class="mini-p c-${esc(p.c||'')}" data-act="sumar" data-k="${p.k}"><span class="mp-e">${p.e}<i aria-hidden="true">+</i></span><b>${esc(p.n)}</b><small>${esc(porU(p))}</small></button>`).join('')}</div>`:''}`;
+}
+
+// ── Paso 2 · Entrega ──
+const opcion=(on,act,attrs,e,b,sm,cls='')=>`<button type="button" class="opcion${on?' on':''}${cls?' '+cls:''}" data-act="${act}" ${attrs}>${e?`<span class="op-e">${e}</span>`:''}<span class="t"><b>${b}</b>${sm?`<small>${sm}</small>`:''}</span><i class="op-ck" aria-hidden="true"></i></button>`;
+function mesaEntrega(){
   asegurarRetiro();
-  const it=cestaItems(),r=C.retiro,s=suc(r.suc),t=T(),env=r.entrega==='envio',tot=cestaTotal(),P=C.perfil,n=it.length;
-  const modos=[['tienda','🚶','Tienda'],...(t.alCarro?[['carro','🚗','Al carro']]:[]),...(t.envio!==false?[['envio','🛵','A casa']]:[])];
+  const r=C.retiro,s=suc(r.suc),t=T(),env=r.entrega==='envio',u=r.ubi,a=s?asap(s):null;
+  const modos=[['tienda','🛍️','Recoger en tienda','Gratis · te la tenemos lista'],...(t.envio!==false?[['envio','🛵','A domicilio','Con Uber · el envío se paga aparte']]:[])];
+  return cabPaso('entrega')+`<div class="titulo"><h2>¿Cómo te la entregamos?</h2></div>
+  <div class="opciones" id="tlSecEntrega">${modos.map(([k,e,b,sm])=>opcion(r.entrega===k,'entrega',`data-v="${k}"`,e,b,sm)).join('')}</div>
+  ${sucs().length>1?`<p class="grupo-h">${env?'Sale de':'¿En cuál tienda?'}</p><div class="opciones dos" id="tlSecSuc">${sucs().map(x=>opcion(r.suc===x.k,'suc',`data-k="${x.k}"`,'',zona(x),abierta(x)?'Abierta · cierra <span class="nw">'+esc(fhm(x.cierra))+'</span>':'Abre a las <span class="nw">'+esc(fhm(x.abre))+'</span>')).join('')}</div>`:''}
+  ${env?`<p class="grupo-h">¿A dónde la llevamos?</p><div class="grupo" id="tlSecUbi">${u?`<div class="g-fila col"><iframe class="ubi-mapa" title="Tu ubicación" src="${mapaEmbed(u)}" loading="lazy"></iframe><div class="ubi-ok"><span>📍 Ubicación lista${u.acc?` · ±${u.acc} m`:''}</span><button type="button" class="link" data-act="ubi-gps">Volver a tomar</button></div></div>`
+      :`<div class="g-fila col"><button type="button" class="btn ghost w" id="tlUbiBtn" data-act="ubi-gps">📍 Usar mi ubicación</button><input id="tlUbiLink" class="inp" placeholder="…o pegá un link de Google Maps" autocomplete="off"></div>`}
+    <label class="g-fila"><span class="g-l">Señas</span><input id="tlSenas" placeholder="Casa verde, portón negro…" value="${esc(r.senas||'')}" autocomplete="street-address"></label></div>`:''}
+  ${s?`<p class="grupo-h">¿Cuándo?</p><div class="opciones" id="tlSecHora">${opcion(r.modo==='asap','cuando','data-v="asap"'+(a?'':' disabled'),'⚡','Lo antes posible',a?(env?'Sale a las ':'Lista a las ')+fh(a):'Hoy ya no da')}${opcion(r.modo==='prog','cuando','data-v="prog"','🗓️','Programar','Elegí día y hora')}</div>
+    ${r.modo==='prog'?`<div class="prog"><div class="chips">${[0,1,2].map(d=>`<button type="button" class="chip${r.dia===d?' on':''}" data-act="dia" data-d="${d}">${d===0?'Hoy':d===1?'Mañana':aFecha(2,0).toLocaleDateString('es-CR',{weekday:'long'})}</button>`).join('')}</div><div class="chips">${slots(s,r.dia).map(x=>`<button type="button" class="chip${r.hora&&+new Date(r.hora)===+x?' on':''}" data-act="hora" data-h="${x.toISOString()}">${fh(x)}</button>`).join('')||'<span class="nota">Ese día ya no hay horas. Probá otro.</span>'}</div></div>`:''}`:''}`;
+}
+
+// ── Paso 3 · Datos y pago (con "si algo no hay") ──
+function mesaPago(){
+  asegurarRetiro();
+  const it=cestaItems(),r=C.retiro,s=suc(r.suc),t=T(),env=r.entrega==='envio',tot=cestaTotal(),P=C.perfil,n=it.length,h=horaRetiro();
   const metodos=Object.entries(N.PAGOS).filter(([k])=>k!=='link'||t.linkTarjeta);
   if(!metodos.some(([k])=>k===C.pago.metodo))C.pago.metodo='sinpe';
-  const a=s?asap(s):null,sug=sugerencias(),u=r.ubi;
-  const corto=m=>m.n.replace(' al recoger','').replace(' Móvil','').replace('Tarjeta en línea','Link');
-  return titulo('Tu canasta',{volver:'armar',volverTxt:'Seguir comprando'})
-  +`<div class="grupo cesta" id="tlSecCesta">${it.map(x=>`<div class="linea c-${esc(x.p.c||'')}"><span class="li-e">${x.p.e}</span><span class="t"><b>${esc(x.p.n)}</b><small>${esc(porU(x.p))}</small></span><span class="pz">${$c(x.q*x.p.p)}</span><span class="step-q"><button type="button" data-act="menos" data-k="${x.k}" aria-label="Menos ${esc(x.p.n)}">−</button><em>${esc(qtxt(x.q,x.p.u))}</em><button type="button" data-act="mas" data-k="${x.k}" aria-label="Más ${esc(x.p.n)}">+</button></span></div>`).join('')}
-    <button type="button" class="agregar-mas" data-act="ir" data-p="armar">＋ Agregar más productos</button></div>
-  ${sug.length?`<div class="sug"><span>¿Te falta algo?</span>${sug.map(p=>`<button type="button" class="chip" data-act="sumar" data-k="${p.k}">＋ ${p.e} ${esc(p.n)}</button>`).join('')}</div>`:''}
-  <p class="grupo-h">Entrega</p>
-  <div class="grupo" id="tlSecEntrega">
-    <div class="g-fila">${seg(modos.map(([k,e,nm])=>`<button type="button" class="${r.entrega===k?'on':''}" data-act="entrega" data-v="${k}">${e} ${nm}</button>`).join(''))}</div>
-    ${r.entrega==='carro'?`<label class="g-fila"><span class="g-l">Carro</span><input id="tlPlaca" placeholder="Placa o color (opcional)" value="${esc(r.placa)}" autocomplete="off"></label>`:''}
-    ${env?(u?`<div class="g-fila col"><iframe class="ubi-mapa" title="Tu ubicación" src="${mapaEmbed(u)}" loading="lazy"></iframe><div class="ubi-ok"><span>📍 Ubicación lista${u.acc?` · ±${u.acc} m`:''}</span><button type="button" class="link" data-act="ubi-gps">Volver a tomar</button></div></div>`
-      :`<div class="g-fila col"><button type="button" class="btn ghost w" id="tlUbiBtn" data-act="ubi-gps">📍 Usar mi ubicación</button><input id="tlUbiLink" class="inp" placeholder="…o pegá un link de Google Maps" autocomplete="off"></div>`)
-      +`<label class="g-fila"><span class="g-l">Señas</span><input id="tlSenas" placeholder="Casa verde, portón negro…" value="${esc(r.senas||'')}" autocomplete="street-address"></label>`:''}
-    ${sucs().length>1?`<div class="g-fila"><span class="g-l">${env?'Sale de':'Tienda'}</span>${seg(sucs().map(x=>`<button type="button" class="${r.suc===x.k?'on':''}" data-act="suc" data-k="${x.k}">${esc(x.n)}</button>`).join(''),'chico')}</div>`:''}
-    ${s?`<div class="g-fila"><span class="g-l">Hora</span>${seg(`<button type="button" class="${r.modo==='asap'?'on':''}" data-act="cuando" data-v="asap" ${a?'':'disabled'}>${a?'⚡ '+fh(a):'Hoy no da'}</button><button type="button" class="${r.modo==='prog'?'on':''}" data-act="cuando" data-v="prog">🗓️ Otra hora</button>`,'chico')}</div>
-      ${r.modo==='prog'?`<div class="g-fila col"><div class="chips">${[0,1,2].map(d=>`<button type="button" class="chip${r.dia===d?' on':''}" data-act="dia" data-d="${d}">${d===0?'Hoy':d===1?'Mañana':aFecha(2,0).toLocaleDateString('es-CR',{weekday:'long'})}</button>`).join('')}</div><div class="chips">${slots(s,r.dia).map(x=>`<button type="button" class="chip${r.hora&&+new Date(r.hora)===+x?' on':''}" data-act="hora" data-h="${x.toISOString()}">${fh(x)}</button>`).join('')||'<span class="nota">Ese día ya no hay horas. Probá otro.</span>'}</div></div>`:''}`:''}
+  const corto=m=>m.n.replace(' al recoger','').replace('Tarjeta en línea','Link de pago');
+  return cabPaso('pago')+`<div class="titulo"><h2>Datos y pago</h2></div>
+  <div class="grupo recap">
+    <button type="button" class="fila-link" data-act="ir" data-p="canasta"><span class="e">${emojis(it,3)}</span><span class="t"><b>${n} ${n===1?'producto':'productos'} · ${$c(tot)}</b><small>Total aproximado</small></span><span class="cambiar">Cambiar</span></button>
+    <button type="button" class="fila-link" data-act="ir" data-p="entrega"><span class="e">${env?'🛵':'🛍️'}</span><span class="t"><b>${env?'A domicilio':'Recoger en '+(zona(s)||'la tienda')}</b><small>${h?esc(cuando(h)):'Falta elegir la hora'}${env&&s?' · sale de '+zona(s):''}</small></span><span class="cambiar">Cambiar</span></button>
   </div>
   <p class="grupo-h">Tus datos</p>
   <div class="grupo" id="tlSecDatos">${perfilOk()&&!C.editPerfil
     ?`<div class="g-fila"><span class="av">${esc(P.nombre.trim()[0]?.toUpperCase()||'·')}</span><span class="t"><b>${esc(P.nombre)}</b><small>${esc(fmtTel(P.tel))} · aquí te avisamos</small></span><button type="button" class="link" data-act="edit-perfil">Cambiar</button></div>`
     :`<label class="g-fila"><span class="g-l">Nombre</span><input id="tlNombre" placeholder="Tu nombre" autocomplete="given-name" value="${esc(P.nombre)}"></label><label class="g-fila"><span class="g-l">Teléfono</span><input id="tlTel" placeholder="8888-8888" inputmode="tel" autocomplete="tel" maxlength="20" value="${esc(P.tel)}"></label><div class="err" id="tlPerfilErr"></div>`}</div>
   <p class="grupo-h">Pago <small>pagás cuando esté lista</small></p>
-  <div class="grupo" id="tlSecPago">
-    <div class="g-fila">${seg(metodos.map(([k,m])=>`<button type="button" class="${C.pago.metodo===k?'on':''}" data-act="metodo" data-k="${k}">${m.e} ${esc(corto(m))}</button>`).join(''))}</div>
-    ${C.pago.metodo==='efectivo'?`<div class="g-fila"><span class="g-l">Pagás con</span>${seg([0,...billetes(tot)].map(v=>`<button type="button" class="${(+C.pago.conCuanto||0)===v?'on':''}" data-act="con" data-v="${v}">${v?$c(v):'Exacto'}</button>`).join(''),'chico')}</div>`:''}
-  </div>
+  <div class="opciones tres" id="tlSecPago">${metodos.map(([k,m])=>`<button type="button" class="opcion pago${C.pago.metodo===k?' on':''}" data-act="metodo" data-k="${k}"><span class="op-e">${m.e}</span><b>${esc(corto(m))}</b><i class="op-ck" aria-hidden="true"></i></button>`).join('')}</div>
+  ${C.pago.metodo==='efectivo'?`<div class="grupo efectivo"><div class="g-fila col"><span class="g-l">¿Con cuánto pagás?</span>${seg([0,...billetes(tot)].map(v=>`<button type="button" class="${(+C.pago.conCuanto||0)===v?'on':''}" data-act="con" data-v="${v}">${v?$c(v):'Exacto'}</button>`).join(''),'chico')}</div></div>`:''}
   <p class="grupo-h">Si algo no hay</p>
   <div class="grupo"><div class="g-fila">${seg(Object.entries(SUST).map(([k,x])=>`<button type="button" class="${C.sust===k?'on':''}" data-act="sust" data-k="${k}">${{avisar:'Avisame',similar:'Algo parecido',quitar:'Quitalo'}[k]||x.n}</button>`).join(''),'chico')}</div>
     <label class="g-fila"><span class="g-l">Nota</span><input id="tlNota" placeholder="Opcional: bolsas aparte…" value="${esc(C.nota)}" autocomplete="off"></label></div>
@@ -486,38 +526,45 @@ function pintarChips(){
 }
 // Las pantallas entran deslizándose (adelante desde la derecha, atrás desde la izquierda).
 // --t mantiene la fase de las animaciones continuas aunque la pantalla se vuelva a pintar.
+const VISTA_POS={armar:0,canasta:1,entrega:2,pago:3,pedido:4};
 let _pos=-1,_mt=0;
+function vistaActual(){return C.actual?'pedido':C.paso==='armar'?'armar':!cestaN()?'canasta':C.paso;}
 function pintarMesa(anim){
-  const m=$('tlMesa'),o=pedidoVisto();
-  const pos=o||C.actual?2:C.paso==='confirmar'?1:0;
+  const m=$('tlMesa'),o=pedidoVisto(),vista=vistaActual(),pos=VISTA_POS[vista]??0;
+  if(vista==='armar'||vista==='pedido')_p3=0;
   m.style.setProperty('--t',-(performance.now()/1000%60).toFixed(3)+'s');
   m.innerHTML=C.actual&&!o?titulo('No encontramos ese pedido en este teléfono',{volver:'armar',volverTxt:'Volver a la tienda'})
-    :o?mesaPedido(o):C.paso==='confirmar'?mesaConfirmar():mesaArmar();
-  document.body.dataset.pantalla=o?'pedido':C.paso;
+    :o?mesaPedido(o):vista==='canasta'?mesaCanasta():vista==='entrega'?mesaEntrega():vista==='pago'?mesaPago():mesaArmar();
+  document.body.dataset.pantalla=vista;
   if(anim&&!MINI){
     const dir=_pos<0||pos===_pos?'fade':pos>_pos?'adelante':'atras';
     m.classList.remove('adelante','atras','fade');void m.offsetWidth;m.classList.add(dir);
     clearTimeout(_mt);_mt=setTimeout(()=>m.classList.remove(dir),900);
   }
   _pos=pos;
-  if(!o&&C.paso==='armar')pintarGrid();
+  if(vista==='armar')pintarGrid();
+  if(vista==='canasta'&&cestaN()){contar($('tlHeroTot'),_totHero,cestaTotal());_totHero=cestaTotal();}
   if(o)pintarQR(o);
-  C.pulso=false;C.ultimo=null;
+  C.pulso=false;C.ultimo=null;C.toque=null;
 }
 function pintarBit(){
   const nAct=misPedidos().filter(o=>!['entregado','cancelado'].includes(o.estado)).length;
   $('tlBitN').hidden=!nAct;$('tlBitN').textContent=nAct;
+  const ri=$('tlReini');if(ri)ri.hidden=MINI||!cestaN()||!!C.actual;
   if(H?.tipo==='pedidos')pintarHoja();
 }
-// Abajo, un solo botón: "Ver canasta" mientras comprás, "Hacer pedido" en la canasta.
+// Abajo, un solo botón: "Ver canasta" mientras comprás, "Continuar" en cada paso y "Hacer pedido" al final.
 function pintarBar(){
   const bar=$('tlBar'),inn=$('tlBarIn'),n=cestaN(),o=pedidoVisto();
   let h='';
   if(!o&&!C.actual&&n&&!MINI){
-    const conf=C.paso==='confirmar',it=cestaItems();
-    const ico=`<span class="tk-ico" id="tlTk">${it.slice(-3).map(x=>`<i>${x.p.e}</i>`).join('')}<em>${n}</em></span><span class="tk-t"><small>${conf?'Total aprox.':n===1?'1 producto':n+' productos'}</small><strong id="tlTot">${$c(_totBar)}</strong></span>`;
-    h=conf?`<div class="tk">${ico}</div><button type="button" class="btn${faltaAlgo()?' apagado':''}" data-act="pedir" id="tlSellar">Hacer pedido</button>`
-      :`<button type="button" class="tk" data-act="siguiente" aria-label="Ver mi canasta">${ico}</button><button type="button" class="btn" data-act="siguiente">Ver canasta <b aria-hidden="true">→</b></button>`;
+    const P=C.paso,it=cestaItems();
+    const ico=`<span class="tk-ico" id="tlTk">${it.slice(-3).map(x=>`<i>${x.p.e}</i>`).join('')}<em>${n}</em></span><span class="tk-t"><small>${P==='armar'?(n===1?'1 producto':n+' productos'):'Total aprox.'}</small><strong id="tlTot">${$c(_totBar)}</strong></span>`;
+    const tk=P==='armar'?`<button type="button" class="tk" data-act="siguiente" aria-label="Ver mi canasta">${ico}</button>`
+      :P==='canasta'?`<div class="tk">${ico}</div>`:`<button type="button" class="tk" data-act="ir" data-p="canasta" aria-label="Ver mi canasta">${ico}</button>`;
+    const btn=P==='pago'?`<button type="button" class="btn${faltaAlgo()?' apagado':''}" data-act="pedir" id="tlSellar">Hacer pedido</button>`
+      :`<button type="button" class="btn" data-act="siguiente">${P==='armar'?'Ver canasta':'Continuar'} <b aria-hidden="true">→</b></button>`;
+    h=tk+btn;
   }
   bar.classList.toggle('hide',!h);
   if(h){inn.innerHTML=h;contar($('tlTot'),_totBar,cestaTotal());_totBar=cestaTotal();}
@@ -531,8 +578,14 @@ function contar(el,de,a){
   const paso=t=>{const k=Math.min(1,(t-t0)/d),e=1-Math.pow(1-k,3);el.textContent=$c(Math.round(de+(a-de)*e));if(k<1)_raf[el.id]=requestAnimationFrame(paso);};
   _raf[el.id]=requestAnimationFrame(paso);
 }
-// El buscador se "pega" arriba con fondo de vidrio solo cuando bajás entre los productos
-function pegar(){const b=$('tlBuscar');if(b)b.classList.toggle('pegado',b.getBoundingClientRect().top<1);}
+// El buscador se "pega" arriba con fondo de vidrio al bajar; cuando las categorías
+// quedan atrás, aparece debajo la fila compacta con todas.
+function pegar(){
+  const b=$('tlBuscar');if(!b)return;
+  const r=b.getBoundingClientRect(),c=$('tlPasillos');
+  b.classList.toggle('pegado',r.top<1);
+  b.classList.toggle('mini',!!c&&!c.hidden&&c.getBoundingClientRect().bottom<r.bottom+2);
+}
 window.addEventListener('scroll',pegar,{passive:true});
 function pintarQR(o){
   const el=$('tlQR');if(!el)return;
@@ -655,7 +708,11 @@ function campana(){
 
 // ══════════════ Efectos ══════════════
 let _tt=0;
-function toast(m){const t=$('tlToast');t.textContent=m;t.classList.add('show');clearTimeout(_tt);_tt=setTimeout(()=>t.classList.remove('show'),2600);}
+function toast(m,acc){
+  const t=$('tlToast');t.textContent=m;
+  if(acc){const b=document.createElement('button');b.type='button';b.textContent=acc.txt;b.addEventListener('click',()=>{t.classList.remove('show');acc.fn();});t.append(b);}
+  t.classList.toggle('accion',!!acc);t.classList.add('show');clearTimeout(_tt);_tt=setTimeout(()=>t.classList.remove('show'),acc?5500:2600);
+}
 function volar(emoji,desde){
   const a=desde.getBoundingClientRect();
   const s=document.createElement('span');s.className='vuelo';s.textContent=emoji;
@@ -734,14 +791,32 @@ function ligar(){
 }
 const ACT={
   tile(el){const k=el.dataset.k;if(C.cesta[k])abrirProd(k);else add(k,el);},
-  mas(el){const p=prod(el.dataset.k);setQ(p.k,(C.cesta[p.k]?.q||0)+p.s);buzz(6);render();},
-  menos(el){const p=prod(el.dataset.k);setQ(p.k,(C.cesta[p.k]?.q||0)-p.s);buzz(6);render();},
+  mas(el){const p=prod(el.dataset.k);setQ(p.k,(C.cesta[p.k]?.q||0)+p.s);C.toque=p.k;buzz(6);render();},
+  // al llegar a cero se quita (con Deshacer); en "Tu canasta" la fila se va deslizando
+  menos(el){
+    const p=prod(el.dataset.k);if(!p)return;
+    const q=+((C.cesta[p.k]?.q||0)-p.s).toFixed(2);
+    if(q>0){setQ(p.k,q);C.toque=p.k;buzz(6);render();return;}
+    const antes=C.cesta[p.k],pos=Object.keys(C.cesta).indexOf(p.k),fila=el.closest('.linea');
+    const quitar=()=>{setQ(p.k,0);render();toast(`${p.e} ${p.n} quitado`,{txt:'Deshacer',fn:()=>{const L=Object.entries(C.cesta);L.splice(Math.max(0,pos),0,[p.k,antes]);C.cesta=Object.fromEntries(L);guardar();C.toque=p.k;render();}});};
+    buzz(10);
+    if(fila&&!MINI){fila.classList.add('sale');setTimeout(quitar,230);}else quitar();
+  },
+  // empezar de cero: vacía la canasta y vuelve al inicio (con Deshacer)
+  reiniciar(){
+    if(!cestaN())return;
+    const antes={cesta:JSON.parse(JSON.stringify(C.cesta)),nota:C.nota,paso:C.paso};
+    C.cesta={};C.nota='';C.parse=null;C.q='';C.pasillo=null;C.editPerfil=false;guardar();buzz([20,30,20]);
+    ir('armar');
+    toast('🧺 Empezamos de cero',{txt:'Deshacer',fn:()=>{C.cesta=antes.cesta;C.nota=antes.nota;guardar();ir(antes.paso==='armar'?'armar':'canasta');}});
+  },
   info(el){abrirProd(el.dataset.k);},
+  // si ya bajaste entre los productos, sube al inicio de la categoría (bajo el buscador y la fila compacta)
   pasillo(el){
     C.pasillo=el.dataset.k;C.animGrid=true;pintarGrid();
-    const t=$('tlPasillos'),b=t?.querySelector('.tab.on');if(b)t.scrollTo({left:b.offsetLeft-t.clientWidth/2+b.clientWidth/2,behavior:'smooth'});
-    const g=$('tlGrid'),bus=$('tlBuscar');if(g&&bus){const y=g.getBoundingClientRect().top+window.scrollY-bus.offsetHeight-6;if(window.scrollY>y)window.scrollTo({top:y,behavior:'smooth'});}
+    const g=$('tlGrid'),bus=$('tlBuscar');if(g&&bus){const y=g.getBoundingClientRect().top+window.scrollY-bus.offsetHeight-($('tlMini')?.offsetHeight||0)-8;if(window.scrollY>y+2)window.scrollTo({top:y,behavior:'smooth'});}
   },
+  cat(el){ACT.pasillo({dataset:{k:el.dataset.c}});},
   recetas(){C.pasillo='recetas';C.animGrid=true;limpiarBusqueda();},
   receta(el){abrirHoja({tipo:'receta',k:el.dataset.k,personas:C.personas,off:new Set()});},
   'mas-recetas'(){C.verRecetas=!C.verRecetas;render();},
@@ -750,7 +825,13 @@ const ACT={
   avisame(){N.avisos.pedir().then(r=>{toast(r==='granted'?'🔔 Listo: te avisamos en el teléfono':'Tu navegador no permitió avisos; te avisamos por WhatsApp');render();});},
   'limpiar-q'(){limpiarBusqueda();$('tlQ')?.focus();},
   ir(el){ir(el.dataset.p);},
-  siguiente(){const f=faltaArmar();if(f){avisarFalta(f);return;}ir('confirmar');},
+  // un paso a la vez: Inicio → Canasta → Entrega → Datos y pago (cada paso revisa lo suyo)
+  siguiente(){
+    const P=C.paso==='armar'?'canasta':C.paso==='canasta'?'entrega':'pago';
+    const f=P==='pago'?faltaArmar()||faltaRetiro():faltaArmar();
+    if(f){avisarFalta(f);return;}
+    ir(P);
+  },
   tema(){const t=temaActual()==='dark'?'light':'dark';document.documentElement.dataset.theme=t;try{localStorage.setItem('cn_theme',t);}catch{}pintarTema();pintarBit();},
   ver(el){ver(el.dataset.id);},
   nuevo(){C.pasillo=null;C.q='';ir('armar');},
@@ -760,8 +841,8 @@ const ACT={
     guardar();C.pulso=true;
     // Exprés: si ya sabemos entrega y pago, va directo a revisar y sellar
     const pr=n===1?'1 producto':n+' productos';
-    if(el.dataset.express&&!puedeIr('sellar')){toast('⚡ '+pr+' · revisá y sellá');ir('sellar');}
-    else{toast('🔁 '+pr+' en tu canasta');ir('armar');}
+    if(el.dataset.express&&!puedeIr('pago')){toast('⚡ '+pr+' · revisá y pedí');ir('pago');}
+    else{toast('🔁 '+pr+' en tu canasta');ir('canasta');}
   },
   'parse-t'(el){const x=C.parse[+el.dataset.i];if(x.p&&!x.p.agotado)x.on=!x.on;$('tlParse').innerHTML=parseHtml();},
   'parse-no'(){limpiarBusqueda();},
@@ -776,7 +857,7 @@ const ACT={
   cuando(el){C.retiro.modo=el.dataset.v;asegurarRetiro();guardar();C.pulso=true;render();},
   dia(el){C.retiro.dia=+el.dataset.d;C.retiro.hora=null;asegurarRetiro();guardar();render();},
   hora(el){C.retiro.hora=el.dataset.h;guardar();C.pulso=true;render();},
-  entrega(el){C.retiro.entrega=el.dataset.v;C.retiro.carro=el.dataset.v==='carro';guardar();C.pulso=true;render();if(el.dataset.v==='envio'&&!C.retiro.ubi){setTimeout(()=>$('tlUbiBtn')?.scrollIntoView({block:'center',behavior:'smooth'}),80);tomarUbicacion();}},
+  entrega(el){C.retiro.entrega=el.dataset.v;C.retiro.carro=false;guardar();C.pulso=true;render();if(el.dataset.v==='envio'&&!C.retiro.ubi){setTimeout(()=>$('tlUbiBtn')?.scrollIntoView({block:'center',behavior:'smooth'}),80);tomarUbicacion();}},
   'ubi-gps'(){tomarUbicacion();},
   metodo(el){C.pago.metodo=el.dataset.k;guardar();C.pulso=true;render();},
   con(el){C.pago.conCuanto=+el.dataset.v;guardar();render();},
