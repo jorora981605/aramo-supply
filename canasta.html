@@ -3,9 +3,9 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
-<title>ARAMO LAB · Taller de pedidos</title>
+<title>ARAMO Taller de pedidos</title>
 <meta name="description" content="Decí qué necesitás: ARAMO arma tu canasta de frutas y verduras, la pesa, te avisa y la recogés lista o te llega a casa.">
-<meta name="theme-color" content="#050c09">
+<meta name="theme-color" content="#f8f5ee">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-title" content="ARAMO Taller">
 <link rel="manifest" href="./canasta.webmanifest">
@@ -13,30 +13,28 @@
 <link rel="icon" href="./icon.png">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Chakra+Petch:wght@500;600;700&family=JetBrains+Mono:wght@500;600;700;800&family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap">
-<link rel="stylesheet" href="canasta.css?v=20261010-lab-1">
-<script>try{var t=localStorage.getItem('cn_theme')||'dark';document.documentElement.dataset.theme=t;if(/[?&]mini=1/.test(location.search)){document.documentElement.classList.add('mini');var m=location.search.match(/[?&]tema=(light|dark)/);if(m)document.documentElement.dataset.theme=m[1];}}catch(e){}</script>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,600;9..144,700&family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap">
+<link rel="stylesheet" href="canasta.css?v=20261010-premium-1">
+<script>try{var t=localStorage.getItem('cn_theme')||(matchMedia('(prefers-color-scheme: dark)').matches?'dark':'light');document.documentElement.dataset.theme=t;if(/[?&]mini=1/.test(location.search)){document.documentElement.classList.add('mini');var m=location.search.match(/[?&]tema=(light|dark)/);if(m)document.documentElement.dataset.theme=m[1];}}catch(e){}</script>
 <script src="canasta-config.js?v=20261007-surtido-1"></script>
 <script src="aramo-nube.js?v=20261007-surtido-1"></script>
 <script defer src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script defer src="https://cdnjs.cloudflare.com/ajax/libs/qrcode-generator/1.4.4/qrcode.min.js"></script>
-<script defer src="canasta.js?v=20261010-lab-1"></script>
+<script defer src="canasta.js?v=20261010-premium-1"></script>
 </head>
 <body>
-<div class="fondo" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i></div>
 <div class="tl" id="tl">
   <header class="tl-top">
     <a class="tl-back" href="APP.html" aria-label="Volver al menú principal" title="Volver al menú principal">⌂</a>
-    <h1 class="marca"><span class="logo" aria-hidden="true">🧪</span><span class="m-t">ARAMO<em>LAB</em><span id="tlVivo" class="vivo" title="Tienda en vivo"></span></span><small>Laboratorio de canastas frescas</small></h1>
-    <button class="ib" id="tlBitBtn" type="button" aria-label="Bitácora del laboratorio">🧾<span class="n" id="tlBitN" hidden></span></button>
+    <h1 class="marca"><button type="button" data-act="nuevo" aria-label="ARAMO Frutas y verduras · ir al inicio"><span class="m-t">ARAMO<svg viewBox="0 0 30 20" aria-hidden="true"><path d="M2 18C1 9 7 3 15 3c0 9-6 14-13 15z"/><path d="M14 17c2-8 8-12 15-11-2 7-7 11-15 11z"/></svg><span id="tlVivo" class="vivo" title="Tienda en vivo"></span></span><small>Frutas y verduras</small></button></h1>
+    <button class="ib" id="tlBitBtn" type="button" aria-label="Mis pedidos" title="Mis pedidos"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 8h14l-1.2 12H6.2L5 8z"/><path d="M9 8V7a3 3 0 0 1 6 0v1"/></svg><span class="n" id="tlBitN" hidden></span></button>
   </header>
-  <nav class="proto" id="tlProto" aria-label="Protocolo del experimento"></nav>
   <main class="mesa" id="tlMesa" aria-live="polite"></main>
 </div>
 <div class="bar hide" id="tlBar"><div class="bar-in" id="tlBarIn"></div></div>
 <div class="sheet-bg" id="tlSheetBg"></div>
 <div class="sheet" id="tlSheet" role="dialog" aria-modal="true"></div>
 <div class="toast" id="tlToast" role="status" aria-live="polite"></div>
-<noscript>ARAMO Taller necesita JavaScript activado.</noscript>
+<noscript>ARAMO necesita JavaScript activado.</noscript>
 </body>
 </html>
