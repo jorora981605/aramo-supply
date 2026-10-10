@@ -1,10 +1,10 @@
 /* ══════════════════════════════════════════════════════════════════════
-   ARAMO Taller de pedidos — simple y ordenado (2026-10-10).
-   La tienda es una sola lista ordenada por pasillo; confirmar es un
-   formulario de filas iguales; el seguimiento, una lista que se llena de ✓.
-   Un solo botón abajo dice siempre qué sigue ("Continuar" o "Sellar").
-
-   Tres pantallas: 🧺 Comprar → ✅ Confirmar → 🛍️ Seguimiento.
+   ARAMO LAB — el pedido es un experimento (2026-10-10).
+   01 Muestras: un matraz que se llena con la canasta y la tabla periódica
+   de productos (cada uno con su número y su símbolo: To, Ag, Cu…).
+   02 Condiciones: entrega, investigador y pago en una sola página.
+   03 Reacción: el matraz hierve mientras escogen tu canasta y la bitácora
+   del experimento se escribe sola. Un solo botón abajo dice qué sigue.
 
    La lógica es la de siempre: catálogo de la vitrina, recetas que se
    escalan, lista escrita o dictada, retiro/carro/envío con Uber, pagos,
@@ -293,89 +293,105 @@ window.addEventListener('popstate',e=>{
 });
 
 // ══════════════ Pantallas ══════════════
-// Todo es una lista ordenada: filas iguales, grupos con el mismo borde y un solo botón principal (abajo).
-function saludo(){const nom=C.perfil.nombre.trim().split(/\s+/)[0],h=new Date().getHours();return nom?`${h<12?'Buenos días':h<18?'Buenas tardes':'Buenas noches'}, ${esc(nom)}`:'¡Pura vida!';}
+// ARAMO LAB: el pedido es un experimento.
+// 01 Muestras (productos) → 02 Condiciones (entrega y pago) → 03 Reacción (seguimiento en vivo).
+const FAM={fav:'💚',top:'⭐',frutas:'🍎',verduras:'🥬',raices:'🥔',hierbas:'🌿',despensa:'🥚',recetas:'⚗️'};
+let _num=null;
+function numero(p){const L=cat();if(!_num||_num.n!==L.length){_num=new Map(L.map((x,i)=>[x.k,i+1]));_num.n=L.length;}return _num.get(p.k)||0;}
+// Símbolo químico de cada producto: To (tomate), Ag (aguacate), Cu (culantro)…
+function simbolo(p){const s=String(p?.n||'').normalize('NFD').replace(/[̀-ͯ]/g,'').replace(/[^A-Za-z]/g,'');return (s[0]||'?').toUpperCase()+(s[1]||'').toLowerCase();}
+function saludo(){const nom=C.perfil.nombre.trim().split(/\s+/)[0],h=new Date().getHours();return nom?`${h<12?'Buenos días':h<18?'Buenas tardes':'Buenas noches'}, ${esc(nom)} · bienvenido al laboratorio`:'Bienvenido al laboratorio ARAMO';}
 function titulo(t,o={}){return `<div class="titulo">${o.volver?`<button type="button" class="volver" data-act="ir" data-p="${o.volver}" aria-label="Volver">‹</button>`:''}<h2>${t}</h2>${o.verdict?`<span class="verdict ${o.cls||''}">${esc(o.verdict)}</span>`:''}</div>`;}
 function fila(e,t,s,act,attrs=''){return `<button type="button" class="fila-link" data-act="${act}" ${attrs}><span class="e">${e}</span><span class="t"><b>${t}</b>${s?`<small>${s}</small>`:''}</span><span class="go" aria-hidden="true">›</span></button>`;}
 const seg=(botones,cls='')=>`<div class="segm ${cls}">${botones}</div>`;
 
-// ── 1 · Comprar ──
+// ── El matraz: el líquido sube con lo que llevás y las frutas flotan adentro ──
+const FORMA='M47 6h26v42l33 74c5 11-3 22-15 22H29c-12 0-20-11-15-22l33-74z';
+function matraz(id,nivel,emos,o={}){
+  return `<div class="matraz${o.hierve?' hierve':''}${o.lleno?' lleno':''}${o.grande?' grande':''}" id="${id}" style="--nivel:${(+nivel||0).toFixed(3)}">
+    <svg viewBox="0 0 120 150" aria-hidden="true"><defs><clipPath id="${id}C"><path d="${FORMA}"/></clipPath></defs>
+      <g clip-path="url(#${id}C)"><g class="liq"><path class="ola o2" d="M-60 4 Q-45 -3 -30 4 T0 4 T30 4 T60 4 T90 4 T120 4 T150 4 T180 4 V170 H-60Z"/><path class="ola" d="M-60 0 Q-45 -7 -30 0 T0 0 T30 0 T60 0 T90 0 T120 0 T150 0 T180 0 V170 H-60Z"/></g></g>
+      <path class="vidrio" d="${FORMA}"/><path class="boca" d="M41 6h38"/><path class="brillo" d="M53 54 L33 98"/>
+      <path class="marcas" d="M62 70h10M66 86h12M70 102h12M74 118h12"/></svg>
+    <div class="dentro">${(emos||[]).slice(-6).map((e,i)=>`<span style="--b:${i}">${e}</span>`).join('')}</div>
+    <i class="bur"></i><i class="bur"></i><i class="bur"></i><i class="bur"></i>
+  </div>`;
+}
+const nivelCesta=()=>{const n=cestaN();return n?Math.min(.9,.16+n*.085):0;};
+const _nivel={};
+function animarMatraz(id){
+  const el=$(id);if(!el)return;
+  const meta=+el.style.getPropertyValue('--nivel')||0,antes=_nivel[id]??0;
+  _nivel[id]=meta;if(Math.abs(antes-meta)<.001||MINI)return;
+  el.style.setProperty('--nivel',antes);requestAnimationFrame(()=>requestAnimationFrame(()=>el.style.setProperty('--nivel',meta)));
+}
+
+// ── 01 · Muestras ──
+let _costo=0;
 function mesaArmar(){
-  const n=cestaN(),u=ultimoPedido(),a=activo();
-  return `<p class="hola">${saludo()} 👋<b>¿Qué llevamos hoy?</b></p>
+  const it=cestaItems(),n=it.length,u=ultimoPedido(),a=activo(),peso=cestaPeso();
+  return `<div class="lab-t"><p>${saludo()}</p><h2>¿Qué mezclamos hoy?</h2></div>
+  ${a?`<button type="button" class="banner vivo-b" data-act="ver" data-id="${a.id}"><span class="e">🧪</span><span class="t"><b>Experimento ${esc(a.ref)} en curso</b><small>${esc(resumenPedido(a))}</small></span><span class="go">›</span></button>`:''}
+  <div class="lab-hero">
+    ${matraz('tlMatraz',nivelCesta(),it.map(x=>x.p.e),{hierve:!!n})}
+    <div class="lecturas"><p class="lab-k">${n?'Mezcla en preparación':'Matraz vacío'}</p>
+      <div class="lect"><span>Muestras</span><b>${n}</b></div>
+      <div class="lect"><span>Masa aprox.</span><b>${peso?kg(peso)+' kg':'—'}</b></div>
+      <div class="lect"><span>Costo aprox.</span><b id="tlCosto">${$c(_costo)}</b></div>
+      ${n?'':'<p class="lab-hint">Tocá un elemento de la tabla para agregarlo</p>'}</div>
+  </div>
+  ${u&&!n?`<button type="button" class="banner repite" data-act="repetir" data-id="${u.id}" data-express="1"><span class="e">⚡</span><span class="t"><b>Repetir el experimento anterior</b><small>${emojis(u.items,8)} · ${$c(N.totalDe(u))}</small></span><span class="go">›</span></button>`:''}
   <div class="buscar" id="tlBuscar">
-    <form class="ask" id="tlAsk" autocomplete="off" role="search"><span class="lupa" aria-hidden="true">🔎</span><input id="tlQ" type="search" enterkeyhint="search" placeholder="Buscá o dictá tu lista" value="${esc(C.q)}" aria-label="Buscá un producto o escribí tu lista"><button type="button" class="mic" id="tlMic" aria-label="Dictar lista"${C.q?' hidden':''}>🎙️</button><button type="button" class="limpiar" id="tlLimpiar" data-act="limpiar-q" aria-label="Borrar"${C.q?'':' hidden'}>✕</button></form>
-    <nav class="tabs" id="tlPasillos" aria-label="Pasillos"></nav>
+    <form class="ask" id="tlAsk" autocomplete="off" role="search"><span class="prompt" aria-hidden="true">&gt;</span><input id="tlQ" type="search" enterkeyhint="search" placeholder="buscá o dictá tu lista" value="${esc(C.q)}" aria-label="Buscá un producto o escribí tu lista"><button type="button" class="mic" id="tlMic" aria-label="Dictar lista"${C.q?' hidden':''}>🎙️</button><button type="button" class="limpiar" id="tlLimpiar" data-act="limpiar-q" aria-label="Borrar"${C.q?'':' hidden'}>✕</button></form>
+    <nav class="tabs" id="tlPasillos" aria-label="Familias"></nav>
   </div>
   <div id="tlParse">${parseHtml()}</div>
-  <div class="grupo atajos" id="tlAtajos">
-    ${a?fila('🛎️',`Tu pedido ${esc(a.ref)}`,esc(resumenPedido(a)),'ver',`data-id="${a.id}"`):''}
-    ${u&&!n?fila('⚡','Repetir mi última canasta',`${emojis(u.items,8)} · ${$c(N.totalDe(u))}`,'repetir',`data-id="${u.id}" data-express="1"`):''}
-    ${fila('📖','Recetas',`Elegí un plato y te ponemos los ingredientes`,'recetas')}
-  </div>
-  <div class="lista" id="tlGrid"></div>`;
+  <div class="tabla" id="tlGrid"></div>`;
 }
 function parseHtml(){
   const P=C.parse;if(!P)return '';
   const ok=P.filter(x=>x.p&&x.on);
-  return `<div class="parse fade"><p class="parse-h">✨ Entendí esto · tocá para quitar o poner</p><div class="chips">${P.map((x,i)=>x.p?`<button type="button" class="chip${x.on?' on':''}" data-act="parse-t" data-i="${i}">${x.p.e} ${esc(qtxt(x.q,x.p.u))} ${esc(x.p.n)}${x.p.agotado?' · agotado':''}</button>`:`<span class="chip no">❓ ${esc(x.txt)}</span>`).join('')}</div><div class="parse-a"><button type="button" class="btn" data-act="parse-ok" ${ok.length?'':'disabled'}>Agregar ${ok.length} a la canasta</button><button type="button" class="btn ghost" data-act="parse-no">Cancelar</button></div></div>`;
+  return `<div class="parse fade"><p class="parse-h">▸ Análisis completado · ${ok.length} ${ok.length===1?'muestra detectada':'muestras detectadas'}</p><div class="chips">${P.map((x,i)=>x.p?`<button type="button" class="chip${x.on?' on':''}" data-act="parse-t" data-i="${i}">${x.p.e} ${esc(qtxt(x.q,x.p.u))} ${esc(x.p.n)}${x.p.agotado?' · agotado':''}</button>`:`<span class="chip no">❓ ${esc(x.txt)}</span>`).join('')}</div><div class="parse-a"><button type="button" class="btn" data-act="parse-ok" ${ok.length?'':'disabled'}>Agregar ${ok.length} al matraz</button><button type="button" class="btn ghost" data-act="parse-no">Cancelar</button></div></div>`;
 }
-// Una fila por producto: emoji · nombre y precio · botón
+// Cada producto es un elemento de la tabla periódica ARAMO
 function tile(p,i){
   const q=C.cesta[p.k]?.q||0;
-  return `<div class="pt c-${esc(p.c||'')}${q?' in':''}${p.agotado?' off':''}${p.k===C.ultimo?' pop':''}" style="--i:${Math.min(i||0,14)}" role="button" tabindex="0" data-act="tile" data-k="${p.k}" aria-label="${esc(p.n)}">
+  return `<div class="pt c-${esc(p.c||'')}${q?' in':''}${p.agotado?' off':''}${p.k===C.ultimo?' pop':''}" style="--i:${Math.min(i||0,18)}" role="button" tabindex="0" data-act="tile" data-k="${p.k}" aria-label="${esc(p.n)}">
+    <span class="el-h"><span class="el-n">${numero(p)}</span><span class="el-s">${esc(simbolo(p))}</span></span>
     <span class="pt-e">${p.e}</span>
-    <span class="pt-t"><span class="pt-n">${esc(p.n)}</span><span class="pt-s"><span class="pt-p">${porU(p)}</span>${p.d?` · <span class="pt-d">${esc(p.d)}</span>`:''}</span></span>
-    ${p.agotado?'<span class="pt-agotado">Agotado</span>':q?`<span class="step-q"><button type="button" data-act="menos" data-k="${p.k}" aria-label="Menos ${esc(p.n)}">−</button><em>${esc(qtxt(q,p.u))}</em><button type="button" data-act="mas" data-k="${p.k}" aria-label="Más ${esc(p.n)}">+</button></span>`:'<span class="pt-add" aria-hidden="true">+</span>'}
+    <span class="pt-n">${esc(p.n)}</span>
+    ${p.agotado?'<span class="el-ago">Agotado</span>':q?`<span class="step-q"><button type="button" data-act="menos" data-k="${p.k}" aria-label="Menos ${esc(p.n)}">−</button><em>${esc(qtxt(q,p.u))}</em><button type="button" data-act="mas" data-k="${p.k}" aria-label="Más ${esc(p.n)}">+</button></span>`:`<span class="pt-p">${porU(p)}</span>`}
   </div>`;
+}
+// Las recetas son fórmulas: sus elementos y el costo para N personas
+function formula(r,i){
+  const ing=r.items.map(([k])=>prod(k)).filter(Boolean);
+  return `<button type="button" class="formula rc-${esc(r.c||'')}" style="--i:${Math.min(i||0,18)}" data-act="receta" data-k="${r.k}"><span class="fo-e">${r.e}</span><span class="fo-n">${esc(r.n)}</span><span class="fo-f">${ing.slice(0,5).map(p=>esc(simbolo(p))).join('·')}${ing.length>5?'·…':''}</span><span class="fo-p">${$c(costoReceta(r,C.personas))} · ${C.personas} 🧑</span></button>`;
 }
 const NUM_RX=/\b(un|una|dos|tres|cuatro|cinco|seis|siete|ocho|nueve|diez|doce|media|medio|kilo|kilos|docena)\b/;
 const pareceLista=t=>/\d|,|;|\n/.test(t)||NUM_RX.test(norm(t));
-// La tienda entera en una lista: secciones por pasillo y pestañas que saltan a cada una
 function pintarGrid(){
   const g=$('tlGrid');if(!g)return;
   const modoLista=!!C.parse;
   const q=modoLista?'':norm(C.q).replace(/[\d.,]+/g,' ').replace(/\b(kg|kilos?|unid\w*|rollos?)\b/g,' ').trim();
-  const secs=[];
-  if(q){
-    const w=q.split(/\s+/).filter(t=>!VACIAS.has(t));
-    const res=cat().filter(p=>{const n=norm(p.n);return w.every(t=>n.includes(t.replace(/(es|s)$/,'')));});
-    secs.push({k:'res',n:res.length?`${res.length} ${res.length===1?'resultado':'resultados'}`:'',L:res});
-  }else if(!modoLista){
-    const fav=favoritos();
-    if(fav.length>=3)secs.push({k:'fav',n:'Tus favoritos',e:'💚',L:fav});
-    secs.push({k:'top',n:'Lo más pedido',e:'⭐',L:cat().filter(p=>p.top)});
-    (CFG.pasillos||[]).filter(p=>p.k!=='top').forEach(p=>{const L=cat().filter(x=>x.c===p.k);if(L.length)secs.push({k:p.k,n:p.n,e:p.e,L});});
-  }
-  const tabs=$('tlPasillos'),at=$('tlAtajos');
-  if(tabs){tabs.hidden=!!q||modoLista;tabs.innerHTML=secs.map(s=>`<button type="button" class="tab" data-act="pasillo" data-k="${s.k}">${s.e||''} ${esc(s.n)}</button>`).join('');}
-  if(at)at.hidden=!!q||modoLista;
+  const fav=favoritos();
+  const fams=(fav.length>=3?[{k:'fav',n:'Favoritos'}]:[]).concat((CFG.pasillos||[]).map(p=>({k:p.k,n:p.k==='top'?'Más pedido':p.n})),[{k:'recetas',n:'Fórmulas'}]);
+  if(!C.pasillo||!fams.some(f=>f.k===C.pasillo))C.pasillo=fav.length>=3?'fav':'top';
+  const tabs=$('tlPasillos');
+  if(tabs){tabs.hidden=!!q||modoLista;tabs.innerHTML=fams.map(f=>`<button type="button" class="tab f-${f.k}${C.pasillo===f.k?' on':''}" data-act="pasillo" data-k="${f.k}">${FAM[f.k]||''} ${esc(f.n)}</button>`).join('');}
+  const formulas=!q&&!modoLista&&C.pasillo==='recetas';
   g.classList.toggle('entra',!!C.animGrid);C.animGrid=false;
-  let i=0;
-  g.innerHTML=q&&!secs[0].L.length
-    ?`<div class="vacio">No encontramos “${esc(C.q)}”.<button type="button" class="link" data-act="limpiar-q">Ver toda la tienda</button></div>`
-    :secs.map(s=>`<section class="sec" id="pas-${s.k}" data-k="${s.k}">${s.n?`<h3 class="sec-h">${s.e?s.e+' ':''}${esc(s.n)}</h3>`:''}<div class="grupo">${s.L.map(p=>tile(p,i++)).join('')}</div></section>`).join('');
-  activarTab();
+  g.classList.toggle('formulas',formulas);
+  g.dataset.fam=q?'res':C.pasillo;
+  if(modoLista){g.innerHTML='';return;}
+  if(formulas){g.innerHTML=RECETAS().map((r,i)=>formula(r,i)).join('');return;}
+  let lista;
+  if(q){const w=q.split(/\s+/).filter(t=>!VACIAS.has(t));lista=cat().filter(p=>{const n=norm(p.n);return w.every(t=>n.includes(t.replace(/(es|s)$/,'')));});}
+  else lista=C.pasillo==='fav'?fav:cat().filter(p=>C.pasillo==='top'?p.top:p.c===C.pasillo);
+  g.innerHTML=lista.length?lista.map((p,i)=>tile(p,i)).join(''):`<div class="vacio">Sin coincidencias para “${esc(C.q)}”.<button type="button" class="link" data-act="limpiar-q">Ver toda la tabla</button></div>`;
 }
-function activarTab(){
-  const secs=document.querySelectorAll('#tlGrid .sec');if(!secs.length)return;
-  const tope=($('tlBuscar')?.getBoundingClientRect().bottom||0)+24;
-  let k=secs[0].dataset.k;
-  secs.forEach(s=>{if(s.getBoundingClientRect().top<=tope)k=s.dataset.k;});
-  marcarTab(k);
-}
-function marcarTab(k){
-  const tabs=$('tlPasillos');if(!tabs)return;
-  tabs.querySelectorAll('.tab').forEach(b=>{
-    const on=b.dataset.k===k;if(on===b.classList.contains('on'))return;
-    b.classList.toggle('on',on);
-    if(on)tabs.scrollTo({left:b.offsetLeft-tabs.clientWidth/2+b.clientWidth/2,behavior:'smooth'});
-  });
-}
-let _spy=0;
-window.addEventListener('scroll',()=>{if(C.actual||C.paso!=='armar')return;cancelAnimationFrame(_spy);_spy=requestAnimationFrame(activarTab);},{passive:true});
 
-// ── 2 · Confirmar ──
+// ── 02 · Condiciones ──
 function mesaConfirmar(){
   asegurarRetiro();
   const it=cestaItems(),r=C.retiro,s=suc(r.suc),t=T(),env=r.entrega==='envio',tot=cestaTotal(),P=C.perfil,n=it.length;
@@ -384,13 +400,14 @@ function mesaConfirmar(){
   if(!metodos.some(([k])=>k===C.pago.metodo))C.pago.metodo='sinpe';
   const a=s?asap(s):null,sug=sugerencias(),u=r.ubi;
   const corto=m=>m.n.replace(' al recoger','').replace(' Móvil','').replace('Tarjeta en línea','Link');
-  return titulo('Confirmá tu pedido',{volver:'armar'})
-  +`<p class="grupo-h">Tu canasta · ${n} ${n===1?'producto':'productos'}<button type="button" class="link" data-act="ir" data-p="armar">＋ Agregar</button></p>
-  <div class="grupo" id="tlSecCesta">${it.map(x=>`<div class="linea"><span class="e">${x.p.e}</span><span class="t"><b>${esc(x.p.n)}</b><small>${esc(porU(x.p))}</small></span><span class="step-q"><button type="button" data-act="menos" data-k="${x.k}" aria-label="Menos ${esc(x.p.n)}">−</button><em>${esc(qtxt(x.q,x.p.u))}</em><button type="button" data-act="mas" data-k="${x.k}" aria-label="Más ${esc(x.p.n)}">+</button></span><span class="pz">${$c(x.q*x.p.p)}</span></div>`).join('')}</div>
-  ${sug.length?`<div class="sug"><span>¿Te falta algo?</span>${sug.map(p=>`<button type="button" class="chip" data-act="sumar" data-k="${p.k}">＋ ${p.e} ${esc(p.n)}</button>`).join('')}</div>`:''}
+  return titulo('Condiciones del experimento',{volver:'armar'})
+  +`<div class="resumen-lab">${matraz('tlMatraz',nivelCesta(),it.map(x=>x.p.e),{hierve:true})}<div><p class="lab-k">En el matraz</p><b>${n} ${n===1?'muestra':'muestras'} · ${$c(tot)}</b><small>Aprox. · pagás lo que pese de verdad</small></div></div>
+  <p class="grupo-h">Muestras<button type="button" class="link" data-act="ir" data-p="armar">＋ Agregar</button></p>
+  <div class="grupo" id="tlSecCesta">${it.map(x=>`<div class="linea c-${esc(x.p.c||'')}"><span class="el-mini"><i>${esc(simbolo(x.p))}</i>${x.p.e}</span><span class="t"><b>${esc(x.p.n)}</b><small>${esc(porU(x.p))}</small></span><span class="step-q"><button type="button" data-act="menos" data-k="${x.k}" aria-label="Menos ${esc(x.p.n)}">−</button><em>${esc(qtxt(x.q,x.p.u))}</em><button type="button" data-act="mas" data-k="${x.k}" aria-label="Más ${esc(x.p.n)}">+</button></span><span class="pz">${$c(x.q*x.p.p)}</span></div>`).join('')}</div>
+  ${sug.length?`<div class="sug"><span>¿Le falta algo a la mezcla?</span>${sug.map(p=>`<button type="button" class="chip" data-act="sumar" data-k="${p.k}">＋ ${p.e} ${esc(p.n)}</button>`).join('')}</div>`:''}
   <p class="grupo-h">Entrega</p>
   <div class="grupo" id="tlSecEntrega">
-    <div class="g-fila">${seg(modos.map(([k,e,nm])=>`<button type="button" class="${r.entrega===k?'on':''}" data-act="entrega" data-v="${k}">${e} ${nm}</button>`).join(''))}</div>
+    <div class="modulos">${modos.map(([k,e,nm])=>`<button type="button" class="${r.entrega===k?'on':''}" data-act="entrega" data-v="${k}"><b>${e}</b>${nm}</button>`).join('')}</div>
     ${r.entrega==='carro'?`<label class="g-fila"><span class="g-l">Carro</span><input id="tlPlaca" placeholder="Placa o color (opcional)" value="${esc(r.placa)}" autocomplete="off"></label>`:''}
     ${env?(u?`<div class="g-fila col"><iframe class="ubi-mapa" title="Tu ubicación" src="${mapaEmbed(u)}" loading="lazy"></iframe><div class="ubi-ok"><span>📍 Ubicación lista${u.acc?` · ±${u.acc} m`:''}</span><button type="button" class="link" data-act="ubi-gps">Volver a tomar</button></div></div>`
       :`<div class="g-fila col"><button type="button" class="btn ghost w" id="tlUbiBtn" data-act="ubi-gps">📍 Usar mi ubicación</button><input id="tlUbiLink" class="inp" placeholder="…o pegá un link de Google Maps" autocomplete="off"></div>`)
@@ -399,19 +416,19 @@ function mesaConfirmar(){
     ${s?`<div class="g-fila"><span class="g-l">Hora</span>${seg(`<button type="button" class="${r.modo==='asap'?'on':''}" data-act="cuando" data-v="asap" ${a?'':'disabled'}>${a?'⚡ '+fh(a):'Hoy no da'}</button><button type="button" class="${r.modo==='prog'?'on':''}" data-act="cuando" data-v="prog">🗓️ Otra hora</button>`,'chico')}</div>
       ${r.modo==='prog'?`<div class="g-fila col"><div class="chips">${[0,1,2].map(d=>`<button type="button" class="chip${r.dia===d?' on':''}" data-act="dia" data-d="${d}">${d===0?'Hoy':d===1?'Mañana':aFecha(2,0).toLocaleDateString('es-CR',{weekday:'long'})}</button>`).join('')}</div><div class="chips">${slots(s,r.dia).map(x=>`<button type="button" class="chip${r.hora&&+new Date(r.hora)===+x?' on':''}" data-act="hora" data-h="${x.toISOString()}">${fh(x)}</button>`).join('')||'<span class="nota">Ese día ya no hay horas. Probá otro.</span>'}</div></div>`:''}`:''}
   </div>
-  <p class="grupo-h">A nombre de</p>
+  <p class="grupo-h">Investigador a cargo</p>
   <div class="grupo" id="tlSecDatos">${perfilOk()&&!C.editPerfil
     ?`<div class="g-fila"><span class="av">${esc(P.nombre.trim()[0]?.toUpperCase()||'·')}</span><span class="t"><b>${esc(P.nombre)}</b><small>${esc(fmtTel(P.tel))} · aquí te avisamos</small></span><button type="button" class="link" data-act="edit-perfil">Cambiar</button></div>`
     :`<label class="g-fila"><span class="g-l">Nombre</span><input id="tlNombre" placeholder="Tu nombre" autocomplete="given-name" value="${esc(P.nombre)}"></label><label class="g-fila"><span class="g-l">Teléfono</span><input id="tlTel" placeholder="8888-8888" inputmode="tel" autocomplete="tel" maxlength="20" value="${esc(P.tel)}"></label><div class="err" id="tlPerfilErr"></div>`}</div>
   <p class="grupo-h">Pago <small>nada hasta que esté lista</small></p>
   <div class="grupo" id="tlSecPago">
-    <div class="g-fila">${seg(metodos.map(([k,m])=>`<button type="button" class="${C.pago.metodo===k?'on':''}" data-act="metodo" data-k="${k}">${m.e} ${esc(corto(m))}</button>`).join(''))}</div>
+    <div class="modulos">${metodos.map(([k,m])=>`<button type="button" class="${C.pago.metodo===k?'on':''}" data-act="metodo" data-k="${k}"><b>${m.e}</b>${esc(corto(m))}</button>`).join('')}</div>
     ${C.pago.metodo==='efectivo'?`<div class="g-fila"><span class="g-l">Pagás con</span>${seg([0,...billetes(tot)].map(v=>`<button type="button" class="${(+C.pago.conCuanto||0)===v?'on':''}" data-act="con" data-v="${v}">${v?$c(v):'Exacto'}</button>`).join(''),'chico')}</div>`:''}
   </div>
-  <p class="grupo-h">Si algo no hay</p>
+  <p class="grupo-h">Si una muestra no hay</p>
   <div class="grupo"><div class="g-fila">${seg(Object.entries(SUST).map(([k,x])=>`<button type="button" class="${C.sust===k?'on':''}" data-act="sust" data-k="${k}">${x.e} ${{avisar:'Avisame',similar:'Parecido',quitar:'Quitalo'}[k]||x.n}</button>`).join(''),'chico')}</div>
     <label class="g-fila"><span class="g-l">Nota</span><input id="tlNota" placeholder="Opcional: bolsas aparte…" value="${esc(C.nota)}" autocomplete="off"></label></div>
-  <p class="pie">Total aprox. <b>${$c(tot)}</b>${env?' + envío':''} · pagás lo que pese de verdad.<br>${N.modo()!=='nube'?'Al sellar, le avisás a la tienda por WhatsApp.':'Podés cancelarlo mientras no lo empiecen a alistar.'}</p>`;
+  <p class="pie">${N.modo()!=='nube'?'Al iniciar, le avisás a la tienda por WhatsApp.':'Podés cancelarlo mientras no lo empiecen a alistar.'}</p>`;
 }
 function billetes(t){
   const out=[];
@@ -419,22 +436,19 @@ function billetes(t){
   return out;
 }
 
-// ── 3 · Seguimiento ──
+// ── 03 · Reacción (seguimiento en vivo) ──
 const _okAntes={};
 function mesaPedido(o){
   const s=suc(o.sucursal),{r,n}=avance(o),total=N.totalDe(o),aprox=N.esAprox(o),E=o.estado,env=o.retiro.envio;
   const fin=E==='entregado'||E==='cancelado',local=N.modo()!=='nube';
   const waPendiente=!!o.waPendiente&&!o.avisado;
   const V={nuevo:local&&!o.avisado?(waPendiente?['WhatsApp abierto','warn']:['Falta avisar','warn']):['Pendiente de aceptación','run'],alistando:[`Alistando ${r}/${n}`,'run'],listo:[env?(env.uber?'En camino':'Lista'):'Lista','ok'],entregado:['Entregado','ok'],cancelado:['Cancelado','bad']}[E]||['—',''];
-  const tit={nuevo:local&&!o.avisado?(waPendiente?'Confirmá el envío':'Avisale a la tienda'):'¡Pedido recibido!',alistando:'Escogiendo tu canasta',listo:env?'¡Va en camino!':'¡Tu canasta está lista!',entregado:'¡Que la disfrutés!',cancelado:'Pedido cancelado'}[E]||'Tu pedido';
-  const ahora={nuevo:local&&!o.avisado?(waPendiente?'Confirmá solo después de tocar Enviar en WhatsApp.':'Mandale el pedido a la tienda por WhatsApp.'):'La tienda lo acepta y empieza a escoger.',alistando:'Escogemos y pesamos cada producto.',listo:env?'Salió con Uber hacia tu ubicación.':`Te espera en ${esc(s?.n||'ARAMO')} · ${esc(cuando(o.retiro.at))}.`,entregado:'Gracias por comprar en ARAMO.',cancelado:esc(o.motivo||'El pedido no siguió.')}[E];
+  const tit={nuevo:local&&!o.avisado?(waPendiente?'Confirmá el envío':'Avisale a la tienda'):'¡Experimento iniciado!',alistando:'Reacción en curso',listo:env?'¡Va en camino!':'¡Experimento exitoso!',entregado:'¡Que la disfrutés!',cancelado:'Experimento cancelado'}[E]||'Tu experimento';
+  const fase={nuevo:local&&!o.avisado?'Esperando que avises a la tienda':'Esperando a la tienda',alistando:'Escogiendo y pesando muestras',listo:env?'Viaja con Uber a tu ubicación':`Lista en ${s?.n||'ARAMO'} · ${cuando(o.retiro.at)}`,entregado:'Entregado · gracias por comprar en ARAMO',cancelado:o.motivo||'El experimento no siguió'}[E]||'';
   const pct={nuevo:12,alistando:15+Math.round(70*(n?r/n:0)),listo:92,entregado:100,cancelado:0}[E]??0;
-  const icoE={nuevo:'📥',alistando:'🧑‍🌾',listo:env?'🛵':'✅',entregado:'🛍️',cancelado:'✖️'}[E]||'🧺';
-  const hora=k=>{const l=(o.log||[]).find(x=>x.s===k);return l?fh(l.t):'';};
-  const idx=['nuevo','alistando','listo','entregado'].indexOf(E);
-  const linea=E==='cancelado'?'':`<ol class="tr-line">${[['Recibido',o.created?fh(o.created):''],['Alistando',hora('alistando')],[env?'En camino':'Lista',hora('listo')],['Entregado',hora('entregado')]].map(([tt,h],i)=>`<li class="${i<idx||(i===idx&&E==='entregado')?'si':i===idx?'ya':''}">${tt}<small>${esc(h||'—')}</small></li>`).join('')}</ol>`;
-  // la canasta: lo que se pidió, lo que pesó y si ya está lista (✓ al momento)
-  const antes=_okAntes[o.id]||new Set(),ahoraOk=new Set();let dif=0;
+  const LOGN={nuevo:'Experimento recibido',alistando:'La tienda empezó a escoger',listo:env?'Salió con Uber':'Canasta lista',entregado:'Entregado · experimento exitoso',cancelado:'Experimento cancelado'};
+  const bit=(o.log||[]).slice(-6).map(l=>`<div class="ln"><span>${esc(fh(l.t))}</span>▸ ${esc(l.m||LOGN[l.s]||l.s)}</div>`).join('');
+  const antes=_okAntes[o.id],ahoraOk=new Set();let dif=0;
   const items=o.items.map((i,j)=>{
     const real=i.qr!=null&&i.qr!=='',q=real?+i.qr:+i.q,pr=i.pr!=null&&i.pr!==''?+i.pr:+i.p;
     const st=i.estado==='listo'?'ok':i.estado==='nohay'?'no':E==='alistando'?'wait':'';
@@ -442,7 +456,7 @@ function mesaPedido(o){
     if(i.estado!=='nohay')dif+=(q-i.q)*pr;else dif-=i.q*pr;
     const pesoDistinto=real&&i.u==='kg'&&Math.abs(q-i.q)>1e-9;
     const det=i.estado==='nohay'?'no hubo':pesoDistinto?`pediste ${qtxt(i.q,i.u)} → pesó ${kg(q)} kg`:qtxt(q,i.u);
-    return `<div class="it ${st}${st==='ok'&&!antes.has(j)&&_okAntes[o.id]?' recien':''}"><span class="e">${i.e}</span><span class="t"><b>${esc(i.n)}</b><small>${esc(det)}</small></span><span class="pz">${i.estado==='nohay'?'₡0':$c(q*pr)}</span><span class="ck" aria-hidden="true">${st==='ok'?'✓':st==='no'?'✕':''}</span></div>`;
+    return `<div class="it ${st}${st==='ok'&&antes&&!antes.has(j)?' recien':''}"><span class="e">${i.e}</span><span class="t"><b>${esc(i.n)}</b><small>${esc(det)}</small></span><span class="pz">${i.estado==='nohay'?'₡0':$c(q*pr)}</span><span class="ck" aria-hidden="true">${st==='ok'?'✓':st==='no'?'✕':''}</span></div>`;
   }).join('');
   _okAntes[o.id]=ahoraOk;
   const costoEnvio=+env?.costo||0,pesado=['listo','entregado'].includes(E)||o.items.some(i=>i.qr!=null&&i.qr!=='');
@@ -452,21 +466,28 @@ function mesaPedido(o){
     E==='alistando'&&local?fila('🔄','Pedir el estado','Por WhatsApp','wa-estado'):'',
     E==='alistando'&&!local?fila('🔄','Revisar estado','','actualizar-pedido'):'',
     !fin&&N.avisos.soportado()&&N.avisos.permiso()==='default'?fila('🔔','Avisarme cuando esté lista','Notificación en el teléfono','avisame'):'',
-    E==='nuevo'?`<button type="button" class="fila-link rojo" data-act="cancelar"><span class="e">✖️</span><span class="t"><b>Cancelar pedido</b></span></button>`:'',
+    E==='nuevo'?`<button type="button" class="fila-link rojo" data-act="cancelar"><span class="e">✖️</span><span class="t"><b>Cancelar experimento</b></span></button>`:'',
   ].join('');
   return titulo(tit,{verdict:V[0],cls:V[1]})
-  +`<div class="tracker est-${E}"><div class="tr-ring" style="--p:${pct}"><b>${icoE}</b>${E==='alistando'?`<span>${r}/${n}</span>`:''}</div><div class="tr-t"><strong>Pedido ${esc(o.ref)}</strong><p>${ahora}</p></div></div>${linea}
+  +`<div class="reaccion tracker est-${E}">
+    ${matraz('tlReactor',pct/100,o.items.filter(i=>i.estado!=='nohay').map(i=>i.e),{hierve:E==='alistando'||E==='nuevo',lleno:E==='listo'||E==='entregado',grande:true})}
+    <div class="lecturas"><p class="lab-k">Experimento ${esc(o.ref)}</p><p class="fase">${esc(fase)}</p>
+      <div class="lect"><span>Muestras listas</span><b>${r}/${n}</b></div>
+      <div class="lect"><span>Masa real</span><b>${pesoReal(o)?kg(pesoReal(o))+' kg':'—'}</b></div>
+      <div class="lect"><span>${aprox?'Costo aprox.':'Costo exacto'}</span><b>${$c(total)}</b></div></div>
+  </div>
+  <div class="consola"><p class="lab-k">Bitácora del experimento</p>${bit}${!fin?'<div class="ln esperando"><span>…</span>▸ esperando la siguiente reacción<i></i></div>':''}</div>
   ${E==='nuevo'&&local&&!o.avisado?(waPendiente
     ?`<div class="aviso"><b>💬 ¿Ya lo enviaste?</b><p>WhatsApp no le avisa a ARAMO si tocaste Enviar.</p><div class="dos-b"><button type="button" class="btn ghost" data-act="wa-enviar">Abrir de nuevo</button><button type="button" class="btn" data-act="wa-confirmar">✅ Ya lo envié</button></div></div>`
     :`<div class="aviso"><b>💬 Último paso</b><p>WhatsApp se abre con tu pedido listo para enviar.</p><button type="button" class="btn big w" data-act="wa-enviar">Avisar a la tienda por WhatsApp</button></div>`):''}
-  ${!fin?`<div class="sello" id="tlStep6"><div class="qr" id="tlQR" aria-label="Código QR de retiro"></div><div><small>Código de retiro</small><div class="pin">${esc(o.pin)}</div><small>${env?'Dáselo al repartidor si te lo pide':'Mostralo al recoger'}${o.retiro.carro?' · te la llevamos al carro':''}</small></div></div>`:''}
+  ${!fin?`<div class="sello" id="tlStep6"><div class="qr" id="tlQR" aria-label="Código QR de retiro"></div><div><p class="lab-k">Credencial de retiro</p><div class="pin">${esc(o.pin)}</div><small>${env?'Dáselo al repartidor si te lo pide':'Mostralo al recoger'}${o.retiro.carro?' · te la llevamos al carro':''}</small></div></div>`:''}
   ${pagoHtml(o,total,aprox)}
   ${env&&!fin?`<div class="card2"><h3>🛵 Envío con Uber</h3><p>${env.uber?`Pedido a las ${esc(fh(env.uber))} · va en camino.`:'Lo pedimos apenas tu canasta esté lista.'}${costoEnvio?` Envío: ${$c(costoEnvio)} (incluido).`:''}</p></div>`:''}
-  ${E!=='cancelado'?`<p class="grupo-h">Tu canasta${E==='alistando'?` · ${r} de ${n} listos`:''}</p>
-  <div class="grupo items">${items}${costoEnvio?`<div class="it"><span class="e">🛵</span><span class="t"><b>Envío Uber</b></span><span class="pz">${$c(costoEnvio)}</span><span class="ck"></span></div>`:''}${pesado&&Math.abs(dif)>=1?`<div class="it ajuste"><span class="e">⚖️</span><span class="t"><b>Ajuste por peso real</b></span><span class="pz">${dif>0?'+':'−'}${$c(Math.abs(dif))}</span><span class="ck"></span></div>`:''}<div class="it total"><span class="e"></span><span class="t"><b>${aprox?'Total aprox.':'Total exacto'}</b></span><span class="pz">${$c(total)}</span><span class="ck"></span></div></div>`:''}
-  ${E==='entregado'?`<div class="card2 centro"><h3>¿Qué tal estuvo todo?</h3><div class="caritas">${['😍','🙂','😐'].map((c,i)=>`<button type="button" class="${o.rating===3-i?'on':''}" data-act="rating" data-v="${3-i}" aria-label="Calificar ${3-i}">${c}</button>`).join('')}</div><button type="button" class="btn w" style="margin-top:12px" data-act="repetir" data-id="${o.id}">🔁 Repetir esta canasta</button></div>`:''}
+  ${E!=='cancelado'?`<p class="grupo-h">Muestras${E==='alistando'?` · ${r} de ${n} listas`:''}</p>
+  <div class="grupo items">${items}${costoEnvio?`<div class="it"><span class="e">🛵</span><span class="t"><b>Envío Uber</b></span><span class="pz">${$c(costoEnvio)}</span><span class="ck"></span></div>`:''}${pesado&&Math.abs(dif)>=1?`<div class="it ajuste"><span class="e">⚖️</span><span class="t"><b>Ajuste por peso real</b></span><span class="pz">${dif>0?'+':'−'}${$c(Math.abs(dif))}</span><span class="ck"></span></div>`:''}<div class="it total"><span class="e">🧪</span><span class="t"><b>${aprox?'Total aprox.':'Total exacto'}</b></span><span class="pz">${$c(total)}</span><span class="ck"></span></div></div>`:''}
+  ${E==='entregado'?`<div class="card2 centro"><h3>¿Qué tal salió el experimento?</h3><div class="caritas">${['😍','🙂','😐'].map((c,i)=>`<button type="button" class="${o.rating===3-i?'on':''}" data-act="rating" data-v="${3-i}" aria-label="Calificar ${3-i}">${c}</button>`).join('')}</div><button type="button" class="btn w" style="margin-top:12px" data-act="repetir" data-id="${o.id}">🔁 Repetir este experimento</button></div>`:''}
   <div class="grupo acciones-l">${acc}</div>
-  <button type="button" class="btn w ${fin?'big':'ghost'} nuevo" data-act="nuevo">＋ Nuevo pedido</button>`;
+  <button type="button" class="btn w ${fin?'big':'ghost'} nuevo" data-act="nuevo">⚗️ Nuevo experimento</button>`;
 }
 function pagoHtml(o,total,aprox){
   const t=T(),m=o.pago||{},M=N.PAGOS[m.metodo]||N.PAGOS.efectivo;
@@ -495,65 +516,67 @@ function pintarChips(){
   const v=$('tlVivo');if(!v)return;
   const en=N.modo()==='nube';v.classList.toggle('on',en);v.title=en?'Tienda en vivo':'Pedidos por WhatsApp';
 }
+// Protocolo de 3 fases con un haz que avanza
+function pintarProto(){
+  const el=$('tlProto');if(!el)return;
+  const o=pedidoVisto(),E=o?.estado,a=o?2:C.paso==='armar'?0:1;
+  const L=[['01','Muestras'],['02','Condiciones'],['03','Reacción']];
+  const st=i=>o?(i<2?'done':E==='cancelado'?'bad':E==='entregado'?'done':'on'):(i<a?'done':i===a?'on':'fut');
+  const nav=i=>o?i===2:(i!==a&&(i===0||!faltaArmar()));
+  el.innerHTML=`<div class="haz" style="--prog:${a*50}%"></div>${L.map(([nn,nm],i)=>`<button type="button" class="fase-b ${st(i)}" data-act="paso" data-i="${i}" ${nav(i)?'':'disabled'}><i>${st(i)==='done'?'✓':st(i)==='bad'?'✕':nn}</i><span>${nm}</span></button>`).join('')}`;
+}
 function pintarMesa(anim){
   const m=$('tlMesa'),o=pedidoVisto();
-  m.innerHTML=C.actual&&!o?titulo('No encontramos ese pedido en este teléfono',{volver:'armar'})
+  m.innerHTML=C.actual&&!o?titulo('No encontramos ese experimento en este teléfono',{volver:'armar'})
     :o?mesaPedido(o):C.paso==='confirmar'?mesaConfirmar():mesaArmar();
   document.body.dataset.pantalla=o?'pedido':C.paso;
   if(anim){m.classList.remove('fade');void m.offsetWidth;m.classList.add('fade');}
-  if(!o&&C.paso==='armar')pintarGrid();
-  if(o){pintarQR(o);animarAnillo(o.id);}
+  if(!o&&C.paso==='armar'){pintarGrid();contar($('tlCosto'),_costo,cestaTotal());_costo=cestaTotal();}
+  animarMatraz('tlMatraz');
+  if(o){pintarQR(o);animarMatraz('tlReactor');}
   C.pulso=false;C.ultimo=null;
-}
-// El anillo del seguimiento se llena desde donde estaba (no salta).
-const _anillo={};
-function animarAnillo(id){
-  const el=document.querySelector('.tr-ring');if(!el)return;
-  const meta=+getComputedStyle(el).getPropertyValue('--p')||0,antes=_anillo[id]??0;
-  _anillo[id]=meta;if(antes===meta||MINI)return;
-  el.style.setProperty('--p',antes);requestAnimationFrame(()=>requestAnimationFrame(()=>el.style.setProperty('--p',meta)));
 }
 function pintarBit(){
   const nAct=misPedidos().filter(o=>!['entregado','cancelado'].includes(o.estado)).length;
   $('tlBitN').hidden=!nAct;$('tlBitN').textContent=nAct;
   if(H?.tipo==='pedidos')pintarHoja();
 }
-// Abajo, siempre un solo botón: "Continuar" mientras comprás, "Sellar" al confirmar.
+// Abajo, un solo botón: "Continuar" mientras agregás muestras, "Iniciar experimento" al confirmar.
 function pintarBar(){
   const bar=$('tlBar'),inn=$('tlBarIn'),n=cestaN(),o=pedidoVisto();
   let h='';
   if(!o&&n&&!MINI){
     const conf=C.paso==='confirmar';
-    const btn=conf?`<button type="button" class="btn${faltaAlgo()?' apagado':''}" data-act="pedir" id="tlSellar">🔒 Sellar pedido</button>`
+    const btn=conf?`<button type="button" class="btn${faltaAlgo()?' apagado':''}" data-act="pedir" id="tlSellar">🧪 Iniciar experimento</button>`
       :`<button type="button" class="btn" data-act="siguiente">Continuar →</button>`;
-    h=`<button type="button" class="tk" data-act="ir" data-p="armar" aria-label="Ver la canasta"><span class="tk-ico" id="tlTk">🧺<em>${n}</em></span><span class="tk-t"><small>${conf?'Total aprox.':n===1?'1 producto':n+' productos'}</small><strong id="tlTot">${$c(_totBar)}</strong></span></button>${btn}`;
+    h=`<button type="button" class="tk" data-act="ir" data-p="armar" aria-label="Ver el matraz"><span class="tk-ico" id="tlTk" style="--nivel:${nivelCesta().toFixed(3)}"><i></i><em>${n}</em></span><span class="tk-t"><small>${conf?'Total aprox.':n===1?'1 muestra':n+' muestras'}</small><strong id="tlTot">${$c(_totBar)}</strong></span></button>${btn}`;
   }
   bar.classList.toggle('hide',!h);
   if(h){inn.innerHTML=h;contar($('tlTot'),_totBar,cestaTotal());_totBar=cestaTotal();}
 }
-// El total sube o baja contando, en vez de saltar.
-let _totBar=0,_contar=0;
+// Los números suben o bajan contando, en vez de saltar.
+let _totBar=0;const _raf={};
 function contar(el,de,a){
-  if(!el)return;cancelAnimationFrame(_contar);
+  if(!el)return;cancelAnimationFrame(_raf[el.id]);
   if(de===a||MINI||matchMedia('(prefers-reduced-motion: reduce)').matches){el.textContent=$c(a);return;}
-  const t0=performance.now(),d=480;
-  const paso=t=>{const k=Math.min(1,(t-t0)/d),e=1-Math.pow(1-k,3);el.textContent=$c(Math.round(de+(a-de)*e));if(k<1)_contar=requestAnimationFrame(paso);};
-  _contar=requestAnimationFrame(paso);
+  const t0=performance.now(),d=520;
+  const paso=t=>{const k=Math.min(1,(t-t0)/d),e=1-Math.pow(1-k,3);el.textContent=$c(Math.round(de+(a-de)*e));if(k<1)_raf[el.id]=requestAnimationFrame(paso);};
+  _raf[el.id]=requestAnimationFrame(paso);
 }
 function pintarQR(o){
   const el=$('tlQR');if(!el)return;
-  if(!window.qrcode){el.innerHTML='<div style="display:grid;place-items:center;height:100%;font-size:40px">🧺</div>';return;}
+  if(!window.qrcode){el.innerHTML='<div style="display:grid;place-items:center;height:100%;font-size:40px">🧪</div>';return;}
   const q=window.qrcode(0,'M');q.addData('ARAMO:'+o.ref+':'+o.pin);q.make();
   el.innerHTML=q.createSvgTag({cellSize:4,margin:0,scalable:true});
 }
 function render(anim){
   const y=window.scrollY,fa=document.activeElement,foco=fa&&fa.id&&fa.matches('input,textarea')?{id:fa.id,s:fa.selectionStart,e:fa.selectionEnd}:null;
-  pintarChips();pintarMesa(anim);pintarBit();pintarBar();ligar();
+  pintarChips();pintarProto();pintarMesa(anim);pintarBit();pintarBar();ligar();
   if(!anim)window.scrollTo(0,y);
   if(foco){const el=$(foco.id);if(el){el.focus({preventScroll:true});try{el.setSelectionRange(foco.s,foco.e);}catch{}}}
 }
 
-// ══════════════ Hojas (producto, receta, recetas y mis pedidos) ══════════════
+// ══════════════ Hojas (ficha de muestra, fórmula y bitácora) ══════════════
 let H=null;
 function abrirHoja(h){
   const ya=!!H;H=h;pintarHoja();
@@ -566,39 +589,34 @@ function cerrarHoja(desdeHist){
   if(!desdeHist&&!MINI)history.back();
 }
 const CERRAR='<div class="sheet-grip"></div><button type="button" class="sheet-x" data-act="h-x" aria-label="Cerrar">✕</button>';
-function filaReceta(r){return fila(r.e,esc(r.n),`${r.items.length} ingredientes · ${$c(costoReceta(r,C.personas))}`,'receta',`data-k="${r.k}"`);}
 function pintarHoja(){
   const el=$('tlSheet');if(!H)return;
   if(H.tipo==='prod'){
     const p=prod(H.k),en=!!C.cesta[H.k],rapidos=p.u==='kg'?[.5,1,2,3]:[1,2,3,6,12];
-    el.innerHTML=`${CERRAR}
-      <div class="ficha c-${esc(p.c||'')}"><span class="ficha-e">${p.e}</span><h2>${esc(p.n)}</h2><p class="sub">${p.d?esc(p.d)+' · ':''}${porU(p)}</p></div>
+    el.innerHTML=`${CERRAR}<p class="lab-k centro">Ficha de muestra</p>
+      <div class="ficha c-${esc(p.c||'')}"><div class="el-grande"><span class="el-n">${numero(p)}</span><span class="el-s">${esc(simbolo(p))}</span><span class="pt-e">${p.e}</span></div><h2>${esc(p.n)}</h2><p class="sub">${p.d?esc(p.d)+' · ':''}${porU(p)}</p></div>
       <div class="big-step"><button type="button" data-act="h-menos" aria-label="Menos">−</button><output>${esc(fq(H.q))}<small>${esc(fu(p.u,H.q))}</small></output><button type="button" data-act="h-mas" aria-label="Más">+</button></div>
       ${seg(rapidos.map(v=>`<button type="button" class="${H.q===v?'on':''}" data-act="h-set" data-v="${v}">${esc(qtxt(v,p.u))}</button>`).join(''),'chico')}
       ${p.mad?`<p class="grupo-h">¿Para cuándo?</p>${seg(Object.entries(MAD).map(([k,n])=>`<button type="button" class="${H.mad===k?'on':''}" data-act="h-mad" data-v="${k}">${n}</button>`).join(''),'chico')}`:''}
       <input class="inp" id="tlHNota" placeholder="Nota (opcional): grandes, bien rojos…" value="${esc(H.nota)}" autocomplete="off">
-      <div class="hoja-a">${en?`<button type="button" class="btn ghost rojo" data-act="h-quitar">Quitar</button>`:''}<button type="button" class="btn" data-act="h-ok">${en?'Listo':'Agregar'} · ${$c(H.q*p.p)}</button></div>`;
+      <div class="hoja-a">${en?`<button type="button" class="btn ghost rojo" data-act="h-quitar">Quitar</button>`:''}<button type="button" class="btn" data-act="h-ok">${en?'Listo':'Agregar al matraz'} · ${$c(H.q*p.p)}</button></div>`;
     $('tlHNota').addEventListener('input',e=>{H.nota=e.target.value;});
   }else if(H.tipo==='receta'){
     const r=RECETAS().find(x=>x.k===H.k),L=ingredientes(r,H.personas,H.off),tot=N.redondear5(L.filter(x=>x.on).reduce((t,x)=>t+x.q*x.p.p,0));
-    el.innerHTML=`${CERRAR}
-      <div class="ficha"><span class="ficha-e">${r.e}</span><h2>${esc(r.n)}</h2><p class="sub">${esc(r.desc||'')}</p></div>
-      <div class="grupo"><div class="g-fila"><span class="g-l">Personas</span><span class="relleno"></span><span class="step-q"><button type="button" data-act="h-per" data-v="${Math.max(1,H.personas-1)}" aria-label="Menos personas">−</button><em>${H.personas}</em><button type="button" data-act="h-per" data-v="${Math.min(12,H.personas+1)}" aria-label="Más personas">+</button></span></div></div>
-      <p class="grupo-h">Ingredientes · tocá para quitar</p>
+    el.innerHTML=`${CERRAR}<p class="lab-k centro">Fórmula</p>
+      <div class="ficha rc-${esc(r.c||'')}"><span class="ficha-e">${r.e}</span><h2>${esc(r.n)}</h2><p class="sub">${esc(r.desc||'')}</p><p class="formula-l">${L.map(x=>`${esc(simbolo(x.p))}<sub>${esc(fq(x.q))}</sub>`).join(' + ')}</p></div>
+      <p class="grupo-h">¿Para cuántas personas? · ${H.personas}</p>
+      <div class="gente">${[1,2,3,4,5,6,7,8].map(i=>`<button type="button" class="${i<=H.personas?'on':''}" data-act="h-per" data-v="${i}" aria-label="${i} ${i===1?'persona':'personas'}">🧑<small>${i}</small></button>`).join('')}</div>
+      <p class="grupo-h">Reactivos · se escalan solos</p>
       <div class="grupo">${L.map(x=>`<button type="button" class="ing${x.on?' on':''}" data-act="h-ing" data-k="${x.p.k}" ${x.p.agotado?'disabled':''}><span class="ck">${x.on?'✓':''}</span><span class="e">${x.p.e}</span><span class="t"><b>${esc(x.p.n)}</b><small>${x.p.agotado?'Agotado hoy':esc(qtxt(x.q,x.p.u))}</small></span><span class="pz">${$c(x.q*x.p.p)}</span></button>`).join('')}</div>
-      <button type="button" class="btn big w hoja-b" data-act="h-receta" ${L.some(x=>x.on)?'':'disabled'}>Agregar a mi canasta · ${$c(tot)}</button>`;
-  }else if(H.tipo==='recetas'){
-    const todas=RECETAS(),cats=(CFG.categoriasRecetas||[]).filter(c=>todas.some(r=>r.c===c.k)),otras=todas.filter(r=>!cats.some(c=>c.k===r.c));
-    el.innerHTML=`${CERRAR}<h2 class="sheet-t">📖 Recetas</h2><p class="sub">Tocá una y elegís para cuántas personas.</p>
-      ${cats.map(c=>`<p class="grupo-h">${c.e} ${esc(c.n)}</p><div class="grupo">${todas.filter(r=>r.c===c.k).map(filaReceta).join('')}</div>`).join('')}
-      ${otras.length?`<p class="grupo-h">Más recetas</p><div class="grupo">${otras.map(filaReceta).join('')}</div>`:''}`;
+      <button type="button" class="btn big w hoja-b" data-act="h-receta" ${L.some(x=>x.on)?'':'disabled'}>⚗️ Agregar fórmula al matraz · ${$c(tot)}</button>`;
   }else if(H.tipo==='pedidos'){
     const L=misPedidos(),dark=temaActual()==='dark';
     const cls={nuevo:'run',alistando:'run',listo:'ok',entregado:'ok',cancelado:'bad'},nom={nuevo:'Recibido',alistando:'Alistando',listo:'Lista',entregado:'Entregado',cancelado:'Cancelado'};
-    el.innerHTML=`${CERRAR}<h2 class="sheet-t">🧾 Mis pedidos</h2>
-      ${L.length?`<div class="grupo">${L.slice(0,20).map(o=>`<button type="button" class="bit-r" data-act="ver" data-id="${o.id}"><span class="e">${emojis(o.items,3)}</span><span class="t"><b>${esc(o.ref)} · ${$c(N.totalDe(o))}</b><small>${esc(fdia(o.created).replace(/^(\w)/,c=>c.toUpperCase()))} · ${esc(fh(o.created))}</small></span><span class="s ${cls[o.estado]||''}">${nom[o.estado]||o.estado}</span></button>`).join('')}</div>`
-        :'<p class="vacio">Todavía no tenés pedidos. Los que sellés aparecen aquí con su estado.</p>'}
-      <div class="grupo" style="margin-top:14px"><button type="button" class="fila-link" data-act="tema"><span class="e">${dark?'☀️':'🌙'}</span><span class="t"><b>${dark?'Usar tema claro':'Usar tema oscuro'}</b></span></button></div>`;
+    el.innerHTML=`${CERRAR}<h2 class="sheet-t">🧾 Bitácora del laboratorio</h2><p class="sub">Tus experimentos sellados en este teléfono.</p>
+      ${L.length?`<div class="grupo" style="margin-top:14px">${L.slice(0,20).map(o=>`<button type="button" class="bit-r" data-act="ver" data-id="${o.id}"><span class="e">${emojis(o.items,3)}</span><span class="t"><b>${esc(o.ref)} · ${$c(N.totalDe(o))}</b><small>${esc(fdia(o.created).replace(/^(\w)/,c=>c.toUpperCase()))} · ${esc(fh(o.created))}</small></span><span class="s ${cls[o.estado]||''}">${nom[o.estado]||o.estado}</span></button>`).join('')}</div>`
+        :'<p class="vacio">Todavía no hay experimentos. Los que iniciés aparecen aquí con su estado.</p>'}
+      <div class="grupo" style="margin-top:14px"><button type="button" class="fila-link" data-act="tema"><span class="e">${dark?'☀️':'🌙'}</span><span class="t"><b>${dark?'Laboratorio claro':'Laboratorio oscuro'}</b></span></button></div>`;
   }
 }
 function abrirProd(k){const p=prod(k);if(!p)return;const c=C.cesta[k];abrirHoja({tipo:'prod',k,q:c?.q||p.s,mad:c?.mad||'',nota:c?.nota||''});}
@@ -621,7 +639,7 @@ function hacerPedido(){
   });
   C.mis=[o.id,...C.mis.filter(x=>x!==o.id)];C.cesta={};C.nota='';C.editPerfil=false;C.paso='armar';guardar();
   estados[o.id]=o.estado;
-  fiesta(o.items.map(i=>i.e));sellado(o.ref);buzz([30,40,30]);toast(N.modo()==='nube'?'🔔 Pedido '+o.ref+' enviado al Taller · aviso automático a la tienda':'🔒 Pedido '+o.ref+' sellado · falta avisar a la tienda');
+  fiesta(o.items.map(i=>i.e));sellado(o.ref);buzz([30,40,30]);toast(N.modo()==='nube'?'🧪 Experimento '+o.ref+' iniciado · la tienda ya lo recibió':'🧪 Experimento '+o.ref+' listo · falta avisar a la tienda');
   ver(o.id);
 }
 function msgTienda(o){
@@ -671,10 +689,11 @@ function volar(emoji,desde){
   s.style.left=(a.left+a.width/2-14)+'px';s.style.top=(a.top+a.height/2-14)+'px';
   document.body.appendChild(s);
   requestAnimationFrame(()=>{
-    const b=$('tlTk')?.getBoundingClientRect()||{left:innerWidth/2,top:innerHeight-60,width:0,height:0};
+    const vis=el=>{if(!el)return null;const r=el.getBoundingClientRect();return r.bottom>40&&r.top<innerHeight-90?r:null;};
+    const b=vis($('tlMatraz'))||$('tlTk')?.getBoundingClientRect()||{left:innerWidth/2,top:innerHeight-60,width:0,height:0};
     s.style.transform=`translate(${b.left+b.width/2-(a.left+a.width/2)}px,${b.top+b.height/2-(a.top+a.height/2)}px) scale(.4)`;s.style.opacity='.2';
   });
-  setTimeout(()=>{s.remove();const i=$('tlTk');if(i){i.classList.remove('bump');void i.offsetWidth;i.classList.add('bump');}},720);
+  setTimeout(()=>{s.remove();[['tlTk','bump'],['tlMatraz','splash']].forEach(([id,c])=>{const i=$(id);if(i){i.classList.remove(c);void i.offsetWidth;i.classList.add(c);}});},720);
 }
 function fiesta(emos){
   if(MINI)return;
@@ -686,8 +705,9 @@ function fiesta(emos){
 function sellado(ref){
   if(MINI)return;
   const f=document.createElement('div');f.className='sellado';f.setAttribute('aria-hidden','true');
-  f.innerHTML=`<div><span><b>SELLADO</b><small>${esc(ref)}</small></span></div>`;
-  document.body.appendChild(f);setTimeout(()=>f.remove(),1800);
+  f.innerHTML=`<div><span><small>EXPERIMENTO</small><b>INICIADO</b><small>${esc(ref)}</small></span></div>`;
+  document.body.appendChild(f);setTimeout(()=>f.remove(),1900);
+  document.body.classList.remove('destello');void document.body.offsetWidth;document.body.classList.add('destello');setTimeout(()=>document.body.classList.remove('destello'),950);
 }
 async function copiar(v){
   try{await navigator.clipboard.writeText(v);}catch{const t=document.createElement('textarea');t.value=v;document.body.appendChild(t);t.select();try{document.execCommand('copy');}catch{}t.remove();}
@@ -745,9 +765,12 @@ const ACT={
   mas(el){const p=prod(el.dataset.k);setQ(p.k,(C.cesta[p.k]?.q||0)+p.s);buzz(6);render();},
   menos(el){const p=prod(el.dataset.k);setQ(p.k,(C.cesta[p.k]?.q||0)-p.s);buzz(6);render();},
   info(el){abrirProd(el.dataset.k);},
-  // la pestaña salta a su pasillo dentro de la lista
-  pasillo(el){const sec=$('pas-'+el.dataset.k);if(!sec)return;const tope=$('tlBuscar')?.offsetHeight||0;window.scrollTo({top:sec.getBoundingClientRect().top+window.scrollY-tope-6,behavior:'smooth'});marcarTab(el.dataset.k);},
-  recetas(){abrirHoja({tipo:'recetas'});},
+  pasillo(el){
+    C.pasillo=el.dataset.k;C.animGrid=true;pintarGrid();
+    const t=$('tlPasillos'),b=t?.querySelector('.tab.on');if(b)t.scrollTo({left:b.offsetLeft-t.clientWidth/2+b.clientWidth/2,behavior:'smooth'});
+    const g=$('tlBuscar');if(g&&g.getBoundingClientRect().top<0)window.scrollTo({top:g.offsetTop-($('tlProto')?.offsetHeight||0),behavior:'smooth'});
+  },
+  recetas(){C.pasillo='recetas';C.animGrid=true;limpiarBusqueda();},
   receta(el){abrirHoja({tipo:'receta',k:el.dataset.k,personas:C.personas,off:new Set()});},
   'mas-recetas'(){C.verRecetas=!C.verRecetas;render();},
   'rec-cat'(el){C.recCat=el.dataset.k;C.verRecetas=false;render();},
@@ -867,7 +890,7 @@ $('tlBitBtn').addEventListener('click',()=>abrirHoja({tipo:'pedidos'}));
 
 // Tema: el del teléfono (claro u oscuro), o el que el cliente eligió
 function temaActual(){return document.documentElement.dataset.theme==='light'?'light':'dark';}
-function pintarTema(){const d=temaActual()==='dark';document.querySelector('meta[name="theme-color"]').content=d?'#060f0b':'#f5f3ea';}
+function pintarTema(){const d=temaActual()==='dark';document.querySelector('meta[name="theme-color"]').content=d?'#050c09':'#edf3ee';}
 pintarTema();
 DESK.addEventListener?.('change',()=>render());
 

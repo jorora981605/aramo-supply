@@ -3,9 +3,9 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
-<title>ARAMO Taller de pedidos</title>
+<title>ARAMO LAB · Taller de pedidos</title>
 <meta name="description" content="Decí qué necesitás: ARAMO arma tu canasta de frutas y verduras, la pesa, te avisa y la recogés lista o te llega a casa.">
-<meta name="theme-color" content="#06120d">
+<meta name="theme-color" content="#050c09">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-title" content="ARAMO Taller">
 <link rel="manifest" href="./canasta.webmanifest">
@@ -13,22 +13,24 @@
 <link rel="icon" href="./icon.png">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,500..800&family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=JetBrains+Mono:wght@500;600;700&display=swap">
-<link rel="stylesheet" href="canasta.css?v=20261010-taller-orden">
-<script>try{var t=localStorage.getItem('cn_theme')||(matchMedia('(prefers-color-scheme: light)').matches?'light':'dark');document.documentElement.dataset.theme=t;if(/[?&]mini=1/.test(location.search)){document.documentElement.classList.add('mini');var m=location.search.match(/[?&]tema=(light|dark)/);if(m)document.documentElement.dataset.theme=m[1];}}catch(e){}</script>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Chakra+Petch:wght@500;600;700&family=JetBrains+Mono:wght@500;600;700;800&family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap">
+<link rel="stylesheet" href="canasta.css?v=20261010-lab-1">
+<script>try{var t=localStorage.getItem('cn_theme')||'dark';document.documentElement.dataset.theme=t;if(/[?&]mini=1/.test(location.search)){document.documentElement.classList.add('mini');var m=location.search.match(/[?&]tema=(light|dark)/);if(m)document.documentElement.dataset.theme=m[1];}}catch(e){}</script>
 <script src="canasta-config.js?v=20261007-surtido-1"></script>
 <script src="aramo-nube.js?v=20261007-surtido-1"></script>
 <script defer src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script defer src="https://cdnjs.cloudflare.com/ajax/libs/qrcode-generator/1.4.4/qrcode.min.js"></script>
-<script defer src="canasta.js?v=20261010-taller-orden"></script>
+<script defer src="canasta.js?v=20261010-lab-1"></script>
 </head>
 <body>
+<div class="fondo" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i></div>
 <div class="tl" id="tl">
   <header class="tl-top">
     <a class="tl-back" href="APP.html" aria-label="Volver al menú principal" title="Volver al menú principal">⌂</a>
-    <h1 class="marca">ARAMO<span id="tlVivo" class="vivo" title="Tienda en vivo"></span><small>Frutas y verduras</small></h1>
-    <button class="ib" id="tlBitBtn" type="button" aria-label="Mis pedidos">🧾<span class="n" id="tlBitN" hidden></span></button>
+    <h1 class="marca"><span class="logo" aria-hidden="true">🧪</span><span class="m-t">ARAMO<em>LAB</em><span id="tlVivo" class="vivo" title="Tienda en vivo"></span></span><small>Laboratorio de canastas frescas</small></h1>
+    <button class="ib" id="tlBitBtn" type="button" aria-label="Bitácora del laboratorio">🧾<span class="n" id="tlBitN" hidden></span></button>
   </header>
+  <nav class="proto" id="tlProto" aria-label="Protocolo del experimento"></nav>
   <main class="mesa" id="tlMesa" aria-live="polite"></main>
 </div>
 <div class="bar hide" id="tlBar"><div class="bar-in" id="tlBarIn"></div></div>
