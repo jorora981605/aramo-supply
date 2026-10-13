@@ -5,6 +5,7 @@
    El pedido en curso se ve arriba como tarjeta en vivo.
    Después, un paso a la vez: Tu canasta → Entrega → Datos y pago, con un
    solo botón abajo. "↺ Reiniciar" vacía todo (con Deshacer).
+   Mi perfil: tarjeta de socio con hojas 🍃 y nivel, consumo y premios.
    Tu pedido: estado en vivo y siempre "‹ Volver a la tienda".
 
    La lógica es la de siempre: catálogo de la vitrina, recetas que se
@@ -22,6 +23,9 @@ const MINI=/[?&]mini=1/.test(location.search);
 const DESK=window.matchMedia('(min-width: 1000px)');
 const LS={get(k,d){try{const v=JSON.parse(localStorage.getItem(k));return v??d;}catch{return d;}},set(k,v){try{localStorage.setItem(k,JSON.stringify(v));}catch{}}};
 const $c=N.colones;
+// Fotos reales de los productos (canasta-fotos.js); si un producto no tiene, se usa su emoji.
+const FOTOS=window.ARAMO_FOTOS||{};
+function foto(k,e,cls=''){const f=FOTOS[k];return f?`<img class="ft ${f.t||'foto'}${cls?' '+cls:''}" src="${f.f}" alt="" loading="lazy" decoding="async" draggable="false">`:`<span class="em${cls?' '+cls:''}">${e||'🧺'}</span>`;}
 
 const C={
   paso:'armar',actual:null,pasillo:null,q:'',parse:null,verRecetas:false,recCat:'todas',ultimo:null,pulso:false,
@@ -33,13 +37,14 @@ const C={
   nota:LS.get('cn_nota',''),
   mis:LS.get('cn_mis',[]),
   personas:LS.get('cn_personas',4),
+  premio:LS.get('cn_premio',null),
   editPerfil:false,animGrid:true,toque:null,
 };
 // "Al carro" es lo mismo que recoger en tienda: ya no es una opción aparte
 if(C.retiro.entrega==='carro'){C.retiro.entrega='tienda';C.retiro.carro=false;}
 function guardar(){
   LS.set('cn_cesta',C.cesta);LS.set('cn_retiro',C.retiro);LS.set('cn_perfil',C.perfil);LS.set('cn_pago',C.pago);
-  LS.set('cn_sust',C.sust);LS.set('cn_nota',C.nota);LS.set('cn_mis',C.mis);LS.set('cn_personas',C.personas);
+  LS.set('cn_sust',C.sust);LS.set('cn_nota',C.nota);LS.set('cn_mis',C.mis);LS.set('cn_personas',C.personas);LS.set('cn_premio',C.premio);
 }
 
 // ══════════════ Vitrina ══════════════
@@ -100,7 +105,7 @@ function add(k,el){
   if(p.agotado){toast(p.n+' está agotado hoy');return;}
   setQ(k,(C.cesta[k]?.q||0)+p.s);buzz(8);
   C.ultimo=k;C.pulso=true;
-  if(el)volar(p.e,el);
+  if(el)volar(p,el);
   render();
 }
 
@@ -348,14 +353,14 @@ function parseHtml(){
 // Tarjeta de producto: el emoji en su plato, nombre y precio. El + flota y se abre en − cantidad +.
 function tile(p,i){
   const q=C.cesta[p.k]?.q||0;
-  return `<div class="pt c-${esc(p.c||'')}${q?' in':''}${p.agotado?' off':''}${p.k===C.ultimo?' pop':''}${p.k===C.toque?' toque':''}" style="--i:${Math.min(i||0,18)}" role="button" tabindex="0" data-act="tile" data-k="${p.k}" aria-label="${esc(p.n)}">
-    <span class="pt-plato"><span class="pt-e">${p.e}</span>${p.agotado?'<span class="pt-ago">Agotado</span>':q?`<span class="step-q"><button type="button" data-act="menos" data-k="${p.k}" aria-label="Menos ${esc(p.n)}">−</button><em>${esc(qcorto(q,p.u))}</em><button type="button" data-act="mas" data-k="${p.k}" aria-label="Más ${esc(p.n)}">+</button></span>`:'<span class="pt-add" aria-hidden="true">+</span>'}</span>
+  return `<div class="pt c-${esc(p.c||'')}${FOTOS[p.k]?' con-foto f-'+(FOTOS[p.k].t||'foto'):''}${q?' in':''}${p.agotado?' off':''}${p.k===C.ultimo?' pop':''}${p.k===C.toque?' toque':''}" style="--i:${Math.min(i||0,18)}" role="button" tabindex="0" data-act="tile" data-k="${p.k}" aria-label="${esc(p.n)}">
+    <span class="pt-plato">${FOTOS[p.k]?foto(p.k,p.e,'pt-f'):`<span class="pt-e">${p.e}</span>`}${p.agotado?'<span class="pt-ago">Agotado</span>':q?`<span class="step-q"><button type="button" data-act="menos" data-k="${p.k}" aria-label="Menos ${esc(p.n)}">−</button><em>${esc(qcorto(q,p.u))}</em><button type="button" data-act="mas" data-k="${p.k}" aria-label="Más ${esc(p.n)}">+</button></span>`:'<span class="pt-add" aria-hidden="true">+</span>'}</span>
     <span class="pt-n">${esc(p.n)}</span><span class="pt-p">${porU(p)}</span>
   </div>`;
 }
 function receta(r,i){
   const ing=r.items.map(([k])=>prod(k)).filter(Boolean);
-  return `<button type="button" class="receta rc-${esc(r.c||'')}" style="--i:${Math.min(i||0,18)}" data-act="receta" data-k="${r.k}"><span class="re-e">${r.e}</span><span class="re-n">${esc(r.n)}</span><span class="re-i">${ing.slice(0,5).map(p=>p.e).join('')}</span><span class="re-s">Para ${C.personas} · ${$c(costoReceta(r,C.personas))}</span></button>`;
+  return `<button type="button" class="receta rc-${esc(r.c||'')}" style="--i:${Math.min(i||0,18)}" data-act="receta" data-k="${r.k}"><span class="re-e">${r.e}</span><span class="re-n">${esc(r.n)}</span><span class="re-i">${ing.slice(0,5).map(p=>`<i>${foto(p.k,p.e)}</i>`).join('')}</span><span class="re-s">Para ${C.personas} · ${$c(costoReceta(r,C.personas))}</span></button>`;
 }
 const NUM_RX=/\b(un|una|dos|tres|cuatro|cinco|seis|siete|ocho|nueve|diez|doce|media|medio|kilo|kilos|docena)\b/;
 const pareceLista=t=>/\d|,|;|\n/.test(t)||NUM_RX.test(norm(t));
@@ -393,13 +398,13 @@ function mesaCanasta(){
   if(!n)return cabPaso('canasta')+`<div class="vacia"><span class="va-e">🧺</span><h2>Tu canasta está vacía</h2><p>Agregá frutas y verduras y aquí las vas a ver.</p><button type="button" class="btn big" data-act="nuevo">Ver productos</button></div>`;
   return cabPaso('canasta')+`<div class="titulo"><h2>Tu canasta</h2></div>
   <div class="cesta-hero"><span class="ch-deco" aria-hidden="true">🧺</span>
-    <span class="ch-e">${it.slice(-4).reverse().map(x=>`<i>${x.p.e}</i>`).join('')}${n>4?`<i class="mas">+${n-4}</i>`:''}</span>
+    <span class="ch-e">${it.slice(-4).reverse().map(x=>`<i>${foto(x.k,x.p.e)}</i>`).join('')}${n>4?`<i class="mas">+${n-4}</i>`:''}</span>
     <small>${n} ${n===1?'producto':'productos'}${peso?` · ≈ ${kg(peso)} kg`:''}</small>
     <b id="tlHeroTot">${$c(_totHero)}</b>
     <p>Total aproximado · pagás lo que pese de verdad</p></div>
-  <div class="grupo cesta" id="tlSecCesta">${it.map(x=>{const min=x.q<=x.p.s;return `<div class="linea c-${esc(x.p.c||'')}${x.k===C.toque?' toque':''}${x.k===C.ultimo?' nueva':''}" role="button" tabindex="0" data-act="info" data-k="${x.k}" aria-label="${esc(x.p.n)}: detalles"><span class="li-e">${x.p.e}</span><span class="t"><b>${esc(x.p.n)}</b><small>${esc(porU(x.p))}</small>${x.mad||x.nota?`<span class="li-n">${[x.mad?MAD[x.mad]:'',x.nota||''].filter(Boolean).map(esc).join(' · ')}</span>`:''}</span><span class="pz">${$c(x.q*x.p.p)}</span><span class="step-q"><button type="button" class="${min?'quita':''}" data-act="menos" data-k="${x.k}" aria-label="${min?'Quitar':'Menos'} ${esc(x.p.n)}">${min?BASURA:'−'}</button><em>${esc(qtxt(x.q,x.p.u))}</em><button type="button" data-act="mas" data-k="${x.k}" aria-label="Más ${esc(x.p.n)}">+</button></span></div>`;}).join('')}
+  <div class="grupo cesta" id="tlSecCesta">${it.map(x=>{const min=x.q<=x.p.s;return `<div class="linea c-${esc(x.p.c||'')}${x.k===C.toque?' toque':''}${x.k===C.ultimo?' nueva':''}" role="button" tabindex="0" data-act="info" data-k="${x.k}" aria-label="${esc(x.p.n)}: detalles"><span class="li-e">${foto(x.k,x.p.e)}</span><span class="t"><b>${esc(x.p.n)}</b><small>${esc(porU(x.p))}</small>${x.mad||x.nota?`<span class="li-n">${[x.mad?MAD[x.mad]:'',x.nota||''].filter(Boolean).map(esc).join(' · ')}</span>`:''}</span><span class="pz">${$c(x.q*x.p.p)}</span><span class="step-q"><button type="button" class="${min?'quita':''}" data-act="menos" data-k="${x.k}" aria-label="${min?'Quitar':'Menos'} ${esc(x.p.n)}">${min?BASURA:'−'}</button><em>${esc(qtxt(x.q,x.p.u))}</em><button type="button" data-act="mas" data-k="${x.k}" aria-label="Más ${esc(x.p.n)}">+</button></span></div>`;}).join('')}
     <button type="button" class="agregar-mas" data-act="ir" data-p="armar">＋ Agregar más productos</button></div>
-  ${sug.length?`<p class="grupo-h">¿Te falta algo?</p><div class="sug2">${sug.map(p=>`<button type="button" class="mini-p c-${esc(p.c||'')}" data-act="sumar" data-k="${p.k}"><span class="mp-e">${p.e}<i aria-hidden="true">+</i></span><b>${esc(p.n)}</b><small>${esc(porU(p))}</small></button>`).join('')}</div>`:''}`;
+  ${sug.length?`<p class="grupo-h">¿Te falta algo?</p><div class="sug2">${sug.map(p=>`<button type="button" class="mini-p c-${esc(p.c||'')}" data-act="sumar" data-k="${p.k}"><span class="mp-e">${foto(p.k,p.e)}<i aria-hidden="true">+</i></span><b>${esc(p.n)}</b><small>${esc(porU(p))}</small></button>`).join('')}</div>`:''}`;
 }
 
 // ── Paso 2 · Entrega ──
@@ -422,9 +427,11 @@ function mesaEntrega(){
 function mesaPago(){
   asegurarRetiro();
   const it=cestaItems(),r=C.retiro,s=suc(r.suc),t=T(),env=r.entrega==='envio',tot=cestaTotal(),P=C.perfil,n=it.length,h=horaRetiro();
-  const metodos=Object.entries(N.PAGOS).filter(([k])=>k!=='link'||t.linkTarjeta);
-  if(!metodos.some(([k])=>k===C.pago.metodo))C.pago.metodo='sinpe';
+  const metodos=metodosPago();
+  if(!metodos.some(([k])=>k===C.pago.metodo)){C.pago.metodo='sinpe';guardar();}
   const corto=m=>m.n.replace(' al recoger','').replace('Tarjeta en línea','Link de pago');
+  const L=N.lealtad(),c=perfilOk()?miCuenta():null,ps=L.activa&&c?L.premios.filter(p=>c.saldo>=+p.hojas&&+p.valor<=tot):[];
+  const pr=premioSel(),guardado=!pr&&C.premio&&L.premios.find(p=>p.k===C.premio);
   return cabPaso('pago')+`<div class="titulo"><h2>Datos y pago</h2></div>
   <div class="grupo recap">
     <button type="button" class="fila-link" data-act="ir" data-p="canasta"><span class="e">${emojis(it,3)}</span><span class="t"><b>${n} ${n===1?'producto':'productos'} · ${$c(tot)}</b><small>Total aproximado</small></span><span class="cambiar">Cambiar</span></button>
@@ -436,11 +443,14 @@ function mesaPago(){
     :`<label class="g-fila"><span class="g-l">Nombre</span><input id="tlNombre" placeholder="Tu nombre" autocomplete="given-name" value="${esc(P.nombre)}"></label><label class="g-fila"><span class="g-l">Teléfono</span><input id="tlTel" placeholder="8888-8888" inputmode="tel" autocomplete="tel" maxlength="20" value="${esc(P.tel)}"></label><div class="err" id="tlPerfilErr"></div>`}</div>
   <p class="grupo-h">Pago <small>pagás cuando esté lista</small></p>
   <div class="opciones tres" id="tlSecPago">${metodos.map(([k,m])=>`<button type="button" class="opcion pago${C.pago.metodo===k?' on':''}" data-act="metodo" data-k="${k}"><span class="op-e">${m.e}</span><b>${esc(corto(m))}</b><i class="op-ck" aria-hidden="true"></i></button>`).join('')}</div>
+  ${env?'<p class="nota-pago">🛵 A domicilio se paga por SINPE Móvil cuando tu canasta esté lista: el repartidor no cobra.</p>':''}
+  ${guardado&&c&&c.saldo>=+guardado.hojas?`<p class="nota-pago">🎁 Tu premio "${esc(guardado.n)}" se usa en pedidos desde ${$c(guardado.valor)}.</p>`:''}
+  ${ps.length?`<p class="grupo-h">🍃 Usá tus hojas <small>tenés ${c.saldo}</small></p><div class="opciones" id="tlSecPremio">${[{k:'',n:'',hojas:0},...ps].map(p=>opcion((pr?.k||'')===p.k,'premio',`data-k="${p.k}"`,p.k?'🎁':'🍃',p.k?esc(p.n):'Guardarlas para después',p.k?`Usa ${p.hojas} de tus ${c.saldo} hojas`:`Seguís juntando · tenés ${c.saldo} 🍃`,'premio-op')).join('')}</div>`:''}
   ${C.pago.metodo==='efectivo'?`<div class="grupo efectivo"><div class="g-fila col"><span class="g-l">¿Con cuánto pagás?</span>${seg([0,...billetes(tot)].map(v=>`<button type="button" class="${(+C.pago.conCuanto||0)===v?'on':''}" data-act="con" data-v="${v}">${v?$c(v):'Exacto'}</button>`).join(''),'chico')}</div></div>`:''}
   <p class="grupo-h">Si algo no hay</p>
   <div class="grupo"><div class="g-fila">${seg(Object.entries(SUST).map(([k,x])=>`<button type="button" class="${C.sust===k?'on':''}" data-act="sust" data-k="${k}">${{avisar:'Avisame',similar:'Algo parecido',quitar:'Quitalo'}[k]||x.n}</button>`).join(''),'chico')}</div>
     <label class="g-fila"><span class="g-l">Nota</span><input id="tlNota" placeholder="Opcional: bolsas aparte…" value="${esc(C.nota)}" autocomplete="off"></label></div>
-  <div class="resumen"><div><span>${n} ${n===1?'producto':'productos'}</span><b>${$c(tot)}</b></div>${env?'<div><span>Envío con Uber</span><b>se confirma</b></div>':''}<div class="tot"><span>Total aprox.</span><b>${$c(tot)}</b></div><p>Pagás lo que pese de verdad · ${N.modo()!=='nube'?'al pedir, le avisás a la tienda por WhatsApp':'podés cancelarlo mientras no lo empiecen a alistar'}.</p></div>`;
+  <div class="resumen"><div><span>${n} ${n===1?'producto':'productos'}</span><b>${$c(tot)}</b></div>${env?'<div><span>Envío con Uber</span><b>se confirma</b></div>':''}${pr?`<div class="desc"><span>🎁 ${esc(pr.n)}</span><b>−${$c(pr.valor)}</b></div>`:''}<div class="tot"><span>Total aprox.</span><b>${$c(totalPagar())}</b></div>${L.activa?`<div class="gana"><span>🍃 Con este pedido ganás</span><b>~${hojasEstimadas()} ${hojasEstimadas()===1?'hoja':'hojas'}${L.dobles?' 🔥':''}</b></div>`:''}<p>Pagás lo que pese de verdad · ${N.modo()!=='nube'?'al pedir, le avisás a la tienda por WhatsApp':'podés cancelarlo mientras no lo empiecen a alistar'}.</p></div>`;
 }
 function billetes(t){
   const out=[];
@@ -471,7 +481,7 @@ function mesaPedido(o){
     if(i.estado!=='nohay')dif+=(q-i.q)*pr;else dif-=i.q*pr;
     const pesoDistinto=real&&i.u==='kg'&&Math.abs(q-i.q)>1e-9;
     const det=i.estado==='nohay'?'no hubo':pesoDistinto?`pediste ${qtxt(i.q,i.u)} → pesó ${kg(q)} kg`:qtxt(q,i.u);
-    return `<div class="it ${st}${st==='ok'&&antes&&!antes.has(j)?' recien':''}"><span class="e">${i.e}</span><span class="t"><b>${esc(i.n)}</b><small>${esc(det)}</small></span><span class="pz">${i.estado==='nohay'?'₡0':$c(q*pr)}</span><span class="ck" aria-hidden="true">${st==='ok'?'✓':st==='no'?'✕':''}</span></div>`;
+    return `<div class="it ${st}${st==='ok'&&antes&&!antes.has(j)?' recien':''}"><span class="e">${foto(i.k,i.e)}</span><span class="t"><b>${esc(i.n)}</b><small>${esc(det)}</small></span><span class="pz">${i.estado==='nohay'?'₡0':$c(q*pr)}</span><span class="ck" aria-hidden="true">${st==='ok'?'✓':st==='no'?'✕':''}</span></div>`;
   }).join('');
   _okAntes[o.id]=ahoraOk;
   const costoEnvio=+env?.costo||0,pesado=['listo','entregado'].includes(E)||o.items.some(i=>i.qr!=null&&i.qr!=='');
@@ -492,7 +502,8 @@ function mesaPedido(o){
   ${pagoHtml(o,total,aprox)}
   ${env&&!fin?`<div class="card2"><h3>🛵 Envío con Uber</h3><p>${env.uber?`Pedido a las ${esc(fh(env.uber))} · va en camino.`:'Lo pedimos apenas tu canasta esté lista.'}${costoEnvio?` Envío: ${$c(costoEnvio)} (incluido).`:''}</p></div>`:''}
   ${E!=='cancelado'?`<p class="grupo-h">Tu canasta${E==='alistando'?` <small>${r} de ${n} listos</small>`:''}</p>
-  <div class="grupo items">${items}${costoEnvio?`<div class="it"><span class="e">🛵</span><span class="t"><b>Envío Uber</b></span><span class="pz">${$c(costoEnvio)}</span><span class="ck"></span></div>`:''}${pesado&&Math.abs(dif)>=1?`<div class="it ajuste"><span class="e">⚖️</span><span class="t"><b>Ajuste por peso real</b></span><span class="pz">${dif>0?'+':'−'}${$c(Math.abs(dif))}</span><span class="ck"></span></div>`:''}<div class="it total"><span class="e"></span><span class="t"><b>${aprox?'Total aprox.':'Total'}</b></span><span class="pz">${$c(total)}</span><span class="ck"></span></div></div>`:''}
+  <div class="grupo items">${items}${costoEnvio?`<div class="it"><span class="e">🛵</span><span class="t"><b>Envío Uber</b></span><span class="pz">${$c(costoEnvio)}</span><span class="ck"></span></div>`:''}${pesado&&Math.abs(dif)>=1?`<div class="it ajuste"><span class="e">⚖️</span><span class="t"><b>Ajuste por peso real</b></span><span class="pz">${dif>0?'+':'−'}${$c(Math.abs(dif))}</span><span class="ck"></span></div>`:''}${o.premio?`<div class="it premio"><span class="e">🎁</span><span class="t"><b>Premio con hojas</b><small>${+o.premio.hojas} 🍃</small></span><span class="pz">−${$c(o.premio.valor)}</span><span class="ck"></span></div>`:''}<div class="it total"><span class="e"></span><span class="t"><b>${aprox?'Total aprox.':'Total'}</b></span><span class="pz">${$c(total)}</span><span class="ck"></span></div></div>`:''}
+  ${E==='entregado'&&N.hojasDe(o)?`<div class="ganaste"><span>🍃</span><div><b>+${N.hojasDe(o)} hojas</b><small>Ganaste con este pedido · <button type="button" class="link" data-act="perfil">ver mi perfil</button></small></div></div>`:''}
   ${E==='entregado'?`<div class="card2 centro"><h3>¿Qué tal estuvo todo?</h3><div class="caritas">${['😍','🙂','😐'].map((c,i)=>`<button type="button" class="${o.rating===3-i?'on':''}" data-act="rating" data-v="${3-i}" aria-label="Calificar ${3-i}">${c}</button>`).join('')}</div><button type="button" class="btn w" style="margin-top:12px" data-act="repetir" data-id="${o.id}">🔁 Pedir lo mismo otra vez</button></div>`:''}
   <div class="grupo acciones-l">${acc}</div>
   <button type="button" class="btn w big ${fin?'':'ghost'} seguir" data-act="nuevo">🛒 Seguir comprando</button>`;
@@ -551,7 +562,8 @@ function pintarBit(){
   const nAct=misPedidos().filter(o=>!['entregado','cancelado'].includes(o.estado)).length;
   $('tlBitN').hidden=!nAct;$('tlBitN').textContent=nAct;
   const ri=$('tlReini');if(ri)ri.hidden=MINI||!cestaN()||!!C.actual;
-  if(H?.tipo==='pedidos')pintarHoja();
+  const av=$('tlAvatar');if(av){const ok=perfilOk();av.className=ok?'av-ini n-'+miCuenta().nivel.k:'';av.innerHTML=ok?esc(C.perfil.nombre.trim()[0].toUpperCase()):PERSONA;}
+  if(H?.tipo==='perfil'||H?.tipo==='pedidos')pintarHoja();
 }
 // Abajo, un solo botón: "Ver canasta" mientras comprás, "Continuar" en cada paso y "Hacer pedido" al final.
 function pintarBar(){
@@ -559,7 +571,7 @@ function pintarBar(){
   let h='';
   if(!o&&!C.actual&&n&&!MINI){
     const P=C.paso,it=cestaItems();
-    const ico=`<span class="tk-ico" id="tlTk">${it.slice(-3).map(x=>`<i>${x.p.e}</i>`).join('')}<em>${n}</em></span><span class="tk-t"><small>${P==='armar'?(n===1?'1 producto':n+' productos'):'Total aprox.'}</small><strong id="tlTot">${$c(_totBar)}</strong></span>`;
+    const ico=`<span class="tk-ico" id="tlTk">${it.slice(-3).map(x=>`<i>${foto(x.k,x.p.e)}</i>`).join('')}<em>${n}</em></span><span class="tk-t"><small>${P==='armar'?(n===1?'1 producto':n+' productos'):'Total aprox.'}</small><strong id="tlTot">${$c(_totBar)}</strong></span>`;
     const tk=P==='armar'?`<button type="button" class="tk" data-act="siguiente" aria-label="Ver mi canasta">${ico}</button>`
       :P==='canasta'?`<div class="tk">${ico}</div>`:`<button type="button" class="tk" data-act="ir" data-p="canasta" aria-label="Ver mi canasta">${ico}</button>`;
     const btn=P==='pago'?`<button type="button" class="btn${faltaAlgo()?' apagado':''}" data-act="pedir" id="tlSellar">Hacer pedido</button>`
@@ -567,15 +579,15 @@ function pintarBar(){
     h=tk+btn;
   }
   bar.classList.toggle('hide',!h);
-  if(h){inn.innerHTML=h;contar($('tlTot'),_totBar,cestaTotal());_totBar=cestaTotal();}
+  if(h){const tb=C.paso==='pago'?totalPagar():cestaTotal();inn.innerHTML=h;contar($('tlTot'),_totBar,tb);_totBar=tb;}
 }
 // Los números suben o bajan contando, en vez de saltar.
 let _totBar=0;const _raf={};
-function contar(el,de,a){
+function contar(el,de,a,fmt=$c){
   if(!el)return;cancelAnimationFrame(_raf[el.id]);
-  if(de===a||MINI||matchMedia('(prefers-reduced-motion: reduce)').matches){el.textContent=$c(a);return;}
-  const t0=performance.now(),d=480;
-  const paso=t=>{const k=Math.min(1,(t-t0)/d),e=1-Math.pow(1-k,3);el.textContent=$c(Math.round(de+(a-de)*e));if(k<1)_raf[el.id]=requestAnimationFrame(paso);};
+  if(de===a||MINI||matchMedia('(prefers-reduced-motion: reduce)').matches){el.textContent=fmt(a);return;}
+  const t0=performance.now(),d=de===0?900:480;
+  const paso=t=>{const k=Math.min(1,(t-t0)/d),e=1-Math.pow(1-k,3);el.textContent=fmt(Math.round(de+(a-de)*e));if(k<1)_raf[el.id]=requestAnimationFrame(paso);};
   _raf[el.id]=requestAnimationFrame(paso);
 }
 // El buscador se "pega" arriba con fondo de vidrio al bajar; cuando las categorías
@@ -619,7 +631,7 @@ function pintarHoja(){
   if(H.tipo==='prod'){
     const p=prod(H.k),en=!!C.cesta[H.k],rapidos=p.u==='kg'?[.5,1,2,3]:[1,2,3,6,12];
     el.innerHTML=`${CERRAR}
-      <div class="ficha c-${esc(p.c||'')}"><span class="ficha-e">${p.e}</span><h2>${esc(p.n)}</h2><p class="sub">${p.d?esc(p.d)+' · ':''}${porU(p)}</p></div>
+      <div class="ficha c-${esc(p.c||'')}"><span class="ficha-e${FOTOS[p.k]?' con-foto':''}">${foto(p.k,p.e)}</span><h2>${esc(p.n)}</h2><p class="sub">${p.d?esc(p.d)+' · ':''}${porU(p)}</p></div>
       <div class="big-step"><button type="button" data-act="h-menos" aria-label="Menos">−</button><output>${esc(fq(H.q))}<small>${esc(fu(p.u,H.q))}</small></output><button type="button" data-act="h-mas" aria-label="Más">+</button></div>
       ${seg(rapidos.map(v=>`<button type="button" class="${H.q===v?'on':''}" data-act="h-set" data-v="${v}">${esc(qtxt(v,p.u))}</button>`).join(''),'chico')}
       ${p.mad?`<p class="grupo-h">¿Para cuándo?</p>${seg(Object.entries(MAD).map(([k,n])=>`<button type="button" class="${H.mad===k?'on':''}" data-act="h-mad" data-v="${k}">${n}</button>`).join(''),'chico')}`:''}
@@ -633,16 +645,65 @@ function pintarHoja(){
       <p class="grupo-h">¿Para cuántas personas? <small>${H.personas}</small></p>
       <div class="gente">${[1,2,3,4,5,6,7,8].map(i=>`<button type="button" class="${i<=H.personas?'on':''}${i===H.personas?' ult':''}" data-act="h-per" data-v="${i}" aria-label="${i} ${i===1?'persona':'personas'}">🧑<small>${i}</small></button>`).join('')}</div>
       <p class="grupo-h">Ingredientes <small>tocá para quitar</small></p>
-      <div class="grupo">${L.map(x=>`<button type="button" class="ing${x.on?' on':''}" data-act="h-ing" data-k="${x.p.k}" ${x.p.agotado?'disabled':''}><span class="ck">${x.on?'✓':''}</span><span class="e">${x.p.e}</span><span class="t"><b>${esc(x.p.n)}</b><small>${x.p.agotado?'Agotado hoy':esc(qtxt(x.q,x.p.u))}</small></span><span class="pz">${$c(x.q*x.p.p)}</span></button>`).join('')}</div>
+      <div class="grupo">${L.map(x=>`<button type="button" class="ing${x.on?' on':''}" data-act="h-ing" data-k="${x.p.k}" ${x.p.agotado?'disabled':''}><span class="ck">${x.on?'✓':''}</span><span class="e">${foto(x.p.k,x.p.e)}</span><span class="t"><b>${esc(x.p.n)}</b><small>${x.p.agotado?'Agotado hoy':esc(qtxt(x.q,x.p.u))}</small></span><span class="pz">${$c(x.q*x.p.p)}</span></button>`).join('')}</div>
       <button type="button" class="btn big w hoja-b" data-act="h-receta" ${L.some(x=>x.on)?'':'disabled'}>Agregar a mi canasta · ${$c(tot)}</button>`;
-  }else if(H.tipo==='pedidos'){
-    const L=misPedidos(),dark=temaActual()==='dark';
-    const cls={nuevo:'run',alistando:'run',listo:'ok',entregado:'ok',cancelado:'bad'},nom={nuevo:'Recibido',alistando:'Alistando',listo:'Lista',entregado:'Entregado',cancelado:'Cancelado'};
-    el.innerHTML=`${CERRAR}<h2 class="sheet-t">Mis pedidos</h2>
-      ${L.length?`<div class="grupo" style="margin-top:14px">${L.slice(0,20).map(o=>`<button type="button" class="bit-r" data-act="ver" data-id="${o.id}"><span class="e">${emojis(o.items,3)}</span><span class="t"><b>${esc(o.ref)} · ${$c(N.totalDe(o))}</b><small>${esc(fdia(o.created).replace(/^(\w)/,c=>c.toUpperCase()))} · ${esc(fh(o.created))}</small></span><span class="s ${cls[o.estado]||''}">${nom[o.estado]||o.estado}</span></button>`).join('')}</div>`
-        :'<p class="vacio"><b>🧺</b>Todavía no tenés pedidos. Los que hagás aparecen aquí con su estado.</p>'}
-      <div class="grupo" style="margin-top:14px"><button type="button" class="fila-link" data-act="tema"><span class="e">${dark?'☀️':'🌙'}</span><span class="t"><b>${dark?'Usar tema claro':'Usar tema oscuro'}</b></span></button></div>`;
-  }
+  }else if(H.tipo==='perfil'||H.tipo==='pedidos'){
+    el.innerHTML=hojaPerfil();
+    if(perfilOk()&&!H.editar){const c=miCuenta();contar($('tlHojas'),_hojasVis,c.saldo,String);_hojasVis=c.saldo;}
+  }else if(H.tipo==='creditos')el.innerHTML=hojaCreditos();
+}
+// ══════════════ Mi perfil: hojas 🍃, nivel y consumo ══════════════
+const miCuenta=()=>N.cuentaCliente(misPedidos());
+const mesTxt=d=>new Date(d).toLocaleDateString('es-CR',{month:'long',year:'numeric'});
+// El premio apartado se aplica si alcanzan las hojas y el pedido es al menos del valor del descuento
+function premioSel(){const L=N.lealtad();if(!C.premio||!L.activa||!perfilOk())return null;const p=L.premios.find(x=>x.k===C.premio);return p&&miCuenta().saldo>=+p.hojas&&+p.valor<=cestaTotal()?p:null;}
+const totalPagar=()=>Math.max(0,cestaTotal()-(+premioSel()?.valor||0));
+function hojasEstimadas(){const L=N.lealtad();return L.activa?Math.floor(totalPagar()/L.porHoja)*(L.dobles?2:1):0;}
+// A domicilio solo se paga por SINPE Móvil (o con el link de pago, si la tienda lo tiene)
+function metodosPago(){const t=T(),env=esEnvio();return Object.entries(N.PAGOS).filter(([k])=>(k!=='link'||t.linkTarjeta)&&(!env||k==='sinpe'||k==='link'));}
+const PERSONA='<svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="8" r="4"/><path d="M4 21a8 8 0 0 1 16 0"/></svg>';
+let _hojasVis=0;
+function filaPedido(o){
+  const cls={nuevo:'run',alistando:'run',listo:'ok',entregado:'ok',cancelado:'bad'},nom={nuevo:'Recibido',alistando:'Alistando',listo:'Lista',entregado:'Entregado',cancelado:'Cancelado'};
+  return `<button type="button" class="bit-r" data-act="ver" data-id="${o.id}"><span class="e pila">${(o.items||[]).slice(0,3).map(i=>`<i>${foto(i.k,i.e)}</i>`).join('')}</span><span class="t"><b>${esc(o.ref)} · ${$c(N.totalDe(o))}</b><small>${esc(fdia(o.created).replace(/^(\w)/,c=>c.toUpperCase()))} · ${esc(fh(o.created))}</small></span><span class="s ${cls[o.estado]||''}">${nom[o.estado]||o.estado}</span></button>`;
+}
+function hojaPerfil(){
+  const P=C.perfil,L=N.lealtad(),dark=temaActual()==='dark',ped=misPedidos();
+  const lista=ped.length?`<div class="grupo">${ped.slice(0,20).map(filaPedido).join('')}</div>`:'<p class="vacio"><b>🧺</b>Todavía no tenés pedidos. Los que hagás aparecen aquí con su estado.</p>';
+  const extras=`<div class="grupo" style="margin-top:14px">${perfilOk()&&!H.editar?`<button type="button" class="fila-link" data-act="perfil-editar"><span class="e">✏️</span><span class="t"><b>Cambiar mis datos</b><small>${esc(P.nombre)} · ${esc(fmtTel(P.tel))}</small></span><span class="go" aria-hidden="true">›</span></button>`:''}<button type="button" class="fila-link" data-act="tema"><span class="e">${dark?'☀️':'🌙'}</span><span class="t"><b>${dark?'Usar tema claro':'Usar tema oscuro'}</b></span></button>${Object.keys(FOTOS).length?`<button type="button" class="fila-link" data-act="creditos"><span class="e">📷</span><span class="t"><b>Fotos de los productos</b><small>Wikimedia Commons · créditos y licencias</small></span><span class="go" aria-hidden="true">›</span></button>`:''}</div>`;
+  if(!perfilOk()||H.editar)return `${CERRAR}<div class="pf-nuevo">
+      <span class="pf-ico" aria-hidden="true">🍃</span>
+      <h2>${H.editar?'Tus datos':'Creá tu perfil ARAMO'}</h2>
+      <p>${H.editar?'Así te reconocemos en la tienda y te avisamos de tu pedido.':'Ganá <b>hojas 🍃</b> con cada compra, subí de nivel y canjealas por descuentos.'}</p>
+      ${H.editar?'':`<div class="pf-pasos"><span>🛒<small>Comprás</small></span><i>→</i><span>🍃<small>Ganás hojas</small></span><i>→</i><span>🎁<small>Canjeás</small></span></div>`}
+      <div class="grupo"><label class="g-fila"><span class="g-l">Nombre</span><input id="tlPNom" placeholder="Tu nombre" autocomplete="given-name" value="${esc(P.nombre)}"></label><label class="g-fila"><span class="g-l">Teléfono</span><input id="tlPTel" placeholder="8888-8888" inputmode="tel" autocomplete="tel" maxlength="20" value="${esc(P.tel)}"></label></div>
+      <button type="button" class="btn big w" data-act="perfil-crear">${H.editar?'Guardar':'Crear mi perfil'}</button>
+      ${H.editar?'<button type="button" class="btn ghost w" style="margin-top:8px" data-act="perfil-cancelar">Cancelar</button>':''}</div>
+    ${ped.length?`<p class="grupo-h">Mis pedidos</p>${lista}`:''}${extras}`;
+  const c=miCuenta(),desde=P.desde||c.desde||new Date().toISOString();
+  const hoy=new Date(),meses=[...Array(6)].map((_,i)=>{const d=new Date(hoy.getFullYear(),hoy.getMonth()-5+i,1),k=d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0');return{k,n:d.toLocaleDateString('es-CR',{month:'short'}).replace('.',''),v:c.meses[k]||0};});
+  const max=Math.max(1,...meses.map(m=>m.v));
+  return `${CERRAR}
+  <div class="socio n-${c.nivel.k}"><i class="so-brillo" aria-hidden="true"></i>
+    <div class="so-top"><span class="so-marca">ARAMO<small>socio</small></span><span class="so-nivel">${c.nivel.e} ${c.nivel.n}</span></div>
+    <div class="so-hojas"><b id="tlHojas">${_hojasVis}</b><span>hojas 🍃</span></div>
+    <div class="so-bar"><i style="--a:${c.avance.toFixed(3)}"></i></div>
+    <p class="so-sig">${c.sig?`Te faltan <b>${c.falta} 🍃</b> para ${c.sig.e} ${c.sig.n}`:'¡Llegaste al nivel más alto! 👑'}</p>
+    <div class="so-pie"><span>${esc(P.nombre)}</span><span>Socio desde ${esc(mesTxt(desde))}</span></div></div>
+  ${L.activa&&L.dobles?'<div class="dobles">🔥 <b>Hojas dobles</b> · cada pedido vale el doble</div>':''}
+  ${c.pendientes?`<p class="en-camino">🍃 +${c.pendientes} hojas en camino · se suman cuando recibás tu pedido</p>`:''}
+  <div class="stats"><div><b>${$c(c.gastado)}</b><span>Comprado</span></div><div><b>${c.pedidos}</b><span>${c.pedidos===1?'Pedido':'Pedidos'}</span></div><div><b>${c.kilos?kg(c.kilos)+' kg':'—'}</b><span>De frescura</span></div>${c.ahorro?`<div><b>${$c(c.ahorro)}</b><span>Ahorrado</span></div>`:''}</div>
+  <p class="grupo-h">Tu consumo <small>últimos 6 meses</small></p>
+  <div class="grafico">${meses.map((m,i)=>`<div class="gb${i===5?' hoy':''}"><em>${m.v?$c(m.v).replace('₡',''):''}</em><i style="--h:${(m.v/max).toFixed(3)};--d:${i}"></i><small>${esc(m.n)}</small></div>`).join('')}</div>
+  ${c.top.length?`<p class="grupo-h">Lo que más llevás</p><div class="top">${c.top.slice(0,4).map((t,i)=>`<div class="tp" style="--i:${i}"><span class="tp-f">${foto(t.k,t.e)}</span><b>${esc(t.n)}</b><small>${t.veces} ${t.veces===1?'vez':'veces'}</small></div>`).join('')}</div>`:''}
+  ${L.activa&&L.premios.length?`<p class="grupo-h">Tus premios <small>1 🍃 por cada ${$c(L.porHoja)}</small></p><div class="premios">${L.premios.map(p=>{const ok=c.saldo>=+p.hojas,usar=C.premio===p.k;return `<div class="prem${ok?' ok':''}${usar?' usar':''}"><span class="pr-e">🎁</span><span class="t"><b>${esc(p.n)}</b><small>${ok?(usar?'✓ Se descuenta en tu próximo pedido':'¡Ya lo podés canjear!'):`Te faltan ${+p.hojas-c.saldo} 🍃`}</small><span class="pr-bar"><i style="--a:${Math.min(1,c.saldo/+p.hojas).toFixed(3)}"></i></span></span><span class="pr-h">${+p.hojas}<small>🍃</small></span>${ok&&!usar?`<button type="button" class="btn" data-act="premio-usar" data-k="${esc(p.k)}">Usar</button>`:''}</div>`;}).join('')}</div>`:''}
+  <p class="grupo-h">Mis pedidos</p>${lista}${extras}`;
+}
+function hojaCreditos(){
+  const L=Object.entries(FOTOS).map(([k,f])=>({k,f,p:cat().find(x=>x.k===k)||{n:k,e:''}}));
+  return `${CERRAR}<h2 class="sheet-t">📷 Fotos de los productos</h2><p class="sub">Fotos reales de Wikimedia Commons con licencias libres. ¡Gracias a sus autores!</p>
+    <div class="grupo creditos" style="margin-top:14px">${L.map(x=>`<a class="cred" href="${esc(x.f.u||'#')}" target="_blank" rel="noopener"><span class="cr-f">${foto(x.k,x.p.e)}</span><span class="t"><b>${esc(x.p.n)}</b><small>${esc(x.f.a||'Autor sin nombre')} · ${esc(x.f.l||'')}</small></span><span class="go" aria-hidden="true">↗</span></a>`).join('')}</div>
+    <button type="button" class="btn ghost w" style="margin-top:14px" data-act="perfil">‹ Volver a mi perfil</button>`;
 }
 function abrirProd(k){const p=prod(k);if(!p)return;const c=C.cesta[k];abrirHoja({tipo:'prod',k,q:c?.q||p.s,mad:c?.mad||'',nota:c?.nota||''});}
 
@@ -651,7 +712,8 @@ const estados={};
 misPedidos().forEach(o=>{estados[o.id]=o.estado;});
 function hacerPedido(){
   const falta=faltaAlgo();if(falta){avisarFalta(falta);return;}
-  const s=suc(C.retiro.suc),h=horaRetiro();
+  if(!metodosPago().some(([k])=>k===C.pago.metodo))C.pago.metodo='sinpe';
+  const s=suc(C.retiro.suc),h=horaRetiro(),pr=premioSel(),L=N.lealtad();
   const items=cestaItems().filter(x=>!x.p.agotado);
   const o=N.crear({
     id:N.nuevoId(),ref:N.nuevoRef(),pin:N.nuevoPin(),estado:'nuevo',sucursal:s.k,
@@ -660,9 +722,11 @@ function hacerPedido(){
     pago:{metodo:C.pago.metodo,conCuanto:C.pago.metodo==='efectivo'?+C.pago.conCuanto||0:0,estado:'pendiente'},
     sust:C.sust,nota:C.nota.trim(),
     items:items.map(x=>({k:x.k,n:x.p.n,e:x.p.e,u:x.p.u,q:x.q,p:x.p.p,mad:x.mad||'',nota:x.nota||''})),
-    totalEst:cestaTotal(),canal:N.modo(),
+    premio:pr?{k:pr.k,n:pr.n,hojas:+pr.hojas,valor:+pr.valor}:null,hojasX:L.activa&&L.dobles?2:1,
+    totalEst:totalPagar(),canal:N.modo(),
   });
-  C.mis=[o.id,...C.mis.filter(x=>x!==o.id)];C.cesta={};C.nota='';C.editPerfil=false;C.paso='armar';guardar();
+  if(!C.perfil.desde)C.perfil.desde=o.created;
+  C.mis=[o.id,...C.mis.filter(x=>x!==o.id)];C.cesta={};C.nota='';C.premio=null;C.editPerfil=false;C.paso='armar';guardar();
   estados[o.id]=o.estado;
   const nube=N.modo()==='nube';
   fiesta(o.items.map(i=>i.e));sellado(o.ref,nube?'¡Pedido enviado!':'¡Pedido listo!');buzz([30,40,30]);toast(nube?'✅ Pedido '+o.ref+' enviado · la tienda ya lo recibió':'📲 Pedido '+o.ref+' listo · ahora avisale a la tienda');
@@ -679,6 +743,7 @@ function msgTienda(o){
     '',
     ...o.items.map(i=>`• ${qtxt(i.q,i.u)} ${i.n}${i.mad?' · '+(MAD[i.mad]||'').toLowerCase():''}${i.nota?' · '+i.nota:''}`),
     '',
+    o.premio?`🎁 Premio con hojas: −${$c(o.premio.valor)} (${o.premio.hojas} 🍃)`:'',
     `Total aprox.: ${$c(N.totalDe(o))}`,
     `Si algo no hay: ${SUST[o.sust]?.n.toLowerCase()}`,
     o.nota?`📝 ${o.nota}`:'',
@@ -695,7 +760,7 @@ function vigilar(){
     if(!antes||antes===o.estado)return;
     if(o.estado==='listo'){toast('✅ ¡Tu canasta '+o.ref+' está lista!');buzz([90,60,90,60,160]);campana();N.avisos.mostrar('✅ Tu canasta '+o.ref+' está lista',o.retiro.envio?'Va en camino con Uber a tu ubicación.':'Te espera en '+(suc(o.sucursal)?.n||'ARAMO')+'. Total '+$c(N.totalDe(o))+'.',{tag:'pedido-'+o.id,url:location.href.split('#')[0]});}
     else if(o.estado==='alistando'){toast('🧑‍🌾 Ya están escogiendo tu canasta');N.avisos.mostrar('🧑‍🌾 Estamos escogiendo tu canasta','Pedido '+o.ref+' · te avisamos cuando esté lista.',{tag:'pedido-'+o.id});}
-    else if(o.estado==='entregado')toast('🛍️ ¡Entregada! Gracias');
+    else if(o.estado==='entregado'){const h=N.hojasDe(o);toast(h?`🛍️ ¡Entregada! Ganaste ${h} 🍃`:'🛍️ ¡Entregada! Gracias');if(h)fiesta(['🍃','🍃','🌿']);}
     else if(o.estado==='cancelado')toast('El pedido '+o.ref+' fue cancelado');
   });
 }
@@ -713,9 +778,10 @@ function toast(m,acc){
   if(acc){const b=document.createElement('button');b.type='button';b.textContent=acc.txt;b.addEventListener('click',()=>{t.classList.remove('show');acc.fn();});t.append(b);}
   t.classList.toggle('accion',!!acc);t.classList.add('show');clearTimeout(_tt);_tt=setTimeout(()=>t.classList.remove('show'),acc?5500:2600);
 }
-function volar(emoji,desde){
+function volar(p,desde){
   const a=desde.getBoundingClientRect();
-  const s=document.createElement('span');s.className='vuelo';s.textContent=emoji;
+  const s=document.createElement('span');s.className='vuelo';
+  if(FOTOS[p.k]){s.classList.add('con-foto');s.innerHTML=foto(p.k,p.e);}else s.textContent=p.e;
   s.style.left=(a.left+a.width/2-14)+'px';s.style.top=(a.top+a.height/2-14)+'px';
   document.body.appendChild(s);
   requestAnimationFrame(()=>{
@@ -905,6 +971,22 @@ const ACT={
   },
   rating(el){N.cambiar(C.actual,o=>{o.rating=+el.dataset.v;},'cliente','Calificó con '+el.dataset.v).then(()=>{toast('¡Gracias por contarnos!');render();});},
   copiar(el){copiar(el.dataset.v);},
+  // perfil y lealtad
+  perfil(){if(H){H.tipo='perfil';H.editar=false;pintarHoja();$('tlSheet').scrollTop=0;}else abrirHoja({tipo:'perfil'});},
+  'perfil-editar'(){H.editar=true;pintarHoja();$('tlSheet').scrollTop=0;$('tlPNom')?.focus();},
+  'perfil-cancelar'(){H.editar=false;pintarHoja();},
+  'perfil-crear'(){
+    const nm=$('tlPNom'),tl=$('tlPTel'),n=nm.value.trim(),t=tl.value;
+    if(n.length<2){toast('Escribí tu nombre');nm.classList.add('falta');nm.focus();return;}
+    if(telDig(t).length!==8){toast('El teléfono debe tener 8 números');tl.classList.add('falta');tl.focus();return;}
+    const nuevo=!perfilOk();
+    C.perfil={...C.perfil,nombre:n,tel:t,desde:C.perfil.desde||new Date().toISOString()};C.editPerfil=false;guardar();
+    H.editar=false;render();$('tlSheet').scrollTop=0;
+    if(nuevo){fiesta(['🍃','🌱','🍃','✨']);buzz([20,40,20]);toast('🎉 ¡Listo, '+n.split(/\s+/)[0]+'! Ya sos socio ARAMO');}else toast('✅ Datos guardados');
+  },
+  'premio-usar'(el){C.premio=el.dataset.k;guardar();pintarHoja();buzz(10);toast('🎁 Listo: se descuenta en tu próximo pedido');},
+  premio(el){C.premio=el.dataset.k||null;guardar();buzz(6);render();},
+  creditos(){H.tipo='creditos';pintarHoja();$('tlSheet').scrollTop=0;},
   // hojas
   'h-x'(){cerrarHoja();},
   'h-mas'(){const p=prod(H.k);H.q=+(H.q+p.s).toFixed(2);pintarHoja();buzz(6);},
@@ -932,7 +1014,7 @@ document.addEventListener('keydown',e=>{
   if((e.key==='Enter'||e.key===' ')&&e.target.matches?.('[role="button"][data-act]')){e.preventDefault();e.target.click();}
 });
 $('tlSheetBg').addEventListener('click',()=>cerrarHoja());
-$('tlBitBtn').addEventListener('click',()=>abrirHoja({tipo:'pedidos'}));
+$('tlBitBtn').addEventListener('click',()=>abrirHoja({tipo:'perfil'}));
 
 // Tema: el del teléfono (claro u oscuro), o el que el cliente eligió
 function temaActual(){return document.documentElement.dataset.theme==='light'?'light':'dark';}

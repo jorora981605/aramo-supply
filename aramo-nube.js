@@ -261,10 +261,61 @@ function nuevoPin(){return rnd(4).map(x=>x%10).join('');}
 function colones(n){return '₡'+Math.round(+n||0).toLocaleString('es-CR').replace(/[\s  ,]/g,'.');}
 function redondear5(n){return Math.round((+n||0)/5)*5;}
 function qtyItem(it){return it.estado==='nohay'?0:(it.qr!=null&&it.qr!==''?+it.qr:+it.q||0);}
-function totalDe(o){return redondear5((o?.items||[]).reduce((t,it)=>t+qtyItem(it)*(it.pr!=null&&it.pr!==''?+it.pr:+it.p||0),0)+(+o?.retiro?.envio?.costo||0));}
+// El premio canjeado con hojas 🍃 se descuenta del total (nunca baja de cero).
+function totalDe(o){return redondear5(Math.max(0,(o?.items||[]).reduce((t,it)=>t+qtyItem(it)*(it.pr!=null&&it.pr!==''?+it.pr:+it.p||0),0)+(+o?.retiro?.envio?.costo||0)-(+o?.premio?.valor||0)));}
 function esAprox(o){return !['listo','entregado'].includes(o?.estado)&&(o?.items||[]).some(it=>it.u==='kg'&&it.qr==null);}
 function telCR(t){const d=String(t||'').replace(/\D/g,'');return d.length===8?'506'+d:d;}
 function wa(tel,texto){const n=telCR(tel);return 'https://wa.me/'+(n||'')+'?text='+encodeURIComponent(texto);}
+
+// ── Lealtad: hojas 🍃 ──
+// Cada pedido entregado da 1 hoja por cada ₡ "porHoja" pagados (×2 si se hizo con "hojas dobles").
+// Las hojas se canjean por premios (descuento en el próximo pedido). El nivel sube con las hojas ganadas.
+const NIVELES=[
+  {k:'semilla',n:'Semilla',e:'🌱',desde:0},
+  {k:'brote',n:'Brote',e:'🌿',desde:25},
+  {k:'arbol',n:'Árbol',e:'🌳',desde:100},
+  {k:'cosecha',n:'Cosecha',e:'🧺',desde:250},
+];
+const LEALTAD_BASE={activa:true,porHoja:1000,dobles:false,premios:[
+  {k:'p1',n:'₡2.500 de descuento',hojas:50,valor:2500},
+  {k:'p2',n:'₡6.000 de descuento',hojas:100,valor:6000},
+]};
+function lealtad(){const l=tienda().lealtad||{};return{...LEALTAD_BASE,...l,porHoja:Math.max(1,+l.porHoja||LEALTAD_BASE.porHoja),premios:(Array.isArray(l.premios)?l.premios:LEALTAD_BASE.premios).filter(p=>p&&+p.hojas>0&&+p.valor>0)};}
+function hojasDe(o,L=lealtad()){return L.activa?Math.floor(totalDe(o)/L.porHoja)*(+o?.hojasX||1):0;}
+const telDe=o=>String(o?.cliente?.tel||'').replace(/\D/g,'').replace(/^506/,'');
+// Cuenta de un cliente a partir de sus pedidos: hojas, nivel, consumo y lo que más lleva.
+function cuentaCliente(pedidos){
+  const L=lealtad();let ganadas=0,usadas=0,pendientes=0,gastado=0,ahorro=0,entregados=0,kilos=0;const prods={},meses={};let desde=null,ultima=null;
+  (pedidos||[]).forEach(o=>{
+    if(!o||o.borrado||o.estado==='cancelado')return;
+    if(o.premio?.hojas){usadas+=+o.premio.hojas;ahorro+=+o.premio.valor||0;}
+    const h=hojasDe(o,L);
+    if(!desde||Date.parse(o.created)<Date.parse(desde))desde=o.created;
+    if(!ultima||Date.parse(o.created)>Date.parse(ultima))ultima=o.created;
+    if(o.estado!=='entregado'){pendientes+=h;return;}
+    ganadas+=h;entregados++;const tot=totalDe(o);gastado+=tot;
+    const m=String(o.entregado||o.updated||o.created).slice(0,7);meses[m]=(meses[m]||0)+tot;
+    (o.items||[]).forEach(i=>{if(i.estado==='nohay')return;const q=qtyItem(i);if(i.u==='kg')kilos+=q;const x=prods[i.k]||(prods[i.k]={k:i.k,n:i.n,e:i.e,veces:0});x.veces++;});
+  });
+  const nivel=[...NIVELES].reverse().find(n=>ganadas>=n.desde)||NIVELES[0],sig=NIVELES[NIVELES.indexOf(nivel)+1]||null;
+  return{ganadas,usadas,saldo:Math.max(0,ganadas-usadas),pendientes,gastado,ahorro,pedidos:entregados,kilos,desde,ultima,meses,
+    top:Object.values(prods).sort((a,b)=>b.veces-a.veces).slice(0,5),nivel,sig,falta:sig?Math.max(0,sig.desde-ganadas):0,
+    avance:sig?Math.min(1,(ganadas-nivel.desde)/(sig.desde-nivel.desde)):1};
+}
+// Todo el historial de pedidos (para la vista de Clientes): la nube completa, por tandas, más lo de este equipo.
+async function historial(){
+  const m=new Map();
+  if(modo==='nube'&&supa){
+    for(let desde=0;desde<50000;desde+=1000){
+      const r=await timeout(supa.from(TABLE).select('id,data').neq('id',TIENDA_ID).range(desde,desde+999),15000);
+      if(r.error)throw new Error(r.error.message);
+      (r.data||[]).forEach(x=>{if(x.data?.id)m.set(x.data.id,x.data);});
+      if(!r.data||r.data.length<1000)break;
+    }
+  }
+  Object.values(store).forEach(o=>{const c=m.get(o.id);if(!c||(o.v||0)>(c.v||0))m.set(o.id,o);});
+  return [...m.values()].filter(o=>o&&!o.borrado&&o.cliente);
+}
 
 const ESTADOS=[
   {k:'nuevo',n:'Pendiente de aceptación',e:'📥',txt:'La tienda recibió tu pedido y debe aceptarlo.'},
@@ -288,6 +339,6 @@ window.AramoNube={
   tienda,guardarTienda,catalogo,recetas,waDe,sinpeDe,avisos,
   pack,unpack,enlace,
   nuevoId,nuevoRef,nuevoPin,colones,redondear5,qtyItem,totalDe,esAprox,telCR,wa,
-  ESTADOS,PAGOS,
+  ESTADOS,PAGOS,NIVELES,lealtad,hojasDe,cuentaCliente,historial,telDe,
 };
 })();

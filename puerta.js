@@ -220,7 +220,8 @@ function montar(){
       <div class="mo-herr">
         <button type="button" data-mo="caja"><b>🧾</b>Caja de hoy</button>
         <button type="button" data-mo="vitrina"><b>🏷️</b>Precios</button>
-        <button type="button" data-mo="whatsapp"><b>📥</b>Pedido de WhatsApp</button>
+        <button type="button" data-mo="clientes"><b>👥</b>Clientes</button>
+        <button type="button" data-mo="whatsapp"><b>📥</b>Pedido WhatsApp</button>
         <button type="button" data-mo="mas" aria-expanded="false" id="moMasBtn"><b>⋯</b>Más</button>
       </div>
       <div class="mo-herr mo-mas" id="moMas" hidden>
@@ -464,7 +465,7 @@ function tarjeta(o){
     <div class="mo-meta">${esc(s?.n||'')} · ${o.retiro.envio?(o.retiro.envio.uber?'🛵 Uber en camino':'🛵 envío Uber'):o.retiro.carro?'🚗 al carro'+(o.retiro.placa?' ('+esc(o.retiro.placa)+')':''):'🚶 adentro'} · ${n} productos</div>
     <div class="mo-nombres">${o.items.map(i=>`<span>${i.e} ${esc(i.n)} <i>${esc(qtxt(qReal(i),i.u))}</i></span>`).join('')}</div>
     ${o.estado==='alistando'?`<div class="mo-bar"><i style="width:${n?r/n*100:0}%"></i></div>`:''}
-    <div class="mo-foot">${pago}${o.sust==='avisar'?'':`<span class="mo-pill">${SUST[o.sust]}</span>`}<span class="mo-total">${N.esAprox(o)?'~':''}${$c(N.totalDe(o))}</span></div>
+    <div class="mo-foot">${pago}${o.premio?`<span class="mo-pill o">🎁 −${$c(o.premio.valor)}</span>`:''}${o.sust==='avisar'?'':`<span class="mo-pill">${SUST[o.sust]}</span>`}<span class="mo-total">${N.esAprox(o)?'~':''}${$c(N.totalDe(o))}</span></div>
   </button>`;
 }
 
@@ -551,7 +552,7 @@ function pintarEncargo(){
   const s=suc(o.sucursal),{r,n}=avance(o),P=N.PAGOS[o.pago?.metodo]||{},tot=N.totalDe(o),edit=o.estado==='alistando';
   const estadoTxt={nuevo:o.avisado?'📥 Pendiente de aceptación':'📥 Nuevo',alistando:'🧑‍🌾 Alistando',listo:'✅ Listo',entregado:'🛍️ Entregado',cancelado:'✖️ Cancelado'}[o.estado];
   const pesoR=o.items.reduce((t,i)=>t+(i.u==='kg'&&i.estado==='listo'?qReal(i):0),0);
-  const est=N.redondear5(o.items.reduce((t,i)=>t+(+i.q)*(+i.p),0)),dif=tot-est-(+o.retiro?.envio?.costo||0);
+  const est=N.redondear5(o.items.reduce((t,i)=>t+(+i.q)*(+i.p),0)),dif=tot+(+o.premio?.valor||0)-est-(+o.retiro?.envio?.costo||0);
   const verd={nuevo:[o.avisado?'Pendiente de aceptación':'Nuevo','run'],alistando:[`Alistando ${r}/${n}`,'run'],listo:[o.cobro?'Cobrado':'Listo','ok'],entregado:['Entregado','ok'],cancelado:['Cancelado','bad']}[o.estado]||['',''];
   const holo=o.items.map(i=>`<div class="mo-hit ${i.estado==='listo'?'ok':i.estado==='nohay'?'no':o.estado==='alistando'?'wait':''}" title="${esc(i.n)}"><b>${i.e}</b><em>${esc(i.n)}</em><small>${esc(i.u==='kg'&&i.qr!=null&&i.qr!==''?kg(qReal(i))+' kg':qtxt(qReal(i),i.u))}</small></div>`).join('');
   let acc='';
@@ -573,8 +574,9 @@ function pintarEncargo(){
     <div class="mo-blk"><h4>Productos · pesá cada uno · si algo no hay: ${SUST[o.sust]||''}</h4>${o.items.map((it,i)=>pesoHtml(it,i,edit)).join('')}
       ${Math.abs(dif)>=5&&o.estado!=='nuevo'?`<div class="mo-tot m"><span>Ajuste por peso real (vs. ${$c(est)} aprox.)</span><span>${dif>0?'+':'−'}${$c(Math.abs(dif))}</span></div>`:''}
       ${o.retiro.envio&&+o.retiro.envio.costo?`<div class="mo-tot m"><span>🛵 Envío Uber</span><span>${$c(o.retiro.envio.costo)}</span></div>`:''}
+      ${o.premio?`<div class="mo-tot m o"><span>🎁 Premio con hojas (${+o.premio.hojas} 🍃)</span><span>−${$c(o.premio.valor)}</span></div>`:''}
       <div class="mo-tot"><span>${N.esAprox(o)?'Total aproximado':'Total exacto'}</span><b>${$c(tot)}</b></div>${o.nota?`<div class="mo-s" style="margin-top:8px">📝 ${esc(o.nota)}</div>`:''}</div>
-    <div class="mo-blk"><h4>Cliente</h4><div class="mo-row"><span style="flex:1"><strong style="font-size:16px">${esc(o.cliente.nombre)}</strong><br><small style="color:var(--m)">${esc(fmtTel(o.cliente.tel))}</small></span><a class="mo-btn" href="tel:${esc(telDig(o.cliente.tel))}" aria-label="Llamar">📞</a><button type="button" class="mo-btn" data-mo="wa" aria-label="WhatsApp">💬</button></div></div>
+    <div class="mo-blk"><h4>Cliente</h4><div class="mo-row"><span style="flex:1"><strong style="font-size:16px">${esc(o.cliente.nombre)}</strong><br><small style="color:var(--m)">${esc(fmtTel(o.cliente.tel))}</small></span><a class="mo-btn" href="tel:${esc(telDig(o.cliente.tel))}" aria-label="Llamar">📞</a><button type="button" class="mo-btn" data-mo="wa" aria-label="WhatsApp">💬</button></div>${lealtadHtml(o)}</div>
     ${o.retiro.envio?envioHtml(o):`<div class="mo-blk"><h4>Retiro</h4><div style="font-weight:900">${esc(sucNom(o.sucursal))}</div><div class="mo-s">${fdia(o.retiro.at)} a las ${fh(o.retiro.at)} (${falta(o.retiro.at)}) · ${o.retiro.carro?'🚗 al carro'+(o.retiro.placa?': '+esc(o.retiro.placa):''):'🚶 adentro'}</div></div>`}
     <div class="mo-blk"><h4>Pago</h4><div style="font-weight:900">${P.e||''} ${esc(P.n||'')} ${o.cobro?`<span class="mo-pill g">🧾 cobrado ${$c(o.cobro.total)}${o.cobro.venta?' · '+esc(o.cobro.venta):''}</span>`:o.pago.estado==='verificado'?'<span class="mo-pill g">✓ pagado</span>':o.pago.estado==='reportado'?'<span class="mo-pill o">el cliente dice que pagó</span>':'<span class="mo-pill">pendiente</span>'}</div>${o.pago.conCuanto?`<div class="mo-s">Paga con ${$c(o.pago.conCuanto)} → vuelto ${$c(Math.max(0,o.pago.conCuanto-tot))}</div>`:''}</div>
     <details class="mo-blk"><summary style="font-weight:900;font-size:13px">🧾 Bitácora del pedido</summary><div class="mo-log" style="margin-top:8px">${(o.log||[]).map(l=>`${fdia(l.t)} ${fh(l.t)} · ${l.by==='cliente'?'👤':'🛎️'} ${esc(l.m||{nuevo:'Recibido',alistando:'Empezó a alistarse',listo:'Quedó lista',entregado:'Entregado',cancelado:'Cancelado'}[l.s]||l.s)}`).join('<br>')}</div></details>`);
@@ -704,7 +706,7 @@ function pintarCobro(o){
   const billetes=[...new Set([tot,...[1000,2000,5000,10000,20000].map(b=>Math.ceil(tot/b)*b)])].filter(v=>v>=tot).sort((a,b)=>a-b).slice(0,5);
   const lineas=o.items.filter(i=>i.estado!=='nohay').map(i=>`<div class="l"><span>${i.e} ${esc(i.n)} · ${esc(i.u==='kg'?kg(qReal(i))+' kg':qtxt(qReal(i),i.u))} × ${$c(precioIt(i))}</span><span>${$c(qReal(i)*precioIt(i))}</span></div>`).join('');
   abrirHoja(`<p class="mo-kick">Caja${c.desdePin?' · paso 2 de 2':''}${POS?' · ARAMO POS':''}</p><div class="mo-h">Cobrar ${esc(o.ref)}</div><div class="mo-s">${esc(o.cliente.nombre)} · ${esc(sucNom(o.sucursal))}</div>
-    <div class="mo-ticket">${lineas}${o.retiro.envio&&+o.retiro.envio.costo?`<div class="l"><span>🛵 Envío Uber</span><span>${$c(o.retiro.envio.costo)}</span></div>`:''}<hr><div class="l t"><span>TOTAL EXACTO</span><span>${$c(tot)}</span></div></div>
+    <div class="mo-ticket">${lineas}${o.retiro.envio&&+o.retiro.envio.costo?`<div class="l"><span>🛵 Envío Uber</span><span>${$c(o.retiro.envio.costo)}</span></div>`:''}${o.premio?`<div class="l"><span>🎁 Premio con hojas (${+o.premio.hojas} 🍃)</span><span>−${$c(o.premio.valor)}</span></div>`:''}<hr><div class="l t"><span>TOTAL EXACTO</span><span>${$c(tot)}</span></div></div>
     <div class="mo-kick" style="margin-top:14px">¿Cómo paga?</div>
     <div class="mo-metodos">${[['efectivo','💵','Efectivo'],['tarjeta','💳','Tarjeta'],['sinpe','📲','SINPE']].map(([k,e,n])=>`<button type="button" class="${c.metodo===k?'on':''}" data-mo="metodo" data-k="${k}"><b>${e}</b>${n}</button>`).join('')}</div>
     ${c.metodo==='efectivo'?`<label class="mo-field">Recibido<input type="number" inputmode="numeric" id="moRecibido" min="0" step="50" value="${+c.recibido||''}" placeholder="${tot}"></label><div class="mo-chips" style="flex-wrap:wrap">${billetes.map(v=>`<button type="button" class="mo-chip${+c.recibido===v?' on':''}" data-mo="recibido" data-v="${v}">${v===tot?'Exacto':$c(v)}</button>`).join('')}</div><div class="mo-vuelto">Vuelto <b id="moVuelto">${$c(vuelto)}</b></div>`:''}
@@ -753,6 +755,7 @@ function tiqueteTexto(o){
   return [`${sucNom(o.sucursal)||t.nombre||'ARAMO'}`,`Pedido ${o.ref}${c.venta?' · '+c.venta:''}`,`${fdia(c.fecha||o.updated)} ${fh(c.fecha||o.updated)} · ${o.cliente.nombre}`,'',
     ...o.items.filter(i=>i.estado!=='nohay').map(i=>`${i.n} ${i.u==='kg'?kg(qReal(i))+' kg':qtxt(qReal(i),i.u)} x ${$c(precioIt(i))} = ${$c(qReal(i)*precioIt(i))}`),
     ...(o.retiro.envio&&+o.retiro.envio.costo?[`Envío Uber = ${$c(o.retiro.envio.costo)}`]:[]),
+    ...(o.premio?[`Premio con hojas (${o.premio.hojas}) = −${$c(o.premio.valor)}`]:[]),
     '',`TOTAL ${$c(N.totalDe(o))}`,`${N.PAGOS[c.metodo]?.n||''}${c.metodo==='efectivo'?` · recibido ${$c(c.recibido)} · vuelto ${$c(c.vuelto)}`:''}`,'','¡Gracias por comprar en ARAMO!'].join('\n');
 }
 function pintarTiquete(o){
@@ -880,6 +883,74 @@ function pintarReceta(){
   const rq=$('reQ');rq.addEventListener('input',()=>{leer();M.rq=rq.value;const pos=rq.selectionStart;repintar(pintarReceta);const n=$('reQ');n.focus();n.setSelectionRange(pos,pos);});
 }
 
+// ── Clientes y lealtad (hojas 🍃) ──
+// Los clientes se reconocen por teléfono. El historial completo se trae de la nube al abrir.
+function todos(){const m=new Map((M.hist||[]).map(o=>[o.id,o]));N.lista().forEach(o=>{const c=m.get(o.id);if(!c||(o.v||0)>=(c.v||0))m.set(o.id,o);});return [...m.values()].filter(o=>o&&!o.borrado&&o.cliente);}
+function cargarHist(){
+  if(M.histT&&Date.now()-M.histT<60000)return;
+  M.histT=Date.now();
+  N.historial().then(L=>{M.hist=L;if(['clientes','cliente'].includes(M.vista)&&$('moSheet').classList.contains('open'))repintar(M.vista==='clientes'?pintarClientes:pintarCliente);}).catch(()=>{M.histT=0;});
+}
+function clientesDe(L){
+  const m=new Map();
+  L.forEach(o=>{if(o.prueba)return;const t=N.telDe(o);if(!t)return;let c=m.get(t);if(!c){c={tel:t,nombre:o.cliente.nombre,ult:o.created,peds:[]};m.set(t,c);}c.peds.push(o);if(Date.parse(o.created)>=Date.parse(c.ult)){c.ult=o.created;c.nombre=o.cliente.nombre;}});
+  return [...m.values()].map(c=>({...c,cuenta:N.cuentaCliente(c.peds)})).sort((a,b)=>b.cuenta.gastado-a.cuenta.gastado||Date.parse(b.ult)-Date.parse(a.ult));
+}
+const cuentaDeTel=t=>N.cuentaCliente(todos().filter(o=>N.telDe(o)===t));
+function lealtadHtml(o){
+  const L=N.lealtad();if(!L.activa||o.prueba)return '';
+  const t=N.telDe(o),c=cuentaDeTel(t),neto=c.ganadas-c.usadas;
+  return `<button type="button" class="mo-leal n-${c.nivel.k}" data-mo="cliente" data-tel="${t}"><span class="b">${c.nivel.e} ${c.nivel.n}</span><span><b>${c.saldo}</b> 🍃</span><span>${c.pedidos} ${c.pedidos===1?'pedido':'pedidos'} · ${$c(c.gastado)}</span><span class="go">›</span></button>
+    ${o.premio&&neto<0&&!['entregado','cancelado'].includes(o.estado)?`<div class="mo-aviso">⚠️ No le alcanzan las hojas para el premio (le faltan ${-neto} 🍃).<button type="button" class="mo-btn" data-mo="quitar-premio">Quitar premio</button></div>`:''}`;
+}
+function graficoMeses(meses){
+  const hoy=new Date(),L=[...Array(6)].map((_,i)=>{const d=new Date(hoy.getFullYear(),hoy.getMonth()-5+i,1),k=d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0');return{n:d.toLocaleDateString('es-CR',{month:'short'}).replace('.',''),v:meses[k]||0};});
+  const max=Math.max(1,...L.map(m=>m.v));
+  return `<div class="mo-graf">${L.map((m,i)=>`<div class="${i===5?'hoy':''}"><em>${m.v?$c(m.v).replace('₡',''):''}</em><i style="--h:${(m.v/max).toFixed(3)};--d:${i}"></i><small>${esc(m.n)}</small></div>`).join('')}</div>`;
+}
+function pintarClientes(){
+  cargarHist();
+  const L=clientesDe(todos()),q=nrm(M.cq||''),V=L.filter(c=>!q||nrm(c.nombre+' '+c.tel).includes(q)),Lz=N.lealtad();
+  const vendido=L.reduce((t,c)=>t+c.cuenta.gastado,0),hojas=L.reduce((t,c)=>t+c.cuenta.saldo,0),mes=new Date().toISOString().slice(0,7);
+  const delMes=L.reduce((t,c)=>t+(c.cuenta.meses[mes]||0),0);
+  abrirHoja(`<p class="mo-kick">Clientes y lealtad${M.hist?'':' · trayendo todo el historial…'}</p><div class="mo-h">👥 Clientes</div><div class="mo-s">Cuánto compra cada cliente y sus hojas 🍃. Cuentan los pedidos entregados; se reconocen por teléfono.</div>
+    <div class="mo-cuadre" style="margin-top:12px"><div><span>Clientes</span><b>${L.length}</b></div><div><span>Este mes</span><b>${$c(delMes)}</b></div><div><span>Hojas por canjear</span><b>${hojas} 🍃</b></div><div class="tot"><span>Vendido a clientes</span><b>${$c(vendido)}</b></div></div>
+    <button type="button" class="mo-prog${Lz.activa?' on':''}" data-mo="programa"><span class="e">🍃</span><span class="t"><b>Programa de lealtad · ${Lz.activa?'activo':'apagado'}</b><small>${Lz.activa?`1 hoja por cada ${$c(Lz.porHoja)} · ${Lz.premios.length} ${Lz.premios.length===1?'premio':'premios'}${Lz.dobles?' · 🔥 hojas dobles':''}`:'Tocá para encenderlo'}</small></span><span class="go">›</span></button>
+    <label class="mo-field">Buscar cliente<input type="search" id="moCliQ" value="${esc(M.cq||'')}" placeholder="Nombre o teléfono" autocomplete="off"></label>
+    <div class="mo-blk mo-clis">${V.length?V.map((c,i)=>`<button type="button" class="mo-cli" data-mo="cliente" data-tel="${c.tel}"><span class="mo-av n-${c.cuenta.nivel.k}">${esc((c.nombre||'?').trim().charAt(0).toUpperCase()||'?')}</span><span class="t"><b>${!q&&i<3&&c.cuenta.gastado?['🥇','🥈','🥉'][i]+' ':''}${esc(c.nombre)}</b><small>${c.cuenta.nivel.e} ${c.cuenta.nivel.n} · ${c.cuenta.saldo} 🍃 · ${c.cuenta.pedidos} ${c.cuenta.pedidos===1?'pedido':'pedidos'} · ${esc(fdia(c.ult))}</small></span><span class="v">${$c(c.cuenta.gastado)}</span></button>`).join(''):`<div class="mo-vacio">${L.length?'Nadie con ese nombre o teléfono.':'Todavía no hay clientes: aparecen con su primer pedido.'}</div>`}</div>`);
+  const qi=$('moCliQ');qi.addEventListener('input',()=>{M.cq=qi.value;const pos=qi.selectionStart;repintar(pintarClientes);const n=$('moCliQ');n.focus();n.setSelectionRange(pos,pos);});
+}
+function pintarCliente(){
+  cargarHist();
+  const c=clientesDe(todos()).find(x=>x.tel===M.ctel);if(!c){M.vista='clientes';pintarClientes();return;}
+  const k=c.cuenta,peds=c.peds.slice().sort((a,b)=>Date.parse(b.created)-Date.parse(a.created)),prom=k.pedidos?k.gastado/k.pedidos:0;
+  abrirHoja(`<p class="mo-kick">Cliente · ${esc(fmtTel(c.tel))}</p>
+    <div class="mo-socio n-${k.nivel.k}"><div class="so-top"><span class="so-n">${esc(c.nombre)}</span><span class="so-nivel">${k.nivel.e} ${k.nivel.n}</span></div>
+      <div class="so-h"><b>${k.saldo}</b> hojas 🍃</div><small>${k.ganadas} ganadas · ${k.usadas} canjeadas${k.pendientes?' · +'+k.pendientes+' en camino':''}</small>
+      <div class="so-bar"><i style="--a:${k.avance.toFixed(3)}"></i></div><small class="so-sig">${k.sig?`Le faltan ${k.falta} 🍃 para ${k.sig.e} ${k.sig.n}`:'Nivel más alto 👑'}</small></div>
+    <div class="mo-cuadre" style="margin-top:12px"><div><span>Comprado</span><b>${$c(k.gastado)}</b></div><div><span>Pedidos</span><b>${k.pedidos}</b></div><div><span>Promedio</span><b>${$c(prom)}</b></div><div><span>Kilos</span><b>${k.kilos?kg(k.kilos):'0'} kg</b></div><div><span>Ahorró</span><b>${$c(k.ahorro)}</b></div><div><span>Cliente desde</span><b>${k.desde?esc(new Date(k.desde).toLocaleDateString('es-CR',{month:'short',year:'numeric'})):'—'}</b></div></div>
+    <div class="mo-blk"><h4>Consumo · últimos 6 meses</h4>${graficoMeses(k.meses)}</div>
+    ${k.top.length?`<div class="mo-blk"><h4>Lo que más lleva</h4><div class="mo-chips" style="flex-wrap:wrap">${k.top.map(t=>`<span class="mo-chip">${t.e} ${esc(t.n)} · ${t.veces}</span>`).join('')}</div></div>`:''}
+    <div class="mo-blk"><h4>Pedidos (${peds.length})</h4>${peds.slice(0,40).map(o=>`<button type="button" class="mo-cobrable" data-mo="abrir" data-id="${o.id}"><span>${esc(fdia(o.created))} · <b>${esc(o.ref)}</b> ${{nuevo:'📥',alistando:'🧑‍🌾',listo:'✅',entregado:'🛍️',cancelado:'✖️'}[o.estado]||''}${o.premio?' 🎁':''}</span><span>${$c(N.totalDe(o))}</span></button>`).join('')}</div>
+    <div class="mo-btns"><button type="button" class="mo-btn" data-mo="cl-wa">💬 Escribirle</button><button type="button" class="mo-btn" data-mo="clientes">‹ Todos los clientes</button></div>`);
+}
+function pintarPrograma(){
+  const L=M.prog||(M.prog=JSON.parse(JSON.stringify(N.lealtad())));
+  abrirHoja(`<p class="mo-kick">Clientes y lealtad · los dos locales</p><div class="mo-h">🍃 Programa de lealtad</div><div class="mo-s">Tus clientes ganan hojas con cada pedido entregado y las canjean por descuentos al pedir en el Taller.</div>
+    <div class="mo-blk"><label class="mo-sw">Programa activo<input type="checkbox" id="lgAct" ${L.activa?'checked':''}></label>
+      <label class="mo-field">1 hoja 🍃 por cada ₡<input type="number" id="lgPor" min="100" step="100" inputmode="numeric" value="${+L.porHoja}"></label>
+      <label class="mo-sw">🔥 Hojas dobles (promo: los pedidos nuevos valen el doble)<input type="checkbox" id="lgDob" ${L.dobles?'checked':''}></label></div>
+    <div class="mo-blk"><h4>🎁 Premios para canjear</h4>${L.premios.map((p,i)=>`<div class="mo-prem"><label class="mo-field">Premio<input data-lg="n" data-i="${i}" value="${esc(p.n)}" placeholder="Ej.: ₡2.500 de descuento"></label><label class="mo-field">Hojas<input type="number" inputmode="numeric" data-lg="hojas" data-i="${i}" min="1" value="${+p.hojas||''}"></label><label class="mo-field">Descuento ₡<input type="number" inputmode="numeric" data-lg="valor" data-i="${i}" min="0" step="50" value="${+p.valor||''}"></label><button type="button" class="tg" data-mo="premio-del" data-i="${i}" aria-label="Quitar premio">✕</button></div>`).join('')||'<div class="mo-s">Sin premios todavía.</div>'}
+      <button type="button" class="mo-btn w" style="margin-top:10px" data-mo="premio-add">＋ Agregar premio</button></div>
+    <div class="mo-blk"><h4>Niveles</h4><div class="mo-niveles">${N.NIVELES.map(n=>`<span class="n-${n.k}"><b>${n.e}</b>${n.n}<small>desde ${n.desde} 🍃</small></span>`).join('')}</div><div class="mo-s" style="margin-top:8px">El nivel sube con las hojas que el cliente gana (canjear no lo baja).</div></div>
+    <button type="button" class="mo-btn p w big" style="margin-top:12px" data-mo="lealtad-ok">Guardar programa</button>
+    <button type="button" class="mo-btn w" style="margin-top:8px" data-mo="clientes">‹ Volver a clientes</button>`);
+  $('moSheet').querySelectorAll('[data-lg]').forEach(i=>i.addEventListener('input',()=>{const p=L.premios[+i.dataset.i],f=i.dataset.lg;p[f]=f==='n'?i.value:+i.value||0;}));
+  $('lgAct').addEventListener('change',e=>{L.activa=e.target.checked;});
+  $('lgDob').addEventListener('change',e=>{L.dobles=e.target.checked;});
+  $('lgPor').addEventListener('input',e=>{L.porHoja=+e.target.value||0;});
+}
+
 // ── Ajustes ──
 function pintarAjustes(){
   const t=T(),k=LOCAL||'moravia',s=(t.sucursales||[]).find(x=>x.k===k)||{k},sp=N.sinpeDe(k);
@@ -893,7 +964,6 @@ function pintarAjustes(){
     <details class="mo-blk mo-comun"><summary>Igual para los dos locales</summary>
       <label class="mo-field">Nombre de la tienda<input id="ajNombre" value="${esc(t.nombre)}"></label>
       <label class="mo-field">Minutos para alistar un pedido<input id="ajMin" type="number" min="10" max="240" value="${+t.alistadoMin||40}"></label>
-      <label class="mo-sw">Ofrecer "me la llevan al carro"<input type="checkbox" id="ajCarro" ${t.alCarro?'checked':''}></label>
       <label class="mo-sw">Ofrecer envío a domicilio con Uber<input type="checkbox" id="ajEnvio" ${t.envio!==false?'checked':''}></label>
       <label class="mo-field">🔗 Link de pago con tarjeta (opcional)<input id="ajLink" type="url" placeholder="https://…" value="${esc(t.linkTarjeta||'')}"></label>
       <div class="mo-s">Sin link, la tarjeta se cobra con datáfono al recoger.</div></details>
@@ -1151,10 +1221,25 @@ const ACT={
       toast('📍 Ubicación de la tienda guardada');pintarAjustes();
     },()=>toast('No se pudo tomar la ubicación'),{enableHighAccuracy:true,timeout:15000});
   },
+  clientes(){M.vista='clientes';M.prog=null;pintarClientes();},
+  cliente(el){M.vista='cliente';M.ctel=el.dataset.tel;pintarCliente();},
+  'cl-wa'(){const c=clientesDe(todos()).find(x=>x.tel===M.ctel);if(!c)return;const k=c.cuenta;abrir(N.wa(c.tel,`¡Hola ${c.nombre.split(' ')[0]}! 👋 Te escribimos de ${T().nombre||'ARAMO'}.${N.lealtad().activa?` Tenés ${k.saldo} hojas 🍃 para canjear en tu próximo pedido.`:''}`));},
+  programa(){M.vista='programa';M.prog=null;pintarPrograma();},
+  'premio-add'(){M.prog.premios.push({k:'p'+Date.now().toString(36),n:'₡1.000 de descuento',hojas:20,valor:1000});repintar(pintarPrograma);},
+  'premio-del'(el){M.prog.premios.splice(+el.dataset.i,1);repintar(pintarPrograma);},
+  'lealtad-ok'(){
+    const L=M.prog;if(!L)return;
+    if(!(+L.porHoja>=1)){toast('Poné cuántos colones vale una hoja');return;}
+    const premios=L.premios.map(p=>({k:p.k||'p'+Math.random().toString(36).slice(2,7),n:String(p.n||'').trim()||`${$c(p.valor)} de descuento`,hojas:Math.round(+p.hojas||0),valor:Math.round(+p.valor||0)}));
+    if(premios.some(p=>p.hojas<1||p.valor<1)){toast('Cada premio necesita hojas y un descuento mayor que cero');return;}
+    N.guardarTienda({lealtad:{activa:!!L.activa,porHoja:Math.round(+L.porHoja),dobles:!!L.dobles,premios}});
+    M.prog=null;toast('🍃 Programa guardado · ya se ve en el Taller');M.vista='clientes';pintarClientes();
+  },
+  'quitar-premio'(){const o=N.get(M.abierto);if(!o?.premio)return;if(!confirm(`¿Quitar el premio de ${$c(o.premio.valor)} del pedido ${o.ref}?`))return;N.cambiar(o.id,x=>{delete x.premio;},'tienda','Premio quitado: no le alcanzaban las hojas').then(()=>{repintar(pintarEncargo);pintarMostrador();toast('Premio quitado');});},
   'aj-ok'(){
     const t=T(),v=id=>$(id)?.value.trim()||'',k=LOCAL||'moravia';
     const sucs=(t.sucursales||[]).map(s=>s.k!==k?s:{...s,activa:!!$('ajAct')?.checked,whatsapp:telDig(v('ajWaSuc')),abre:v('ajAbre')||s.abre,cierra:v('ajCierra')||s.cierra,sinpe:{numero:telDig(v('ajSinpe')),nombre:v('ajSinpeN')}});
-    N.guardarTienda({nombre:v('ajNombre')||'ARAMO',alistadoMin:Math.max(10,+v('ajMin')||40),alCarro:$('ajCarro').checked,envio:$('ajEnvio').checked,linkTarjeta:v('ajLink'),sucursales:sucs});
+    N.guardarTienda({nombre:v('ajNombre')||'ARAMO',alistadoMin:Math.max(10,+v('ajMin')||40),envio:$('ajEnvio').checked,linkTarjeta:v('ajLink'),sucursales:sucs});
     cerrarHoja();toast('⚙️ Guardado · '+sucNom(k));
   },
   copiar(el){navigator.clipboard?.writeText(el.dataset.v).then(()=>toast('📋 Copiado'),()=>toast(el.dataset.v));},
@@ -1245,6 +1330,7 @@ N.on(tipo=>{
   if(tipo==='tienda'){clearTimeout(_vitT);_vitT=setTimeout(()=>{if(['vitrina','recetario'].includes(M.vista)&&$('moSheet').classList.contains('open')&&!document.activeElement?.matches?.('#moSheet input,#moSheet textarea'))repintar(M.vista==='vitrina'?pintarVitrina:pintarRecetario);},350);}
   pintarPuerta();pintarMostrador();
   if(M.vista==='encargo'&&$('moSheet').classList.contains('open')&&!document.activeElement?.matches?.('#moSheet input'))repintar(pintarEncargo);
+  if(tipo==='encargo'&&['clientes','cliente'].includes(M.vista)&&$('moSheet').classList.contains('open')&&!document.activeElement?.matches?.('#moSheet input'))repintar(M.vista==='clientes'?pintarClientes:pintarCliente);
 });
 setInterval(()=>{if($('mostrador')?.classList.contains('open')&&!$('moSheet').classList.contains('open'))pintarMostrador();},30000);
 
