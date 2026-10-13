@@ -138,8 +138,8 @@ button:disabled{cursor:default}
 .mic.on{background:var(--r);animation:latidoR 1.2s ease-out infinite}
 @keyframes latidoR{0%{box-shadow:0 0 0 0 color-mix(in srgb,var(--r) 55%,transparent)}100%{box-shadow:0 0 0 12px transparent}}
 /* categorías: todas a la vista, como íconos */
-.cats{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px 6px;margin-top:6px}
-@media (min-width:560px){.cats{grid-template-columns:repeat(8,minmax(0,1fr))}}
+.cats{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px 6px;margin-top:6px}
+@media (min-width:560px){.cats{grid-template-columns:repeat(6,minmax(0,1fr))}}
 .c-top{--pc:#f0b429}.c-fav{--pc:#2fb36b}.c-recetas{--pc:#d64a3b}
 .tab{display:flex;flex-direction:column;align-items:center;gap:6px;min-width:0;transition:transform .25s var(--resorte)}
 .tab:active{transform:scale(.92)}
@@ -711,3 +711,19 @@ html.mini .fondo{display:none}
 .opcion.premio-op .op-e{background:var(--o-soft)}
 .opcion.premio-op.on{border-color:var(--o);background:color-mix(in srgb,var(--o) 7%,var(--card));box-shadow:0 0 0 3px var(--o-soft),var(--sh-1)}
 .opcion.premio-op.on .op-ck{border-color:var(--o);background:var(--o)}
+/* ══════════════ Ventana de producto: cantidad libre y unidad ══════════════ */
+.unid-sel button{min-height:46px;font-size:14px}
+.big-step .cant{display:flex;flex-direction:column;align-items:center;cursor:text}
+.big-step .cant input{width:150px;height:66px;padding:0 8px;border:2px solid var(--line-2);border-radius:22px;background:var(--card);text-align:center;font-family:var(--display);font-size:40px;font-weight:700;color:var(--ink);caret-color:var(--g);outline:0;transition:border-color .2s,box-shadow .2s}
+.big-step .cant input:focus{border-color:var(--g);box-shadow:0 0 0 4px var(--g-soft)}
+.big-step .cant small{margin-top:6px;font-size:12.5px;font-weight:800;color:var(--muted)}
+.conv{min-height:1.3em;margin:-4px 0 8px;text-align:center;font-size:13px;font-weight:700;color:var(--g)}
+/* tienda claramente identificada */
+.opciones.tiendas .opcion b{font-size:17px}
+.suc-ok{margin:10px 6px 0;font-size:13.5px;font-weight:700;color:var(--g)}
+.suc-ok b{color:var(--ink)}
+/* SINPE con su número */
+.sinpe-info{display:flex;align-items:flex-start;gap:12px;margin-top:10px;padding:14px 16px;border-radius:20px;background:var(--g-soft);border:1px solid color-mix(in srgb,var(--g) 35%,transparent)}
+.sinpe-info .si-e{font-size:26px;line-height:1.1}
+.sinpe-info b{display:block;font-size:16px;font-weight:800;color:var(--ink)}
+.sinpe-info small{display:block;margin-top:2px;font-size:12.5px;color:var(--muted)}

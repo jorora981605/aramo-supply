@@ -33,7 +33,7 @@ const sucNom=k=>{const s=suc(k);return s?`${s.n} · ${s.zona}`:'';};
 const fh=d=>new Date(d).toLocaleTimeString('es-CR',{hour:'numeric',minute:'2-digit'});
 function fdia(d){const a=new Date();a.setHours(0,0,0,0);const b=new Date(d);b.setHours(0,0,0,0);const n=Math.round((b-a)/864e5);return n===0?'hoy':n===1?'mañana':n===-1?'ayer':b.toLocaleDateString('es-CR',{weekday:'short',day:'numeric',month:'short'});}
 const esHoy=d=>fdia(d)==='hoy';
-function fq(n){n=+n||0;if(Number.isInteger(n))return String(n);const w=Math.floor(n),f=+(n-w).toFixed(2),fr={.25:'¼',.5:'½',.75:'¾'}[f];return fr?(w||'')+fr:String(+n.toFixed(2));}
+function fq(n){n=+n||0;if(Number.isInteger(n))return String(n);const w=Math.floor(n),f=+(n-w).toFixed(2),fr={.25:'¼',.5:'½',.75:'¾'}[f];return fr?(w||'')+fr:String(+n.toFixed(2)).replace('.',',');}
 const UNIDADES=[['kg','kilo (kg)'],['unid','unidad'],['rollo','rollo / mazo'],['paquete','paquete'],['bolsa','bolsa'],['bolsita','bolsita'],['cartón','cartón'],['frasco','frasco'],['botella','botella']];
 const UNI={kg:'kg',unid:'unid.',rollo:'rollo',paquete:'paq.',bolsita:'bolsita',bolsa:'bolsa','cartón':'cartón',frasco:'frasco',botella:'botella'};
 const qtxt=(q,u)=>fq(q)+' '+(UNI[u]||u);
@@ -195,6 +195,8 @@ function avance(o){const it=o.items||[],r=it.filter(x=>x.estado==='listo'||x.est
 const urgente=o=>o.estado!=='listo'&&minsA(o.retiro.at)<=15;
 const cobrado=o=>!!o.cobro||o.pago?.estado==='verificado';
 const qReal=it=>it.qr!=null&&it.qr!==''?+it.qr:+it.q;
+// Lo que pidió el cliente: si lo pidió en otra unidad (p. ej. 4 tomates), se muestra con su equivalente.
+const pidio=i=>i.pide?`${qtxt(i.pide.q,i.pide.u)} (≈ ${i.u==='kg'?kg(i.q)+' kg':qtxt(i.q,i.u)})`:qtxt(i.q,i.u);
 const precioIt=it=>it.pr!=null&&it.pr!==''?+it.pr:+it.p;
 const nombres=o=>(o.items||[]).map(i=>i.n).join(', ');
 
@@ -463,7 +465,7 @@ function tarjeta(o){
     <div class="mo-card-h"><span class="mo-ref">${esc(o.ref)}</span>${o.prueba?'<span class="mo-pill">🧪 prueba</span>':''}${sinAbrir.has(o.id)?'<span class="mo-pill o">NUEVO</span>':''}<span class="mo-when${tarde?' tarde':''}">${o.estado==='entregado'?'✓ '+fh(o.updated):o.estado==='cancelado'?'Cancelado':'🕐 '+fh(o.retiro.at)+' · '+falta(o.retiro.at)}</span></div>
     <div class="mo-who">${esc(o.cliente.nombre)} <span style="color:var(--m);font-weight:700">· ${esc(fmtTel(o.cliente.tel))}</span></div>
     <div class="mo-meta">${esc(s?.n||'')} · ${o.retiro.envio?(o.retiro.envio.uber?'🛵 Uber en camino':'🛵 envío Uber'):o.retiro.carro?'🚗 al carro'+(o.retiro.placa?' ('+esc(o.retiro.placa)+')':''):'🚶 adentro'} · ${n} productos</div>
-    <div class="mo-nombres">${o.items.map(i=>`<span>${i.e} ${esc(i.n)} <i>${esc(qtxt(qReal(i),i.u))}</i></span>`).join('')}</div>
+    <div class="mo-nombres">${o.items.map(i=>`<span>${i.e} ${esc(i.n)} <i>${esc(i.qr!=null&&i.qr!==''?qtxt(qReal(i),i.u):i.pide?qtxt(i.pide.q,i.pide.u):qtxt(i.q,i.u))}</i></span>`).join('')}</div>
     ${o.estado==='alistando'?`<div class="mo-bar"><i style="width:${n?r/n*100:0}%"></i></div>`:''}
     <div class="mo-foot">${pago}${o.premio?`<span class="mo-pill o">🎁 −${$c(o.premio.valor)}</span>`:''}${o.sust==='avisar'?'':`<span class="mo-pill">${SUST[o.sust]}</span>`}<span class="mo-total">${N.esAprox(o)?'~':''}${$c(N.totalDe(o))}</span></div>
   </button>`;
@@ -536,7 +538,7 @@ function pesoHtml(it,i,edit){
   const sub=it.estado==='nohay'?0:q*pr;
   return `<div class="mo-it ${cls}">
     <span class="e">${it.e}</span>
-    <span class="t"><strong>${esc(it.n)}</strong><small>Pidió ${esc(qtxt(it.q,it.u))} · <button type="button" class="mo-precio" data-mo="precio-it" data-i="${i}" ${edit?'':'disabled'}>${$c(pr)}${kgU?'/kg':' c/u'}</button>${it.mad?' · '+esc(MAD[it.mad]||''):''}${it.nota?' · 📝 '+esc(it.nota):''}</small>${difTxt}${alerta}</span>
+    <span class="t"><strong>${esc(it.n)}</strong><small>Pidió ${esc(pidio(it))} · <button type="button" class="mo-precio" data-mo="precio-it" data-i="${i}" ${edit?'':'disabled'}>${$c(pr)}${kgU?'/kg':' c/u'}</button>${it.mad?' · '+esc(MAD[it.mad]||''):''}${it.nota?' · 📝 '+esc(it.nota):''}</small>${difTxt}${alerta}</span>
     ${edit?`<span class="mo-peso"><label><small>${kgU?'Pesó (kg)':'Cantidad'}</small><input type="number" inputmode="decimal" step="${kgU?'0.005':'1'}" min="0" value="${esc(pesado?q:'')}" placeholder="${esc(fq(it.q))}" data-mo-q="${i}" aria-label="${kgU?'Peso real':'Cantidad real'} de ${esc(it.n)}"></label><b>${it.estado==='nohay'?'—':$c(sub)}</b></span><button type="button" class="mo-ck${it.estado==='listo'?' on':''}" data-mo="it-ok" data-i="${i}" aria-label="Listo">✓</button><button type="button" class="mo-ck no${it.estado==='nohay'?' on':''}" data-mo="it-no" data-i="${i}" aria-label="No hay">✕</button>`
       :`<span class="mo-peso"><small>${it.estado==='nohay'?'No hubo':kgU&&pesado?'Pesó':'Lleva'}</small><b>${it.estado==='nohay'?'—':esc(kgU&&pesado?kg(q)+' kg':qtxt(q,it.u))}</b><em>${it.estado==='nohay'?'₡0':$c(sub)}</em></span>`}
     ${edit&&it.estado==='nohay'?`<input class="sub" type="text" placeholder="Cambio por… (opcional)" value="${esc(it.sub||'')}" data-mo-sub="${i}">`:''}
@@ -614,13 +616,13 @@ function pintarPesar(o){
   const valor=P.buf!==''?P.buf:(it.qr!=null&&it.qr!==''?String(+it.qr):'');
   const num=valor===''?null:+valor.replace(',','.'),sub=num==null?null:num*precioIt(it);
   const dif=kgU&&num!=null?num-it.q:0;
-  const filas=o.items.map((x,i)=>{const q=qReal(x),pes=x.qr!=null&&x.qr!=='';return `<button type="button" class="pk-fila${i===P.i?' on':''}${x.estado==='listo'?' ok':''}${x.estado==='nohay'?' no':''}" data-mo="pk-fila" data-i="${i}"><span class="e">${x.e}</span><span class="t"><b>${esc(x.n)}</b><small>Pidió ${esc(qtxt(x.q,x.u))} · ${$c(precioIt(x))}${x.u==='kg'?'/kg':' c/u'}${x.mad?' · '+esc(MAD[x.mad]||''):''}${x.nota?' · 📝 '+esc(x.nota):''}</small></span><span class="v">${x.estado==='nohay'?'No hay':pes?esc(x.u==='kg'?kg(q)+' kg':qtxt(q,x.u)):'—'}</span><span class="s">${x.estado==='nohay'?'₡0':pes?$c(q*precioIt(x)):''}</span></button>`;}).join('');
+  const filas=o.items.map((x,i)=>{const q=qReal(x),pes=x.qr!=null&&x.qr!=='';return `<button type="button" class="pk-fila${i===P.i?' on':''}${x.estado==='listo'?' ok':''}${x.estado==='nohay'?' no':''}" data-mo="pk-fila" data-i="${i}"><span class="e">${x.e}</span><span class="t"><b>${esc(x.n)}</b><small>Pidió ${esc(pidio(x))} · ${$c(precioIt(x))}${x.u==='kg'?'/kg':' c/u'}${x.mad?' · '+esc(MAD[x.mad]||''):''}${x.nota?' · 📝 '+esc(x.nota):''}</small></span><span class="v">${x.estado==='nohay'?'No hay':pes?esc(x.u==='kg'?kg(q)+' kg':qtxt(q,x.u)):'—'}</span><span class="s">${x.estado==='nohay'?'₡0':pes?$c(q*precioIt(x)):''}</span></button>`;}).join('');
   $('moSheet').classList.add('ancho');
   abrirHoja(`<p class="mo-kick">⚖️ Pesar en caja · ${esc(o.ref)} · ${esc(o.cliente.nombre)} · ${esc(sucNom(o.sucursal))}</p>
     <div class="pk">
       <div class="pk-lista">${filas}<div class="pk-pie">Si algo no hay: ${SUST[o.sust]||''}${o.nota?' · 📝 '+esc(o.nota):''}</div></div>
       <div class="pk-panel">
-        <div class="pk-actual"><small>${it.e} ${esc(it.n)} · pidió ${esc(qtxt(it.q,it.u))}</small>
+        <div class="pk-actual"><small>${it.e} ${esc(it.n)} · pidió ${esc(pidio(it))}</small>
           <div class="pk-pantalla${P.buf!==''?' escribiendo':''}">${valor===''?`<i>${esc(fq(it.q))}</i>`:esc(valor)}<span>${kgU?'kg':'unid.'}</span></div>
           <em>${sub!=null?$c(sub):'Escribí el '+(kgU?'peso de la balanza':'número de unidades')}${dif&&Math.abs(dif)>1e-9?` · ${dif>0?'+':'−'}${Math.round(Math.abs(dif)*1000)} g`:''}</em></div>
         <div class="pk-pad">${['7','8','9','4','5','6','1','2','3',kgU?'.':'',"0",'⌫'].map(k=>k?`<button type="button" data-mo="pk" data-k="${k}">${k}</button>`:'<span></span>').join('')}</div>
@@ -775,7 +777,7 @@ function imprimir(html,titulo){
 }
 function listaAlistado(o){
   return `<p>${esc(sucNom(o.sucursal))} · ${esc(o.cliente.nombre)} · ${o.retiro.envio?'🛵 envío':'recoge'} ${esc(fdia(o.retiro.at))} ${esc(fh(o.retiro.at))} · si algo no hay: ${esc(SUST[o.sust]||'')}</p>
-    <table><thead><tr><th></th><th>Producto</th><th>Pidió</th><th>Pesó / lleva</th><th>Nota</th></tr></thead><tbody>${o.items.map(i=>`<tr><td>☐</td><td><b>${esc(i.n)}</b><br><small>${esc(N.catalogo().find(p=>p.k===i.k)?.d||'')}</small></td><td>${esc(qtxt(i.q,i.u))}</td><td>__________</td><td>${esc([i.mad?MAD[i.mad]:'',i.nota].filter(Boolean).join(' · '))}</td></tr>`).join('')}</tbody></table>${o.nota?`<p>📝 ${esc(o.nota)}</p>`:''}`;
+    <table><thead><tr><th></th><th>Producto</th><th>Pidió</th><th>Pesó / lleva</th><th>Nota</th></tr></thead><tbody>${o.items.map(i=>`<tr><td>☐</td><td><b>${esc(i.n)}</b><br><small>${esc(N.catalogo().find(p=>p.k===i.k)?.d||'')}</small></td><td>${esc(pidio(i))}</td><td>__________</td><td>${esc([i.mad?MAD[i.mad]:'',i.nota].filter(Boolean).join(' · '))}</td></tr>`).join('')}</tbody></table>${o.nota?`<p>📝 ${esc(o.nota)}</p>`:''}`;
 }
 
 // ── Caja de hoy ──
