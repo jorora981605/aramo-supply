@@ -11,7 +11,6 @@
 <meta name="description" content="Sistema de pedidos ARAMO Supply">
 <link rel="manifest" href="./manifest.json">
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-<script src="https://cdn.sheetjs.com/xlsx-0.20.3/package/dist/xlsx.full.min.js"></script>
 <script src="catalogo-productos.js"></script>
 <script src="supplier-base.js"></script>
 <link rel="apple-touch-icon" href="./icon.png">
@@ -693,11 +692,27 @@ html[data-theme="dark"] .today-money-card{background:linear-gradient(145deg,#125
 <link rel="stylesheet" href="express.css?v=20261007-productos-1">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Caveat:wght@600;700&family=Chakra+Petch:wght@500;600;700&family=JetBrains+Mono:wght@500;600&display=swap">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Caveat:wght@600;700&family=Chakra+Petch:wght@500;600;700&family=JetBrains+Mono:wght@500;600&display=swap" media="print" onload="this.media='all'">
 <link rel="stylesheet" href="puerta.css?v=20261013-perfil-1">
-<link rel="stylesheet" href="portadas.css?v=20261007-productos-1">
+<link rel="stylesheet" href="portadas.css?v=20261016-colores-1">
 </head>
 <body>
+<script>
+// Arranque al instante: al volver del Taller, del POS o al reabrir en la misma sesión, se pinta
+// enseguida la última portada guardada (una foto). puerta.js la cambia por la de verdad en cuanto
+// termina de cargar; así no se ve pasar la pantalla de Surtido mientras tanto.
+(function(){try{
+  if(location.hash||/[?&](pos|portada)=/.test(location.search)||!sessionStorage.getItem('aramo_local_sesion'))return;
+  var f=JSON.parse(localStorage.getItem('aramo_portada_foto')||'null');if(!f||!f.html||f.v!==+(localStorage.getItem('aramo_portada')||2))return;
+  document.documentElement.dataset.theme=localStorage.getItem('aramo_theme')||'light';
+  document.body.insertAdjacentHTML('afterbegin','<div class="pu open" id="puFoto" data-portada="'+f.v+'" aria-hidden="true"><div class="'+f.cls+'">'+f.html+'</div></div>');
+  document.body.classList.add('pu-lock');
+  // un toque mientras termina de cargar no se pierde: puerta.js lo cumple apenas está lista
+  document.addEventListener('click',function(e){var b=e.target.closest&&e.target.closest('#puFoto [data-pu]');if(b){window.__puPend=b.getAttribute('data-pu');b.classList.add('po-esperando');}},true);
+  // por si algo falla al cargar: la foto nunca se queda tapando la app
+  addEventListener('load',function(){var e=document.getElementById('puFoto');if(e){e.remove();if(!document.querySelector('.pu.open,.mo.open'))document.body.classList.remove('pu-lock');}});
+}catch(e){}})();
+</script>
 
 <div class="scope-picker open" id="scopePicker" role="dialog" aria-modal="true" aria-labelledby="scopePickerTitle">
   <div class="scope-picker-card">
@@ -1625,7 +1640,12 @@ function parseImportPrice(value){
 async function importCatalogFile(file){
   const status=document.getElementById('catalogImportStatus');
   if(!file)return;
-  if(!window.XLSX){
+  // El lector de Excel pesa casi 1 MB: se baja solo cuando se importa un archivo.
+  if(!window.XLSX?.read){
+    status.textContent='Preparando el lector de Excel…';status.className='excel-import-status';
+    await new Promise(r=>{const s=document.createElement('script');s.src='https://cdn.sheetjs.com/xlsx-0.20.3/package/dist/xlsx.full.min.js';s.onload=s.onerror=r;document.head.appendChild(s);});
+  }
+  if(!window.XLSX?.read){
     status.textContent='No se pudo cargar el lector de Excel. Revisá tu conexión y recargá la app.';
     status.className='excel-import-status error';
     return;
@@ -3819,6 +3839,8 @@ if('serviceWorker' in navigator){
     const check=()=>{try{reg?.update?.()?.catch?.(()=>{});}catch{}};
     document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='visible')check();});
     setInterval(check,15*60*1000);
+    // Por detrás: guardar las fotos del Taller y el POS para que abran al instante.
+    navigator.serviceWorker.ready.then(r=>setTimeout(()=>r.active?.postMessage({tipo:'calentar'}),2500));
   }).catch(err=>console.warn('Service worker no disponible',err)));
 }
 
@@ -3836,7 +3858,7 @@ if(isIOS && !isInStandalone && !dismissed){
 <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcode-generator/1.4.4/qrcode.min.js"></script>
 <script src="canasta-config.js?v=20261013-unidades-1"></script>
 <script src="aramo-nube.js?v=20261013-perfil-1"></script>
-<script src="portadas.js?v=20261007-productos-1"></script>
-<script src="puerta.js?v=20261015-pos-1"></script>
+<script src="portadas.js?v=20261016-colores-1"></script>
+<script src="puerta.js?v=20261016-colores-1"></script>
 </body>
 </html>

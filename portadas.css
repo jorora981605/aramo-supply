@@ -4,7 +4,9 @@
    ══════════════════════════════════════════════════════════════════════ */
 
 /* ── Comunes ── */
-.po{--po-urg:#d4451f;--po-aviso:#d98a12;--po-ok:#0f8a52;--po-s:#0d7a4a;--po-s2:#16a463;--po-t:#d4661a;--po-t2:#f29a45;--po-p:#1d4d2b;--po-p2:#2f7a43}
+/* Cada puerta con su color, sin repetir: Mostrador naranja · Surtido verde · Taller morado · POS negro */
+.po{--po-urg:#d4451f;--po-aviso:#d98a12;--po-ok:#0f8a52;--po-s:#0d7a4a;--po-s2:#16a463;--po-t:#5b21b6;--po-t2:#8b5cf6;--po-p:#0b0c0f;--po-p2:#3a3f48;--po-m:#c2410c;--po-m-tx:#fff;--po-m-tinte:#f97316}
+html[data-theme="dark"] .po{--po-m:#ff8a3d;--po-m-tx:#1c0d03}
 .po-tools{display:flex;align-items:center;gap:8px;margin-left:auto;flex:none}
 .po-chip{display:inline-flex;align-items:center;gap:6px;min-height:36px;padding:0 12px;border-radius:999px;border:1px solid var(--b);background:var(--card);color:var(--t);font:800 12px var(--fn);white-space:nowrap;cursor:pointer;transition:transform .12s,border-color .2s}
 .po-chip:active{transform:scale(.95)}
@@ -57,15 +59,18 @@
 .po2-puesto{--c1:var(--po-s);--c2:var(--po-s2);--raya:#e9f7ee;position:relative;min-height:clamp(132px,calc((100dvh - 330px)/3),230px);border-radius:26px;overflow:hidden;background:radial-gradient(120% 90% at 85% 110%,rgba(255,255,255,.16),transparent 60%),linear-gradient(150deg,var(--c1),var(--c2));box-shadow:0 14px 30px color-mix(in srgb,var(--c1) 30%,transparent),inset 0 1px 0 rgba(255,255,255,.18);isolation:isolate;transition:transform .16s cubic-bezier(.22,1,.36,1),box-shadow .2s}
 .po2-puesto:hover{transform:translateY(-3px);box-shadow:0 20px 40px color-mix(in srgb,var(--c1) 36%,transparent)}
 .po2-puesto:active{transform:scale(.985)}
-.po2-t{--c1:var(--po-t);--c2:var(--po-t2);--raya:#fff3e6}
-.po2-p{--c1:var(--po-p);--c2:var(--po-p2);--raya:#edf6ee}
+.po2-t{--c1:var(--po-t);--c2:var(--po-t2);--raya:#f3ecff}
+.po2-p{--c1:var(--po-p);--c2:var(--po-p2);--raya:#f2f2f4}
+html[data-theme="dark"] .po2-p{box-shadow:0 14px 30px rgba(0,0,0,.45),inset 0 0 0 1px rgba(255,255,255,.14)}
 /* toldo rayado con festón */
 .po2-toldo{position:absolute;left:0;right:0;top:0;height:30px;z-index:1;background:repeating-linear-gradient(90deg,var(--raya) 0 24px,color-mix(in srgb,var(--c1) 82%,#000) 24px 48px);box-shadow:0 3px 8px rgba(0,0,0,.18)}
 .po2-toldo::after{content:'';position:absolute;left:0;right:0;bottom:-11px;height:12px;background:radial-gradient(circle at 12px 0,var(--raya) 11px,transparent 11.5px) 0 0/48px 12px repeat-x,radial-gradient(circle at 36px 0,color-mix(in srgb,var(--c1) 82%,#000) 11px,transparent 11.5px) 0 0/48px 12px repeat-x}
 .po2-main{position:absolute;inset:0;display:grid;grid-template-columns:auto minmax(0,1fr) auto;align-items:center;gap:14px;padding:46px 18px 18px;border:0;background:none;color:#fff;text-align:left;cursor:pointer;z-index:2}
-.po2-num{display:grid;place-items:center;width:48px;height:48px;border-radius:16px;background:rgba(255,255,255,.2);font:950 24px var(--fn);box-shadow:inset 0 1px 0 rgba(255,255,255,.3)}
+.po2-ico{position:relative;display:grid;place-items:center;width:58px;height:58px;border-radius:18px;background:rgba(255,255,255,.2);font-size:32px;line-height:1;box-shadow:inset 0 1px 0 rgba(255,255,255,.3)}
+.po2-ico kbd{display:none;position:absolute;top:-8px;left:-8px;min-width:22px;height:22px;padding:0 6px;border-radius:8px;background:#fff;color:var(--c1);font:900 12px var(--fn);place-items:center;box-shadow:0 3px 8px rgba(0,0,0,.22)}
+@media (hover:hover) and (pointer:fine){.po2-ico kbd{display:grid}}
 .po2-tx{min-width:0}
-.po2-tx b{display:block;font-size:clamp(22px,5.4vw,30px);font-weight:950;letter-spacing:-.5px;line-height:1.05;text-shadow:0 2px 10px rgba(0,0,0,.18)}
+.po2-tx b{display:block;font-size:clamp(27px,8.4vw,46px);font-weight:950;letter-spacing:-1px;line-height:1;text-shadow:0 2px 10px rgba(0,0,0,.2)}
 .po2-tx small{display:block;margin-top:4px;font-size:13.5px;font-weight:700;opacity:.92}
 .po2-tx em{display:inline-block;margin-top:8px;padding:5px 10px;border-radius:999px;background:rgba(255,255,255,.2);font:800 12px var(--fn);font-style:normal;backdrop-filter:blur(6px)}
 .po2-ir{display:grid;place-items:center;width:46px;height:46px;border-radius:50%;background:#fff;color:var(--c1);font-size:22px;font-weight:950;box-shadow:0 8px 18px rgba(0,0,0,.2);transition:transform .2s}
@@ -74,8 +79,8 @@
 .po2-arte{position:absolute;right:76px;bottom:-6px;z-index:-1;display:flex;gap:0;pointer-events:none;opacity:.95}
 .po2-arte i{font-style:normal;font-size:clamp(38px,9vw,56px);margin-left:-14px;transform:rotate(calc((var(--i) - 1.5) * 12deg)) translateY(calc(var(--i) * 3px));filter:drop-shadow(0 6px 10px rgba(0,0,0,.25));animation:poFlota 4s ease-in-out infinite;animation-delay:calc(var(--i) * -.7s)}
 @keyframes poFlota{50%{translate:0 -4px}}
-@media (max-width:520px){.po2-arte{right:62px;opacity:.55}.po2-ir{width:40px;height:40px;font-size:19px}.po2-num{width:42px;height:42px;font-size:21px}}
-@media (min-width:900px){.po2-main{grid-template-columns:1fr;grid-template-rows:auto 1fr auto auto;align-items:start;padding:48px 22px 22px}.po2-arte{position:static;z-index:0;justify-content:center;align-self:center;margin:6px 0}.po2-arte i{font-size:62px}.po2-ir{justify-self:end}.po2-main .po-badge{top:46px;right:18px}}
+@media (max-width:520px){.po2-arte{right:62px;opacity:.55}.po2-ir{width:40px;height:40px;font-size:19px}.po2-ico{width:50px;height:50px;border-radius:16px;font-size:28px}.po2-main{gap:12px;padding-left:14px;padding-right:14px}}
+@media (min-width:900px){.po2-main{grid-template-columns:1fr;grid-template-rows:auto 1fr auto auto;align-items:start;padding:48px 22px 22px}.po2-tx b{font-size:44px}.po2-arte{position:static;z-index:0;justify-content:center;align-self:center;margin:6px 0}.po2-arte i{font-size:62px}.po2-ir{justify-self:end}.po2-main .po-badge{top:46px;right:18px}}
 .po2-sub{position:absolute;right:12px;bottom:12px;z-index:3;background:#fff;border:0;color:#7a3a07;box-shadow:0 8px 18px rgba(0,0,0,.2)}
 .po2-sub small{display:none}
 @media (min-width:900px){.po2-sub{left:22px;right:auto;bottom:22px}}
@@ -115,7 +120,7 @@
 .po3-dia b{display:block;font-size:20px;font-weight:950}
 
 /* ── 4 · Pizarra de la verdu ── */
-#puerta[data-portada="4"]{background:radial-gradient(120% 80% at 50% 0%,#5a3b22,#2a1a0e 70%),#2a1a0e}
+#puerta[data-portada="4"],#puFoto[data-portada="4"]{background:radial-gradient(120% 80% at 50% 0%,#5a3b22,#2a1a0e 70%),#2a1a0e}
 .pu-in.po4{max-width:900px;padding-left:12px;padding-right:12px}
 .po4-marco{padding:14px;border-radius:22px;background:linear-gradient(90deg,rgba(0,0,0,.12) 0 2px,transparent 2px 9px) 0 0/9px 100%,linear-gradient(160deg,#a8743f,#7a4f26 45%,#9a6a37 70%,#6e451f);box-shadow:0 24px 50px rgba(0,0,0,.5),inset 0 2px 0 rgba(255,255,255,.25),inset 0 -3px 6px rgba(0,0,0,.35)}
 .po4-pizarra{position:relative;padding:22px 20px 18px;border-radius:12px;color:#f4f1e6;background:radial-gradient(circle at 20% 30%,rgba(255,255,255,.05) 0 1px,transparent 2px) 0 0/7px 7px,radial-gradient(circle at 70% 60%,rgba(255,255,255,.04) 0 1px,transparent 2px) 0 0/11px 11px,radial-gradient(90% 70% at 30% 20%,rgba(255,255,255,.07),transparent 60%),#1e3a2b;box-shadow:inset 0 0 40px rgba(0,0,0,.45)}
@@ -155,7 +160,7 @@
 @media (max-width:520px){.po4-v{font-size:20px}.po4-t small{display:none}.po4-sub{margin-left:0}}
 
 /* ── 5 · Consola de taller ── */
-#puerta[data-portada="5"]{background:radial-gradient(ellipse at 70% -10%,rgba(159,224,191,.10),transparent 55%),linear-gradient(rgba(159,224,191,.035) 1px,transparent 1px) 0 0/100% 28px,#06120d;color:#dcefe4}
+#puerta[data-portada="5"],#puFoto[data-portada="5"]{background:radial-gradient(ellipse at 70% -10%,rgba(159,224,191,.10),transparent 55%),linear-gradient(rgba(159,224,191,.035) 1px,transparent 1px) 0 0/100% 28px,#06120d;color:#dcefe4}
 .pu-in.po5{max-width:1080px;font-family:'IBM Plex Sans',var(--fn);--h:#9fe0bf;--line:#1c4431;--panel:#0b2519;--mut:#8eae9b}
 .po5-top{display:flex;align-items:flex-end;gap:10px}
 .po5-top h1{font:600 clamp(28px,6vw,38px)/1 'Chakra Petch',var(--fn);letter-spacing:.06em;color:#dcefe4}
@@ -189,7 +194,7 @@
 .po5-tile::before{content:'';position:absolute;left:0;top:0;bottom:0;width:3px;background:var(--c)}
 .po5-tile:hover{border-color:var(--h)}
 .po5-tile:active{transform:scale(.98)}
-.po5-tile.c-t{--c:#f2a35b}.po5-tile.c-p{--c:#9fe0bf}
+.po5-tile.c-t{--c:#b794f6}.po5-tile.c-p{--c:#e5e7eb}
 .po5-kick{font:500 10.5px 'JetBrains Mono',monospace;letter-spacing:.14em;text-transform:uppercase;color:var(--h)}
 .po5-tile b{font-size:32px;line-height:1.1;margin-top:4px}
 .po5-tile strong{font:600 21px 'Chakra Petch',var(--fn);letter-spacing:.04em}
@@ -221,7 +226,7 @@
 .po-mini{flex:none;position:relative;width:72px;height:54px;border-radius:10px;overflow:hidden;border:1px solid var(--b);background:var(--bg);display:grid;gap:3px;padding:5px}
 .po-mini i{display:block;border-radius:4px}
 .po-mini1{grid-template-columns:repeat(3,1fr);grid-template-rows:1fr 8px}.po-mini1 .m1a{background:linear-gradient(var(--b) 0 5px,var(--card) 5px);border:1px solid var(--b)}.po-mini1 .m1b{grid-column:1/-1;background:var(--od)}
-.po-mini2{grid-template-rows:repeat(3,1fr)}.po-mini2 .m2a{background:repeating-linear-gradient(90deg,#e9f7ee 0 4px,#0d7a4a 4px 8px) 0 0/100% 4px no-repeat,linear-gradient(120deg,#0d7a4a,#16a463)}.po-mini2 .m2a.o{background:repeating-linear-gradient(90deg,#fff3e6 0 4px,#b85512 4px 8px) 0 0/100% 4px no-repeat,linear-gradient(120deg,#d4661a,#f29a45)}.po-mini2 .m2a.p{background:repeating-linear-gradient(90deg,#edf6ee 0 4px,#173f23 4px 8px) 0 0/100% 4px no-repeat,linear-gradient(120deg,#1d4d2b,#2f7a43)}
+.po-mini2{grid-template-rows:repeat(3,1fr)}.po-mini2 .m2a{background:repeating-linear-gradient(90deg,#e9f7ee 0 4px,#0d7a4a 4px 8px) 0 0/100% 4px no-repeat,linear-gradient(120deg,#0d7a4a,#16a463)}.po-mini2 .m2a.o{background:repeating-linear-gradient(90deg,#f3ecff 0 4px,#4a1b94 4px 8px) 0 0/100% 4px no-repeat,linear-gradient(120deg,#5b21b6,#8b5cf6)}.po-mini2 .m2a.p{background:repeating-linear-gradient(90deg,#f2f2f4 0 4px,#000 4px 8px) 0 0/100% 4px no-repeat,linear-gradient(120deg,#0b0c0f,#3a3f48)}
 .po-mini3{grid-template-columns:repeat(3,1fr);grid-template-rows:2fr 1fr}.po-mini3 .m3a{grid-column:1/-1;background:linear-gradient(120deg,#e5631d,#b92b17)}.po-mini3 .m3b{background:var(--card);border:1px solid var(--b);border-top:3px solid var(--g)}
 .po-mini4{background:#1e3a2b;border:3px solid #9a6a37;grid-template-rows:auto repeat(3,1fr)}.po-mini4 .m4a{height:7px;width:60%;background:#fffaf0;opacity:.85}.po-mini4 .m4b{border-bottom:2px dotted rgba(255,255,255,.45)}
 .po-mini5{background:#06120d;grid-template-columns:repeat(3,1fr);grid-template-rows:9px 1fr}.po-mini5 .m5a{grid-column:1/-1;border:1px solid #3fcf8e}.po-mini5 .m5b{background:#0b2519;border:1px solid #1c4431;border-left:2px solid #9fe0bf}
@@ -272,3 +277,26 @@ html[data-theme="dark"] .po3-hero[data-tono] .po3-cta{color:#1a1a1a}
 .po-ahora-t small:empty,.po-ahora-t em:empty,.po3-hero [data-d]:empty,.po4-nota small:empty,.po4-nota em:empty,.po5-ahora [data-d]:empty{display:none}
 .po-ahora-t strong{font-size:19px}
 .po3-hero{cursor:pointer}
+
+/* Mostrador: siempre naranja (su color). Con pedidos nuevos se enciende fuerte y late. */
+.po-ahora[data-tono="ok"],.po-ahora[data-tono="calma"]{border-color:color-mix(in srgb,var(--po-m-tinte) 45%,transparent);background:color-mix(in srgb,var(--po-m-tinte) 11%,var(--card))}
+.po-ahora:not([data-tono="urg"]) .po-ahora-e{background:color-mix(in srgb,var(--po-m-tinte) 18%,var(--card))}
+.po-ahora:not([data-tono="urg"]) .po-ahora-go,html[data-theme="dark"] .po-ahora:not([data-tono="urg"]) .po-ahora-go{background:var(--po-m);color:var(--po-m-tx)}
+.po-ahora-v2{padding:16px 16px 16px 14px}
+.po-ahora-v2 .po-ahora-e{width:58px;height:58px;border-radius:18px;font-size:32px}
+.po-ahora-v2 .po-ahora-t strong{font-size:clamp(27px,8.4vw,40px);letter-spacing:-1px;line-height:1.05;-webkit-line-clamp:1}
+/* Igual que las puertas: un círculo con la flecha */
+.po-ahora-v2 .po-ahora-go{display:grid;place-items:center;width:46px;height:46px;padding:0;border-radius:50%;font-size:0;box-shadow:0 8px 18px rgba(0,0,0,.18)}
+.po-ahora-v2 .po-ahora-go::after{content:'→';font-size:22px;font-weight:950}
+@media (max-width:520px){.po-ahora-v2 .po-ahora-e{width:50px;height:50px;border-radius:16px;font-size:28px}.po-ahora-v2 .po-ahora-go{width:40px;height:40px}.po-ahora-v2 .po-ahora-go::after{font-size:19px}}
+@media (max-width:380px){.po2-ico,.po-ahora-v2 .po-ahora-e{width:44px;height:44px;border-radius:14px;font-size:25px}.po2-ir{width:38px;height:38px}.po2-main{gap:10px}.po-ahora-v2{gap:10px}}
+/* ↻ Reiniciar: a la derecha de los avisos, siempre con su nombre */
+.po-reini b{font-size:16px;line-height:1;font-weight:900}
+.po-tools .po-reini span{display:inline!important}
+.po-reini.girando b{animation:poGira .8s linear infinite}
+@keyframes poGira{to{transform:rotate(360deg)}}
+/* Si los botones no caben en una fila (portadas.js lo mide), el reinicio queda solo con su ↻ */
+.po-tools.apretado .po-reini{min-width:36px;padding:0 10px;justify-content:center}
+.po-tools.apretado .po-reini span{display:none!important}
+@media (max-width:520px){.po-tools{gap:6px}.po-tools>.po-chip{padding:0 11px}}
+.po-esperando{transform:scale(.97);opacity:.8;transition:transform .12s,opacity .12s}

@@ -62,6 +62,7 @@ function uberLink(o){
 function abrir(url){const w=window.open(url,'_blank','noopener');if(!w)location.href=url;}
 let _tt=0;
 function toast(m){let t=$('moToast');if(!t){t=document.createElement('div');t.id='moToast';t.className='mo-toast';t.setAttribute('role','status');document.body.appendChild(t);}t.textContent=m;t.classList.add('show');clearTimeout(_tt);_tt=setTimeout(()=>t.classList.remove('show'),2800);}
+// La campana suena SOLO cuando llega un pedido nuevo al Mostrador (y en "Probar").
 function campana(fuerte){
   if(!R.sonido)return;
   try{const a=new (window.AudioContext||window.webkitAudioContext)();(fuerte?[660,880,990,1320,990,1320]:[660,880,990]).forEach((f,i)=>{const o=a.createOscillator(),g=a.createGain();o.frequency.value=f;o.connect(g);g.connect(a.destination);const t=a.currentTime+i*.14;g.gain.setValueAtTime(.0001,t);g.gain.exponentialRampToValueAtTime(.25,t+.02);g.gain.exponentialRampToValueAtTime(.0001,t+.3);o.start(t);o.stop(t+.35);});}catch{}
@@ -303,7 +304,7 @@ function datosPuerta(){
     bit:bitacoraHoy(),
   };
 }
-let _portadaMontada=0;
+let _portadaMontada=0,_fotoT=0;
 function pintarPuerta(){
   const raiz=$('puIn');if(!raiz||!window.AramoPortadas)return;
   const v=window.AramoPortadas.pintar(raiz,datosPuerta());
@@ -313,6 +314,14 @@ function pintarPuerta(){
     if(v===5)ligarConsola();
   }
   pintarNube();
+  clearTimeout(_fotoT);_fotoT=setTimeout(()=>guardarFoto(raiz,v),600);
+}
+// Foto de la portada para el arranque al instante (ver el inicio de APP.html). Sin ids ni
+// vistas en vivo; la portada 1 (ventanas con el Taller adentro) no se guarda.
+function guardarFoto(raiz,v){
+  if(!$('puerta')?.classList.contains('open'))return;
+  if(v===1){try{localStorage.removeItem('aramo_portada_foto');}catch{}return;}
+  LS.set('aramo_portada_foto',{v,cls:raiz.className,html:raiz.innerHTML.replace(/\sid="[^"]*"/g,'')});
 }
 // ── Consola: escribir qué abrir ──
 function sugerencias(q){
@@ -383,22 +392,39 @@ function abrirPOS(){
   location.href=u;
 }
 function cerrarPuerta(){$('puerta').classList.remove('open','zoom');document.body.classList.remove('pu-lock');}
-function entrar(cara,el){
-  const pu=$('puerta'),v=el?.querySelector?.('.pu-ventana')||(el&&el.closest?.('#puerta')?el:null);
-  if(v){const r=v.getBoundingClientRect(),inn=pu.querySelector('.pu-in');inn.style.transformOrigin=`${r.left+r.width/2}px ${r.top+r.height/2+pu.scrollTop}px`;inn.style.transform='scale(2.4)';pu.classList.add('zoom');}
+// Entrar es inmediato: sin animación de espera. Taller y POS ya están guardados en el
+// teléfono (service-worker.js), así que abren al instante.
+function entrar(cara){
   buzz(12);
-  setTimeout(()=>{
-    pu.querySelector('.pu-in').style.transform='';
-    if(cara==='pos'){pu.classList.remove('zoom');abrirPOS();return;}
-    if(cara==='surtido'){cerrarPuerta();}
-    else if(cara==='canasta'){
-      // En la computadora el Taller abre en otra pestaña: ARAMO sigue escuchando pedidos y avisando.
-      if(esCompu()){pu.classList.remove('zoom');const w=window.open('canasta.html','aramo-taller');if(!w)location.href='canasta.html';return;}
-      location.href='canasta.html';return;
-    }
-    else if(cara==='mostrador'){if(activos().some(o=>o.estado==='nuevo'&&paraMi(o)))M.tab='nuevo';cerrarPuerta();abrirMostrador();}
-    primeraVez=false;
-  },v?330:0);
+  if(cara==='pos'){abrirPOS();return;}
+  if(cara==='canasta'){
+    // En la computadora el Taller abre en otra pestaña: ARAMO sigue escuchando pedidos y avisando.
+    if(esCompu()){const w=window.open('canasta.html','aramo-taller');if(w)return;}
+    location.href='canasta.html';return;
+  }
+  if(cara==='surtido')cerrarPuerta();
+  else if(cara==='mostrador'){if(activos().some(o=>o.estado==='nuevo'&&paraMi(o)))M.tab='nuevo';cerrarPuerta();abrirMostrador();}
+  primeraVez=false;
+}
+// ↻ Reiniciar: la app vuelve a arrancar desde cero, con lo último publicado. Borra solo lo
+// guardado para abrir rápido (páginas, fotos, librerías); los pedidos, el Surtido, el local
+// y los ajustes se quedan.
+async function reiniciarApp(el){
+  if(el?.classList.contains('girando'))return;
+  el?.classList.add('girando');
+  toast('↻ Reiniciando ARAMO…');
+  try{window.flushPersist?.();}catch{}
+  if(navigator.onLine===false){toast('Sin internet: se recarga lo guardado');setTimeout(()=>location.reload(),600);return;}
+  try{
+    const regs=await navigator.serviceWorker?.getRegistrations?.()||[];
+    await Promise.all(regs.map(r=>r.unregister()));
+    const ks=window.caches?await caches.keys():[];
+    await Promise.all(ks.filter(k=>k.startsWith('aramo-')).map(k=>caches.delete(k)));
+    // Renovar también la memoria del navegador para esta página y sus archivos.
+    const urls=[location.href.split('#')[0],...[...document.querySelectorAll('script[src],link[rel="stylesheet"][href]')].map(e=>e.src||e.href).filter(u=>u.startsWith(location.origin))];
+    await Promise.race([Promise.all(urls.map(u=>fetch(u,{cache:'reload'}).catch(()=>{}))),new Promise(r=>setTimeout(r,5000))]);
+  }catch{}
+  location.reload();
 }
 
 // ══════════════ Mostrador ══════════════
@@ -656,7 +682,7 @@ function terminarPesaje(){
   if(faltan&&!confirm(`Faltan ${faltan} producto${faltan>1?'s':''}: se marcan como lo pidió el cliente. ¿Seguimos?`))return;
   borrarBorr(o.id,'pk');
   N.cambiar(o.id,x=>{x.items.forEach(t=>{if(t.estado!=='listo'&&t.estado!=='nohay'){t.estado='listo';if(t.qr==null||t.qr==='')t.qr=t.q;}});x.estado='listo';x.totalFinal=N.totalDe(x);},'tienda','Pesado en caja · lista · '+$c(N.totalDe(o))).then(x=>{
-    M.tab='listo';M.vista='encargo';pintarEncargo();pintarMostrador();campana();
+    M.tab='listo';M.vista='encargo';pintarEncargo();pintarMostrador();
     toast('✅ '+x.ref+' lista · '+$c(N.totalDe(x))+' · avisando a '+x.cliente.nombre.split(' ')[0]);
     abrir(N.wa(x.cliente.tel,msgCliente(x)));
   });
@@ -746,7 +772,7 @@ async function cobrar(){
     x.pago.estado='verificado';
     if(entregar){x.estado='entregado';x.entregado=new Date().toISOString();}
   },'tienda',`Cobrado ${$c(tot)} (${N.PAGOS[c.metodo]?.n||c.metodo})${venta?' · '+venta:''}${entregar?' · entregado':''}`);
-  campana();buzz([40,40,80]);
+  buzz([40,40,80]);
   toast(`🧾 ${o.ref} cobrado ${$c(tot)}${venta?' · '+venta+' en ARAMO POS':''}`);
   M.vista='tiquete';pintarEncargo();pintarMostrador();pintarPuerta();
 }
@@ -1047,6 +1073,7 @@ const ACT={
   'portada-usar'(el){window.AramoPortadas.elegir(+el.dataset.v);cerrarHoja();_portadaMontada=0;const r=$('puIn');if(r)r.dataset.v='';pintarPuerta();$('puerta').scrollTop=0;toast('🎨 Portada '+el.dataset.v+' · '+(window.AramoPortadas.LISTA.find(x=>x.n===+el.dataset.v)?.t||''));},
   compartir(){M.vista='compartir';pintarCompartir();},
   local(){pedirLocal(()=>abrirPuerta());},
+  'reiniciar-app'(el){reiniciarApp(el);},
   'ajustes-app'(){M.vista='ajustes-app';pintarAjustesApp();},
   mas(el){const m=$('moMas');m.hidden=!m.hidden;el.setAttribute('aria-expanded',String(!m.hidden));el.querySelector('b').textContent=m.hidden?'⋯':'✕';},
   'acceso-sw'(){
@@ -1158,7 +1185,7 @@ const ACT={
   'todo-y-listo'(){
     N.cambiar(M.abierto,o=>{o.items.forEach(it=>{if(it.estado!=='nohay'){it.estado='listo';if(it.qr==null||it.qr==='')it.qr=it.q;}});o.estado='listo';o.totalFinal=N.totalDe(o);},'tienda','Todo confirmado · pedido listo').then(o=>{
       if(!o)return;
-      M.tab='listo';pintarEncargo();pintarMostrador();campana();
+      M.tab='listo';pintarEncargo();pintarMostrador();
       toast('✅ '+o.ref+' lista · avisando a '+o.cliente.nombre.split(' ')[0]);
       abrir(N.wa(o.cliente.tel,msgCliente(o)));
     });
@@ -1171,7 +1198,7 @@ const ACT={
   },
   listo(){
     N.cambiar(M.abierto,o=>{o.estado='listo';o.totalFinal=N.totalDe(o);},'tienda','Lista · total exacto '+$c(N.totalDe(N.get(M.abierto)))).then(o=>{
-      M.tab='listo';pintarEncargo();pintarMostrador();campana();
+      M.tab='listo';pintarEncargo();pintarMostrador();
       toast('✅ '+o.ref+' lista · avisando a '+o.cliente.nombre.split(' ')[0]);
       abrir(N.wa(o.cliente.tel,msgCliente(o)));
     });
@@ -1252,7 +1279,7 @@ function codigoOk(o,como){
 }
 async function entregar(o,como){
   await N.cambiar(o.id,x=>{x.estado='entregado';x.entregado=new Date().toISOString();if(x.pago.estado==='reportado')x.pago.estado='verificado';},'tienda',como);
-  pararCamara();campana();buzz([40,40,80]);
+  pararCamara();buzz([40,40,80]);
   toast(`🛍️ ${o.ref} entregado`);
   M.vista='encargo';pintarEncargo();pintarMostrador();pintarPuerta();
 }
@@ -1313,7 +1340,7 @@ function vigilar(){
       nuevos++;sinAbrir.add(o.id);
       N.avisos.mostrar(`🛎️ Pedido nuevo · ${o.ref}`,`${o.cliente.nombre} · ${o.items.length} productos · ${sucNom(o.sucursal)} · ${o.retiro.envio?'envío':'recoge'} ${fh(o.retiro.at)}`,{tag:'nuevo-'+o.id,fijo:true,url:new URL('APP.html#ver='+o.id,location.href).href});
     }
-    else if(antes&&o.pago?.estado==='reportado'&&!antes.endsWith('reportado')&&paraMi(o)){toast(`📲 ${o.cliente.nombre} dice que pagó ${o.ref}`);campana();N.avisos.mostrar(`📲 ${o.cliente.nombre} pagó por SINPE`,`${o.ref} · ${$c(N.totalDe(o))} · revisalo`,{tag:'pago-'+o.id});}
+    else if(antes&&o.pago?.estado==='reportado'&&!antes.endsWith('reportado')&&paraMi(o))toast(`📲 ${o.cliente.nombre} dice que pagó ${o.ref}`); // sin sonido: solo suenan los pedidos nuevos
     else if(antes&&o.estado==='cancelado'&&!antes.startsWith('cancelado')&&paraMi(o)){toast(`✖️ ${o.ref} fue cancelado`);sinAbrir.delete(o.id);}
   });
   if(nuevos){
@@ -1359,6 +1386,8 @@ else{
   pedirLocal(()=>{if(h&&location.hash!==h)history.replaceState(null,'',location.pathname+location.search+h);if(!porHash()){if(MODO_POS)abrirMostrador();else abrirPuerta();}});
 }
 window.addEventListener('hashchange',porHash);
+$('puFoto')?.remove(); // la foto del arranque ya no hace falta: la portada de verdad está lista
+{const p=window.__puPend;delete window.__puPend;if(['surtido','canasta','pos','mostrador'].includes(p)&&$('puerta')?.classList.contains('open'))ACT[p]();}
 navigator.serviceWorker?.addEventListener?.('message',e=>{if(e.data?.tipo==='abrir'&&e.data.id)mostrarEnLista(e.data.id);});
 N.avisos.insignia(sinAbrir.size);
 if(sinAbrir.size)repetirAlarma();

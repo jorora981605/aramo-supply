@@ -26,7 +26,8 @@ const LS={get(k,d){try{const v=JSON.parse(localStorage.getItem(k));return v??d;}
 const $c=N.colones;
 // Fotos reales de los productos (canasta-fotos.js); si un producto no tiene, se usa su emoji.
 const FOTOS=window.ARAMO_FOTOS||{};
-function foto(k,e,cls=''){const f=FOTOS[k];return f?`<img class="ft ${f.t||'foto'}${cls?' '+cls:''}" src="${f.f}" alt="" loading="lazy" decoding="async" draggable="false">`:`<span class="em${cls?' '+cls:''}">${e||'🧺'}</span>`;}
+// Las fotos ya están guardadas en el teléfono (service-worker.js): se cargan enseguida, sin esperar a verlas.
+function foto(k,e,cls=''){const f=FOTOS[k];return f?`<img class="ft ${f.t||'foto'}${cls?' '+cls:''}" src="${f.f}" alt="" draggable="false">`:`<span class="em${cls?' '+cls:''}">${e||'🧺'}</span>`;}
 
 const C={
   paso:'armar',actual:null,pasillo:null,q:'',parse:null,verRecetas:false,recCat:'todas',ultimo:null,pulso:false,
@@ -547,6 +548,8 @@ function pintarMesa(anim){
   const m=$('tlMesa'),o=pedidoVisto(),vista=vistaActual(),pos=VISTA_POS[vista]??0;
   if(vista==='armar'||vista==='pedido')_p3=0;
   m.style.setProperty('--t',-(performance.now()/1000%60).toFixed(3)+'s');
+  // Un repintado por datos nuevos (sin animación) no repite la entrada: si no, todo se apaga y vuelve.
+  if(!anim){clearTimeout(_mt);m.classList.remove('adelante','atras','fade');}
   m.innerHTML=C.actual&&!o?titulo('No encontramos ese pedido en este teléfono',{volver:'armar',volverTxt:'Volver a la tienda'})
     :o?mesaPedido(o):vista==='canasta'?mesaCanasta():vista==='entrega'?mesaEntrega():vista==='pago'?mesaPago():mesaArmar();
   document.body.dataset.pantalla=vista;
@@ -777,12 +780,16 @@ function msgTienda(o){
 function abrir(url){const w=window.open(url,'_blank','noopener');if(!w)location.href=url;}
 
 // ══════════════ Avisos en vivo ══════════════
+// En un equipo de la tienda el Taller no suena ni manda notificaciones: ahí solo avisa el
+// Mostrador cuando llega un pedido nuevo. Al cliente sí le suena cuando su canasta está lista.
+const silencio=()=>!MINI&&!!LS.get('aramo_local',null);
 function vigilar(){
+  const callado=silencio(),aviso=callado?{mostrar(){}}:N.avisos;
   misPedidos().forEach(o=>{
     const antes=estados[o.id];estados[o.id]=o.estado;
     if(!antes||antes===o.estado)return;
-    if(o.estado==='listo'){toast('✅ ¡Tu canasta '+o.ref+' está lista!');buzz([90,60,90,60,160]);campana();N.avisos.mostrar('✅ Tu canasta '+o.ref+' está lista',o.retiro.envio?'Va en camino con Uber a tu ubicación.':'Te espera en '+(suc(o.sucursal)?.n||'ARAMO')+'. Total '+$c(N.totalDe(o))+'.',{tag:'pedido-'+o.id,url:location.href.split('#')[0]});}
-    else if(o.estado==='alistando'){toast('🧑‍🌾 Ya están escogiendo tu canasta');N.avisos.mostrar('🧑‍🌾 Estamos escogiendo tu canasta','Pedido '+o.ref+' · te avisamos cuando esté lista.',{tag:'pedido-'+o.id});}
+    if(o.estado==='listo'){toast('✅ ¡Tu canasta '+o.ref+' está lista!');if(!callado){buzz([90,60,90,60,160]);campana();}aviso.mostrar('✅ Tu canasta '+o.ref+' está lista',o.retiro.envio?'Va en camino con Uber a tu ubicación.':'Te espera en '+(suc(o.sucursal)?.n||'ARAMO')+'. Total '+$c(N.totalDe(o))+'.',{tag:'pedido-'+o.id,url:location.href.split('#')[0]});}
+    else if(o.estado==='alistando'){toast('🧑‍🌾 Ya están escogiendo tu canasta');aviso.mostrar('🧑‍🌾 Estamos escogiendo tu canasta','Pedido '+o.ref+' · te avisamos cuando esté lista.',{tag:'pedido-'+o.id});}
     else if(o.estado==='entregado'){const h=N.hojasDe(o);toast(h?`🛍️ ¡Entregada! Ganaste ${h} 🍃`:'🛍️ ¡Entregada! Gracias');if(h)fiesta(['🍃','🍃','🌿']);}
     else if(o.estado==='cancelado')toast('El pedido '+o.ref+' fue cancelado');
   });
@@ -1075,6 +1082,16 @@ window.addEventListener('hashchange',()=>{if(importarHash()){history.replaceStat
 // y el acceso al Mostrador viven únicamente en la app de la tienda (APP.html), nunca aquí.
 const LOCAL_TIENDA=MINI?null:LS.get('aramo_local',null);
 document.querySelector('.tl-back')?.toggleAttribute('hidden',!LOCAL_TIENDA);
+// ⌂ vuelve al menú al instante. En la compu el Taller se abrió en otra pestaña desde el menú:
+// se cierra esta y queda la del menú (que nunca se fue). En el celular abre el menú guardado.
+document.querySelector('.tl-back')?.addEventListener('click',e=>{
+  try{
+    if(window.name==='aramo-taller'&&window.opener&&!window.opener.closed&&window.opener.location.origin===location.origin){
+      e.preventDefault();window.opener.focus();window.close();
+      setTimeout(()=>{location.href='APP.html';},300); // si el navegador no deja cerrarla
+    }
+  }catch{}
+});
 if(!MINI){
   history.replaceState({paso:C.paso,id:C.actual},'',location.pathname+location.search);
   N.conectar({ids:C.mis});

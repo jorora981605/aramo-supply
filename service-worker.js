@@ -1,8 +1,44 @@
-const CACHE_NAME = 'aramo-shell-v36';
-const APP_SHELL = ['./APP.html', './index.html', './manifest.json', './icon.png', './pos-vista.jpg', './catalogo-productos.js', './supplier-base.js', './express.js', './express.css', './puerta.js', './puerta.css', './portadas.js', './portadas.css', './aramo-nube.js', './canasta-config.js', './canasta-fotos.js', './canasta.html', './canasta.js', './canasta.css', './canasta.webmanifest'];
+const CACHE_NAME = 'aramo-shell-v37';
+const CDN_CACHE = 'aramo-cdn-v1';
+// Las páginas: al instalar se guardan junto con TODOS los archivos que cargan,
+// tal cual los piden (con su ?v=…). Así cada pantalla abre sin esperar a internet.
+const PAGINAS = ['./APP.html', './canasta.html', './pos/index.html', './index.html'];
+const EXTRAS = ['./manifest.json', './canasta.webmanifest', './icon.png', './pos-vista.jpg', './canasta-fotos.js', './catalogo-productos.js', './supplier-base.js'];
+// Librerías de afuera (nube, QR, letras): se guardan y se renuevan por detrás.
+const CDN = /^https:\/\/(cdn\.jsdelivr\.net|cdnjs\.cloudflare\.com|cdn\.sheetjs\.com|fonts\.googleapis\.com|fonts\.gstatic\.com)\//;
+
+const fresco = url => new Request(url, { cache: 'reload' });
+// src="…" y href="…" de una página que sean de este mismo sitio (sin plantillas ni anclas).
+function archivosDe(html, base) {
+  const L = new Set();
+  for (const m of html.matchAll(/(?:src|href)="([^"]+)"/g)) {
+    const v = m[1];
+    if (/[${}'+]|^(#|data:|mailto:|tel:|javascript:)/.test(v)) continue;
+    try {
+      const u = new URL(v, base);
+      if (u.origin === self.location.origin && !u.pathname.endsWith('/')) L.add(u.href.split('#')[0]);
+    } catch {}
+  }
+  return [...L];
+}
 
 self.addEventListener('install', event => {
-  event.waitUntil(caches.open(CACHE_NAME).then(cache => cache.addAll(APP_SHELL)));
+  event.waitUntil((async () => {
+    const cache = await caches.open(CACHE_NAME);
+    const todos = new Set(EXTRAS.map(u => new URL(u, self.location).href));
+    for (const p of PAGINAS) {
+      const url = new URL(p, self.location).href;
+      const r = await fetch(fresco(url));
+      if (!r.ok) throw new Error('No se pudo guardar ' + p);
+      await cache.put(url, r.clone());
+      archivosDe(await r.text(), url).forEach(u => todos.add(u));
+    }
+    PAGINAS.forEach(p => todos.delete(new URL(p, self.location).href));
+    await Promise.all([...todos].map(async u => {
+      const r = await fetch(fresco(u));
+      if (r.ok) await cache.put(u, r);
+    }));
+  })());
   self.skipWaiting();
 });
 
@@ -16,30 +52,73 @@ self.addEventListener('activate', event => {
   self.clients.claim();
 });
 
-// Primero internet (siempre lo más nuevo); sin conexión, lo guardado.
-// Los archivos se piden con ?v=… y se buscan también sin esa marca. Una página
-// que no esté guardada cae en APP.html; un script o estilo nunca recibe HTML.
+// Calentar: fotos del Taller y archivos del POS que se cargan después, guardados por
+// detrás para que al entrar ya estén. Solo baja lo que falta.
+async function calentar() {
+  const cache = await caches.open(CACHE_NAME);
+  const quiero = new Set();
+  const texto = async u => { try { const r = await (await cache.match(u) || fetch(u)); return r.ok ? await r.clone().text() : ''; } catch { return ''; } };
+  const fotos = await texto(new URL('./canasta-fotos.js', self.location).href);
+  for (const m of fotos.matchAll(/fotos\/[\w-]+\.webp/g)) quiero.add(new URL('./' + m[0], self.location).href);
+  const pos = new URL('./pos/index.html', self.location).href;
+  for (const u of archivosDe(await texto(pos), pos)) {
+    if (!/\/assets\/index-[\w-]+\.js$/.test(u)) continue;
+    for (const m of (await texto(u)).matchAll(/"\.\/([\w-]+\.(?:js|css))"/g)) quiero.add(new URL(m[1], u).href);
+  }
+  quiero.add(new URL('./pos/sql/sql-wasm-browser.wasm', self.location).href);
+  for (const u of quiero) {
+    if (await cache.match(u)) continue;
+    try { const r = await fetch(u); if (r.ok) await cache.put(u, r); } catch {}
+  }
+}
+self.addEventListener('message', event => {
+  if (event.data && event.data.tipo === 'calentar') event.waitUntil(calentar());
+});
+
+// Primero lo guardado (abre al instante); si falta, internet y se guarda.
+// Lo nuevo llega con cada versión de este archivo: se instala por detrás y APP.html
+// se recarga sola. "↻ Reiniciar" en la portada borra todo lo guardado y baja todo de nuevo.
 self.addEventListener('fetch', event => {
   const request = event.request;
-  if (request.method !== 'GET' || new URL(request.url).origin !== self.location.origin) return;
+  if (request.method !== 'GET') return;
+  const url = new URL(request.url);
 
-  event.respondWith(
-    fetch(request)
-      .then(response => {
-        if (response.ok) {
-          const copy = response.clone();
-          caches.open(CACHE_NAME).then(cache => cache.put(request, copy));
-        }
-        return response;
-      })
-      .catch(async () => {
-        const cached = await caches.match(request) || await caches.match(request, { ignoreSearch: true });
-        if (cached) return cached;
-        if (request.mode === 'navigate') return (await caches.match('./APP.html')) || Response.error();
-        return Response.error();
-      })
-  );
+  if (url.origin !== self.location.origin) {
+    if (CDN.test(request.url)) event.respondWith(deLaCdn(event, request));
+    return;
+  }
+
+  event.respondWith((async () => {
+    const pagina = request.mode === 'navigate';
+    const guardado = await caches.match(request, { ignoreSearch: pagina });
+    if (guardado) return guardado;
+    try {
+      const response = await fetch(request);
+      if (response.ok) {
+        const copy = response.clone();
+        event.waitUntil(caches.open(CACHE_NAME).then(cache => cache.put(request, copy)));
+      }
+      return response;
+    } catch {
+      const parecido = await caches.match(request, { ignoreSearch: true });
+      if (parecido) return parecido;
+      if (pagina) return (await caches.match('./APP.html')) || Response.error();
+      return Response.error();
+    }
+  })());
 });
+
+// Librerías de afuera: lo guardado al instante y se renueva por detrás.
+// Se piden con CORS para poder revisar que vinieron bien antes de guardarlas.
+async function deLaCdn(event, request) {
+  const cache = await caches.open(CDN_CACHE);
+  const guardado = await cache.match(request.url);
+  const red = fetch(request.url, { mode: 'cors', credentials: 'omit' })
+    .then(async r => { if (r.ok) await cache.put(request.url, r.clone()); return r; })
+    .catch(() => fetch(request));
+  if (guardado) { event.waitUntil(red.catch(() => {})); return guardado; }
+  return red;
+}
 
 // Tocar una notificación de ARAMO abre la app justo en ese pedido.
 self.addEventListener('notificationclick', event => {

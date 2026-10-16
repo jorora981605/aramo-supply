@@ -44,7 +44,7 @@ function actual(){
 function elegir(n){LS.set('aramo_portada',Math.min(5,Math.max(1,+n||2)));}
 
 // ── Piezas comunes ──
-const herramientas=()=>`<div class="po-tools"><button type="button" class="po-chip po-local" data-pu="local" aria-label="Cambiar de local" title="Cambiar de local"><span data-d="local"></span></button><button type="button" class="po-chip po-nube" data-pu="compartir" data-nube title="Compartir el Taller"><i></i><span data-d="nube"></span></button><button type="button" class="po-chip po-avisar" data-pu="avisos-on" data-dn="avisosTxt" title="Activar avisos de pedidos nuevos"></button><span class="po-ics"><button type="button" class="po-chip" data-pu="portada" aria-label="Cambiar portada" title="Cambiar portada">🎨 <span>Portada</span></button><button type="button" class="po-chip" data-pu="ajustes-app" aria-label="Ajustes" title="Ajustes">⚙️ <span>Ajustes</span></button></span></div>`;
+const herramientas=()=>`<div class="po-tools"><button type="button" class="po-chip po-local" data-pu="local" aria-label="Cambiar de local" title="Cambiar de local"><span data-d="local"></span></button><button type="button" class="po-chip po-nube" data-pu="compartir" data-nube title="Compartir el Taller"><i></i><span data-d="nube"></span></button><button type="button" class="po-chip po-avisar" data-pu="avisos-on" data-dn="avisosTxt" title="Activar avisos de pedidos nuevos"></button><button type="button" class="po-chip po-reini" data-pu="reiniciar-app" aria-label="Reiniciar la app desde cero" title="Reiniciar la app: baja todo de nuevo (no borra pedidos ni ajustes)"><b aria-hidden="true">↻</b><span>Reiniciar</span></button><span class="po-ics"><button type="button" class="po-chip" data-pu="portada" aria-label="Cambiar portada" title="Cambiar portada">🎨 <span>Portada</span></button><button type="button" class="po-chip" data-pu="ajustes-app" aria-label="Ajustes" title="Ajustes">⚙️ <span>Ajustes</span></button></span></div>`;
 const ahora=cls=>`<button type="button" class="po-ahora ${cls||''}" data-ahora><span class="po-ahora-e" data-d="ahora.e"></span><span class="po-ahora-t"><small data-d="ahora.k"></small><strong data-d="ahora.t"></strong><em data-d="ahora.s"></em></span><span class="po-ahora-go" data-d="ahora.cta"></span></button>`;
 const badge=p=>`<span class="po-badge" data-dn="${p}"></span>`;
 
@@ -60,11 +60,11 @@ function v1(){
       <div class="pu-ventana"><div class="pu-barra"><i></i><i></i><i></i><span>1 · Surtido</span></div><div class="pu-vista" id="puMiniS"></div><div class="pu-glow"><span class="pu-abrir">Abrir Surtido</span></div></div>
       <div class="pu-info"><b>🚚 Surtido</b><small>Lo que ARAMO le pide a sus proveedores</small><span class="pu-stat" data-d="s.txt"></span></div>
     </button>
-    <button type="button" class="pu-cara" data-pu="canasta" style="--c:var(--o)" aria-label="2 · Abrir Taller de pedidos">
+    <button type="button" class="pu-cara" data-pu="canasta" style="--c:var(--po-t2)" aria-label="2 · Abrir Taller de pedidos">
       <div class="pu-ventana"><div class="pu-barra"><i></i><i></i><i></i><span>2 · Taller de pedidos</span></div><div class="pu-vista" id="puMiniC"><iframe title="Vista del Taller" src="canasta.html?mini=1&tema=${tema}" loading="lazy" tabindex="-1" aria-hidden="true"></iframe></div><div class="pu-glow"><span class="pu-abrir">Abrir Taller</span></div></div>
       <div class="pu-info"><b>🧺 Taller</b><small>Donde los clientes arman su pedido, de punta a punta</small><span class="pu-stat o" data-d="t.txt"></span></div>
     </button>
-    <button type="button" class="pu-cara pu-cara-pos" data-pu="pos" style="--c:#1b5e20" aria-label="3 · Abrir ARAMO POS">
+    <button type="button" class="pu-cara pu-cara-pos" data-pu="pos" style="--c:var(--po-p2)" aria-label="3 · Abrir ARAMO POS">
       <div class="pu-ventana"><div class="pu-barra"><i></i><i></i><i></i><span>3 · ARAMO POS</span></div><img class="pu-foto" src="pos-vista.jpg" alt="" loading="lazy"><div class="pu-glow"><span class="pu-abrir">Abrir ARAMO POS</span></div></div>
       <div class="pu-info"><b>🧾 ARAMO POS</b><small>Ventas y caja del mostrador</small><span class="pu-stat" data-d="p.txt"></span></div>
     </button>
@@ -80,9 +80,9 @@ function v2(){
   <div class="po2-puestos">${PUERTAS.map(p=>`<div class="po2-puesto po2-${p.c}">
     <span class="po2-toldo" aria-hidden="true"></span>
     <button type="button" class="po2-main" data-pu="${p.k}" aria-label="${p.tecla} · Abrir ${esc(p.n)}">
-      <span class="po2-num">${p.tecla}</span>
+      <span class="po2-ico" aria-hidden="true">${p.e}<kbd>${p.tecla}</kbd></span>
       <span class="po2-arte" aria-hidden="true">${p.arte.map((a,i)=>`<i style="--i:${i}">${a}</i>`).join('')}</span>
-      <span class="po2-tx"><b>${p.e} ${esc(p.n)}</b><small>${esc(p.d)}</small><em data-d="${p.dato}.chip"></em></span>
+      <span class="po2-tx"><b>${esc(p.n)}</b><small>${esc(p.d)}</small><em data-d="${p.dato}.chip"></em></span>
       ${badge(p.dato+'.alerta')}<span class="po2-ir" aria-hidden="true">→</span>
     </button>
   </div>`).join('')}</div>
@@ -135,6 +135,16 @@ function llenar(root,D){
   root.querySelectorAll('[data-ahora]').forEach(el=>{el.dataset.pu=D.ahora.act;if(D.ahora.id)el.dataset.id=D.ahora.id;else delete el.dataset.id;el.dataset.tono=D.ahora.tono;el.setAttribute('aria-label',D.ahora.k+': '+D.ahora.t);});
   root.querySelectorAll('[data-ahora-tono]').forEach(el=>{el.dataset.tono=D.ahora.tono;});
 }
+// Los botones de arriba van en una sola fila: si no caben, "↻ Reiniciar" queda solo con su ícono.
+function ajustarHerramientas(root){
+  root.querySelectorAll('.po-tools').forEach(t=>{
+    t.classList.remove('apretado');
+    const cs=[...t.children].filter(c=>c.classList.contains('po-chip')&&!c.hidden);
+    if(cs.length>1&&cs[cs.length-1].offsetTop>cs[0].offsetTop+4)t.classList.add('apretado');
+  });
+}
+let _ajT=0;
+window.addEventListener('resize',()=>{clearTimeout(_ajT);_ajT=setTimeout(()=>{const r=document.getElementById('puIn');if(r)ajustarHerramientas(r);},120);});
 function pintar(root,D){
   const v=actual();
   if(+root.dataset.v!==v){
@@ -143,6 +153,7 @@ function pintar(root,D){
     document.getElementById('puerta')?.setAttribute('data-portada',v);
   }
   llenar(root,D);
+  ajustarHerramientas(root);
   return v;
 }
 
