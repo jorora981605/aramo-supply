@@ -1,0 +1,23 @@
+<!DOCTYPE html>
+<html lang="es">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline' 'wasm-unsafe-eval' https://cdn.jsdelivr.net; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; img-src 'self' data: blob:; font-src 'self' data: https://fonts.gstatic.com; connect-src 'self' https://*.supabase.co wss://*.supabase.co https://api.hacienda.go.cr https://cdn.jsdelivr.net; frame-src 'self' blob: data:; worker-src 'self' blob:;" />
+    <title>ARAMO POS</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <meta name="theme-color" content="#1B5E20" />
+    <link rel="icon" href="../icon.png" />
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <script src="./sql/sql-wasm-browser.js?v=20261015-pos-1"></script>
+    <script src="./pos-web.js?v=20261015-pos-1"></script>
+    <script src="./pos-main.js?v=20261015-pos-1"></script>
+    <script src="./pos-preload.js?v=20261015-pos-1"></script>
+    <script type="module" crossorigin src="./assets/index-DWj2HEej.js"></script>
+    <link rel="stylesheet" crossorigin href="./assets/index-CuHZDM05.css">
+      <link rel="stylesheet" href="./pos-web.css?v=20261015-pos-1">
+  </head>
+  <body>
+    <div id="root"></div>
+  </body>
+</html>

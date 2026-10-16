@@ -297,7 +297,7 @@ function datosPuerta(){
     t:{activos:a.length,nuevos,txt:a.length?`🛎️ ${a.length} pedido${a.length>1?'s':''} en curso`:'Lista para recibir pedidos',
        chip:a.length?`${a.length} en curso · ${listos} listos`:'Lista para recibir pedidos',alerta:nuevos?`${nuevos} nuevo${nuevos>1?'s':''}`:'',
        mo:`📡 ${receptorNom()} · `+(a.length?`${nuevos} nuevo${nuevos===1?'':'s'} · ${alist} alistando · ${listos} por entregar`:'recibir, alistar, cobrar y entregar')},
-    p:{txt:esCompu()?'💻 Se abre en esta computadora':'💻 Se abre en la computadora de caja',chip:esCompu()?'En esta computadora':'En la compu de caja',alerta:''},
+    p:{txt:'☁️ POS de '+sucNom(LOCAL||'moravia')+' en la nube',chip:'POS de '+sucNom(LOCAL||'moravia'),alerta:''},
     caja:{total:$c(total),n:cob.length},
     cadena:pasos.map((p,i)=>`${i?'<span class="pu-flecha">›</span>':''}<div class="pu-eslabon"><b>${p[0]}</b>${p[1]}<em>${esc(p[2])}</em></div>`).join(''),
     bit:bitacoraHoy(),
@@ -373,16 +373,14 @@ function abrirPuerta(){
   pintarPuerta();clonarSurtido();autoPrecios();
   requestAnimationFrame(escalarMinis);
 }
-// ARAMO POS es un programa de la computadora: se abre con el enlace aramo-pos://
-// (registrado en la computadora de caja). Si ya está abierto, lo trae al frente.
-function esCompu(){return /Windows/i.test(navigator.userAgent)&&!/Mobi|Android/i.test(navigator.userAgent);}
+// ARAMO POS en la nube: el POS del local elegido al entrar (Moravia o LASR), en cualquier dispositivo.
+// En la compu se abre en otra pestaña (así el Mostrador sigue avisando); en el celular, aquí mismo.
+function esCompu(){return /Windows|Macintosh|Linux/i.test(navigator.userAgent)&&!/Mobi|Android|iPhone|iPad/i.test(navigator.userAgent);}
 function abrirPOS(){
-  if(!esCompu()){toast('🧾 ARAMO POS se abre en la computadora de caja');return;}
-  toast('🧾 Abriendo ARAMO POS…');
-  let salio=false;const onBlur=()=>{salio=true;};
-  window.addEventListener('blur',onBlur,{once:true});
-  const a=document.createElement('a');a.href='aramo-pos://abrir';a.style.display='none';document.body.appendChild(a);a.click();a.remove();
-  setTimeout(()=>{window.removeEventListener('blur',onBlur);if(!salio&&document.hasFocus())toast('Si no se abrió: ARAMO POS no está instalado en esta computadora');},3000);
+  const u='pos/index.html?suc='+encodeURIComponent(LOCAL||'moravia');
+  toast('🧾 Abriendo el POS de '+sucNom(LOCAL||'moravia')+'…');
+  if(esCompu()){const w=window.open(u,'_blank');if(w)return;}
+  location.href=u;
 }
 function cerrarPuerta(){$('puerta').classList.remove('open','zoom');document.body.classList.remove('pu-lock');}
 function entrar(cara,el){
