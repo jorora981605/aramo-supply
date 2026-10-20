@@ -746,7 +746,26 @@ function xpPedidoClick(e){
 
 // Reiniciar SOLO el pedido (cantidades, extras, notas y "enviado").
 // Proveedores, productos, precios, teléfonos e histórico no se tocan.
+async function xpResetEntireCombined(){
+  const old=JSON.parse(JSON.stringify(S.pedidos||{})),providers=Object.keys(old);
+  if(!confirm('Borrar todo el pedido combinado?\n\nSe eliminaran las cantidades, extras, notas y estados de Moravia y Los Angeles.\nLos proveedores del catalogo no se borran.'))return;
+  XP.undo={at:Date.now(),data:old,sides:['moravia','angeles']};
+  S.pedidos={};
+  S.createSelection={};
+  _dirtyProvs.clear();
+  providers.forEach(prov=>delete _syncBase[prov]);
+  saveSyncBase();
+  saveLocalState();
+  let remoteOk=true;
+  try{
+    const res=await supa.from('pedidos').delete().neq('proveedor','');
+    if(res.error)throw new Error(res.error.message);
+  }catch(e){remoteOk=false;console.warn('No se pudo borrar el pedido combinado en la nube:',e?.message||e);}
+  xpRefresh();
+  toast(remoteOk?'Pedido combinado vacio':'Pedido vacio en este telefono; revisa la conexion',remoteOk?'ok':'err');
+}
 function xpResetPedido(){
+  if(activeOrderSides().length>1){xpResetEntireCombined();return;}
   const sides=activeOrderSides();
   const label=sides.length>1?'Moravia y Los Ángeles':SIDE_NAME[sides[0]];
   if(!confirm(`¿Reiniciar el pedido de ${label}?\n\nSe borran las cantidades de todos los proveedores en TODOS los teléfonos.\nProveedores, precios e historial no se tocan.`))return;

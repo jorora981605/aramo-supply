@@ -562,6 +562,7 @@ html[data-theme="dark"] .both-summary-action.primary{border-color:#d7e1e6;backgr
 @media(max-width:560px){.both-summary-head{display:block}.both-summary-actions{margin-top:10px}.both-summary-action{flex:1}.both-summary-provider-head{align-items:flex-start;flex-wrap:wrap}.both-summary-provider-name{flex-basis:100%}.both-summary-provider-state{justify-content:flex-start}.both-summary-provider-actions{margin-left:auto}}
 @media(max-width:560px){.both-summary-table-wrap{overflow-x:visible}.both-summary-table{min-width:0;table-layout:fixed}.both-summary-table th,.both-summary-table td{padding:6px 3px}.both-summary-table th{font-size:8px;letter-spacing:0}.both-summary-product{min-width:0;width:36%;font-size:10px;line-height:1.15;overflow-wrap:anywhere}.both-summary-product small{font-size:9px}.both-summary-qty{width:100%;max-width:58px;min-height:30px;padding:4px 2px;font-size:11px}.both-summary-unit{font-size:8px}.both-summary-total-cell{font-size:11px}}
 @media(max-width:700px){.both-summary{padding:10px;border-radius:13px}.both-summary-table-wrap{overflow-x:hidden}.both-summary-table{width:100%;min-width:0;table-layout:fixed}.both-summary-table th,.both-summary-table td{padding:5px 2px;overflow-wrap:anywhere}.both-summary-table th{font-size:8px;line-height:1.1;white-space:normal}.both-summary-table th:first-child,.both-summary-table td:first-child{width:34%}.both-summary-table th:nth-child(2),.both-summary-table td:nth-child(2),.both-summary-table th:nth-child(3),.both-summary-table td:nth-child(3),.both-summary-table th:nth-child(4),.both-summary-table td:nth-child(4){width:22%}.both-summary-product{min-width:0;width:auto;font-size:10px;line-height:1.15;overflow-wrap:anywhere}.both-summary-product small{font-size:8px;line-height:1.1}.both-summary-qty{display:block;width:100%;max-width:50px;min-height:28px;margin:0 auto;padding:3px 1px;font-size:10px}.both-summary-unit{font-size:8px}.both-summary-total-cell{font-size:10px;white-space:nowrap}}
+.both-summary-empty strong{display:block;font-size:16px;color:var(--t)}.both-summary-empty span{display:block;margin-top:4px}.both-summary-empty button{margin-top:10px;min-height:36px;padding:0 12px;border:1px solid var(--b2);border-radius:10px;background:var(--card);color:var(--t);font-size:12px;font-weight:900}
 .excel-import-box{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:5px;min-height:132px;padding:18px;border:2px dashed var(--g);border-radius:17px;background:var(--gd);color:var(--t);text-align:center;cursor:pointer}
 .excel-import-box:active{transform:scale(.99)}.excel-import-icon{font-size:30px}.excel-import-box strong{font-size:15px}.excel-import-box small{font-size:12px;color:var(--m)}
 .excel-import-status{min-height:20px;margin-top:8px;font-size:13px;line-height:1.4;color:var(--m)}.excel-import-status.ok{color:var(--g)}.excel-import-status.error{color:var(--o)}
@@ -2223,7 +2224,12 @@ function renderCombinedSurtidoSummary(){
       </section>`;
     }).join(''):'<div class="both-summary-empty">Todavía no hay cantidades en Moravia ni en Los Ángeles.<br>Entrá a un proveedor y agregá los productos que necesitás.</div>'}
   `;
+  if(!data.rows){
+    const empty=box.querySelector('.both-summary-empty');
+    if(empty){empty.innerHTML='<strong>Pedido limpio</strong><span>Escribi un producto arriba o agrega uno desde un proveedor.</span><button type="button" data-summary-add>➕ Agregar productos</button>';}
+  }
   box.querySelector('[data-summary-send-all]')?.addEventListener('click',()=>openSendOrdersModal());
+  box.querySelector('[data-summary-add]')?.addEventListener('click',()=>{const input=document.getElementById('pvSearch');input?.focus();input?.scrollIntoView({behavior:'smooth',block:'center'});});
   box.querySelectorAll('[data-summary-send]').forEach(btn=>btn.addEventListener('click',()=>sendSummaryProvider(decodeURIComponent(btn.dataset.summarySend))));
   box.querySelectorAll('[data-summary-open]').forEach(btn=>btn.addEventListener('click',()=>openProv(decodeURIComponent(btn.dataset.summaryOpen))));
   box.querySelectorAll('[data-summary-qty]').forEach(input=>{
@@ -3967,7 +3973,7 @@ if(isIOS && !isInStandalone && !dismissed){
   },3000);
 }
 </script>
-<script src="express.js?v=20261020-pedido-ramas-1"></script>
+<script src="express.js?v=20261020-pedido-ramas-2"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcode-generator/1.4.4/qrcode.min.js"></script>
 <script src="canasta-config.js?v=20261018-seguridad-1"></script>
 <script src="aramo-nube.js?v=20261020-circuito-6"></script>
