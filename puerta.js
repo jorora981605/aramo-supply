@@ -124,7 +124,7 @@ function cerrarLocal(){$('loc').classList.remove('open');}
 function entrarLocal(k){
   usarLocal(k);cerrarLocal();buzz(10);
   const sig=_trasLocal;_trasLocal=null;
-  if(sig)sig();else abrirPuerta();
+  if(sig)sig();else if(k==='todas')abrirSurtidoAmbos();else abrirPuerta();
   toast(`${k==='moravia'?'🏠':k==='angeles'?'📍':'🧺'} ${k==='todas'?'Ambos · Moravia y Los Ángeles':sucNom(k)}`);
 }
 function pintarClave(k,mal){
@@ -391,6 +391,16 @@ function abrirPuerta(){
   pintarPuerta();clonarSurtido();autoPrecios();
   requestAnimationFrame(escalarMinis);
 }
+// “Ambos” es un acceso directo al Surtido combinado. No muestra la portada,
+// Mostrador ni POS porque esos módulos necesitan una sucursal específica.
+function abrirSurtidoAmbos(){
+  cerrarHoja();
+  $('mostrador')?.classList.remove('open');
+  $('puerta')?.classList.remove('open','zoom');
+  document.body.classList.remove('pu-lock');
+  try{switchView('proveedores');}catch(e){console.warn('No se pudo abrir Surtido combinado',e);}
+  toast('🧺 Surtido combinado · Moravia + Los Ángeles');
+}
 // ARAMO POS en la nube: el POS del local elegido al entrar (Moravia o LASR), en cualquier dispositivo.
 // En la compu se abre en otra pestaña (así el Mostrador sigue avisando); en el celular, aquí mismo.
 function esCompu(){return /Windows|Macintosh|Linux/i.test(navigator.userAgent)&&!/Mobi|Android|iPhone|iPad/i.test(navigator.userAgent);}
@@ -412,7 +422,7 @@ function entrar(cara){
     if(esCompu()){const w=window.open('canasta.html','aramo-taller');if(w)return;}
     location.href='canasta.html';return;
   }
-  if(cara==='surtido')cerrarPuerta();
+  if(cara==='surtido'){if(LOCAL==='todas')abrirSurtidoAmbos();else cerrarPuerta();}
   else if(cara==='mostrador'){if(activos().some(o=>o.estado==='nuevo'&&paraMi(o)))M.tab='nuevo';cerrarPuerta();abrirMostrador();}
   primeraVez=false;
 }
@@ -1131,7 +1141,7 @@ const ACT={
   portada(){M.vista='portada';abrirHoja(window.AramoPortadas.selectorHtml());},
   'portada-usar'(el){window.AramoPortadas.elegir(+el.dataset.v);cerrarHoja();_portadaMontada=0;const r=$('puIn');if(r)r.dataset.v='';pintarPuerta();$('puerta').scrollTop=0;toast('🎨 Portada '+el.dataset.v+' · '+(window.AramoPortadas.LISTA.find(x=>x.n===+el.dataset.v)?.t||''));},
   compartir(){M.vista='compartir';pintarCompartir();},
-  local(){pedirLocal(()=>abrirPuerta());},
+  local(){pedirLocal(()=>LOCAL==='todas'?abrirSurtidoAmbos():abrirPuerta());},
   'reiniciar-app'(el){reiniciarApp(el);},
   'ajustes-app'(){M.vista='ajustes-app';pintarAjustesApp();},
   mas(el){const m=$('moMas');m.hidden=!m.hidden;el.setAttribute('aria-expanded',String(!m.hidden));el.querySelector('b').textContent=m.hidden?'⋯':'✕';},
@@ -1460,12 +1470,12 @@ document.getElementById('scopePicker')?.classList.remove('open');document.body.c
 primeraVez=false;
 if(LOCAL){ // ya se eligió (y se validó) en esta sesión, por ejemplo al volver del Taller
   usarLocal(LOCAL);
-  if(!porHash()){if(MODO_POS)abrirMostrador();else abrirPuerta();}
+  if(!porHash()){if(MODO_POS)abrirMostrador();else if(LOCAL==='todas')abrirSurtidoAmbos();else abrirPuerta();}
 }
 else{
   // Primero se elige el local; después sigue a donde iba (portada, pedido de WhatsApp o notificación).
   const h=location.hash;
-  pedirLocal(()=>{if(h&&location.hash!==h)history.replaceState(null,'',location.pathname+location.search+h);if(!porHash()){if(MODO_POS)abrirMostrador();else abrirPuerta();}});
+  pedirLocal(()=>{if(h&&location.hash!==h)history.replaceState(null,'',location.pathname+location.search+h);if(!porHash()){if(MODO_POS)abrirMostrador();else if(LOCAL==='todas')abrirSurtidoAmbos();else abrirPuerta();}});
 }
 window.addEventListener('hashchange',porHash);
 $('puFoto')?.remove(); // la foto del arranque ya no hace falta: la portada de verdad está lista
@@ -1473,5 +1483,5 @@ $('puFoto')?.remove(); // la foto del arranque ya no hace falta: la portada de v
 navigator.serviceWorker?.addEventListener?.('message',e=>{if(e.data?.tipo==='abrir'&&e.data.id)mostrarEnLista(e.data.id);});
 N.avisos.insignia(sinAbrir.size);
 if(sinAbrir.size)repetirAlarma();
-window.AramoPuerta={abrirPuerta,abrirMostrador,pintarMostrador,abrirCobro,autoPrecios,R};
+window.AramoPuerta={abrirPuerta,abrirSurtidoAmbos,abrirMostrador,pintarMostrador,abrirCobro,autoPrecios,R};
 })();
