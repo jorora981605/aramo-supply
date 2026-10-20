@@ -94,7 +94,7 @@ async function claveOk(k,clave){const h=acceso().claves?.[k]||await huella(CLAVE
 function usarLocal(k){
   LOCAL=k;LS.set('aramo_local',k);try{sessionStorage.setItem('aramo_local_sesion',k);}catch{}
   R.suc=k;M.suc=k;guardarR();
-  try{if(typeof chooseOrderScope==='function')chooseOrderScope(k==='moravia'?'moravia':'lasr');}catch{}
+  try{if(typeof chooseOrderScope==='function')chooseOrderScope(k==='todas'?'both':k==='moravia'?'moravia':'lasr');}catch{}
   document.getElementById('scopePicker')?.classList.remove('open');document.body.classList.remove('scope-picker-open');
 }
 let _trasLocal=null;
@@ -102,11 +102,16 @@ function pedirLocal(despues){
   _trasLocal=despues||null;
   const ultimo=LS.get('aramo_local',null),activo=acceso().activo;
   const el=$('loc');
+  const opciones=[
+    {k:'moravia',e:'🏠',n:suc('moravia')?.n||'ARAMO',zona:suc('moravia')?.zona||'Moravia'},
+    {k:'angeles',e:'📍',n:suc('angeles')?.n||'LASR',zona:suc('angeles')?.zona||'Los Ángeles'},
+    {k:'todas',e:'🧺',n:'Ambos',zona:'Moravia y Los Ángeles · solo Surtido'}
+  ];
   el.innerHTML=`<div class="loc-in">
     <div class="loc-marca">ARAMO</div>
     <h1>¿En qué local estás?</h1>
-    <p>Todo se ajusta a ese local: pedidos de clientes, avisos y Surtido.</p>
-    <div class="loc-ops">${['moravia','angeles'].map(k=>{const s=suc(k);return `<button type="button" class="loc-op${ultimo===k?' ult':''}" data-loc="${k}"><span class="loc-e">${k==='moravia'?'🏠':'📍'}</span><span class="loc-t"><b>${esc(s?.n||k)}</b><small>${esc(s?.zona||'')}</small></span>${ultimo===k?'<em>Último</em>':''}<span class="loc-ir">→</span></button>`;}).join('')}</div>
+    <p>Elegí un local para ver sus pedidos, o <b>Ambos</b> para trabajar el Surtido de las dos tiendas.</p>
+    <div class="loc-ops">${opciones.map(x=>`<button type="button" class="loc-op${ultimo===x.k?' ult':''}" data-loc="${x.k}"><span class="loc-e">${x.e}</span><span class="loc-t"><b>${esc(x.n)}</b><small>${esc(x.zona)}</small></span>${ultimo===x.k?'<em>Último</em>':''}<span class="loc-ir">→</span></button>`).join('')}</div>
     <div id="locClave"></div>
     <p class="loc-pie">${activo?'🔒 Cada local pide su contraseña':'🔓 Entrada directa · la contraseña se activa en ⚙️ Ajustes'}</p>
   </div>`;
@@ -117,7 +122,7 @@ function entrarLocal(k){
   usarLocal(k);cerrarLocal();buzz(10);
   const sig=_trasLocal;_trasLocal=null;
   if(sig)sig();else abrirPuerta();
-  toast(`${k==='moravia'?'🏠':'📍'} ${sucNom(k)}`);
+  toast(`${k==='moravia'?'🏠':k==='angeles'?'📍':'🧺'} ${k==='todas'?'Ambos · Moravia y Los Ángeles':sucNom(k)}`);
 }
 function pintarClave(k,mal){
   const d=(M.clave||'').padEnd(5,' ').split('');
