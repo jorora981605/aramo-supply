@@ -1,4 +1,4 @@
-const CACHE_NAME = 'aramo-shell-v45-order-circuit';
+const CACHE_NAME = 'aramo-shell-v46-network-first-pages';
 const CDN_CACHE = 'aramo-cdn-v1';
 // Las páginas: al instalar se guardan junto con TODOS los archivos que cargan,
 // tal cual los piden (con su ?v=…). Así cada pantalla abre sin esperar a internet.
@@ -99,7 +99,24 @@ self.addEventListener('fetch', event => {
 
   event.respondWith((async () => {
     const pagina = request.mode === 'navigate';
-    const guardado = await caches.match(request, { ignoreSearch: pagina });
+
+    // Las páginas principales deben buscar primero la versión publicada. Así
+    // una versión antigua del caché no puede ocultar una actualización del sitio.
+    if (pagina) {
+      try {
+        const response = await fetch(new Request(request, { cache: 'no-store' }));
+        if (response.ok) {
+          const copy = response.clone();
+          event.waitUntil(caches.open(CACHE_NAME).then(cache => cache.put(request, copy)));
+          return response;
+        }
+      } catch {}
+      const guardado = await caches.match(request, { ignoreSearch: true });
+      if (guardado) return guardado;
+      return (await caches.match('./APP.html')) || Response.error();
+    }
+
+    const guardado = await caches.match(request);
     if (guardado) return guardado;
     try {
       const response = await fetch(request);
@@ -111,7 +128,6 @@ self.addEventListener('fetch', event => {
     } catch {
       const parecido = await caches.match(request, { ignoreSearch: true });
       if (parecido) return parecido;
-      if (pagina) return (await caches.match('./APP.html')) || Response.error();
       return Response.error();
     }
   })());
