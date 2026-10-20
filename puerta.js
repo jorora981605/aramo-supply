@@ -73,6 +73,8 @@ const R=Object.assign({suc:'todas',sonido:true,pantalla:false},LS.get('aramo_rec
 function guardarR(){LS.set('aramo_receptor',R);}
 const paraMi=o=>R.suc==='todas'||o.sucursal===R.suc;
 const receptorNom=()=>R.suc==='todas'?'Ambas tiendas':sucNom(R.suc);
+const localNom=k=>k==='todas'?'Ambos · Moravia y Los Ángeles':sucNom(k);
+const localIcon=k=>k==='todas'?'🧺':k==='moravia'?'🏠':'📍';
 let _wake=null;
 async function pantallaEncendida(){
   try{
@@ -88,6 +90,7 @@ document.addEventListener('visibilitychange',()=>{if(document.visibilityState===
 const CLAVE_FABRICA='12345';
 let LOCAL=null;
 try{LOCAL=sessionStorage.getItem('aramo_local_sesion');}catch{}
+const localK=()=>LOCAL&&LOCAL!=='todas'?LOCAL:'moravia';
 async function huella(t){const b=await crypto.subtle.digest('SHA-256',new TextEncoder().encode('aramo:'+t));return [...new Uint8Array(b)].map(x=>x.toString(16).padStart(2,'0')).join('');}
 const acceso=()=>({activo:false,claves:{},...(T().acceso||{})});
 async function claveOk(k,clave){const h=acceso().claves?.[k]||await huella(CLAVE_FABRICA);return (await huella(String(clave)))===h;}
@@ -126,7 +129,7 @@ function entrarLocal(k){
 }
 function pintarClave(k,mal){
   const d=(M.clave||'').padEnd(5,' ').split('');
-  $('locClave').innerHTML=`<div class="loc-clave${mal?' mal':''}"><p>Contraseña de <b>${esc(sucNom(k))}</b></p><div class="loc-dig">${d.map(c=>`<span class="${c!==' '?'f':''}">${c!==' '?'•':''}</span>`).join('')}</div>
+  $('locClave').innerHTML=`<div class="loc-clave${mal?' mal':''}"><p>Contraseña de <b>${esc(localNom(k))}</b></p><div class="loc-dig">${d.map(c=>`<span class="${c!==' '?'f':''}">${c!==' '?'•':''}</span>`).join('')}</div>
     <div class="loc-pad">${[1,2,3,4,5,6,7,8,9,'⌫',0,'✓'].map(x=>`<button type="button" data-clave="${x}">${x}</button>`).join('')}</div></div>`;
 }
 document.addEventListener('click',async e=>{
@@ -295,7 +298,7 @@ function datosPuerta(){
     saludo:h<12?'Buenos días':h<18?'Buenas tardes':'Buenas noches',
     fecha:fd.charAt(0).toUpperCase()+fd.slice(1),hora:fh(new Date()),
     nubeOn:N.modo()==='nube',nube:N.modo()==='nube'?'En vivo':'En este equipo',
-    local:LOCAL?`${LOCAL==='moravia'?'🏠':'📍'} ${suc(LOCAL)?.zona||''}`:'📍 Local',
+    local:LOCAL?`${localIcon(LOCAL)} ${LOCAL==='todas'?'Moravia y Los Ángeles':suc(LOCAL)?.zona||''}`:'📍 Local',
     avisosTxt:N.avisos.soportado()&&N.avisos.permiso()!=='granted'?'🔔 Activar avisos':'',
     alarma:'', // en la portada, los pedidos nuevos se ven en la barra naranja del Mostrador
     ahora:ahoraMostrador(a),
@@ -304,7 +307,7 @@ function datosPuerta(){
     t:{activos:a.length,nuevos,txt:a.length?`🛎️ ${a.length} pedido${a.length>1?'s':''} en curso`:'Lista para recibir pedidos',
        chip:a.length?`${a.length} en curso · ${listos} listos`:'Lista para recibir pedidos',alerta:nuevos?`${nuevos} nuevo${nuevos>1?'s':''}`:'',
        mo:`📡 ${receptorNom()} · `+(a.length?`${nuevos} nuevo${nuevos===1?'':'s'} · ${alist} alistando · ${listos} por entregar`:'recibir, alistar, cobrar y entregar')},
-    p:{txt:'☁️ POS de '+sucNom(LOCAL||'moravia')+' en la nube',chip:'POS de '+sucNom(LOCAL||'moravia'),alerta:''},
+    p:{txt:'☁️ POS de '+localNom(LOCAL||'moravia')+' en la nube',chip:'POS de '+localNom(LOCAL||'moravia'),alerta:''},
     caja:{total:$c(total),n:cob.length},
     cadena:pasos.map((p,i)=>`${i?'<span class="pu-flecha">›</span>':''}<div class="pu-eslabon"><b>${p[0]}</b>${p[1]}<em>${esc(p[2])}</em></div>`).join(''),
     bit:bitacoraHoy(),
@@ -392,8 +395,9 @@ function abrirPuerta(){
 // En la compu se abre en otra pestaña (así el Mostrador sigue avisando); en el celular, aquí mismo.
 function esCompu(){return /Windows|Macintosh|Linux/i.test(navigator.userAgent)&&!/Mobi|Android|iPhone|iPad/i.test(navigator.userAgent);}
 function abrirPOS(){
-  const u='pos/index.html?suc='+encodeURIComponent(LOCAL||'moravia');
-  toast('🧾 Abriendo el POS de '+sucNom(LOCAL||'moravia')+'…');
+  if(LOCAL==='todas'){toast('🧾 Para abrir el POS elegí Moravia o LASR en el selector de local');return;}
+  const k=LOCAL||'moravia',u='pos/index.html?suc='+encodeURIComponent(k);
+  toast('🧾 Abriendo el POS de '+localNom(k)+'…');
   if(esCompu()){const w=window.open(u,'_blank');if(w)return;}
   location.href=u;
 }
@@ -851,7 +855,7 @@ function pintarVitrina(){
   $('moSheet').querySelectorAll('[data-mo-pr]').forEach(i=>i.addEventListener('change',()=>{
     const k=i.dataset.moPr,v=Math.max(0,Math.round(+i.value||0));
     const precios={...(T().precios||{})};if(v>0)precios[k]=v;else delete precios[k];
-    const t2=T(),kk=M.suc==='todas'?(LOCAL||'moravia'):M.suc,sucursales=(t2.sucursales||[]).map(s=>s.k===kk?{...s,precios:{...(s.precios||{}),...(v>0?{[k]:v}:{})}}:s);
+    const t2=T(),kk=M.suc==='todas'?localK():M.suc,sucursales=(t2.sucursales||[]).map(s=>s.k===kk?{...s,precios:{...(s.precios||{}),...(v>0?{[k]:v}:{})}}:s);
     N.guardarTienda({precios,sucursales});toast('🏷️ Precio guardado · ya se ve en el Taller');
   }));
 }
@@ -1000,7 +1004,7 @@ function pintarPrograma(){
 
 // ── Ajustes ──
 function pintarAjustes(){
-  const t=T(),k=LOCAL||'moravia',s=(t.sucursales||[]).find(x=>x.k===k)||{k},sp=N.sinpeDe(k);
+  const t=T(),k=localK(),s=(t.sucursales||[]).find(x=>x.k===k)||{k},sp=N.sinpeDe(k);
   abrirHoja(`<p class="mo-kick">Solo este local</p><div class="mo-h">💳 Pagos y horarios · ${esc(sucNom(k))}</div><div class="mo-s">Lo que ve el cliente de ${esc(sucNom(k))} al pagar y al elegir hora.</div>
     <div class="mo-blk"><h4>${k==='angeles'?'📍':'🏠'} ${esc(s.n||'')} · ${esc(s.zona||'')}</h4>
       <label class="mo-sw">Recibe pedidos<input type="checkbox" id="ajAct" ${s.activa!==false?'checked':''}></label>
@@ -1055,7 +1059,7 @@ async function pintarAnalitica(){
 function pintarAjustesApp(){
   const a=acceso(),perm=N.avisos.permiso();
   abrirHoja(`<p class="mo-kick">Pantalla principal · este equipo</p><div class="mo-h">⚙️ Ajustes</div>
-    <div class="mo-blk"><h4>🔒 Contraseña de ${esc(sucNom(LOCAL||'moravia'))}</h4>
+    <div class="mo-blk"><h4>🔒 Contraseña de ${esc(localNom(LOCAL||'moravia'))}</h4>
       <label class="mo-sw">Pedir contraseña al abrir la app<input type="checkbox" ${a.activo?'checked':''} data-mo="acceso-sw"></label>
       <div class="mo-s">${a.activo?'Está activa: al abrir la app se pide la contraseña del local.':'Apagada por ahora: se entra directo. La contraseña de fábrica es 12345.'}</div>
       <label class="mo-field" style="margin-top:8px">Contraseña actual<input id="acActual" type="password" inputmode="numeric" autocomplete="off" placeholder="12345"></label>
@@ -1065,7 +1069,7 @@ function pintarAjustesApp(){
       <div class="mo-row"><span style="flex:1"><small style="color:var(--m)">${!N.avisos.soportado()?'Este navegador no permite notificaciones; queda el sonido y WhatsApp.':perm==='granted'?'Activados ✓ · te llegan estés en Surtido, Taller o el POS.':perm==='denied'?'Bloqueados: permitilos en la configuración del sitio.':'Activalos para que te avise en cualquier pantalla.'}</small></span>${perm==='granted'?'<button type="button" class="mo-btn" data-mo="probar-aviso">Probar</button>':'<button type="button" class="mo-btn p" data-mo="avisos-on">Activar</button>'}</div>
       <label class="mo-sw">🔊 Sonido que se repite hasta abrir el pedido<input type="checkbox" id="rSon" ${R.sonido?'checked':''}></label>
       <label class="mo-sw">💡 Mantener la pantalla encendida<input type="checkbox" id="rPan" ${R.pantalla?'checked':''}></label></div>
-    <div class="mo-btns"><button type="button" class="mo-btn" data-mo="ajustes">💳 Pagos y horarios de ${esc(sucNom(LOCAL||'moravia'))}</button></div>`);
+    <div class="mo-btns"><button type="button" class="mo-btn" data-mo="ajustes">💳 Pagos y horarios de ${esc(localNom(LOCAL||'moravia'))}</button></div>`);
   $('rSon').addEventListener('change',e=>{R.sonido=e.target.checked;guardarR();});
   $('rPan').addEventListener('change',e=>{R.pantalla=e.target.checked;guardarR();pantallaEncendida();});
 }
@@ -1134,18 +1138,18 @@ const ACT={
   'acceso-sw'(){
     const a=acceso();
     if(a.activo){
-      const c=prompt('Para apagar la contraseña, escribí la de '+sucNom(LOCAL||'moravia'));if(c===null)return;
-      claveOk(LOCAL||'moravia',c).then(ok=>{if(!ok){toast('Esa contraseña no es');repintar(pintarAjustesApp);return;}N.guardarTienda({acceso:{...a,activo:false}});toast('🔓 Entrada directa, sin contraseña');repintar(pintarAjustesApp);});
+      const c=prompt('Para apagar la contraseña, escribí la de '+localNom(localK()));if(c===null)return;
+      claveOk(localK(),c).then(ok=>{if(!ok){toast('Esa contraseña no es');repintar(pintarAjustesApp);return;}N.guardarTienda({acceso:{...a,activo:false}});toast('🔓 Entrada directa, sin contraseña');repintar(pintarAjustesApp);});
     }else{N.guardarTienda({acceso:{...a,activo:true}});toast('🔒 Cada local pide su contraseña al abrir');repintar(pintarAjustesApp);}
   },
   'clave-ok'(){
-    const k=LOCAL||'moravia',act=$('acActual').value,n1=$('acNueva').value,n2=$('acRepite').value;
+    const k=localK(),act=$('acActual').value,n1=$('acNueva').value,n2=$('acRepite').value;
     if(!/^\d{4,8}$/.test(n1)){toast('La nueva contraseña: de 4 a 8 números');return;}
     if(n1!==n2){toast('Las contraseñas nuevas no coinciden');return;}
     claveOk(k,act).then(async ok=>{
       if(!ok){toast('La contraseña actual no es');return;}
       const a=acceso();N.guardarTienda({acceso:{...a,claves:{...(a.claves||{}),[k]:await huella(n1)}}});
-      toast('🔒 Contraseña de '+sucNom(k)+' cambiada');repintar(pintarAjustesApp);
+      toast('🔒 Contraseña de '+localNom(k)+' cambiada');repintar(pintarAjustesApp);
     });
   },
   pesar(){M.vista='pesar';M.pk=pkInicial(N.get(M.abierto));pintarEncargo();},
@@ -1241,7 +1245,8 @@ const ACT={
   'pos-pedido'(){
     const o=N.get(M.abierto);if(!o)return;
     LS.set('aramo_pos_encargo',{id:o.id,ref:o.ref,sucursal:o.sucursal,cliente:o.cliente,retiro:o.retiro,pago:o.pago,items:o.items,total:N.totalDe(o),at:new Date().toISOString()});
-    const u='pos/index.html?suc='+encodeURIComponent(LOCAL||o.sucursal||'moravia')+'&encargo='+encodeURIComponent(o.id);
+    const k=LOCAL&&LOCAL!=='todas'?LOCAL:(o.sucursal||'moravia');
+    const u='pos/index.html?suc='+encodeURIComponent(k)+'&encargo='+encodeURIComponent(o.id);
     toast('🧾 Abriendo POS con '+o.ref+'…');abrir(u);
   },
   'aplicar-pos'(){
@@ -1338,7 +1343,7 @@ const ACT={
   },
   'quitar-premio'(){const o=N.get(M.abierto);if(!o?.premio)return;if(!confirm(`¿Quitar el premio de ${$c(o.premio.valor)} del pedido ${o.ref}?`))return;N.cambiar(o.id,x=>{delete x.premio;},'tienda','Premio quitado: no le alcanzaban las hojas').then(()=>{repintar(pintarEncargo);pintarMostrador();toast('Premio quitado');});},
   'aj-ok'(){
-    const t=T(),v=id=>$(id)?.value.trim()||'',k=LOCAL||'moravia';
+    const t=T(),v=id=>$(id)?.value.trim()||'',k=localK();
     const sucs=(t.sucursales||[]).map(s=>s.k!==k?s:{...s,activa:!!$('ajAct')?.checked,whatsapp:telDig(v('ajWaSuc')),abre:v('ajAbre')||s.abre,cierra:v('ajCierra')||s.cierra,sinpe:{numero:telDig(v('ajSinpe')),nombre:v('ajSinpeN')}});
     const faq=v('ajFaq').split(/\n+/).map(x=>x.split('|')).filter(x=>x[0]?.trim()).map(x=>({q:x[0].trim(),a:(x.slice(1).join('|')||'').trim()}));
     const horarios={};v('ajEspecial').split(/\n+/).forEach(line=>{const [f,raw]=line.split('|').map(x=>x.trim());if(!/^\d{4}-\d{2}-\d{2}$/.test(f)||!raw)return;if(raw.toLowerCase()==='cerrado')horarios[f]={cerrada:true};else{const [abre,cierra]=raw.split('-').map(x=>x.trim());if(abre&&cierra)horarios[f]={abre,cierra};}});
