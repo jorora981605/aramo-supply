@@ -160,7 +160,12 @@ html[data-theme="dark"] .xs-actions .primary{color:#0c100e}
 .pd-prov header div{flex:1;min-width:0}.pd-prov header strong{display:block;font-size:16px;font-weight:950}
 .pd-prov header small{display:block;font-size:11.5px;color:var(--m);font-weight:700}
 .pd-prov header b{font-family:var(--mo);font-size:15px;color:var(--g)}
+.pd-branches{border-top:1px solid var(--b)}
+.pd-branch+.pd-branch{border-top:1px solid var(--b)}
+.pd-branch-head{display:flex;align-items:center;justify-content:space-between;gap:8px;padding:7px 12px;background:var(--s);color:var(--t);font-size:11px;font-weight:950;text-transform:uppercase;letter-spacing:.25px}
+.pd-branch-head b{font-family:var(--mo);font-size:12px;color:var(--m);white-space:nowrap}
 .pd-lines{border-top:1px solid var(--b)}
+.pd-branch .pd-lines{border-top:0}
 .pd-line{display:flex;align-items:center;gap:8px;width:100%;min-height:44px;padding:7px 12px;border:0;border-bottom:1px solid var(--b);background:none;color:var(--t);text-align:left;font-size:14px}
 .pd-line:last-child{border-bottom:0}
 .pd-line .e{font-size:19px;width:24px;text-align:center}

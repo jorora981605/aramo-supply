@@ -659,6 +659,25 @@ function xpSugClick(e){
 // ══════════════════════════════════════════
 // 🧺 PEDIDO — revisar, enviar uno por uno, reiniciar e historial
 // ══════════════════════════════════════════
+function xpPedidoBranchMarkup(prov,sides){
+  const {lines,extras}=xpProvLines(prov);
+  return `<div class="pd-branches">${sides.map(side=>{
+    const branchLines=lines.filter(l=>l.q[side]>0),branchExtras=extras.filter(x=>x.side===side);
+    if(!branchLines.length&&!branchExtras.length)return '';
+    return `<section class="pd-branch"><div class="pd-branch-head"><span>${SIDE_ICO[side]} ${SIDE_NAME[side]}</span><b>₡${fmt(calcSide(side,prov))}</b></div><div class="pd-lines">
+      ${branchLines.map(l=>`<button type="button" class="pd-line" data-pd="line" data-prov="${esc(prov)}" data-pid="${esc(l.prod.id)}"><span class="e">${smartEmoji(l.prod)}</span><span class="n">${esc(niceName(l.prod.name))}</span><span class="q"><b class="${side}">${fmtQ(l.q[side])}</b> <small>${esc(l.unit)}</small></span></button>`).join('')}
+      ${branchExtras.map(x=>`<div class="pd-line"><span class="e">➕</span><span class="n">${esc(x.name||'Extra')}</span><span class="q"><b class="${side}">${fmtQ(+x.qty)}</b> <small>${esc(x.unit||'kg')}</small></span></div>`).join('')}
+    </div></section>`;
+  }).join('')}</div>`;
+}
+function xpReclassifyPedido(body,sides){
+  body.querySelectorAll('.pd-prov').forEach(card=>{
+    const prov=card.querySelector('header')?.dataset.prov,list=card.querySelector('.pd-lines');
+    if(!prov||!list)return;
+    const holder=document.createElement('div');holder.innerHTML=xpPedidoBranchMarkup(prov,sides);
+    if(holder.firstElementChild)list.replaceWith(holder.firstElementChild);
+  });
+}
 function xpRenderPedido(){
   const body=$('pedidoBody');if(!body)return;
   const sides=activeOrderSides();
@@ -697,6 +716,7 @@ function xpRenderPedido(){
   if(t.items)html+=`<button type="button" class="pd-reset" data-pd="reset">🗑️ Reiniciar pedido${sides.length===1?' de '+SIDE_NAME[sides[0]]:''}</button>`;
   html+=xpHistoryHtml();
   body.innerHTML=html;
+  if(t.items)xpReclassifyPedido(body,sides);
 }
 function xpHistoryHtml(){
   const today=new Date().toISOString().slice(0,10);
