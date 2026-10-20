@@ -380,6 +380,7 @@ async function abrir(r,local){
   await guardarLocal();
   pintarCapa(null);
   listoRes();
+  montarPedidoWeb();
   pintarEstado();
   if(sucio&&dueno)programarSubida();
   if(!dueno&&info?.dueno)aviso('👀 La caja de '+zona(SUC)+' está abierta en '+(info.dueno_nombre||'otro dispositivo')+'. Aquí podés mirar; para cobrar, tocá el estado y «Usar la caja aquí».');
@@ -540,6 +541,24 @@ function pintarMenu(){
     <button type="button" data-pw="nombre">✏️ Nombre de este dispositivo</button>
     <button type="button" data-pw="olvidar">🔒 Cerrar sesión del local</button>
     <button type="button" data-pw="salir" class="pw-m-salir">⌂ Volver al menú de ARAMO</button>`;
+}
+// Puente móvil para un pedido que viene del Mostrador. El POS conserva aquí
+// las cantidades/precios revisados y devuelve la cotización al mismo pedido;
+// no crea una venta hasta que el cliente la confirme en el Mostrador.
+function montarPedidoWeb(){
+  const id=new URLSearchParams(location.search).get('encargo'),d=LS.get('aramo_pos_encargo',null);
+  if(!id||!d||d.id!==id||document.getElementById('pwPedidoWeb'))return;
+  const box=document.createElement('aside');box.id='pwPedidoWeb';
+  Object.assign(box.style,{position:'fixed',right:'12px',top:'12px',zIndex:1200,width:'min(380px,calc(100vw - 24px))',maxHeight:'62vh',overflow:'auto',padding:'14px',borderRadius:'16px',background:'#fff',color:'#18351f',boxShadow:'0 18px 50px rgba(0,0,0,.25)',fontFamily:'system-ui,sans-serif'});
+  const filas=(d.items||[]).map((it,i)=>`<div style="display:grid;grid-template-columns:1fr 74px 88px;gap:6px;align-items:center;padding:8px 0;border-top:1px solid #dbe7dd"><span><b>${esc(it.n)}</b><small style="display:block;color:#607565">${esc(it.u||'unidad')}</small></span><input type="number" step="0.001" min="0" value="${+it.q||0}" data-pw-q="${i}" aria-label="Cantidad de ${esc(it.n)}" style="width:100%;padding:8px;border:1px solid #b8cbbd;border-radius:8px"><input type="number" step="1" min="0" value="${+it.p||0}" data-pw-p="${i}" aria-label="Precio de ${esc(it.n)}" style="width:100%;padding:8px;border:1px solid #b8cbbd;border-radius:8px"></div>`).join('');
+  box.innerHTML=`<button type="button" data-pw-close style="float:right;border:0;background:transparent;font-size:20px">×</button><div style="font-size:11px;text-transform:uppercase;letter-spacing:.08em;color:#55765e">Pedido web · ${esc(d.sucursal||'')}</div><h3 style="margin:3px 0 5px">${esc(d.ref||id)}</h3><p style="margin:0 0 10px;font-size:13px">${esc(d.cliente?.nombre||'Cliente')} · revisá cantidades y precios antes de cotizar.</p><div style="display:grid;grid-template-columns:1fr 74px 88px;gap:6px;font-size:11px;color:#607565"><span>Producto</span><span>Cantidad</span><span>Precio</span></div>${filas}<div style="display:flex;gap:8px;margin-top:12px"><button type="button" data-pw-save style="flex:1;border:0;border-radius:10px;padding:10px;background:#1b7f42;color:#fff;font-weight:800">Guardar cotización</button><a href="../APP.html#ver=${encodeURIComponent(id)}" style="display:grid;place-items:center;padding:0 10px;border-radius:10px;background:#eef6ef;color:#1b7f42;font-weight:800;text-decoration:none">Mostrador</a></div><small data-pw-msg style="display:block;margin-top:8px;color:#607565">La venta se registra en POS solo después de la confirmación del cliente.</small>`;
+  box.querySelector('[data-pw-close]').onclick=()=>box.remove();
+  box.querySelector('[data-pw-save]').onclick=()=>{
+    const items=(d.items||[]).map((it,i)=>({...it,q:Math.max(0,+box.querySelector(`[data-pw-q="${i}"]`)?.value||0),p:Math.max(0,+box.querySelector(`[data-pw-p="${i}"]`)?.value||0)}));
+    LS.set('aramo_pos_cotizacion_'+id,{id,items,total:items.reduce((s,it)=>s+(+it.q||0)*(+it.p||0),0),at:new Date().toISOString()});
+    const m=box.querySelector('[data-pw-msg]');if(m)m.textContent='✅ Cotización guardada. Volvé al Mostrador para aplicarla y enviarla al cliente.';
+  };
+  document.body.appendChild(box);
 }
 let _tt=0;
 function aviso(m){const t=document.getElementById('pwToast');if(!t)return;t.textContent=m;t.classList.add('show');clearTimeout(_tt);_tt=setTimeout(()=>t.classList.remove('show'),5200);}

@@ -10,7 +10,7 @@
 <meta name="theme-color" content="#f4f7f5">
 <meta name="description" content="Sistema de pedidos ARAMO Supply">
 <link rel="manifest" href="./manifest.json">
-<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.117.0"></script>
 <script src="catalogo-productos.js"></script>
 <script src="supplier-base.js"></script>
 <link rel="apple-touch-icon" href="./icon.png">
@@ -3635,11 +3635,15 @@ document.getElementById('saveNewCatalogProduct').addEventListener('click',saveNe
 document.getElementById('modalNewCatalogProduct').addEventListener('click',e=>{if(e.target.id==='modalNewCatalogProduct')closeNewCatalogProductModal();});
 document.getElementById('modalPriceCompare').addEventListener('click',e=>{if(e.target.id==='modalPriceCompare')closePriceModal();});
 
-function resetAll(){
-  if(!confirm('¿Reiniciar TODO? Esto borra los pedidos y la configuración para TODOS los dispositivos conectados, no solo este.'))return;
-  ['aramo4','aramo_hist','aramo_prices','aramo_lp','aramo_syncbase'].forEach(k=>localStorage.removeItem(k));
-  supa.from('pedidos').delete().neq('proveedor','').then(()=>{});
-  supa.from('app_config').delete().eq('id','main').then(()=>{});
+async function resetAll(){
+  if(!confirm('¿Reiniciar TODO? Se borrarán los pedidos del Mostrador, el Surtido, las canastas locales y los datos locales del POS. Se conservarán el catálogo, las sucursales y la cuenta de personal.'))return;
+  try{await window.AramoNube?.borrarTodo?.();}catch(e){console.warn('No se pudo reiniciar la nube de encargos',e);}
+  ['aramo4','aramo_hist','aramo_prices','aramo_lp','aramo_syncbase','aramo_order_scope','aramo_encargos_v1','aramo_encargos_pend','aramo_encargos_changes','aramo_reinicio_respaldo','aramo_borradores'].forEach(k=>localStorage.removeItem(k));
+  try{sessionStorage.removeItem('pos_suc');}catch{}
+  try{indexedDB.deleteDatabase('aramo-pos');}catch{}
+  try{await supa.from('pedidos').delete().neq('proveedor','');}catch(e){console.warn('No se pudo limpiar pedidos antiguos',e);}
+  try{await supa.from('app_config').delete().eq('id','main');}catch(e){console.warn('No se pudo limpiar configuración antigua',e);}
+  if(window.caches){try{for(const k of await caches.keys())if(k.startsWith('aramo-'))await caches.delete(k);}catch{}}
   location.reload();
 }
 
@@ -3827,13 +3831,10 @@ document.querySelectorAll('.overlay').forEach(el=>modalScrollObserver.observe(el
 // por su cuenta).
 if('serviceWorker' in navigator){
   const hadController=!!navigator.serviceWorker.controller;
-  let reloading=false;
   navigator.serviceWorker.addEventListener('controllerchange',()=>{
-    if(!hadController||reloading)return;
-    reloading=true;
+    if(!hadController)return;
     try{flushPersist();}catch{}
-    toast('⬆️ Nueva versión — actualizando…','ok');
-    setTimeout(()=>location.reload(),900);
+    toast('⬆️ Nueva versión lista. Se usará al abrir de nuevo.','ok');
   });
   window.addEventListener('load',()=>navigator.serviceWorker.register('./service-worker.js',{updateViaCache:'none'}).then(reg=>{
     const check=()=>{try{reg?.update?.()?.catch?.(()=>{});}catch{}};
@@ -3856,9 +3857,17 @@ if(isIOS && !isInStandalone && !dismissed){
 </script>
 <script src="express.js?v=20261007-productos-1"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcode-generator/1.4.4/qrcode.min.js"></script>
-<script src="canasta-config.js?v=20261013-unidades-1"></script>
-<script src="aramo-nube.js?v=20261013-perfil-1"></script>
+<script src="canasta-config.js?v=20261018-seguridad-1"></script>
+<script src="aramo-nube.js?v=20261020-circuito-6"></script>
 <script src="portadas.js?v=20261016-colores-1"></script>
-<script src="puerta.js?v=20261016-colores-1"></script>
+<script src="puerta.js?v=20261020-circuito-7"></script>
+<script>
+  // El menú, Mostrador y Surtido se desplazan verticalmente; no usar gestos
+  // horizontales como Atrás/Adelante del navegador en el teléfono.
+  document.documentElement.style.overscrollBehaviorX='none';
+  let _appTouchX=0,_appTouchY=0;
+  document.addEventListener('touchstart',e=>{const t=e.touches?.[0];if(t){_appTouchX=t.clientX;_appTouchY=t.clientY;}},{passive:true});
+  document.addEventListener('touchmove',e=>{const t=e.touches?.[0];if(!t)return;const dx=t.clientX-_appTouchX,dy=t.clientY-_appTouchY;if(Math.abs(dx)>18&&Math.abs(dx)>Math.abs(dy)*1.15)e.preventDefault();},{passive:false});
+</script>
 </body>
 </html>

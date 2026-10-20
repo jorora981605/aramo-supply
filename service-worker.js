@@ -1,9 +1,9 @@
-const CACHE_NAME = 'aramo-shell-v37';
+const CACHE_NAME = 'aramo-shell-v46-network-first-pages';
 const CDN_CACHE = 'aramo-cdn-v1';
 // Las páginas: al instalar se guardan junto con TODOS los archivos que cargan,
 // tal cual los piden (con su ?v=…). Así cada pantalla abre sin esperar a internet.
 const PAGINAS = ['./APP.html', './canasta.html', './pos/index.html', './index.html'];
-const EXTRAS = ['./manifest.json', './canasta.webmanifest', './icon.png', './pos-vista.jpg', './canasta-fotos.js', './catalogo-productos.js', './supplier-base.js'];
+const EXTRAS = ['./manifest.json', './canasta.webmanifest', './icon.png', './pos-vista.jpg', './canasta-fotos.js', './catalogo-productos.js', './supplier-base.js', './privacidad.html', './condiciones.html'];
 // Librerías de afuera (nube, QR, letras): se guardan y se renuevan por detrás.
 const CDN = /^https:\/\/(cdn\.jsdelivr\.net|cdnjs\.cloudflare\.com|cdn\.sheetjs\.com|fonts\.googleapis\.com|fonts\.gstatic\.com)\//;
 
@@ -75,6 +75,15 @@ self.addEventListener('message', event => {
   if (event.data && event.data.tipo === 'calentar') event.waitUntil(calentar());
 });
 
+// Avisos cuando el Taller está cerrado. El servidor de notificaciones puede
+// mandar {title, body, url, tag}; si todavía no hay push configurado, la app
+// sigue usando las notificaciones locales de aramo-nube.js.
+self.addEventListener('push', event => {
+  let d={};try{d=event.data?.json()||{};}catch{try{d={body:event.data?.text()||''};}catch{}}
+  event.waitUntil(self.registration.showNotification(d.title||'ARAMO',{
+    body:d.body||'Hay una actualización en tu pedido.',tag:d.tag||'aramo-pedido',renotify:true,icon:'./icon.png',badge:'./icon.png',data:{url:d.url||'./canasta.html'}
+  }));
+});
 // Primero lo guardado (abre al instante); si falta, internet y se guarda.
 // Lo nuevo llega con cada versión de este archivo: se instala por detrás y APP.html
 // se recarga sola. "↻ Reiniciar" en la portada borra todo lo guardado y baja todo de nuevo.
@@ -90,7 +99,24 @@ self.addEventListener('fetch', event => {
 
   event.respondWith((async () => {
     const pagina = request.mode === 'navigate';
-    const guardado = await caches.match(request, { ignoreSearch: pagina });
+
+    // Las páginas principales deben buscar primero la versión publicada. Así
+    // una versión antigua del caché no puede ocultar una actualización del sitio.
+    if (pagina) {
+      try {
+        const response = await fetch(new Request(request, { cache: 'no-store' }));
+        if (response.ok) {
+          const copy = response.clone();
+          event.waitUntil(caches.open(CACHE_NAME).then(cache => cache.put(request, copy)));
+          return response;
+        }
+      } catch {}
+      const guardado = await caches.match(request, { ignoreSearch: true });
+      if (guardado) return guardado;
+      return (await caches.match('./APP.html')) || Response.error();
+    }
+
+    const guardado = await caches.match(request);
     if (guardado) return guardado;
     try {
       const response = await fetch(request);
@@ -102,7 +128,6 @@ self.addEventListener('fetch', event => {
     } catch {
       const parecido = await caches.match(request, { ignoreSearch: true });
       if (parecido) return parecido;
-      if (pagina) return (await caches.match('./APP.html')) || Response.error();
       return Response.error();
     }
   })());

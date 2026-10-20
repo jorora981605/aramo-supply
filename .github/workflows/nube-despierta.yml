@@ -1,0 +1,24 @@
+# Supabase pausa los proyectos gratis que pasan ~7 días sin uso.
+# Cada 2 días hace una lectura pequeña para que la nube de ARAMO no se duerma.
+# La llave es la pública (anon) que ya va dentro de la app publicada.
+name: Mantener despierta la nube de ARAMO
+on:
+  schedule:
+    - cron: '17 14 */2 * *'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  tocar-nube:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Leer la nube
+        run: |
+          JS=$(curl -fsS "https://jorora981605.github.io/aramo-supply/aramo-nube.js")
+          URL=$(printf '%s' "$JS" | grep -o "SUPA_URL='[^']*'" | cut -d"'" -f2)
+          KEY=$(printf '%s' "$JS" | grep -o "SUPA_KEY='[^']*'" | cut -d"'" -f2)
+          for t in encargos app_config; do
+            code=$(curl -sS -o /dev/null -w '%{http_code}' "$URL/rest/v1/$t?select=id&limit=1" -H "apikey: $KEY" -H "Authorization: Bearer $KEY")
+            echo "$t → HTTP $code"
+            if [ "$code" != "200" ]; then echo "::error::La nube de ARAMO no respondió ($t → $code). Revisá supabase.com: puede estar en pausa."; exit 1; fi
+          done

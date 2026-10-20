@@ -141,6 +141,23 @@ window.ARAMO_CANASTA={
     whatsapp:'',            // WhatsApp general (si una tienda no tiene el suyo)
     sinpe:{numero:'',nombre:''},
     linkTarjeta:'',         // opcional: link de pago con tarjeta (Tilopay, ONVO, etc.)
+    // Operación y comunicación pública. Se pueden ajustar desde Mostrador.
+    envioConfig:{activa:true,zona:'Moravia y alrededores',radioKm:8,tarifaBase:1500,tarifaKm:250,minimo:0},
+    feriados:[],            // fechas YYYY-MM-DD sin servicio
+    horariosEspeciales:{},  // fecha -> {cerrada,abre,cierra}
+    capacidadPorHora:20,
+    privacidad:'Usamos tus datos para preparar, cobrar y entregar tu pedido, avisarte de su estado y atender consultas. No los vendemos.',
+    condiciones:'Los precios son aproximados hasta pesar la canasta. Si algo falta, aplicamos la opción que elegiste. Podés cancelar antes de que empiece el alistado.',
+    faq:[
+      {q:'¿Cuánto tarda?',a:'La hora disponible aparece al elegir tienda. También podés programar el retiro.'},
+      {q:'¿Cómo pago?',a:'SINPE, efectivo, tarjeta o link de pago cuando la tienda lo tenga habilitado.'},
+      {q:'¿Dónde entregan?',a:'La app valida la zona y muestra la tarifa estimada antes de confirmar.'}
+    ],
+    promos:[],
+    shareTitle:'Pedí frutas y verduras en ARAMO',
+    shareDescription:'Armá tu canasta, elegí tienda y recibila lista.',
+    shareImage:'',
+    pushPublicKey:'',       // clave pública VAPID; el backend envía las notificaciones push
     alistadoMin:40,         // minutos que tarda en estar lista
     alCarro:true,           // ofrecer "me lo llevan al carro"
     envio:true,             // ofrecer envío a domicilio con Uber
