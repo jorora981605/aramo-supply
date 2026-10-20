@@ -315,6 +315,12 @@ function datosPuerta(){
 }
 let _portadaMontada=0,_fotoT=0;
 function pintarPuerta(){
+  if(LOCAL==='todas'){
+    $('puerta')?.classList.remove('open','zoom');
+    $('puIn')?.replaceChildren();
+    document.body.classList.remove('pu-lock');
+    return;
+  }
   const raiz=$('puIn');if(!raiz||!window.AramoPortadas)return;
   const v=window.AramoPortadas.pintar(raiz,datosPuerta());
   if(v!==_portadaMontada){
@@ -397,6 +403,8 @@ function abrirSurtidoAmbos(){
   cerrarHoja();
   $('mostrador')?.classList.remove('open');
   $('puerta')?.classList.remove('open','zoom');
+  $('puIn')?.replaceChildren();
+  _portadaMontada=0;
   document.body.classList.remove('pu-lock');
   try{switchView('proveedores');}catch(e){console.warn('No se pudo abrir Surtido combinado',e);}
   toast('🧺 Surtido combinado · Moravia + Los Ángeles');
