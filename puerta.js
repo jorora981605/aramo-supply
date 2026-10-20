@@ -255,6 +255,7 @@ function montar(){
   const top=document.querySelector('.topbar');
   if(top&&!$('puHome')){const b=document.createElement('button');b.type='button';b.className='pu-home';b.id='puHome';b.setAttribute('aria-label','Volver al menú principal');b.title='Volver al menú principal';b.innerHTML='<span aria-hidden="true">⌂</span><span class="pu-home-label">Menú</span>';b.addEventListener('click',()=>abrirPuerta());top.insertBefore(b,top.firstChild);}
   window.addEventListener('resize',escalarMinis);
+  const home=$('puHome');if(home){const replacement=home.cloneNode(true);home.replaceWith(replacement);replacement.addEventListener('click',volverAlMenu);}
 
   // Arrastrar un pedido a la Caja
   document.addEventListener('dragstart',e=>{const c=e.target.closest?.('.mo-card[data-id]');if(!c)return;e.dataTransfer.setData('text/aramo-encargo',c.dataset.id);e.dataTransfer.effectAllowed='move';document.body.classList.add('mo-arrastrando');});
@@ -420,6 +421,16 @@ function abrirPOS(){
   location.href=u;
 }
 function cerrarPuerta(){$('puerta').classList.remove('open','zoom');document.body.classList.remove('pu-lock');}
+function volverAlMenu(){
+  if(LOCAL==='todas'){
+    cerrarHoja();
+    $('mostrador')?.classList.remove('open');
+    cerrarPuerta();
+    pedirLocal();
+    return;
+  }
+  abrirPuerta();
+}
 // Entrar es inmediato: sin animación de espera. Taller y POS ya están guardados en el
 // teléfono (service-worker.js), así que abren al instante.
 function entrar(cara){
@@ -1145,7 +1156,7 @@ function pedidoPrueba(){
 // ══════════════ Acciones ══════════════
 const ACT={
   surtido(el){entrar('surtido',el);},canasta(el){entrar('canasta',el);},mostrador(el){entrar('mostrador',el);},pos(el){entrar('pos',el);},
-  puerta(){abrirPuerta();},
+  puerta(){volverAlMenu();},
   portada(){M.vista='portada';abrirHoja(window.AramoPortadas.selectorHtml());},
   'portada-usar'(el){window.AramoPortadas.elegir(+el.dataset.v);cerrarHoja();_portadaMontada=0;const r=$('puIn');if(r)r.dataset.v='';pintarPuerta();$('puerta').scrollTop=0;toast('🎨 Portada '+el.dataset.v+' · '+(window.AramoPortadas.LISTA.find(x=>x.n===+el.dataset.v)?.t||''));},
   compartir(){M.vista='compartir';pintarCompartir();},
