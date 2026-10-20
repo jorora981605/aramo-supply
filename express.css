@@ -164,6 +164,8 @@ html[data-theme="dark"] .xs-actions .primary{color:#0c100e}
 .pd-branch+.pd-branch{border-top:1px solid var(--b)}
 .pd-branch-head{display:flex;align-items:center;justify-content:space-between;gap:8px;padding:7px 12px;background:var(--s);color:var(--t);font-size:11px;font-weight:950;text-transform:uppercase;letter-spacing:.25px}
 .pd-branch-head b{font-family:var(--mo);font-size:12px;color:var(--m);white-space:nowrap}
+.pd-branch:first-child .pd-branch-head{border-left:4px solid var(--g)}
+.pd-branch:nth-child(2) .pd-branch-head{border-left:4px solid var(--o)}
 .pd-lines{border-top:1px solid var(--b)}
 .pd-branch .pd-lines{border-top:0}
 .pd-line{display:flex;align-items:center;gap:8px;width:100%;min-height:44px;padding:7px 12px;border:0;border-bottom:1px solid var(--b);background:none;color:var(--t);text-align:left;font-size:14px}
@@ -176,6 +178,20 @@ html[data-theme="dark"] .xs-actions .primary{color:#0c100e}
 .pd-prov footer{display:grid;grid-template-columns:1.5fr 1fr;gap:7px;padding:9px 10px;background:var(--s)}
 .pd-prov footer button{min-height:44px;border:1px solid var(--b2);border-radius:12px;background:var(--card);color:var(--t);font-size:13.5px;font-weight:900}
 .pd-prov footer .wa{border:0;background:#25d366;color:#062b12}
+@media(max-width:700px){
+  .pd-wrap{padding-left:8px;padding-right:8px}
+  .pd-prov{border-width:1px;border-radius:14px;margin-bottom:8px}
+  .pd-prov header{gap:7px;padding:9px 9px}
+  .pd-prov header strong{font-size:15px}
+  .pd-prov header small{font-size:10.5px}
+  .pd-prov header b{font-size:13px}
+  .pd-branch-head{padding:7px 9px;font-size:10.5px}
+  .pd-line{min-height:38px;gap:6px;padding:5px 8px;font-size:13px}
+  .pd-line .e{font-size:17px;width:21px}
+  .pd-line .n{white-space:normal;line-height:1.15;overflow-wrap:anywhere}
+  .pd-line .q{font-size:12px}
+  .pd-line .q small{font-size:9px}
+}
 .pd-reset{display:block;width:100%;min-height:52px;margin:18px 0 6px;border:2px solid #db4b35;border-radius:16px;background:#fff0ed;color:#a92919;font-size:15px;font-weight:900}
 html[data-theme="dark"] .pd-reset{background:#3b1d19;color:#ff9b8d}
 .pd-undo{display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:12px;padding:11px 13px;border-radius:15px;background:var(--od);color:var(--o);font-weight:850}
