@@ -700,7 +700,7 @@ html[data-theme="dark"] .today-money-card{background:linear-gradient(145deg,#125
   .nav-bottom{left:50%;right:auto;transform:translateX(-50%)!important;width:min(720px,100%);border-radius:22px 22px 0 0}
 }
 </style>
-<link rel="stylesheet" href="express.css?v=20261020-premium-1">
+<link rel="stylesheet" href="express.css?v=20261020-premium-2">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Caveat:wght@600;700&family=Chakra+Petch:wght@500;600;700&family=JetBrains+Mono:wght@500;600&display=swap" media="print" onload="this.media='all'">
@@ -802,16 +802,6 @@ html[data-theme="dark"] .today-money-card{background:linear-gradient(145deg,#125
 <div class="view" id="view-proveedores">
   <div class="scroll">
     <div class="pv-wrap">
-      <section class="pv-hero" aria-label="Panel de surtido">
-        <div class="pv-hero-mark" aria-hidden="true"><span>✦</span></div>
-        <div class="pv-hero-copy">
-          <div class="pv-hero-kicker">ARAMO · CONTROL DE SURTIDO</div>
-          <h1>Todo fresco. Todo claro.</h1>
-          <p>Organizá los pedidos por proveedor y sucursal desde una sola vista.</p>
-          <div class="pv-hero-chips"><span>● En vivo</span><span>2 tiendas</span><span>1 flujo</span></div>
-        </div>
-        <div class="pv-hero-orbit" aria-hidden="true"><i>🥑</i><i>🍅</i><i>🌿</i></div>
-      </section>
       <div id="pvTop"></div>
       <button type="button" class="pv-sum" id="pvSum"></button>
       <div class="pv-search">
@@ -2224,7 +2214,8 @@ function renderCombinedSurtidoSummary(){
     <div class="both-summary-help"><b>${data.rows?data.rows+' líneas':'Sin productos todavía'}</b> · En cada proveedor, <b>📤 Enviar</b> manda las dos sucursales juntas. Usá <b>✏️ Editar</b> para agregar o corregir.</div>
     ${data.groups.length?data.groups.map(group=>{
       const flags=sentFlags(group.p);
-      return `<section class="both-summary-provider"><div class="both-summary-provider-head"><div class="both-summary-provider-name">🏪 ${summaryEsc(group.prov)}</div><div class="both-summary-provider-state"><span class="both-summary-state ${flags.moravia?'sent':''}">Moravia · ${flags.moravia?'Enviado':'Pendiente'}</span><span class="both-summary-state ${flags.angeles?'sent':''}">Los Ángeles · ${flags.angeles?'Enviado':'Pendiente'}</span></div><div class="both-summary-provider-actions"><button type="button" class="both-summary-send" data-summary-send="${summaryEsc(encodeURIComponent(group.prov))}">📤 Enviar</button><button type="button" class="both-summary-edit" data-summary-open="${summaryEsc(encodeURIComponent(group.prov))}">✏️ Editar</button></div></div>
+      const groupTotal=calcSide('moravia',group.prov)+calcSide('angeles',group.prov);
+      return `<section class="both-summary-provider"><div class="both-summary-provider-head"><div class="both-summary-provider-id"><div class="both-summary-provider-name">🏪 ${summaryEsc(group.prov)}</div><div class="both-summary-provider-total">₡${fmt(groupTotal)} <span>estimado</span></div></div><div class="both-summary-provider-state"><span class="both-summary-state ${flags.moravia?'sent':''}">Moravia · ${flags.moravia?'Enviado':'Pendiente'}</span><span class="both-summary-state ${flags.angeles?'sent':''}">Los Ángeles · ${flags.angeles?'Enviado':'Pendiente'}</span></div><div class="both-summary-provider-actions"><button type="button" class="both-summary-send" data-summary-send="${summaryEsc(encodeURIComponent(group.prov))}">📤 Enviar</button><button type="button" class="both-summary-edit" data-summary-open="${summaryEsc(encodeURIComponent(group.prov))}">✏️ Editar</button></div></div>
         <div class="both-summary-table-wrap"><table class="both-summary-table"><thead><tr><th>Producto</th><th>Moravia</th><th>Los Ángeles</th><th>Total</th></tr></thead><tbody>${group.items.map(row=>{
           const total=(+row.qM||0)+(+row.qA||0),unit=row.unitM||row.unitA||'kg';
           const mCell=row.kind==='product'?`<input class="both-summary-qty" type="number" min="0" step="0.5" inputmode="decimal" value="${summaryEsc(row.qM)}" data-summary-qty data-provider="${summaryEsc(encodeURIComponent(group.prov))}" data-product="${summaryEsc(encodeURIComponent(row.id))}" data-side="moravia" data-unit="${summaryEsc(row.unitM||unit)}"><small class="both-summary-unit">${summaryEsc(normUnit(row.unitM||unit))}</small>`:'<span class="both-summary-branch-empty">—</span>';
