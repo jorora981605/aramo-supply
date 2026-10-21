@@ -700,7 +700,7 @@ html[data-theme="dark"] .today-money-card{background:linear-gradient(145deg,#125
   .nav-bottom{left:50%;right:auto;transform:translateX(-50%)!important;width:min(720px,100%);border-radius:22px 22px 0 0}
 }
 </style>
-<link rel="stylesheet" href="express.css?v=20261007-productos-1">
+<link rel="stylesheet" href="express.css?v=20261020-premium-1">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Caveat:wght@600;700&family=Chakra+Petch:wght@500;600;700&family=JetBrains+Mono:wght@500;600&display=swap" media="print" onload="this.media='all'">
@@ -802,6 +802,16 @@ html[data-theme="dark"] .today-money-card{background:linear-gradient(145deg,#125
 <div class="view" id="view-proveedores">
   <div class="scroll">
     <div class="pv-wrap">
+      <section class="pv-hero" aria-label="Panel de surtido">
+        <div class="pv-hero-mark" aria-hidden="true"><span>✦</span></div>
+        <div class="pv-hero-copy">
+          <div class="pv-hero-kicker">ARAMO · CONTROL DE SURTIDO</div>
+          <h1>Todo fresco. Todo claro.</h1>
+          <p>Organizá los pedidos por proveedor y sucursal desde una sola vista.</p>
+          <div class="pv-hero-chips"><span>● En vivo</span><span>2 tiendas</span><span>1 flujo</span></div>
+        </div>
+        <div class="pv-hero-orbit" aria-hidden="true"><i>🥑</i><i>🍅</i><i>🌿</i></div>
+      </section>
       <div id="pvTop"></div>
       <button type="button" class="pv-sum" id="pvSum"></button>
       <div class="pv-search">
@@ -811,6 +821,7 @@ html[data-theme="dark"] .today-money-card{background:linear-gradient(145deg,#125
       <div id="pvParse" class="pv-parse" hidden></div>
       <div id="pvResults"></div>
       <section class="both-summary" id="bothSummary" hidden aria-label="Resumen combinado de Surtido"></section>
+      <div class="pv-list-kicker"><span>Proveedores</span><small>Elegí dónde querés editar</small></div>
       <div id="providersNavList" class="pv-grid"></div>
     </div>
   </div>
