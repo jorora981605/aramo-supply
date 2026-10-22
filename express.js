@@ -659,64 +659,85 @@ function xpSugClick(e){
 // ══════════════════════════════════════════
 // 🧺 PEDIDO — revisar, enviar uno por uno, reiniciar e historial
 // ══════════════════════════════════════════
-function xpPedidoBranchMarkup(prov,sides){
-  const {lines,extras}=xpProvLines(prov);
-  return `<div class="pd-branches">${sides.map(side=>{
-    const branchLines=lines.filter(l=>l.q[side]>0),branchExtras=extras.filter(x=>x.side===side);
-    if(!branchLines.length&&!branchExtras.length)return '';
-    return `<section class="pd-branch"><div class="pd-branch-head"><span>${SIDE_ICO[side]} ${SIDE_NAME[side]}</span><b>₡${fmt(calcSide(side,prov))}</b></div><div class="pd-lines">
-      ${branchLines.map(l=>`<button type="button" class="pd-line" data-pd="line" data-prov="${esc(prov)}" data-pid="${esc(l.prod.id)}"><span class="e">${smartEmoji(l.prod)}</span><span class="n">${esc(niceName(l.prod.name))}</span><span class="q"><b class="${side}">${fmtQ(l.q[side])}</b> <small>${esc(l.unit)}</small></span></button>`).join('')}
-      ${branchExtras.map(x=>`<div class="pd-line"><span class="e">➕</span><span class="n">${esc(x.name||'Extra')}</span><span class="q"><b class="${side}">${fmtQ(+x.qty)}</b> <small>${esc(x.unit||'kg')}</small></span></div>`).join('')}
-    </div></section>`;
-  }).join('')}</div>`;
-}
-function xpReclassifyPedido(body,sides){
-  body.querySelectorAll('.pd-prov').forEach(card=>{
-    const prov=card.querySelector('header')?.dataset.prov,list=card.querySelector('.pd-lines');
-    if(!prov||!list)return;
-    const holder=document.createElement('div');holder.innerHTML=xpPedidoBranchMarkup(prov,sides);
-    if(holder.firstElementChild)list.replaceWith(holder.firstElementChild);
-  });
+// Pedido de mañana: arriba un tablero con lo importante (total, productos, por enviar y cada
+// tienda) y abajo una tarjeta por proveedor con sus productos en mosaicos chicos. Cada mosaico
+// muestra las dos cantidades con el color de su tienda (verde Moravia, naranja Los Ángeles).
+// Tocar un mosaico abre el producto para cambiar la cantidad; los botones hacen lo de siempre.
+let _pdFiltro='todos',_pdEntrar=true,_pdNums={},_pdT=0;
+const capital=s=>String(s||'').charAt(0).toUpperCase()+String(s||'').slice(1);
+const plural=(n,a,b)=>n+' '+(n===1?a:b);
+function xpPedidoTarjeta(d,i,sides){
+  const dos=sides.length>1,hue=[...d.prov].reduce((h,c)=>(h*31+c.charCodeAt(0))%360,7),p=S.pedidos[d.prov]||{};
+  const subs=dos?sides.map(s=>{const v=calcSide(s,d.prov);return v?`<span class="${s}">${SIDE_ICO[s]} ${SIDE_NAME[s]} <b>₡${fmt(v)}</b></span>`:'';}).join(''):'';
+  const notas=sides.map(s=>{const n=String(p.notes?.['__note_'+s]||(s==='moravia'?p.note:'')||'').trim();return n?`<p class="pdx-nota ${s}"><b>📝 ${SIDE_NAME[s]}:</b> ${esc(n)}</p>`:'';}).join('');
+  const cant=(q,s)=>`<i class="${s}${q>0?'':' cero'}" title="${SIDE_NAME[s]}">${q>0?fmtQ(q):'–'}</i>`;
+  return `<article class="pdx-prov${d.sent?' enviado':''}" style="--i:${i};--h:${hue}">
+    <header class="pdx-prov-h" data-pd="open" data-prov="${esc(d.prov)}" title="Editar ${esc(d.prov)}">
+      <span class="pdx-av">${esc(d.prov.charAt(0).toUpperCase())}</span>
+      <span class="pdx-prov-t"><b>${esc(d.prov)}</b><small>${plural(d.n,'producto','productos')}</small></span>
+      <span class="pdx-prov-r"><b>${d.tot?'₡'+fmt(d.tot):''}</b><em class="pdx-estado">${d.sent?'✅ Enviado':'⏳ Por enviar'}</em></span>
+    </header>
+    ${subs?`<div class="pdx-subs">${subs}</div>`:''}
+    <div class="pdx-items">
+      ${d.lines.map(l=>`<button type="button" class="pdx-item" data-pd="line" data-prov="${esc(d.prov)}" data-pid="${esc(l.prod.id)}" aria-label="${esc(niceName(l.prod.name))}: ${sides.map(s=>SIDE_NAME[s]+' '+(l.q[s]||0)).join(', ')} ${esc(l.unit)}"><span class="pdx-e">${smartEmoji(l.prod)}</span><span class="pdx-n">${esc(niceName(l.prod.name))}</span><span class="pdx-q">${sides.map(s=>cant(l.q[s],s)).join('')}<small>${esc(l.unit)}</small></span></button>`).join('')}
+      ${d.extras.map(x=>`<div class="pdx-item extra"><span class="pdx-e">➕</span><span class="pdx-n">${esc(x.name||'Extra')}</span><span class="pdx-q">${sides.map(s=>cant(s===x.side?+x.qty:0,s)).join('')}<small>${esc(x.unit||'kg')}</small></span></div>`).join('')}
+    </div>
+    ${notas}
+    <footer class="pdx-pie"><button type="button" class="pdx-wa" data-pd="send" data-prov="${esc(d.prov)}">💬 ${d.sent?'Reenviar':'Enviar'}</button><button type="button" class="pdx-ed" data-pd="open" data-prov="${esc(d.prov)}">✏️ Editar</button></footer>
+  </article>`;
 }
 function xpRenderPedido(){
   const body=$('pedidoBody');if(!body)return;
-  const sides=activeOrderSides();
+  const sides=activeOrderSides(),dos=sides.length>1;
   const t=xpTotals(),all=calcScopedAllProvs();
   const provs=t.provs.slice().sort((a,b)=>(isSent(a)-isSent(b))||a.localeCompare(b,'es'));
-  const fecha=new Date().toLocaleDateString('es-CR',{weekday:'long',day:'numeric',month:'long'});
-  let html=`<div class="pd-head"><h2>Pedido de mañana</h2><small>${esc(fecha)}${t.items?` · ${t.items} producto${t.items===1?'':'s'} · ${provs.length} proveedor${provs.length===1?'':'es'}`:''}</small></div>`;
-  if(XP.undo&&Date.now()-XP.undo.at<120000){
-    html+=`<div class="pd-undo">Pedido reiniciado. <button type="button" data-pd="undo">↩️ Deshacer</button></div>`;
-  }
+  const fecha=capital(new Date().toLocaleDateString('es-CR',{weekday:'long',day:'numeric',month:'long'}));
+  const datos=provs.map(prov=>{const {lines,extras}=xpProvLines(prov);return{prov,lines,extras,sent:isSent(prov),tot:sideTotal(prov),n:lines.length+extras.length};});
+  const enviados=datos.filter(d=>d.sent).length,porEnviar=datos.length-enviados;
+  const nSide=s=>datos.reduce((k,d)=>k+d.lines.filter(l=>l.q[s]>0).length+d.extras.filter(x=>x.side===s).length,0);
+  if((_pdFiltro==='pend'&&!porEnviar)||(_pdFiltro==='env'&&!enviados))_pdFiltro='todos';
+  const ley=sides.map(s=>`<span class="${s}">${SIDE_ICO[s]} ${SIDE_NAME[s]}</span>`).join('');
+  let html=`<section class="pdx-hero${t.items?'':' vacio'}">
+    <div class="pdx-fx" aria-hidden="true"><i>🥕</i><i>🍅</i><i>🥬</i><i>🧅</i><i>🍋</i></div>
+    <div class="pdx-top"><div><p class="pdx-kick">Pedido de mañana</p><h2>${esc(fecha)}</h2></div><div class="pdx-ley">${ley}</div></div>`;
   if(!t.items){
-    html+=`<div class="pd-empty"><div class="pd-empty-ico">🧺</div><strong>Todavía no hay nada pedido</strong><p>Entrá a un proveedor y tocá sus productos.</p><button type="button" class="pd-primary" data-pd="go">🏪 Ir a proveedores</button></div>`;
+    html+=`<div class="pdx-vacio"><span>🧺</span><b>Todavía no hay nada pedido</b><small>Entrá a un proveedor y tocá sus productos.</small><button type="button" class="pdx-cta" data-pd="go"><span>🏪</span><span><b>Ir a proveedores</b></span><i>→</i></button></div></section>`;
   }else{
-    html+=`<div class="pd-totals">
-      <div class="pd-total main"><span>Total</span><strong>₡${fmt(all.total)}</strong></div>
-      ${sides.length>1?sides.map(s=>`<div class="pd-total ${s}"><span>${SIDE_NAME[s]}</span><strong>₡${fmt(all[s])}</strong></div>`).join(''):''}
-    </div>`;
-    html+=t.pending
-      ?`<button type="button" class="pd-chain" data-pd="chain">⛓️ Enviar uno por uno <small>${t.pending} proveedor${t.pending===1?'':'es'} · te guío paso a paso</small></button>
-        <div class="pd-row"><button type="button" data-pd="allone">📤 Todo en 1 mensaje</button><button type="button" data-pd="lista">📋 Lista a contactos</button></div>`
-      :`<div class="pd-done">🎉 ¡Todo enviado! <button type="button" data-pd="lista">📋 Lista a contactos</button></div>`;
-    html+=provs.map(prov=>{
-      const {lines,extras}=xpProvLines(prov),sent=isSent(prov),tot=sideTotal(prov);
-      return `<section class="pd-prov${sent?' sent':''}">
-        <header data-pd="open" data-prov="${esc(prov)}"><span class="pv-av">${esc(prov.charAt(0).toUpperCase())}</span><div><strong>${esc(prov)}</strong><small>${sent?'✅ Enviado':'⚠️ Por enviar'} · ${lines.length+extras.length} producto${lines.length+extras.length===1?'':'s'}</small></div><b>${tot?'₡'+fmt(tot):''}</b></header>
-        <div class="pd-lines">
-          ${lines.map(l=>`<button type="button" class="pd-line" data-pd="line" data-prov="${esc(prov)}" data-pid="${esc(l.prod.id)}"><span class="e">${smartEmoji(l.prod)}</span><span class="n">${esc(niceName(l.prod.name))}</span><span class="q">${xpQtyLabel(l.q,l.unit)}</span></button>`).join('')}
-          ${extras.map(x=>`<div class="pd-line"><span class="e">➕</span><span class="n">${esc(x.name||'Extra')}</span><span class="q"><b class="${x.side}">${sides.length>1?SIDE_SHORT[x.side]+' ':''}${fmtQ(+x.qty)}</b> <small>${esc(x.unit||'kg')}</small></span></div>`).join('')}
-        </div>
-        <footer>
-          <button type="button" class="wa" data-pd="send" data-prov="${esc(prov)}">💬 ${sent?'Reenviar':'Enviar'}</button>
-          <button type="button" data-pd="open" data-prov="${esc(prov)}">✏️ Editar</button>
-        </footer>
-      </section>`;}).join('');
+    html+=`<div class="pdx-total"><small>${dos?'Total de las dos tiendas':'Total del pedido'}</small><strong data-pdx-num="total" data-v="${all.total}">₡${fmt(all.total)}</strong></div>
+    <div class="pdx-stats">
+      <div class="pdx-stat"><span class="pdx-se">🧺</span><b data-pdx-num="items" data-v="${t.items}">${t.items}</b><small>${t.items===1?'producto':'productos'}</small></div>
+      <div class="pdx-stat ${porEnviar?'urg':'ok'}"><span class="pdx-se">${porEnviar?'📤':'✅'}</span><b data-pdx-num="pend" data-v="${porEnviar}">${porEnviar}</b><small>${porEnviar?(porEnviar===1?'proveedor por enviar':'proveedores por enviar'):'todo enviado'}</small></div>
+      ${dos?sides.map(s=>`<div class="pdx-stat ${s}"><span class="pdx-se">${SIDE_ICO[s]}</span><b data-pdx-num="${s}" data-v="${all[s]}">₡${fmt(all[s])}</b><small>${SIDE_NAME[s]} · ${plural(nSide(s),'producto','productos')}</small></div>`).join('')
+        :`<div class="pdx-stat"><span class="pdx-se">🏪</span><b>${datos.length}</b><small>${datos.length===1?'proveedor':'proveedores'}</small></div>`}
+    </div>
+    <div class="pdx-prog" role="progressbar" aria-valuemin="0" aria-valuemax="${datos.length}" aria-valuenow="${enviados}"><div class="pdx-barra"><i style="--p:${datos.length?enviados/datos.length:0}"></i></div><span><b>${enviados}</b> de ${plural(datos.length,'proveedor enviado','proveedores enviados')}</span></div>
+    ${porEnviar?`<button type="button" class="pdx-cta" data-pd="chain"><span>⛓️</span><span><b>Enviar uno por uno</b><small>${plural(porEnviar,'proveedor','proveedores')} · te guío paso a paso</small></span><i>→</i></button>
+      <div class="pdx-acc2"><button type="button" data-pd="allone">📤 Todo en 1 mensaje</button><button type="button" data-pd="lista">📋 Lista a contactos</button></div>`
+      :`<div class="pdx-listo"><span>🎉 ¡Todo enviado!</span><button type="button" data-pd="lista">📋 Lista a contactos</button></div>`}
+  </section>`;
   }
-  if(t.items)html+=`<button type="button" class="pd-reset" data-pd="reset">🗑️ Reiniciar pedido${sides.length===1?' de '+SIDE_NAME[sides[0]]:''}</button>`;
+  if(XP.undo&&Date.now()-XP.undo.at<120000)html+=`<div class="pd-undo">Pedido reiniciado. <button type="button" data-pd="undo">↩️ Deshacer</button></div>`;
+  if(t.items){
+    html+=`<div class="pdx-filtros" role="group" aria-label="Qué proveedores ver">${[['todos','Todos',datos.length],['pend','⏳ Por enviar',porEnviar],['env','✅ Enviados',enviados]].map(([k,n,c])=>`<button type="button" class="${_pdFiltro===k?'on':''}" data-pdx-f="${k}"${c||k==='todos'?'':' disabled'} aria-pressed="${_pdFiltro===k}">${n} <b>${c}</b></button>`).join('')}</div>`;
+    html+=`<div class="pdx-grid">${datos.filter(d=>_pdFiltro==='todos'||(_pdFiltro==='pend'?!d.sent:d.sent)).map((d,i)=>xpPedidoTarjeta(d,i,sides)).join('')}</div>`;
+    html+=`<button type="button" class="pd-reset pdx-reset" data-pd="reset">🗑️ Reiniciar pedido${sides.length===1?' de '+SIDE_NAME[sides[0]]:''}</button>`;
+  }
   html+=xpHistoryHtml();
+  // La entrada animada solo al abrir la pestaña (si no, cada cambio en vivo la repetiría).
+  if(_pdEntrar){body.classList.add('pdx-entra');clearTimeout(_pdT);_pdT=setTimeout(()=>body.classList.remove('pdx-entra'),1400);_pdEntrar=false;}
   body.innerHTML=html;
-  if(t.items)xpReclassifyPedido(body,sides);
+  xpContarPedido(body);
+}
+// Los números suben solos hasta su valor cuando cambian (o al abrir la pestaña).
+function xpContarPedido(body){
+  if(matchMedia('(prefers-reduced-motion: reduce)').matches){body.querySelectorAll('[data-pdx-num]').forEach(el=>{_pdNums[el.dataset.pdxNum]=+el.dataset.v;});return;}
+  body.querySelectorAll('[data-pdx-num]').forEach(el=>{
+    const k=el.dataset.pdxNum,fin=+el.dataset.v||0,ini=_pdNums[k]??0,plata=/^₡/.test(el.textContent);_pdNums[k]=fin;
+    if(ini===fin)return;
+    const t0=performance.now(),dur=700;
+    const paso=now=>{const x=Math.min(1,(now-t0)/dur),e=1-Math.pow(1-x,3),v=Math.round(ini+(fin-ini)*e);el.textContent=(plata?'₡':'')+fmt(v);if(x<1&&el.isConnected)requestAnimationFrame(paso);};
+    requestAnimationFrame(paso);
+  });
 }
 function xpHistoryHtml(){
   const today=new Date().toISOString().slice(0,10);
@@ -895,7 +916,7 @@ window.switchView=function(name){
   $('modalProvList')?.classList.remove('open');
   _switchView(name);
   window.scrollTo(0,0);
-  if(name==='pedido')xpRenderPedido();
+  if(name==='pedido'){_pdEntrar=true;xpRenderPedido();}
   if(name==='proveedores')xpRenderProveedores();
   xpRenderBadge();
 };
@@ -927,6 +948,7 @@ $('pvParse')?.addEventListener('input',xpParseChange);
 $('pvParse')?.addEventListener('change',xpParseChange);
 $('provSuggest')?.addEventListener('click',xpSugClick);
 $('pedidoBody')?.addEventListener('click',xpPedidoClick);
+$('pedidoBody')?.addEventListener('click',e=>{const f=e.target.closest('[data-pdx-f]');if(!f||f.disabled)return;_pdFiltro=f.dataset.pdxF;xpRenderPedido();});
 
 // Arranque
 xpBuildOverlays();
