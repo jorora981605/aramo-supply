@@ -1,0 +1,168 @@
+/* ══════════════════════════════════════════════════════════════════════
+   ARAMO · Surtido — pantalla de Proveedores y tarjetas sencillas.
+   Arriba: tres tarjetitas (pedido, buscar, reiniciar). En el medio: "Tu pedido de hoy"
+   con una tarjeta por proveedor y cada producto como pastilla que se arrastra a otro
+   proveedor. Abajo: los proveedores comprimidos en una barra que se abre.
+   Verde = Moravia · Naranja = Los Ángeles. Lo dibuja express.js (sxTarjeta, sxMover…).
+   ══════════════════════════════════════════════════════════════════════ */
+#view-proveedores,#pedidoBody,.sx-dock,.sx-pregunta,.sx-aviso,.sx-fantasma{
+  --sx-f:'Plus Jakarta Sans',var(--fn);--sx-s:'Fraunces',Georgia,'Times New Roman',serif;
+  --pm:#15803d;--pa:#c2410c;--pm-t:#e7f6ec;--pa-t:#fdeee4;
+  --sx-card:var(--card,#fff);--sx-linea:rgba(16,40,28,.09);--sx-tile:#f3f7f4;--sx-tinta:#0e4a30;
+}
+html[data-theme="dark"] #view-proveedores,html[data-theme="dark"] #pedidoBody,html[data-theme="dark"] .sx-dock,html[data-theme="dark"] .sx-pregunta,html[data-theme="dark"] .sx-aviso,html[data-theme="dark"] .sx-fantasma{
+  --pm:#4ade80;--pa:#fb923c;--pm-t:rgba(74,222,128,.12);--pa-t:rgba(251,146,60,.13);
+  --sx-linea:rgba(255,255,255,.08);--sx-tile:rgba(255,255,255,.05);--sx-tinta:#1f7a4d;
+}
+
+/* ── Proveedores: acomodo ── */
+#view-proveedores .pv-wrap{display:grid;grid-template-columns:minmax(0,1fr) auto;column-gap:8px;row-gap:14px;align-items:stretch;font-family:var(--sx-f)}
+#view-proveedores .pv-wrap>*{grid-column:1/-1;margin:0}
+#view-proveedores #pvSum{grid-area:1/1/2/2}
+#view-proveedores #pvTop{grid-area:1/2/2/3}
+#view-proveedores .pv-search{grid-area:2/1/3/-1}
+#view-proveedores #pvTop:empty{display:none}
+#view-proveedores .pv-wrap:has(#pvTop:empty) #pvSum{grid-column:1/-1}
+#view-proveedores #pvResults:empty,#view-proveedores #pvParse[hidden],#view-proveedores #bothSummary{display:none!important}
+@media (min-width:560px){
+  #view-proveedores .pv-wrap{grid-template-columns:minmax(0,1.3fr) minmax(0,1fr) auto}
+  #view-proveedores #pvSum{grid-area:1/1/2/2}
+  #view-proveedores .pv-search{grid-area:1/2/2/3}
+  #view-proveedores #pvTop{grid-area:1/3/2/4}
+  #view-proveedores .pv-wrap:has(#pvTop:empty) .pv-search{grid-column:2/-1}
+  #view-proveedores .pv-wrap:has(#pvSearch:focus) .pv-search,#view-proveedores .pv-wrap:has(#pvSearch:not(:placeholder-shown)) .pv-search{grid-area:2/1/3/-1}
+  #view-proveedores .pv-wrap:has(#pvSearch:focus) #pvSum,#view-proveedores .pv-wrap:has(#pvSearch:not(:placeholder-shown)) #pvSum{grid-column:1/3}
+}
+
+/* Tarjetitas de arriba */
+#view-proveedores .sx-mini,#view-proveedores .pv-search{min-height:60px;margin:0;border-radius:18px;font-family:var(--sx-f)}
+.pv-sum.sx-mini{display:flex;align-items:center;gap:10px;width:100%;padding:10px 10px 10px 13px;border:0;background:var(--sx-card);box-shadow:inset 0 0 0 1px var(--sx-linea),0 6px 18px -12px rgba(16,40,28,.3);color:var(--t);text-align:left;cursor:pointer}
+.pv-sum.sx-mini.has{background:linear-gradient(140deg,#0d3d28,#156640);color:#fff;box-shadow:0 12px 24px -12px rgba(13,61,40,.7)}
+.pv-sum.sx-mini::before{display:none}
+#view-proveedores .pv-sum.sx-mini{min-height:60px;border:0}
+.sx-mini-e{flex:none;display:grid;place-items:center;font-size:22px;line-height:1}
+.sx-mini-e .pdx-i{width:20px;height:20px}
+.sx-mini-t{flex:1;min-width:0}
+.sx-mini-t b{display:block;font:800 15px/1.15 var(--sx-f);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.sx-mini-t small{display:block;margin-top:2px;font:600 11.5px var(--sx-f);opacity:.82;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.sx-mini-f{flex:none;display:grid;place-items:center;width:34px;height:34px;border-radius:50%;background:rgba(255,255,255,.16)}
+.sx-mini-f .pdx-i{width:16px;height:16px}
+#view-proveedores .pv-search{display:flex;align-items:center;gap:8px;padding:0 12px;border:0;background:var(--sx-card);box-shadow:inset 0 0 0 1px var(--sx-linea),0 6px 18px -12px rgba(16,40,28,.25);transition:box-shadow .2s}
+#view-proveedores .pv-search:focus-within{box-shadow:inset 0 0 0 2px var(--pm),0 8px 20px -12px rgba(16,40,28,.35)}
+#view-proveedores .pv-search input{height:44px;font:700 15px var(--sx-f)}
+#view-proveedores .pv-search input::placeholder{color:var(--m);font-weight:700}
+.pv-reset.sx-mini{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:4px;width:auto;min-width:76px;padding:8px 10px;border:0;background:color-mix(in srgb,#dc2626 7%,var(--sx-card));box-shadow:inset 0 0 0 1px color-mix(in srgb,#dc2626 25%,transparent);color:#b91c1c;cursor:pointer}
+html[data-theme="dark"] .pv-reset.sx-mini{color:#fca5a5}
+.pv-reset.sx-mini .sx-mini-t{flex:none}
+.pv-reset.sx-mini .sx-mini-t b{font-size:11.5px}
+.pv-undo.sx-mini{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:4px;padding:6px 8px;background:var(--pm-t);color:var(--pm)}
+.pv-undo.sx-mini button{padding:6px 9px;font-size:12px}
+
+/* ── Tu pedido de hoy ── */
+.sx-tablero-h{display:flex;align-items:flex-end;justify-content:space-between;flex-wrap:wrap;gap:4px 12px;margin:4px 2px 10px}
+.sx-tablero-h h2{margin:0;font:600 24px/1.1 var(--sx-s);letter-spacing:-.01em;color:var(--t)}
+.sx-tablero-h small{display:inline-flex;align-items:center;gap:6px;font:600 12px var(--sx-f);color:var(--m)}
+.sx-tablero-h .pdx-i{width:15px;height:15px}
+.sx-vacio{display:flex;align-items:center;gap:12px;padding:16px;border-radius:18px;background:var(--sx-card);box-shadow:inset 0 0 0 1px var(--sx-linea);font-family:var(--sx-f)}
+.sx-vacio>span{font-size:30px}
+.sx-vacio b{display:block;font:800 15px var(--sx-f);color:var(--t)}
+.sx-vacio small{display:block;font:600 12.5px var(--sx-f);color:var(--m)}
+.sx-grid{display:grid;gap:10px}
+@media (min-width:760px){.sx-grid{display:block;columns:2 330px;column-gap:12px}.sx-grid>.sx-card{break-inside:avoid;margin-bottom:12px}}
+
+/* Tarjeta sencilla */
+.sx-card{position:relative;padding:12px;border-radius:20px;background:var(--sx-card);border:1px solid var(--sx-linea);box-shadow:0 1px 2px rgba(16,40,28,.04),0 10px 26px -16px rgba(16,40,28,.28);outline:2px dashed transparent;outline-offset:3px;font-family:var(--sx-f);transition:transform .18s,box-shadow .2s,background .2s,outline-color .2s}
+.sx-card.sx-sobre{outline-color:var(--c);background:color-mix(in srgb,var(--c) 7%,var(--sx-card));transform:scale(1.015)}
+.sx-card-h{display:flex;align-items:center;gap:8px}
+.sx-card-id{flex:1;min-width:0;display:flex;align-items:center;gap:10px;padding:0;border:0;background:none;color:var(--t);text-align:left;cursor:pointer}
+.sx-av{flex:none;display:grid;place-items:center;width:36px;height:36px;border-radius:50%;background:color-mix(in srgb,var(--c) 14%,transparent);color:var(--c);font:800 15px var(--sx-f);box-shadow:inset 0 0 0 1.5px color-mix(in srgb,var(--c) 28%,transparent)}
+html[data-theme="dark"] .sx-av{background:color-mix(in srgb,var(--c) 32%,transparent);color:#fff}
+.sx-card-t{min-width:0}
+.sx-card-t b{display:block;font:800 15.5px/1.2 var(--sx-f);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.sx-card-t small{display:flex;align-items:center;gap:5px;margin-top:1px;font:600 11.5px var(--sx-f);color:var(--m)}
+.sx-card-t small i{width:7px;height:7px;border-radius:50%;background:#f59e0b;box-shadow:0 0 0 3px rgba(245,158,11,.18)}
+.sx-card.enviado .sx-card-t small i{background:#22c55e;box-shadow:0 0 0 3px rgba(34,197,94,.18)}
+.sx-card-tot{flex:none;font:800 14px var(--sx-f);color:var(--t);font-variant-numeric:tabular-nums}
+.sx-env{flex:none;display:grid;place-items:center;width:38px;height:38px;border:0;border-radius:50%;background:var(--sx-tinta);color:#fff;cursor:pointer;box-shadow:0 6px 14px -6px rgba(14,74,48,.7);transition:transform .12s,filter .2s}
+.sx-env:active{transform:scale(.92)}
+@media (hover:hover){.sx-env:hover{filter:brightness(1.15)}}
+.sx-env.hecho{background:var(--pm-t);color:var(--pm);box-shadow:none}
+.sx-env .pdx-i{width:17px;height:17px}
+
+/* Pastillas de producto */
+.sx-chips{display:flex;flex-wrap:wrap;gap:6px;margin-top:10px}
+.sx-chip{display:inline-flex;align-items:center;gap:6px;max-width:100%;min-height:34px;padding:3px 4px 3px 9px;border-radius:999px;border:1px solid transparent;background:var(--sx-tile);color:var(--t);font:700 13px var(--sx-f);cursor:grab;user-select:none;-webkit-user-select:none;-webkit-touch-callout:none;transition:transform .15s,opacity .15s,background .2s,border-color .2s,box-shadow .2s}
+@media (hover:hover){.sx-chip[data-pid]:hover{background:var(--sx-card);border-color:var(--sx-linea);box-shadow:0 4px 12px -6px rgba(16,40,28,.3)}}
+.sx-chip:active{transform:scale(.97)}
+.sx-chip.extra{cursor:default}
+.sx-e{font-size:16px;line-height:1}
+.sx-n{min-width:0;max-width:150px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.sx-q{flex:none;display:inline-flex;align-items:center;border-radius:999px;background:var(--sx-card);box-shadow:inset 0 0 0 1px var(--sx-linea);overflow:hidden}
+.sx-q b{min-width:24px;padding:3px 7px;font:800 12px var(--sx-f);text-align:center;font-variant-numeric:tabular-nums}
+.sx-q b.moravia{background:var(--pm-t);color:var(--pm)}
+.sx-q b.angeles{background:var(--pa-t);color:var(--pa)}
+.sx-q b.cero{background:transparent;color:var(--m);opacity:.4}
+.sx-q small{padding:0 8px 0 4px;font:600 10.5px var(--sx-f);color:var(--m)}
+.sx-chip.levantado{opacity:.3;transform:scale(.94)}
+.sx-fantasma{position:fixed;left:0;top:0;z-index:10050;margin:0;pointer-events:none;background:var(--sx-card,#fff);box-shadow:0 18px 40px -8px rgba(0,0,0,.35),0 0 0 2px #22c55e;will-change:transform}
+body.sx-arrastrando{user-select:none;-webkit-user-select:none;cursor:grabbing}
+.sx-nota{margin:8px 2px 0;font:500 12px/1.4 var(--sx-f);color:#8a5a00}
+.sx-nota b{font-weight:800}
+html[data-theme="dark"] .sx-nota{color:#fde68a}
+
+/* ── Proveedores comprimidos en una barra ── */
+.sx-provbar{display:flex;align-items:center;gap:12px;width:100%;min-height:62px;padding:10px 14px;border:0;border-radius:18px;background:var(--sx-card);box-shadow:inset 0 0 0 1px var(--sx-linea),0 6px 18px -12px rgba(16,40,28,.3);color:var(--t);text-align:left;cursor:pointer;font-family:var(--sx-f)}
+.sx-pb-e{font-size:22px;line-height:1}
+.sx-pb-t{flex:1;min-width:0}
+.sx-pb-t b{display:block;font:800 15.5px var(--sx-f)}
+.sx-pb-t small{display:block;margin-top:1px;font:600 12px var(--sx-f);color:var(--m)}
+.sx-pb-n{display:grid;place-items:center;min-width:30px;height:30px;padding:0 9px;border-radius:999px;background:var(--sx-tile);font:800 13px var(--sx-f)}
+.sx-pb-f{font-size:13px;color:var(--m);transition:transform .25s}
+.sx-abierto .sx-pb-f{transform:rotate(180deg)}
+#view-proveedores .pv-wrap:not(.sx-abierto) #providersNavList{display:none}
+#view-proveedores .pv-wrap:has(#pvSearch:not(:placeholder-shown)) #providersNavList{display:grid}
+#view-proveedores .pv-wrap:has(#pvSearch:not(:placeholder-shown)) #sxTablero{display:none}
+#view-proveedores .sx-abierto #providersNavList{animation:sxAbre .3s cubic-bezier(.22,1,.36,1)}
+@keyframes sxAbre{from{opacity:0;transform:translateY(-6px)}}
+#view-proveedores #providersNavList{margin-top:-6px}
+
+/* ── Lista que sube al arrastrar o al mantener apretado ── */
+.sx-dock{position:fixed;left:0;right:0;bottom:0;z-index:10040;max-width:760px;margin:0 auto;padding:14px 14px calc(16px + env(safe-area-inset-bottom,0px));border-radius:24px 24px 0 0;background:color-mix(in srgb,var(--card,#fff) 95%,transparent);backdrop-filter:blur(16px);-webkit-backdrop-filter:blur(16px);box-shadow:0 -16px 40px rgba(0,0,0,.2);transform:translateY(110%);transition:transform .28s cubic-bezier(.22,1,.36,1);font-family:var(--sx-f)}
+.sx-dock.open{transform:none}
+.sx-dock-h{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:10px}
+.sx-dock-h>span{display:flex;align-items:center;gap:8px;font:800 14.5px var(--sx-f);color:var(--t)}
+.sx-dock-h button{padding:8px 14px;border:0;border-radius:999px;background:var(--sx-tile);color:var(--t);font:700 13px var(--sx-f);cursor:pointer}
+.sx-dock-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(92px,1fr));gap:8px;max-height:36vh;overflow:auto;padding:2px}
+.sx-dock-grid button{display:flex;flex-direction:column;align-items:center;gap:6px;min-width:0;padding:10px 6px;border-radius:16px;border:1.5px solid var(--sx-linea);background:var(--sx-card);color:var(--t);font:700 12.5px var(--sx-f);cursor:pointer;transition:transform .15s,border-color .15s,background .15s}
+.sx-dock-grid button.sx-sobre{border-color:var(--c);background:color-mix(in srgb,var(--c) 13%,var(--sx-card));transform:scale(1.06)}
+.sx-dock.elegir .sx-dock-grid button:active{transform:scale(.95)}
+.sx-dock-n{max-width:100%;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+
+/* ── ¿Las dos tiendas o una sola? ── */
+.sx-pregunta{position:fixed;inset:0;z-index:10060;display:grid;place-items:end center;padding:16px;background:rgba(8,20,14,.45);backdrop-filter:blur(4px);-webkit-backdrop-filter:blur(4px);opacity:0;pointer-events:none;transition:opacity .2s}
+.sx-pregunta.open{opacity:1;pointer-events:auto}
+@media (min-width:600px){.sx-pregunta{place-items:center}}
+.sx-preg-in{width:min(420px,100%);padding:18px;border-radius:24px;background:var(--card,#fff);color:var(--t);box-shadow:0 30px 60px -20px rgba(0,0,0,.5);transform:translateY(24px);transition:transform .28s cubic-bezier(.22,1,.36,1);font-family:var(--sx-f)}
+.sx-pregunta.open .sx-preg-in{transform:none}
+.sx-preg-cab{display:flex;align-items:center;gap:12px;margin-bottom:12px}
+.sx-preg-e{font-size:36px;line-height:1}
+.sx-preg-cab p{margin:0;font:600 12.5px var(--sx-f);color:var(--m)}
+.sx-preg-cab p b{color:var(--t)}
+.sx-preg-cab h3{margin:2px 0 0;font:600 22px var(--sx-s);color:var(--t)}
+.sx-preg-b{display:flex;flex-direction:column;align-items:flex-start;width:100%;margin-top:8px;padding:12px 14px;border-radius:16px;border:1.5px solid var(--sx-linea);background:var(--sx-card);color:var(--t);text-align:left;cursor:pointer;transition:transform .12s}
+.sx-preg-b:active{transform:scale(.98)}
+.sx-preg-b b{font:800 15px var(--sx-f)}
+.sx-preg-b small{margin-top:2px;font:600 12px var(--sx-f);color:var(--m)}
+.sx-preg-b.todo{border-color:transparent;background:var(--sx-tinta);color:#fff}
+.sx-preg-b.todo small{color:#cde9d8}
+.sx-preg-b.moravia{box-shadow:inset 4px 0 0 #22c55e}
+.sx-preg-b.angeles{box-shadow:inset 4px 0 0 #f97316}
+.sx-preg-x{width:100%;margin-top:10px;padding:10px;border:0;background:none;color:var(--m);font:700 13.5px var(--sx-f);cursor:pointer}
+
+/* ── Aviso con Deshacer ── */
+.sx-aviso{position:fixed;left:50%;bottom:calc(92px + env(safe-area-inset-bottom,0px));z-index:10070;display:flex;align-items:center;gap:10px;width:min(460px,calc(100% - 24px));padding:10px 10px 10px 14px;border-radius:16px;background:#10241a;color:#eaf6ee;box-shadow:0 18px 40px -12px rgba(0,0,0,.5);transform:translate(-50%,160%);opacity:0;transition:transform .3s cubic-bezier(.22,1,.36,1),opacity .3s;font-family:var(--sx-f)}
+.sx-aviso.open{transform:translate(-50%,0);opacity:1}
+.sx-aviso-e{font-size:20px;line-height:1}
+.sx-aviso-t{flex:1;min-width:0;font:600 13.5px/1.35 var(--sx-f)}
+.sx-aviso button{flex:none;padding:8px 12px;border:0;border-radius:12px;background:#4ade80;color:#06210f;font:800 13px var(--sx-f);cursor:pointer}
+@media (prefers-reduced-motion:reduce){.sx-card,.sx-chip,.sx-dock,.sx-preg-in,.sx-aviso{transition:none}}

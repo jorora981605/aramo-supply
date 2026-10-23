@@ -96,58 +96,7 @@ html[data-theme="dark"] #pedidoBody{
 .pdx-filtros button.on b{opacity:1;color:var(--pm)}
 .pdx-filtros button:disabled{opacity:.4;cursor:default}
 
-/* ── Tarjetas de proveedor ── */
-.pdx-grid{display:grid;gap:14px;grid-template-columns:minmax(0,1fr)}
-@media (min-width:760px){.pdx-grid{display:block;columns:2 340px;column-gap:14px}.pdx-grid>.pdx-prov{break-inside:avoid;margin-bottom:14px}}
-.pdx-prov{position:relative;padding:16px;border-radius:22px;background:var(--pdx-card);border:1px solid var(--pdx-linea);box-shadow:0 1px 2px rgba(16,40,28,.04),0 14px 32px -16px rgba(16,40,28,.22);transition:transform .2s,box-shadow .25s}
-@media (hover:hover){.pdx-prov:hover{transform:translateY(-2px);box-shadow:0 1px 2px rgba(16,40,28,.04),0 22px 44px -18px rgba(16,40,28,.3)}}
-.pdx-prov-h{display:flex;align-items:center;gap:12px;cursor:pointer}
-.pdx-av{position:relative;flex:none;display:grid;place-items:center;width:44px;height:44px;border-radius:50%;background:color-mix(in srgb,var(--c) 13%,transparent);color:var(--c);font:800 18px var(--pdx-f);box-shadow:inset 0 0 0 1.5px color-mix(in srgb,var(--c) 28%,transparent)}
-html[data-theme="dark"] .pdx-av{background:color-mix(in srgb,var(--c) 30%,transparent);color:#fff}
-.pdx-av em{position:absolute;right:-3px;bottom:-3px;display:grid;place-items:center;width:19px;height:19px;border-radius:50%;background:#16a34a;color:#fff;box-shadow:0 0 0 2px var(--pdx-card)}
-.pdx-av em .pdx-i{width:11px;height:11px;stroke-width:3}
-.pdx-prov-t{flex:1;min-width:0}
-.pdx-prov-t b{display:block;font:800 17px/1.2 var(--pdx-f);color:var(--t);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-.pdx-prov-t small{display:block;margin-top:2px;font:600 12.5px var(--pdx-f);color:var(--m)}
-.pdx-prov-t small strong{font-weight:800;color:var(--t);font-variant-numeric:tabular-nums}
-.pdx-estado{flex:none;display:inline-flex;align-items:center;gap:5px;padding:5px 10px 5px 8px;border-radius:999px;font:700 11.5px var(--pdx-f);background:#fff6eb;color:#b45309}
-.pdx-estado .pdx-i{width:14px;height:14px}
-.pdx-prov.enviado .pdx-estado{background:#ebfaf0;color:#15803d}
-html[data-theme="dark"] .pdx-estado{background:rgba(251,146,60,.14);color:#fdba74}
-html[data-theme="dark"] .pdx-prov.enviado .pdx-estado{background:rgba(74,222,128,.13);color:#86efac}
-.pdx-tiendas{margin-top:14px}
-.pdx-tiendas .pdx-split{height:6px;margin:0 0 7px;background:var(--pdx-tile)}
-.pdx-tiendas-ley{display:flex;justify-content:space-between;gap:10px;font:600 12px var(--pdx-f);color:var(--m)}
-.pdx-tiendas-ley b{font-weight:800;font-variant-numeric:tabular-nums}
-.pdx-tiendas-ley .moravia b{color:var(--pm)}.pdx-tiendas-ley .angeles b{color:var(--pa)}
-
-/* Mosaicos de producto */
-.pdx-items{display:grid;grid-template-columns:repeat(auto-fill,minmax(138px,1fr));gap:8px;margin-top:14px}
-.pdx-item{display:grid;grid-template-columns:auto minmax(0,1fr);grid-template-areas:"e n" "q q";align-items:center;column-gap:8px;row-gap:9px;min-width:0;padding:10px;border-radius:15px;border:1px solid transparent;background:var(--pdx-tile);color:var(--t);text-align:left;cursor:pointer;transition:transform .12s,background .2s,border-color .2s}
-@media (hover:hover){.pdx-item:hover{background:var(--pdx-card);border-color:var(--pdx-linea);box-shadow:0 6px 16px -8px rgba(16,40,28,.2)}}
-.pdx-item:active{transform:scale(.96)}
-.pdx-item.extra{cursor:default}
-.pdx-e{grid-area:e;font-size:21px;line-height:1}
-.pdx-n{grid-area:n;font:700 13.5px/1.25 var(--pdx-f);display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;overflow-wrap:anywhere}
-.pdx-q{grid-area:q;display:flex;align-items:center;gap:6px;min-width:0}
-.pdx-cap{display:inline-flex;border-radius:999px;overflow:hidden;background:var(--pdx-card);box-shadow:inset 0 0 0 1px var(--pdx-linea)}
-.pdx-cap b{min-width:32px;padding:3px 9px;font:800 13px var(--pdx-f);text-align:center;font-variant-numeric:tabular-nums}
-.pdx-cap b.moravia{background:var(--pm-t);color:var(--pm)}
-.pdx-cap b.angeles{background:var(--pa-t);color:var(--pa)}
-.pdx-cap b.cero{background:transparent;color:var(--m);opacity:.45}
-.pdx-q small{font:600 11.5px var(--pdx-f);color:var(--m)}
-.pdx-nota{margin:12px 0 0;padding:9px 12px;border-radius:12px;background:#fffaeb;box-shadow:inset 3px 0 0 #f59e0b;font:500 12.5px/1.45 var(--pdx-f);color:#6b4a0e}
-.pdx-nota b{display:block;margin-bottom:1px;font:800 10.5px var(--pdx-f);letter-spacing:.08em;text-transform:uppercase;color:#b45309}
-html[data-theme="dark"] .pdx-nota{background:rgba(245,158,11,.1);color:#fde68a}
-html[data-theme="dark"] .pdx-nota b{color:#fbbf24}
-.pdx-pie{display:grid;grid-template-columns:1.5fr 1fr;gap:8px;margin-top:14px}
-.pdx-pie button{display:inline-flex;align-items:center;justify-content:center;gap:8px;min-height:44px;border-radius:14px;font:700 14px var(--pdx-f);cursor:pointer;transition:transform .12s,background .2s,filter .2s}
-.pdx-pie button:active{transform:scale(.97)}
-.pdx-wa{border:0;background:var(--pdx-tinta);color:#fff;box-shadow:0 8px 18px -8px rgba(14,74,48,.7)}
-@media (hover:hover){.pdx-wa:hover{filter:brightness(1.12)}}
-.pdx-ed{border:1px solid var(--pdx-linea);background:var(--pdx-tile);color:var(--t)}
-.pdx-prov.enviado .pdx-items{opacity:.72}
-.pdx-prov.enviado .pdx-wa{background:var(--pdx-tile);color:var(--pm);box-shadow:inset 0 0 0 1px var(--pdx-linea)}
+/* Las tarjetas de proveedor son las sencillas de surtido.css (sx-card). */
 .pd-reset.pdx-reset{display:flex;align-items:center;justify-content:center;width:auto;margin:10px auto 0;padding:10px 18px;border-radius:999px;border:1px dashed color-mix(in srgb,#dc2626 45%,transparent);background:transparent;color:#b91c1c;font:700 13px var(--pdx-f)}
 
 /* Entrada: solo al abrir la pestaña */
@@ -155,9 +104,9 @@ html[data-theme="dark"] .pdx-nota b{color:#fbbf24}
 .pdx-entra .pdx-chip,.pdx-entra .pdx-ley>div{animation:pdxEntra .55s cubic-bezier(.22,1,.36,1) both;animation-delay:.12s}
 .pdx-entra .pdx-split i{animation:pdxCrece .9s cubic-bezier(.22,1,.36,1) both;animation-delay:.2s}
 .pdx-entra .pdx-dots i{animation:pdxPunto .4s cubic-bezier(.34,1.56,.64,1) both;animation-delay:.35s}
-.pdx-entra .pdx-barra-f,.pdx-entra .pdx-prov{animation:pdxEntra .6s cubic-bezier(.22,1,.36,1) both;animation-delay:calc(.18s + var(--i,0) * 70ms)}
+.pdx-entra .pdx-barra-f,.pdx-entra .sx-card{animation:pdxEntra .6s cubic-bezier(.22,1,.36,1) both;animation-delay:calc(.18s + var(--i,0) * 70ms)}
 @keyframes pdxEntra{from{opacity:0;transform:translateY(18px)}}
 @keyframes pdxCrece{from{width:0}}
 @keyframes pdxPunto{from{transform:scale(0)}}
 @media (prefers-reduced-motion:reduce){.pdx-hero::after,.pdx-arte i{animation:none}.pdx-entra *{animation:none!important}}
-@media (max-width:400px){.pdx-hero{padding:20px 16px 16px;border-radius:24px}.pdx-arte i{font-size:28px}.pdx-fecha{font-size:24px;padding-right:96px}.pdx-chip{padding:10px}.pdx-chip b{font-size:21px}.pdx-items{grid-template-columns:repeat(2,minmax(0,1fr))}.pdx-prov{padding:14px}}
+@media (max-width:400px){.pdx-hero{padding:20px 16px 16px;border-radius:24px}.pdx-arte i{font-size:28px}.pdx-fecha{font-size:24px;padding-right:96px}.pdx-chip{padding:10px}.pdx-chip b{font-size:21px}}

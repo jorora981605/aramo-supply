@@ -323,10 +323,11 @@ function xpRenderProveedores(){
   const t=xpTotals();
   const sum=$('pvSum');
   if(sum){
-    sum.className='pv-sum'+(t.items?' has':'');
+    sum.className='pv-sum sx-mini'+(t.items?' has':'');
+    sum.setAttribute('aria-label',t.items?`${t.items} productos, ₡${fmt(t.total)}. Ver el pedido y enviarlo`:'Pedido vacío');
     sum.innerHTML=t.items
-      ?`<span class="pv-sum-ico">🧺</span><span class="pv-sum-txt"><strong>${t.items} producto${t.items===1?'':'s'} · ₡${fmt(t.total)}</strong><small>${t.pending?`${t.pending} proveedor${t.pending===1?'':'es'} por enviar`:'Todo enviado ✓'}</small></span><span class="pv-sum-go">${t.pending?'Enviar':'Ver'} ›</span>`
-      :`<span class="pv-sum-ico">👇</span><span class="pv-sum-txt"><strong>Elegí un proveedor</strong><small>y tocá los productos que necesitás</small></span>`;
+      ?`<span class="sx-mini-e">🧺</span><span class="sx-mini-t"><b>${plural(t.items,'producto','productos')}</b><small>₡${fmt(t.total)}${t.pending?` · ${t.pending} por enviar`:' · enviado ✓'}</small></span><span class="sx-mini-f">${ico('enviar')}</span>`
+      :`<span class="sx-mini-e">🧺</span><span class="sx-mini-t"><b>Pedido vacío</b><small>Buscá o abrí un proveedor</small></span>`;
   }
   const q=normalizeText($('pvSearch')?.value||'');
   const searching=!!q&&!XP.parsed.length;
@@ -345,9 +346,10 @@ function xpRenderProveedores(){
   if(top){
     const sides=activeOrderSides();
     top.innerHTML=XP.undo&&Date.now()-XP.undo.at<120000
-      ?`<div class="pv-undo">Pedido reiniciado <button type="button" data-pv="undo">↩️ Deshacer</button></div>`
-      :t.items?`<button type="button" class="pv-reset" data-pv="reset">🗑️ Reiniciar pedido${sides.length===1?' de '+SIDE_NAME[sides[0]]:''} <small>borra las cantidades y empieza de cero</small></button>`:'';
+      ?`<div class="pv-undo sx-mini"><span class="sx-mini-t"><b>Reiniciado</b></span><button type="button" data-pv="undo">↩️ Deshacer</button></div>`
+      :t.items?`<button type="button" class="pv-reset sx-mini" data-pv="reset" aria-label="Reiniciar pedido${sides.length===1?' de '+SIDE_NAME[sides[0]]:''}: borra las cantidades y empieza de cero" title="Borra las cantidades y empieza de cero"><span class="sx-mini-e">${ico('reiniciar')}</span><span class="sx-mini-t"><b>Reiniciar</b></span></button>`:'';
   }
+  sxRenderTablero();
 }
 window.renderProveedoresNav=xpRenderProveedores;
 
@@ -676,6 +678,8 @@ const PDX_ICO={
   listo:'<path d="M20 6 9 17l-5-5"/>',
   reloj:'<circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/>',
   canasta:'<path d="M5 10h14l-1.5 9a2 2 0 0 1-2 1.7h-7a2 2 0 0 1-2-1.7z"/><path d="m9 10 3-6 3 6"/>',
+  mover:'<path d="M17 4l3 3-3 3"/><path d="M20 7H8"/><path d="M7 20l-3-3 3-3"/><path d="M4 17h12"/>',
+  reiniciar:'<path d="M3 12a9 9 0 1 0 2.6-6.4"/><path d="M3 4v5h5"/>',
 };
 const ico=(k,cls='')=>`<svg class="pdx-i${cls?' '+cls:''}" viewBox="0 0 24 24" aria-hidden="true">${PDX_ICO[k]}</svg>`;
 const PDX_COLORES=['#0f766e','#7c3aed','#c2410c','#0369a1','#be185d','#4d7c0f','#a16207','#4338ca','#0e7490','#b91c1c'];
@@ -684,26 +688,44 @@ function xpPartes(sides,valores){
   const tot=sides.reduce((t,s)=>t+(valores[s]||0),0)||1;
   return `<div class="pdx-split" aria-hidden="true">${sides.map(s=>`<i class="${s}" style="width:${Math.max(valores[s]?3:0,Math.round(valores[s]/tot*1000)/10)}%"></i>`).join('')}</div>`;
 }
-function xpPedidoTarjeta(d,i,sides){
-  const dos=sides.length>1,p=S.pedidos[d.prov]||{};
-  const color=PDX_COLORES[[...d.prov].reduce((h,c)=>(h*31+c.charCodeAt(0))%997,7)%PDX_COLORES.length];
-  const val={};sides.forEach(s=>val[s]=calcSide(s,d.prov));
-  const notas=sides.map(s=>{const n=String(p.notes?.['__note_'+s]||(s==='moravia'?p.note:'')||'').trim();return n?`<p class="pdx-nota ${s}"><b>${SIDE_NAME[s]}</b>${esc(n)}</p>`:'';}).join('');
-  const cant=(q,s)=>`<b class="${s}${q>0?'':' cero'}" title="${SIDE_NAME[s]}">${q>0?fmtQ(q):'·'}</b>`;
-  return `<article class="pdx-prov${d.sent?' enviado':''}" style="--i:${i};--c:${color}">
-    <header class="pdx-prov-h" data-pd="open" data-prov="${esc(d.prov)}" title="Editar ${esc(d.prov)}">
-      <span class="pdx-av">${esc(d.prov.charAt(0).toUpperCase())}${d.sent?`<em>${ico('listo')}</em>`:''}</span>
-      <span class="pdx-prov-t"><b>${esc(d.prov)}</b><small>${plural(d.n,'producto','productos')}${d.tot?` · <strong>₡${fmt(d.tot)}</strong>`:''}</small></span>
-      <span class="pdx-estado">${d.sent?ico('listo')+'Enviado':ico('reloj')+'Por enviar'}</span>
+// ── Tarjeta sencilla de proveedor (la usan Proveedores y Pedido) ──
+// Cada producto es una pastilla: fruta, nombre y las dos cantidades (verde Moravia, naranja
+// Los Ángeles). Tocarla cambia la cantidad; mantenerla apretada y arrastrarla la pasa a otro
+// proveedor (ver "Mover un producto" más abajo).
+const UNI_CORTA={unidad:'u',unid:'u','unid.':'u',unidades:'u',kg:'kg',paquete:'paq',rollo:'rollo',bolsa:'bolsa',caja:'caja',docena:'doc'};
+const uniCorta=u=>UNI_CORTA[String(u||'').toLowerCase()]||String(u||'');
+function sxColor(prov){return PDX_COLORES[[...String(prov)].reduce((h,c)=>(h*31+c.charCodeAt(0))%997,7)%PDX_COLORES.length];}
+function sxTarjeta(d,i,sides,modo){
+  const p=S.pedidos[d.prov]||{};
+  const cant=(q,s)=>`<b class="${s}${q>0?'':' cero'}">${q>0?fmtQ(q):'·'}</b>`;
+  const notas=sides.map(s=>{const n=String(p.notes?.['__note_'+s]||(s==='moravia'?p.note:'')||'').trim();return n?`<p class="sx-nota"><b>${SIDE_NAME[s]}:</b> ${esc(n)}</p>`:'';}).join('');
+  return `<article class="sx-card${d.sent?' enviado':''}" data-sx-drop="${esc(d.prov)}" style="--i:${i};--c:${sxColor(d.prov)}">
+    <header class="sx-card-h">
+      <button type="button" class="sx-card-id" data-pd="open" data-prov="${esc(d.prov)}" title="Abrir ${esc(d.prov)}"><span class="sx-av">${esc(d.prov.charAt(0).toUpperCase())}</span><span class="sx-card-t"><b>${esc(d.prov)}</b><small><i></i>${d.sent?'Enviado':'Por enviar'} · ${plural(d.n,'producto','productos')}</small></span></button>
+      ${d.tot?`<span class="sx-card-tot">₡${fmt(d.tot)}</span>`:''}
+      ${modo==='pedido'?`<button type="button" class="sx-env${d.sent?' hecho':''}" data-pd="send" data-prov="${esc(d.prov)}" aria-label="${d.sent?'Reenviar':'Enviar'} el pedido a ${esc(d.prov)}" title="${d.sent?'Reenviar':'Enviar'} por WhatsApp">${ico(d.sent?'listo':'enviar')}</button>`:''}
     </header>
-    ${dos&&d.tot?`<div class="pdx-tiendas">${xpPartes(sides,val)}<div class="pdx-tiendas-ley">${sides.map(s=>`<span class="${s}">${SIDE_NAME[s]} <b>₡${fmt(val[s])}</b></span>`).join('')}</div></div>`:''}
-    <div class="pdx-items">
-      ${d.lines.map(l=>`<button type="button" class="pdx-item" data-pd="line" data-prov="${esc(d.prov)}" data-pid="${esc(l.prod.id)}" aria-label="${esc(niceName(l.prod.name))}: ${sides.map(s=>SIDE_NAME[s]+' '+(l.q[s]||0)).join(', ')} ${esc(l.unit)}"><span class="pdx-e">${smartEmoji(l.prod)}</span><span class="pdx-n">${esc(niceName(l.prod.name))}</span><span class="pdx-q"><span class="pdx-cap">${sides.map(s=>cant(l.q[s],s)).join('')}</span><small>${esc(l.unit)}</small></span></button>`).join('')}
-      ${d.extras.map(x=>`<div class="pdx-item extra"><span class="pdx-e">➕</span><span class="pdx-n">${esc(x.name||'Extra')}</span><span class="pdx-q"><span class="pdx-cap">${sides.map(s=>cant(s===x.side?+x.qty:0,s)).join('')}</span><small>${esc(x.unit||'kg')}</small></span></div>`).join('')}
+    <div class="sx-chips">
+      ${d.lines.map(l=>`<button type="button" class="sx-chip" data-pd="line" data-prov="${esc(d.prov)}" data-pid="${esc(l.prod.id)}" aria-label="${esc(niceName(l.prod.name))}: ${sides.map(s=>SIDE_NAME[s]+' '+(l.q[s]||0)).join(', ')} ${esc(l.unit)}. Mantené apretado para pasarlo a otro proveedor."><span class="sx-e">${smartEmoji(l.prod)}</span><span class="sx-n">${esc(niceName(l.prod.name))}</span><span class="sx-q">${sides.map(s=>cant(l.q[s],s)).join('')}<small>${esc(uniCorta(l.unit))}</small></span></button>`).join('')}
+      ${d.extras.map(x=>`<span class="sx-chip extra"><span class="sx-e">➕</span><span class="sx-n">${esc(x.name||'Extra')}</span><span class="sx-q">${sides.map(s=>cant(s===x.side?+x.qty:0,s)).join('')}<small>${esc(uniCorta(x.unit||'kg'))}</small></span></span>`).join('')}
     </div>
     ${notas}
-    <footer class="pdx-pie"><button type="button" class="pdx-wa" data-pd="send" data-prov="${esc(d.prov)}">${ico('enviar')}${d.sent?'Reenviar':'Enviar pedido'}</button><button type="button" class="pdx-ed" data-pd="open" data-prov="${esc(d.prov)}">${ico('lapiz')}Editar</button></footer>
   </article>`;
+}
+function sxDatos(){
+  return xpTotals().provs.slice().sort((a,b)=>(isSent(a)-isSent(b))||a.localeCompare(b,'es'))
+    .map(prov=>{const {lines,extras}=xpProvLines(prov);return{prov,lines,extras,sent:isSent(prov),tot:sideTotal(prov),n:lines.length+extras.length};})
+    .filter(d=>d.n>0);
+}
+// Proveedores: "Tu pedido de hoy" arriba, en tarjetas sencillas.
+function sxRenderTablero(){
+  const box=$('sxTablero');if(!box)return;
+  const sides=activeOrderSides(),datos=sxDatos();
+  box.innerHTML=datos.length
+    ?`<div class="sx-tablero-h"><h2>Tu pedido de hoy</h2><small>${ico('mover')}Mantené apretado un producto y arrastralo a otro proveedor</small></div>
+      <div class="sx-grid">${datos.map((d,i)=>sxTarjeta(d,i,sides,'tablero')).join('')}</div>`
+    :`<div class="sx-vacio"><span>🧺</span><div><b>Todavía no hay productos</b><small>Buscá un producto arriba o abrí un proveedor abajo.</small></div></div>`;
+  const bn=$('sxProvBarN');if(bn)bn.textContent=getProvNames().length;
 }
 function xpRenderPedido(){
   const body=$('pedidoBody');if(!body)return;
@@ -747,7 +769,7 @@ function xpRenderPedido(){
   if(XP.undo&&Date.now()-XP.undo.at<120000)html+=`<div class="pd-undo">Pedido reiniciado. <button type="button" data-pd="undo">↩️ Deshacer</button></div>`;
   if(t.items){
     html+=`<div class="pdx-barra-f"><h3>Proveedores</h3><div class="pdx-filtros" role="group" aria-label="Qué proveedores ver">${[['todos','Todos',datos.length],['pend','Por enviar',porEnviar],['env','Enviados',enviados]].map(([k,n,c])=>`<button type="button" class="${_pdFiltro===k?'on':''}" data-pdx-f="${k}"${c||k==='todos'?'':' disabled'} aria-pressed="${_pdFiltro===k}">${n} <b>${c}</b></button>`).join('')}</div></div>`;
-    html+=`<div class="pdx-grid">${datos.filter(d=>_pdFiltro==='todos'||(_pdFiltro==='pend'?!d.sent:d.sent)).map((d,i)=>xpPedidoTarjeta(d,i,sides)).join('')}</div>`;
+    html+=`<div class="sx-grid">${datos.filter(d=>_pdFiltro==='todos'||(_pdFiltro==='pend'?!d.sent:d.sent)).map((d,i)=>sxTarjeta(d,i,sides,'pedido')).join('')}</div>`;
     html+=`<button type="button" class="pd-reset pdx-reset" data-pd="reset">🗑️ Reiniciar pedido${sides.length===1?' de '+SIDE_NAME[sides[0]]:''}</button>`;
   }
   html+=xpHistoryHtml();
@@ -767,6 +789,156 @@ function xpContarPedido(body){
     requestAnimationFrame(paso);
   });
 }
+// ══════════════════════════════════════════
+// ⇄ MOVER UN PRODUCTO a otro proveedor
+// Mantener apretada la pastilla (o arrastrar con el mouse) y soltarla sobre otra tarjeta o
+// sobre un proveedor de la lista que sube desde abajo. Si el producto es de las dos tiendas,
+// pregunta: las dos, solo Moravia o solo Los Ángeles. Siempre con "Deshacer".
+// Mantener apretado y soltar sin moverse abre la misma lista para elegir con un toque.
+// ══════════════════════════════════════════
+const SX={pend:null,sinClick:0,elegir:null,resp:null};
+const sxLinea=(prov,pid)=>xpProvLines(prov).lines.find(l=>l.prod.id===pid)||null;
+function sxDock(desde,arrastrando){
+  let dock=$('sxDock');
+  if(!dock){
+    dock=document.createElement('div');dock.id='sxDock';dock.className='sx-dock';dock.setAttribute('role','dialog');dock.setAttribute('aria-label','Pasar a otro proveedor');document.body.appendChild(dock);
+    dock.addEventListener('click',e=>{
+      const b=e.target.closest('[data-sx-drop]');
+      if(b&&SX.elegir){const f=SX.elegir;SX.elegir=null;f(b.dataset.sxDrop);}
+      else if(e.target.closest('[data-sx-cerrar]')){SX.elegir=null;sxCerrarDock();}
+    });
+  }
+  dock.classList.toggle('elegir',!arrastrando);
+  dock.innerHTML=`<div class="sx-dock-h"><span>${ico('mover')}<b>${arrastrando?'Soltalo en el proveedor que querés':'¿A quién se lo pedís?'}</b></span>${arrastrando?'':'<button type="button" data-sx-cerrar>Cancelar</button>'}</div>
+    <div class="sx-dock-grid">${getProvNames().filter(n=>n!==desde).map(n=>`<button type="button" data-sx-drop="${esc(n)}" style="--c:${sxColor(n)}"><span class="sx-av">${esc(n.charAt(0).toUpperCase())}</span><span class="sx-dock-n">${esc(n)}</span></button>`).join('')}</div>`;
+  requestAnimationFrame(()=>dock.classList.add('open'));
+}
+function sxCerrarDock(){$('sxDock')?.classList.remove('open');}
+function sxLevantar(st,x,y){
+  st.activo=true;buzz(14);
+  const r=st.chip.getBoundingClientRect();
+  st.dx=Math.min(x-r.left,r.width-20);st.dy=y-r.top;
+  const g=st.chip.cloneNode(true);g.className='sx-chip sx-fantasma';g.removeAttribute('data-pd');g.removeAttribute('data-pid');g.setAttribute('aria-hidden','true');
+  document.body.appendChild(g);st.g=g;
+  st.chip.classList.add('levantado');document.body.classList.add('sx-arrastrando');
+  sxDock(st.chip.dataset.prov,true);
+  sxSeguir(st,x,y);
+}
+function sxSeguir(st,x,y){
+  st.x=x;st.y=y;
+  st.g.style.transform=`translate(${x-st.dx}px,${y-st.dy}px) rotate(-3deg) scale(1.07)`;
+  st.g.style.visibility='hidden';const el=document.elementFromPoint(x,y);st.g.style.visibility='';
+  const t=el?.closest?.('[data-sx-drop]'),destino=t&&t.dataset.sxDrop!==st.chip.dataset.prov?t:null;
+  if(st.sobre!==destino){st.sobre?.classList.remove('sx-sobre');destino?.classList.add('sx-sobre');st.sobre=destino;if(destino)buzz(6);}
+  cancelAnimationFrame(st.raf);
+  if(y<90){const sube=()=>{window.scrollBy(0,-9);$('view-proveedores')?.querySelector('.scroll')?.scrollBy?.(0,-9);st.raf=requestAnimationFrame(sube);};st.raf=requestAnimationFrame(sube);}
+}
+function sxTerminar(st){
+  cancelAnimationFrame(st.raf);st.g?.remove();st.chip.classList.remove('levantado');st.sobre?.classList.remove('sx-sobre');document.body.classList.remove('sx-arrastrando');
+}
+function sxSoltar(st){
+  const desde=st.chip.dataset.prov,pid=st.chip.dataset.pid,hacia=st.sobre?.dataset.sxDrop,quieto=Math.hypot(st.x-st.x0,st.y-st.y0)<12;
+  sxTerminar(st);SX.sinClick=Date.now();
+  if(hacia){sxCerrarDock();sxPreguntar(desde,pid,hacia);return;}
+  if(quieto){sxDock(desde,false);SX.elegir=h=>{sxCerrarDock();sxPreguntar(desde,pid,h);};return;}
+  sxCerrarDock();
+}
+function sxPreguntar(desde,pid,hacia){
+  const l=sxLinea(desde,pid);if(!l||desde===hacia)return;
+  const lados=activeOrderSides().filter(s=>l.q[s]>0);
+  if(lados.length<2){sxHacer(desde,pid,hacia,lados,l);return;}
+  let m=$('sxPregunta');
+  if(!m){
+    m=document.createElement('div');m.id='sxPregunta';m.className='sx-pregunta';document.body.appendChild(m);
+    m.addEventListener('click',e=>{
+      const b=e.target.closest('[data-sx-lados]');
+      if(b){const f=SX.resp;SX.resp=null;m.classList.remove('open');if(f&&b.dataset.sxLados)f(b.dataset.sxLados.split(','));}
+      else if(e.target===m){SX.resp=null;m.classList.remove('open');}
+    });
+  }
+  const nom=esc(niceName(l.prod.name)),u=esc(uniCorta(l.unit));
+  m.innerHTML=`<div class="sx-preg-in" role="dialog" aria-modal="true" aria-label="Pasar ${nom} a ${esc(hacia)}">
+    <div class="sx-preg-cab"><span class="sx-preg-e">${smartEmoji(l.prod)}</span><div><p>Pasar a <b>${esc(hacia)}</b></p><h3>${nom}</h3></div></div>
+    <button type="button" class="sx-preg-b todo" data-sx-lados="${lados.join(',')}"><b>Las dos tiendas</b><small>${lados.map(s=>`${SIDE_NAME[s]} ${fmtQ(l.q[s])}`).join(' · ')} ${u}</small></button>
+    ${lados.map(s=>`<button type="button" class="sx-preg-b ${s}" data-sx-lados="${s}"><b>Solo ${SIDE_NAME[s]}</b><small>${fmtQ(l.q[s])} ${u} · lo otro sigue con ${esc(desde)}</small></button>`).join('')}
+    <button type="button" class="sx-preg-x" data-sx-lados="">Cancelar</button>
+  </div>`;
+  SX.resp=ls=>sxHacer(desde,pid,hacia,ls,l);
+  requestAnimationFrame(()=>m.classList.add('open'));
+}
+// Pasa la cantidad de cada tienda elegida. Si el otro proveedor no tiene ese producto, se le
+// agrega (con el precio del primero como punto de partida). Devuelve lo necesario para deshacer.
+function sxMover(desde,pid,hacia,lados){
+  const prodA=(getAllProviders()[desde]?.products||[]).find(x=>x.id===pid);if(!prodA||desde===hacia)return null;
+  const key=normalizeText(prodA.name);
+  let prodB=(getAllProviders()[hacia]?.products||[]).find(x=>normalizeText(x.name)===key);
+  if(!prodB){
+    ensureCustomProv(hacia);
+    const nuevo={id:'mv_'+Date.now().toString(36)+Math.random().toString(36).slice(2,6),name:prodA.name,emoji:prodA.emoji||'',unit:prodA.unit,agregado:Date.now()};
+    (S.customProviders[hacia].products=S.customProviders[hacia].products||[]).push(nuevo);
+    invalidateProvidersCache();
+    prodB=(getAllProviders()[hacia]?.products||[]).find(x=>x.id===nuevo.id)||nuevo;
+    const precio=getPrice(desde,pid);if(precio&&!getPrice(hacia,prodB.id))setPrice(hacia,prodB.id,precio);
+  }
+  const pA=getPedido(desde),pB=getPedido(hacia),antes=[];
+  lados.forEach(side=>{
+    const v=pA.qtys?.[side]?.[pid];if(!v||!(+v.qty>0))return;
+    const w=pB.qtys?.[side]?.[prodB.id];
+    antes.push([desde,prodA,side,v.qty,v.unit],[hacia,prodB,side,w?.qty||'',w?.unit||prodB.unit]);
+    syncQty(hacia,prodB,side,String(+((+w?.qty||0)+(+v.qty)).toFixed(3)),v.unit||w?.unit||prodB.unit);
+    const nota=getProductNote(pA,pid,side);if(nota&&!getProductNote(pB,prodB.id,side))syncProductNote(hacia,prodB,side,nota);
+    syncQty(desde,prodA,side,'',v.unit);
+  });
+  return antes;
+}
+function sxHacer(desde,pid,hacia,lados,l){
+  const antes=sxMover(desde,pid,hacia,lados);if(!antes||!antes.length)return;
+  xpRefresh();
+  const solo=lados.length===1&&activeOrderSides().length>1?' de '+SIDE_NAME[lados[0]]:'';
+  sxAviso(`${niceName(l.prod.name)}${solo} ahora se lo pedís a ${hacia}`,smartEmoji(l.prod),()=>{
+    antes.forEach(([prov,prod,side,q,u])=>syncQty(prov,prod,side,q?String(q):'',u));xpRefresh();
+  });
+}
+let _sxAvisoT=0;
+function sxAviso(txt,e,deshacer){
+  let a=$('sxAviso');if(!a){a=document.createElement('div');a.id='sxAviso';a.className='sx-aviso';a.setAttribute('role','status');document.body.appendChild(a);}
+  a.innerHTML=`<span class="sx-aviso-e">${e||'⇄'}</span><span class="sx-aviso-t">${esc(txt)}</span>${deshacer?'<button type="button">Deshacer</button>':''}`;
+  a.querySelector('button')?.addEventListener('click',()=>{a.classList.remove('open');deshacer();});
+  a.classList.add('open');clearTimeout(_sxAvisoT);_sxAvisoT=setTimeout(()=>a.classList.remove('open'),7000);
+}
+document.addEventListener('pointerdown',e=>{
+  const chip=e.target.closest?.('.sx-chip[data-pid]');if(!chip||(e.pointerType==='mouse'&&e.button!==0))return;
+  const st={chip,x0:e.clientX,y0:e.clientY,x:e.clientX,y:e.clientY,id:e.pointerId,tipo:e.pointerType,activo:false};
+  SX.pend=st;
+  if(e.pointerType!=='mouse')st.timer=setTimeout(()=>{if(SX.pend===st&&!st.activo)sxLevantar(st,st.x,st.y);},320);
+},{passive:true});
+document.addEventListener('pointermove',e=>{
+  const st=SX.pend;if(!st||e.pointerId!==st.id)return;
+  if(!st.activo){
+    const d=Math.hypot(e.clientX-st.x0,e.clientY-st.y0);st.x=e.clientX;st.y=e.clientY;
+    if(st.tipo==='mouse'){if(d>6)sxLevantar(st,e.clientX,e.clientY);}
+    else if(d>10){clearTimeout(st.timer);SX.pend=null;} // era para bajar la pantalla
+    return;
+  }
+  sxSeguir(st,e.clientX,e.clientY);
+});
+// Mientras se arrastra, la pantalla no se mueve con el dedo.
+document.addEventListener('touchmove',e=>{if(SX.pend?.activo)e.preventDefault();},{passive:false});
+const sxFin=e=>{
+  const st=SX.pend;if(!st||e.pointerId!==st.id)return;
+  clearTimeout(st.timer);SX.pend=null;
+  if(!st.activo)return;
+  if(e.type==='pointercancel'){sxTerminar(st);sxCerrarDock();}else sxSoltar(st);
+};
+document.addEventListener('pointerup',sxFin);document.addEventListener('pointercancel',sxFin);
+// Soltar después de arrastrar no cuenta como toque (no abre la cantidad).
+document.addEventListener('click',e=>{if(Date.now()-SX.sinClick<450&&e.target.closest?.('.sx-chip,.sx-card')){e.stopPropagation();e.preventDefault();}},true);
+document.addEventListener('contextmenu',e=>{if(e.target.closest?.('.sx-chip[data-pid]'))e.preventDefault();});
+document.addEventListener('keydown',e=>{
+  if(e.key!=='Escape')return;
+  if(SX.pend?.activo){const st=SX.pend;SX.pend=null;sxTerminar(st);}
+  SX.elegir=SX.resp=null;sxCerrarDock();$('sxPregunta')?.classList.remove('open');
+});
 function xpHistoryHtml(){
   const today=new Date().toISOString().slice(0,10);
   const byDate={};
@@ -976,6 +1148,8 @@ $('pvParse')?.addEventListener('input',xpParseChange);
 $('pvParse')?.addEventListener('change',xpParseChange);
 $('provSuggest')?.addEventListener('click',xpSugClick);
 $('pedidoBody')?.addEventListener('click',xpPedidoClick);
+$('sxTablero')?.addEventListener('click',xpPedidoClick);
+$('sxProvBar')?.addEventListener('click',()=>{const b=$('sxProvBar'),w=b.closest('.pv-wrap'),ab=!w.classList.contains('sx-abierto');w.classList.toggle('sx-abierto',ab);b.setAttribute('aria-expanded',String(ab));if(ab)setTimeout(()=>b.scrollIntoView({behavior:'smooth',block:'start'}),60);});
 $('pedidoBody')?.addEventListener('click',e=>{const f=e.target.closest('[data-pdx-f]');if(!f||f.disabled)return;_pdFiltro=f.dataset.pdxF;xpRenderPedido();});
 
 // Arranque
