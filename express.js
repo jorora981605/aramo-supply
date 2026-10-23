@@ -666,24 +666,43 @@ function xpSugClick(e){
 let _pdFiltro='todos',_pdEntrar=true,_pdNums={},_pdT=0;
 const capital=s=>String(s||'').charAt(0).toUpperCase()+String(s||'').slice(1);
 const plural=(n,a,b)=>n+' '+(n===1?a:b);
+// Íconos dibujados (se ven nítidos en cualquier teléfono, a diferencia de los emojis en botones).
+const PDX_ICO={
+  enviar:'<path d="M22 2 11 13"/><path d="M22 2 15 22l-4-9-9-4z"/>',
+  mensaje:'<path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>',
+  lista:'<path d="M8 6h13M8 12h13M8 18h13"/><path d="M3.5 6h.01M3.5 12h.01M3.5 18h.01"/>',
+  lapiz:'<path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4z"/>',
+  flecha:'<path d="M5 12h14M13 5l7 7-7 7"/>',
+  listo:'<path d="M20 6 9 17l-5-5"/>',
+  reloj:'<circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/>',
+  canasta:'<path d="M5 10h14l-1.5 9a2 2 0 0 1-2 1.7h-7a2 2 0 0 1-2-1.7z"/><path d="m9 10 3-6 3 6"/>',
+};
+const ico=(k,cls='')=>`<svg class="pdx-i${cls?' '+cls:''}" viewBox="0 0 24 24" aria-hidden="true">${PDX_ICO[k]}</svg>`;
+const PDX_COLORES=['#0f766e','#7c3aed','#c2410c','#0369a1','#be185d','#4d7c0f','#a16207','#4338ca','#0e7490','#b91c1c'];
+// Barra que muestra cuánto pide cada tienda (verde Moravia, naranja Los Ángeles).
+function xpPartes(sides,valores){
+  const tot=sides.reduce((t,s)=>t+(valores[s]||0),0)||1;
+  return `<div class="pdx-split" aria-hidden="true">${sides.map(s=>`<i class="${s}" style="width:${Math.max(valores[s]?3:0,Math.round(valores[s]/tot*1000)/10)}%"></i>`).join('')}</div>`;
+}
 function xpPedidoTarjeta(d,i,sides){
-  const dos=sides.length>1,hue=[...d.prov].reduce((h,c)=>(h*31+c.charCodeAt(0))%360,7),p=S.pedidos[d.prov]||{};
-  const subs=dos?sides.map(s=>{const v=calcSide(s,d.prov);return v?`<span class="${s}">${SIDE_ICO[s]} ${SIDE_NAME[s]} <b>₡${fmt(v)}</b></span>`:'';}).join(''):'';
-  const notas=sides.map(s=>{const n=String(p.notes?.['__note_'+s]||(s==='moravia'?p.note:'')||'').trim();return n?`<p class="pdx-nota ${s}"><b>📝 ${SIDE_NAME[s]}:</b> ${esc(n)}</p>`:'';}).join('');
-  const cant=(q,s)=>`<i class="${s}${q>0?'':' cero'}" title="${SIDE_NAME[s]}">${q>0?fmtQ(q):'–'}</i>`;
-  return `<article class="pdx-prov${d.sent?' enviado':''}" style="--i:${i};--h:${hue}">
+  const dos=sides.length>1,p=S.pedidos[d.prov]||{};
+  const color=PDX_COLORES[[...d.prov].reduce((h,c)=>(h*31+c.charCodeAt(0))%997,7)%PDX_COLORES.length];
+  const val={};sides.forEach(s=>val[s]=calcSide(s,d.prov));
+  const notas=sides.map(s=>{const n=String(p.notes?.['__note_'+s]||(s==='moravia'?p.note:'')||'').trim();return n?`<p class="pdx-nota ${s}"><b>${SIDE_NAME[s]}</b>${esc(n)}</p>`:'';}).join('');
+  const cant=(q,s)=>`<b class="${s}${q>0?'':' cero'}" title="${SIDE_NAME[s]}">${q>0?fmtQ(q):'·'}</b>`;
+  return `<article class="pdx-prov${d.sent?' enviado':''}" style="--i:${i};--c:${color}">
     <header class="pdx-prov-h" data-pd="open" data-prov="${esc(d.prov)}" title="Editar ${esc(d.prov)}">
-      <span class="pdx-av">${esc(d.prov.charAt(0).toUpperCase())}</span>
-      <span class="pdx-prov-t"><b>${esc(d.prov)}</b><small>${plural(d.n,'producto','productos')}</small></span>
-      <span class="pdx-prov-r"><b>${d.tot?'₡'+fmt(d.tot):''}</b><em class="pdx-estado">${d.sent?'✅ Enviado':'⏳ Por enviar'}</em></span>
+      <span class="pdx-av">${esc(d.prov.charAt(0).toUpperCase())}${d.sent?`<em>${ico('listo')}</em>`:''}</span>
+      <span class="pdx-prov-t"><b>${esc(d.prov)}</b><small>${plural(d.n,'producto','productos')}${d.tot?` · <strong>₡${fmt(d.tot)}</strong>`:''}</small></span>
+      <span class="pdx-estado">${d.sent?ico('listo')+'Enviado':ico('reloj')+'Por enviar'}</span>
     </header>
-    ${subs?`<div class="pdx-subs">${subs}</div>`:''}
+    ${dos&&d.tot?`<div class="pdx-tiendas">${xpPartes(sides,val)}<div class="pdx-tiendas-ley">${sides.map(s=>`<span class="${s}">${SIDE_NAME[s]} <b>₡${fmt(val[s])}</b></span>`).join('')}</div></div>`:''}
     <div class="pdx-items">
-      ${d.lines.map(l=>`<button type="button" class="pdx-item" data-pd="line" data-prov="${esc(d.prov)}" data-pid="${esc(l.prod.id)}" aria-label="${esc(niceName(l.prod.name))}: ${sides.map(s=>SIDE_NAME[s]+' '+(l.q[s]||0)).join(', ')} ${esc(l.unit)}"><span class="pdx-e">${smartEmoji(l.prod)}</span><span class="pdx-n">${esc(niceName(l.prod.name))}</span><span class="pdx-q">${sides.map(s=>cant(l.q[s],s)).join('')}<small>${esc(l.unit)}</small></span></button>`).join('')}
-      ${d.extras.map(x=>`<div class="pdx-item extra"><span class="pdx-e">➕</span><span class="pdx-n">${esc(x.name||'Extra')}</span><span class="pdx-q">${sides.map(s=>cant(s===x.side?+x.qty:0,s)).join('')}<small>${esc(x.unit||'kg')}</small></span></div>`).join('')}
+      ${d.lines.map(l=>`<button type="button" class="pdx-item" data-pd="line" data-prov="${esc(d.prov)}" data-pid="${esc(l.prod.id)}" aria-label="${esc(niceName(l.prod.name))}: ${sides.map(s=>SIDE_NAME[s]+' '+(l.q[s]||0)).join(', ')} ${esc(l.unit)}"><span class="pdx-e">${smartEmoji(l.prod)}</span><span class="pdx-n">${esc(niceName(l.prod.name))}</span><span class="pdx-q"><span class="pdx-cap">${sides.map(s=>cant(l.q[s],s)).join('')}</span><small>${esc(l.unit)}</small></span></button>`).join('')}
+      ${d.extras.map(x=>`<div class="pdx-item extra"><span class="pdx-e">➕</span><span class="pdx-n">${esc(x.name||'Extra')}</span><span class="pdx-q"><span class="pdx-cap">${sides.map(s=>cant(s===x.side?+x.qty:0,s)).join('')}</span><small>${esc(x.unit||'kg')}</small></span></div>`).join('')}
     </div>
     ${notas}
-    <footer class="pdx-pie"><button type="button" class="pdx-wa" data-pd="send" data-prov="${esc(d.prov)}">💬 ${d.sent?'Reenviar':'Enviar'}</button><button type="button" class="pdx-ed" data-pd="open" data-prov="${esc(d.prov)}">✏️ Editar</button></footer>
+    <footer class="pdx-pie"><button type="button" class="pdx-wa" data-pd="send" data-prov="${esc(d.prov)}">${ico('enviar')}${d.sent?'Reenviar':'Enviar pedido'}</button><button type="button" class="pdx-ed" data-pd="open" data-prov="${esc(d.prov)}">${ico('lapiz')}Editar</button></footer>
   </article>`;
 }
 function xpRenderPedido(){
@@ -691,40 +710,49 @@ function xpRenderPedido(){
   const sides=activeOrderSides(),dos=sides.length>1;
   const t=xpTotals(),all=calcScopedAllProvs();
   const provs=t.provs.slice().sort((a,b)=>(isSent(a)-isSent(b))||a.localeCompare(b,'es'));
-  const fecha=capital(new Date().toLocaleDateString('es-CR',{weekday:'long',day:'numeric',month:'long'}));
+  const fecha=capital(new Date().toLocaleDateString('es-CR',{weekday:'long',day:'numeric',month:'long'}).replace(',',''));
   const datos=provs.map(prov=>{const {lines,extras}=xpProvLines(prov);return{prov,lines,extras,sent:isSent(prov),tot:sideTotal(prov),n:lines.length+extras.length};});
   const enviados=datos.filter(d=>d.sent).length,porEnviar=datos.length-enviados;
   const nSide=s=>datos.reduce((k,d)=>k+d.lines.filter(l=>l.q[s]>0).length+d.extras.filter(x=>x.side===s).length,0);
   if((_pdFiltro==='pend'&&!porEnviar)||(_pdFiltro==='env'&&!enviados))_pdFiltro='todos';
-  const ley=sides.map(s=>`<span class="${s}">${SIDE_ICO[s]} ${SIDE_NAME[s]}</span>`).join('');
   let html=`<section class="pdx-hero${t.items?'':' vacio'}">
-    <div class="pdx-fx" aria-hidden="true"><i>🥕</i><i>🍅</i><i>🥬</i><i>🧅</i><i>🍋</i></div>
-    <div class="pdx-top"><div><p class="pdx-kick">Pedido de mañana</p><h2>${esc(fecha)}</h2></div><div class="pdx-ley">${ley}</div></div>`;
+    <div class="pdx-arte" aria-hidden="true"><i>🥬</i><i>🍅</i><i>🥕</i></div>
+    <p class="pdx-kick">${ico('canasta')}Pedido de mañana</p>
+    <h2 class="pdx-fecha">${esc(fecha)}</h2>`;
   if(!t.items){
-    html+=`<div class="pdx-vacio"><span>🧺</span><b>Todavía no hay nada pedido</b><small>Entrá a un proveedor y tocá sus productos.</small><button type="button" class="pdx-cta" data-pd="go"><span>🏪</span><span><b>Ir a proveedores</b></span><i>→</i></button></div></section>`;
+    html+=`<div class="pdx-vacio"><b>Todavía no hay nada pedido</b><small>Entrá a un proveedor y tocá sus productos.</small><button type="button" class="pdx-cta" data-pd="go"><span class="pdx-cta-i">${ico('canasta')}</span><span class="pdx-cta-t"><b>Ir a proveedores</b></span><span class="pdx-cta-f">${ico('flecha')}</span></button></div></section>`;
   }else{
-    html+=`<div class="pdx-total"><small>${dos?'Total de las dos tiendas':'Total del pedido'}</small><strong data-pdx-num="total" data-v="${all.total}">₡${fmt(all.total)}</strong></div>
-    <div class="pdx-stats">
-      <div class="pdx-stat"><span class="pdx-se">🧺</span><b data-pdx-num="items" data-v="${t.items}">${t.items}</b><small>${t.items===1?'producto':'productos'}</small></div>
-      <div class="pdx-stat ${porEnviar?'urg':'ok'}"><span class="pdx-se">${porEnviar?'📤':'✅'}</span><b data-pdx-num="pend" data-v="${porEnviar}">${porEnviar}</b><small>${porEnviar?(porEnviar===1?'proveedor por enviar':'proveedores por enviar'):'todo enviado'}</small></div>
-      ${dos?sides.map(s=>`<div class="pdx-stat ${s}"><span class="pdx-se">${SIDE_ICO[s]}</span><b data-pdx-num="${s}" data-v="${all[s]}">₡${fmt(all[s])}</b><small>${SIDE_NAME[s]} · ${plural(nSide(s),'producto','productos')}</small></div>`).join('')
-        :`<div class="pdx-stat"><span class="pdx-se">🏪</span><b>${datos.length}</b><small>${datos.length===1?'proveedor':'proveedores'}</small></div>`}
+    html+=`<div class="pdx-cuerpo">
+      <div class="pdx-col">
+        <div class="pdx-total"><strong data-pdx-num="total" data-v="${all.total}">₡${fmt(all.total)}</strong><span>${dos?'total de las dos tiendas':'total del pedido'}</span></div>
+        ${dos?`${xpPartes(sides,all)}<div class="pdx-ley">${sides.map(s=>`<div class="${s}"><span><i></i>${SIDE_NAME[s]}</span><b data-pdx-num="${s}" data-v="${all[s]}">₡${fmt(all[s])}</b><small>${plural(nSide(s),'producto','productos')}</small></div>`).join('')}</div>`:''}
+      </div>
+      <div class="pdx-col">
+        <div class="pdx-chips">
+          <div class="pdx-chip"><b data-pdx-num="items" data-v="${t.items}">${t.items}</b><span>${t.items===1?'producto':'productos'}</span></div>
+          <div class="pdx-chip ${porEnviar?'urg':'ok'}"><b data-pdx-num="pend" data-v="${porEnviar}">${porEnviar}</b><span>${porEnviar?'por enviar':'todo enviado'}</span></div>
+          <div class="pdx-chip"><b>${datos.length}</b><span>${datos.length===1?'proveedor':'proveedores'}</span></div>
+        </div>
+        <div class="pdx-envios" role="progressbar" aria-valuemin="0" aria-valuemax="${datos.length}" aria-valuenow="${enviados}" aria-label="Proveedores enviados">
+          <span class="pdx-dots">${datos.map(d=>`<i class="${d.sent?'on':''}" title="${esc(d.prov)}"></i>`).join('')}</span>
+          <small><b>${enviados}</b> de ${datos.length} enviados</small>
+        </div>
+        ${porEnviar?`<button type="button" class="pdx-cta" data-pd="chain"><span class="pdx-cta-i">${ico('enviar')}</span><span class="pdx-cta-t"><b>Enviar uno por uno</b><small>${plural(porEnviar,'proveedor','proveedores')} · te guío paso a paso</small></span><span class="pdx-cta-f">${ico('flecha')}</span></button>
+          <div class="pdx-acc2"><button type="button" data-pd="allone">${ico('mensaje')}Todo en 1 mensaje</button><button type="button" data-pd="lista">${ico('lista')}Lista a contactos</button></div>`
+          :`<div class="pdx-listo"><span>${ico('listo')}¡Todo enviado!</span><button type="button" data-pd="lista">${ico('lista')}Lista a contactos</button></div>`}
+      </div>
     </div>
-    <div class="pdx-prog" role="progressbar" aria-valuemin="0" aria-valuemax="${datos.length}" aria-valuenow="${enviados}"><div class="pdx-barra"><i style="--p:${datos.length?enviados/datos.length:0}"></i></div><span><b>${enviados}</b> de ${plural(datos.length,'proveedor enviado','proveedores enviados')}</span></div>
-    ${porEnviar?`<button type="button" class="pdx-cta" data-pd="chain"><span>⛓️</span><span><b>Enviar uno por uno</b><small>${plural(porEnviar,'proveedor','proveedores')} · te guío paso a paso</small></span><i>→</i></button>
-      <div class="pdx-acc2"><button type="button" data-pd="allone">📤 Todo en 1 mensaje</button><button type="button" data-pd="lista">📋 Lista a contactos</button></div>`
-      :`<div class="pdx-listo"><span>🎉 ¡Todo enviado!</span><button type="button" data-pd="lista">📋 Lista a contactos</button></div>`}
   </section>`;
   }
   if(XP.undo&&Date.now()-XP.undo.at<120000)html+=`<div class="pd-undo">Pedido reiniciado. <button type="button" data-pd="undo">↩️ Deshacer</button></div>`;
   if(t.items){
-    html+=`<div class="pdx-filtros" role="group" aria-label="Qué proveedores ver">${[['todos','Todos',datos.length],['pend','⏳ Por enviar',porEnviar],['env','✅ Enviados',enviados]].map(([k,n,c])=>`<button type="button" class="${_pdFiltro===k?'on':''}" data-pdx-f="${k}"${c||k==='todos'?'':' disabled'} aria-pressed="${_pdFiltro===k}">${n} <b>${c}</b></button>`).join('')}</div>`;
+    html+=`<div class="pdx-barra-f"><h3>Proveedores</h3><div class="pdx-filtros" role="group" aria-label="Qué proveedores ver">${[['todos','Todos',datos.length],['pend','Por enviar',porEnviar],['env','Enviados',enviados]].map(([k,n,c])=>`<button type="button" class="${_pdFiltro===k?'on':''}" data-pdx-f="${k}"${c||k==='todos'?'':' disabled'} aria-pressed="${_pdFiltro===k}">${n} <b>${c}</b></button>`).join('')}</div></div>`;
     html+=`<div class="pdx-grid">${datos.filter(d=>_pdFiltro==='todos'||(_pdFiltro==='pend'?!d.sent:d.sent)).map((d,i)=>xpPedidoTarjeta(d,i,sides)).join('')}</div>`;
     html+=`<button type="button" class="pd-reset pdx-reset" data-pd="reset">🗑️ Reiniciar pedido${sides.length===1?' de '+SIDE_NAME[sides[0]]:''}</button>`;
   }
   html+=xpHistoryHtml();
   // La entrada animada solo al abrir la pestaña (si no, cada cambio en vivo la repetiría).
-  if(_pdEntrar){body.classList.add('pdx-entra');clearTimeout(_pdT);_pdT=setTimeout(()=>body.classList.remove('pdx-entra'),1400);_pdEntrar=false;}
+  if(_pdEntrar){body.classList.add('pdx-entra');clearTimeout(_pdT);_pdT=setTimeout(()=>body.classList.remove('pdx-entra'),1600);_pdEntrar=false;}
   body.innerHTML=html;
   xpContarPedido(body);
 }
