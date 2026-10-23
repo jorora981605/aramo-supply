@@ -722,42 +722,57 @@ function sxDatos(){
     .map(prov=>{const {lines,extras}=xpProvLines(prov);return{prov,lines,extras,sent:isSent(prov),tot:sideTotal(prov),n:lines.length+extras.length};})
     .filter(d=>d.n>0);
 }
-// Proveedores: "Tu pedido de hoy" dividido por sucursal. Cada tienda ve lo que ella llenó:
-// sus proveedores, sus cantidades, su total y si ya se le envió. En el celular se cambia de
-// tienda con dos pestañas; en la compu se ven las dos lado a lado.
-const SX_LADO_KEY='aramo_sx_lado';
-function sxLadoVisto(sides){let l='';try{l=localStorage.getItem(SX_LADO_KEY)||'';}catch{}return sides.includes(l)?l:sides[0];}
-function sxTarjetaLado(d,side,i){
+// Proveedores: "Tu pedido de hoy" con las dos tiendas a la vista al mismo tiempo.
+// Una franja por proveedor y, debajo, dos columnas: Moravia (verde) y Los Ángeles (naranja),
+// cada una con lo que llenó esa tienda. Arriba queda fija la cabecera de las dos columnas.
+// Tocar un producto cambia su cantidad; arrastrarlo (puntitos) lo pasa a otro proveedor,
+// a la misma tienda.
+function sxLado(d,side){
   const p=S.pedidos[d.prov]||{},lines=d.lines.filter(l=>l.q[side]>0),extras=d.extras.filter(x=>x.side===side);
-  const sent=!!sentFlags(p)[side],tot=calcSide(side,d.prov),n=lines.length+extras.length;
+  const sent=!!sentFlags(p)[side];
   const nota=String(p.notes?.['__note_'+side]||(side==='moravia'?p.note:'')||'').trim();
-  return `<article class="sx-card ${side}${sent?' enviado':''}" data-sx-drop="${esc(d.prov)}" data-sx-lado="${side}" style="--i:${i};--c:${sxColor(d.prov)}">
-    <header class="sx-card-h"><button type="button" class="sx-card-id" data-pd="open" data-prov="${esc(d.prov)}" title="Abrir ${esc(d.prov)}"><span class="sx-av">${esc(d.prov.charAt(0).toUpperCase())}</span><span class="sx-card-t"><b>${esc(d.prov)}</b><small><i></i>${sent?'Enviado':'Por enviar'} · ${plural(n,'producto','productos')}</small></span></button>${tot?`<span class="sx-card-tot">₡${fmt(tot)}</span>`:''}</header>
-    <div class="sx-chips">
-      ${lines.map(l=>`<div class="sx-chip uno ${side}" data-prov="${esc(d.prov)}" data-pid="${esc(l.prod.id)}" data-lado="${side}"><span class="sx-grip" title="Arrastrar a otro proveedor" aria-hidden="true"></span><button type="button" class="sx-chip-b" data-sx-ed aria-label="${esc(niceName(l.prod.name))}: ${fmtQ(l.q[side])} ${esc(l.unit)} para ${SIDE_NAME[side]}. Tocá para cambiar la cantidad o pasarlo a otro proveedor."><span class="sx-e">${smartEmoji(l.prod)}</span><span class="sx-n">${esc(niceName(l.prod.name))}</span><span class="sx-uno">${fmtQ(l.q[side])}<small>${esc(uniCorta(l.unit))}</small></span></button></div>`).join('')}
-      ${extras.map(x=>`<div class="sx-chip uno extra ${side}"><button type="button" class="sx-chip-b" data-pd="open" data-prov="${esc(d.prov)}" aria-label="${esc(x.name||'Extra')}: se edita en el proveedor"><span class="sx-e">➕</span><span class="sx-n">${esc(x.name||'Extra')}</span><span class="sx-uno">${fmtQ(+x.qty)}<small>${esc(uniCorta(x.unit||'kg'))}</small></span></button></div>`).join('')}
-    </div>
+  const filas=lines.map(l=>`<div class="sx-chip uno ${side}" data-prov="${esc(d.prov)}" data-pid="${esc(l.prod.id)}" data-lado="${side}"><button type="button" class="sx-grip" tabindex="-1" title="Arrastrar a otro proveedor" aria-hidden="true"></button><button type="button" class="sx-chip-b" data-sx-ed aria-label="${esc(niceName(l.prod.name))}: ${fmtQ(l.q[side])} ${esc(l.unit)} para ${SIDE_NAME[side]}. Tocá para cambiar la cantidad o pasarlo a otro proveedor."><span class="sx-e">${smartEmoji(l.prod)}</span><span class="sx-n">${esc(niceName(l.prod.name))}</span><span class="sx-uno">${fmtQ(l.q[side])}<small>${esc(uniCorta(l.unit))}</small></span></button></div>`).join('')
+    +extras.map(x=>`<div class="sx-chip uno extra ${side}"><button type="button" class="sx-chip-b" data-pd="open" data-prov="${esc(d.prov)}" aria-label="${esc(x.name||'Extra')}: se edita en el proveedor"><span class="sx-e">➕</span><span class="sx-n">${esc(x.name||'Extra')}</span><span class="sx-uno">${fmtQ(+x.qty)}<small>${esc(uniCorta(x.unit||'kg'))}</small></span></button></div>`).join('');
+  return `<div class="sx-lado ${side}${sent?' enviado':''}${filas?'':' nada'}" data-lado="${side}" aria-label="${SIDE_NAME[side]}">
+    ${sent&&filas?`<span class="sx-ok">✓ Enviado</span>`:''}${filas||'<span class="sx-nada" aria-label="Nada para '+SIDE_NAME[side]+'">—</span>'}
     ${nota?`<p class="sx-nota">📝 ${esc(nota)}</p>`:''}
-  </article>`;
+  </div>`;
 }
 function sxRenderTablero(){
   const box=$('sxTablero');if(!box)return;
   const bn=$('sxProvBarN');if(bn)bn.textContent=getProvNames().length;
-  const sides=activeOrderSides(),datos=sxDatos(),dos=sides.length>1,ver=sxLadoVisto(sides);
+  const sides=activeOrderSides(),datos=sxDatos();
   if(!datos.length){box.innerHTML=`<div class="sx-vacio"><span>🧺</span><div><b>Todavía no hay productos</b><small>Buscá un producto arriba o abrí un proveedor abajo.</small></div></div>`;return;}
-  const porLado=sides.map(side=>{
+  const tienda=side=>{
     const ds=datos.filter(d=>d.lines.some(l=>l.q[side]>0)||d.extras.some(x=>x.side===side));
-    return{side,ds,n:ds.reduce((k,d)=>k+d.lines.filter(l=>l.q[side]>0).length+d.extras.filter(x=>x.side===side).length,0),
-      tot:ds.reduce((t,d)=>t+calcSide(side,d.prov),0),pend:ds.filter(d=>!sentFlags(S.pedidos[d.prov]||{})[side]).length};
-  });
-  box.innerHTML=`<div class="sx-tablero-h"><h2>Tu pedido de hoy</h2><small><span class="sx-grip-demo" aria-hidden="true"></span>Arrastrá desde los puntitos para pasar un producto a otro proveedor</small></div>
-    ${dos?`<div class="sx-lados" role="tablist" aria-label="Sucursal">${porLado.map(x=>`<button type="button" role="tab" class="${x.side}${x.side===ver?' on':''}" data-sx-tab="${x.side}" aria-selected="${x.side===ver}"><span class="sx-lados-n">${SIDE_ICO[x.side]} ${SIDE_NAME[x.side]}</span><span class="sx-lados-d"><b>₡${fmt(x.tot)}</b> · ${plural(x.n,'producto','productos')}</span>${x.pend?`<em>${x.pend} por enviar</em>`:`<em class="ok">enviado ✓</em>`}</button>`).join('')}</div>`:''}
-    <div class="sx-columnas${dos?' dos':''}" data-ver="${ver}">${porLado.map(x=>`<section class="sx-col ${x.side}" aria-label="Pedido de ${SIDE_NAME[x.side]}">
-      <div class="sx-col-h"><b>${SIDE_ICO[x.side]} ${SIDE_NAME[x.side]}</b><span>₡${fmt(x.tot)} · ${plural(x.n,'producto','productos')}${x.pend?` · ${x.pend} por enviar`:''}</span></div>
-      ${x.ds.length?`<div class="sx-grid">${x.ds.map((d,i)=>sxTarjetaLado(d,x.side,i)).join('')}</div>`
-        :`<div class="sx-vacio chico"><span>🧺</span><div><b>${SIDE_NAME[x.side]} todavía no pidió nada</b><small>Buscá un producto arriba o abrí un proveedor.</small></div></div>`}
+    const n=ds.reduce((k,d)=>k+d.lines.filter(l=>l.q[side]>0).length+d.extras.filter(x=>x.side===side).length,0);
+    const tot=ds.reduce((t,d)=>t+calcSide(side,d.prov),0),pend=ds.filter(d=>!sentFlags(S.pedidos[d.prov]||{})[side]).length;
+    return `<div class="${side}"><b>${SIDE_ICO[side]} ${SIDE_NAME[side]}</b><span>${plural(n,'producto','productos')}${tot?` · ₡${fmt(tot)}`:''}</span>${n?(pend?`<em>${pend} por enviar</em>`:`<em class="ok">✓ todo enviado</em>`):''}</div>`;
+  };
+  box.innerHTML=`<div class="sx-tablero-h"><h2>Tu pedido de hoy</h2><small>Tocá para cambiar · arrastrá <span class="sx-grip-demo" aria-hidden="true"></span> para pasar a otro proveedor</small></div>
+    <div class="sx-tiendas n${sides.length}">${sides.map(tienda).join('')}</div>
+    <div class="sx-lista">${datos.map((d,i)=>`<section class="sx-prov" data-sx-drop="${esc(d.prov)}" style="--i:${i};--c:${sxColor(d.prov)}">
+      <button type="button" class="sx-prov-h" data-pd="open" data-prov="${esc(d.prov)}" title="Abrir ${esc(d.prov)}"><b>${esc(d.prov)}</b>${d.tot?`<span>₡${fmt(d.tot)}</span>`:''}<i aria-hidden="true">›</i></button>
+      <div class="sx-par n${sides.length}">${sides.map(s=>sxLado(d,s)).join('')}</div>
     </section>`).join('')}</div>`;
+  sxCabeceraFija();
 }
+// La cabecera Moravia | Los Ángeles queda arriba mientras se recorre la lista. La página se
+// desplaza entera (no la vista), así que "sticky" no sirve: se muestra una copia fija.
+function sxCabeceraFija(){
+  const box=$('sxTablero'),orig=box?.querySelector('.sx-tiendas');let f=$('sxTiendasFija');
+  if(!orig||box.offsetParent===null){f?.classList.remove('open');return;}
+  const r=orig.getBoundingClientRect(),t=box.getBoundingClientRect(),ver=r.bottom<4&&t.bottom>140;
+  if(!f){f=document.createElement('div');f.id='sxTiendasFija';f.className='sx-tiendas sx-fija';f.setAttribute('aria-hidden','true');box.parentElement.appendChild(f);}
+  if(ver){
+    if(f._html!==orig.innerHTML){f.innerHTML=orig.innerHTML;f._html=orig.innerHTML;}
+    f.className=orig.className+' sx-fija open';f.style.left=t.left+'px';f.style.width=t.width+'px';
+  }else f.classList.remove('open');
+}
+let _sxFijaRaf=0;
+const sxFijaLuego=()=>{if(!_sxFijaRaf)_sxFijaRaf=requestAnimationFrame(()=>{_sxFijaRaf=0;sxCabeceraFija();});};
+addEventListener('scroll',sxFijaLuego,{passive:true,capture:true});
+addEventListener('resize',sxFijaLuego,{passive:true});
 function xpRenderPedido(){
   const body=$('pedidoBody');if(!body)return;
   const sides=activeOrderSides(),dos=sides.length>1;
@@ -832,7 +847,8 @@ function xpContarPedido(body){
 // ══════════════════════════════════════════
 const SX={pend:null,sinClick:0,elegir:null,resp:null,ed:null,edT:0};
 const sxLinea=(prov,pid)=>xpProvLines(prov).lines.find(l=>l.prod.id===pid)||null;
-const sxScroller=()=>document.querySelector('.view.active .scroll')||document.scrollingElement;
+// Lo que de verdad se desplaza: en la app es la página entera; la vista solo si es más alta que su caja.
+const sxScroller=()=>{const s=document.querySelector('.view.active .scroll');return s&&s.scrollHeight>s.clientHeight+2?s:document.scrollingElement;};
 const sxProd=(prov,pid)=>(getAllProviders()[prov]?.products||[]).find(x=>x.id===pid)||null;
 function sxDock(desde,arrastrando,lado){
   let dock=$('sxDock');
@@ -860,7 +876,7 @@ function sxLevantar(st,x,y){
   st.dx=Math.min(Math.max(x-r.left,12),r.width-12);st.dy=Math.min(Math.max(y-r.top,8),r.height-8);
   const g=st.chip.cloneNode(true);g.classList.add('sx-fantasma');g.classList.remove('levantado');g.removeAttribute('data-pid');g.setAttribute('aria-hidden','true');g.style.width=r.width+'px';
   document.body.appendChild(g);st.g=g;
-  st.chip.classList.add('levantado');document.body.classList.add('sx-arrastrando');
+  st.chip.classList.add('levantado');document.body.classList.add('sx-arrastrando');if(st.lado)document.body.dataset.sxLado=st.lado;
   document.querySelectorAll('#sxTablero [data-sx-drop],#pedidoBody [data-sx-drop]').forEach(t=>{if(sxValido(st,t))t.classList.add('sx-meta');});
   sxDock(st.chip.dataset.prov,true,st.lado);
   sxSeguir(st,x,y);
@@ -879,7 +895,7 @@ function sxSeguir(st,x,y){
 }
 function sxTerminar(st){
   st.activo=false;cancelAnimationFrame(st.raf);st.g?.remove();st.chip.classList.remove('levantado');st.sobre?.classList.remove('sx-sobre');
-  document.querySelectorAll('.sx-meta').forEach(t=>t.classList.remove('sx-meta'));document.body.classList.remove('sx-arrastrando');
+  document.querySelectorAll('.sx-meta').forEach(t=>t.classList.remove('sx-meta'));document.body.classList.remove('sx-arrastrando');delete document.body.dataset.sxLado;
 }
 function sxSoltar(st){
   const desde=st.chip.dataset.prov,pid=st.chip.dataset.pid,lado=st.lado,hacia=st.sobre?.dataset.sxDrop,quieto=Math.hypot(st.x-st.x0,st.y-st.y0)<12;
@@ -1036,15 +1052,8 @@ document.addEventListener('keydown',e=>{
   if(SX.pend?.activo){const st=SX.pend;SX.pend=null;sxTerminar(st);}
   SX.elegir=SX.resp=null;sxCerrarDock();$('sxPregunta')?.classList.remove('open');if(SX.ed)sxCerrarEditor();
 });
-// En "Tu pedido de hoy": cambiar de sucursal y abrir la ventanita de cantidad.
+// En "Tu pedido de hoy": un toque abre la ventanita de cantidad.
 $('sxTablero')?.addEventListener('click',e=>{
-  const tab=e.target.closest('[data-sx-tab]');
-  if(tab){
-    const lado=tab.dataset.sxTab;try{localStorage.setItem(SX_LADO_KEY,lado);}catch{}
-    $('sxTablero').querySelectorAll('[data-sx-tab]').forEach(b=>{const on=b===tab;b.classList.toggle('on',on);b.setAttribute('aria-selected',String(on));});
-    const cols=$('sxTablero').querySelector('.sx-columnas');if(cols)cols.dataset.ver=lado;
-    return;
-  }
   const b=e.target.closest('[data-sx-ed]');if(!b)return;
   const chip=b.closest('.sx-chip');if(chip)sxEditar(chip.dataset.prov,chip.dataset.pid,chip.dataset.lado);
 });
