@@ -1,4 +1,4 @@
-const CACHE_NAME = 'aramo-shell-v51-rapida';
+const CACHE_NAME = 'aramo-shell-v52-al-dia';
 const CDN_CACHE = 'aramo-cdn-v1';
 // Las páginas: al instalar se guardan junto con TODOS los archivos que cargan,
 // tal cual los piden (con su ?v=…). Así cada pantalla abre sin esperar a internet.

@@ -1008,7 +1008,7 @@ html[data-theme="dark"] .today-money-card{background:linear-gradient(145deg,#125
         </div>
       </div>
 
-      <div class="app-version">ARAMO · versión <b>2026-10-15 · ARAMO POS en la nube</b> · se actualiza sola</div>
+      <div class="app-version">ARAMO · versión <b>2026-10-23 · más rápida</b> · se actualiza sola</div>
 
       <div class="cfg-acc" data-acc="datos">
         <button class="cfg-acc-hdr">⚠️ Borrar TODA la aplicación <span class="cfg-acc-arrow">▾</span></button>
@@ -3956,14 +3956,55 @@ document.querySelectorAll('.overlay').forEach(el=>modalScrollObserver.observe(el
 // Actualización automática: cada vez que se vuelve a la app se revisa si hay
 // una versión nueva publicada; si la hay, se guarda lo pendiente y se recarga
 // sola (las apps instaladas en la pantalla de inicio no se recargan nunca
-// por su cuenta).
+// por su cuenta). Se recarga solo cuando no molesta: al dejar la app en segundo
+// plano, o en el menú principal sin nada abierto ni tocado hace 2,5 s. Nunca con
+// el Mostrador a la vista (los avisos con sonido piden un toque para volver a sonar).
 if('serviceWorker' in navigator){
   const hadController=!!navigator.serviceWorker.controller;
-  navigator.serviceWorker.addEventListener('controllerchange',()=>{
+  let nueva=false,saliendo=false,ultimoToque=0;
+  ['pointerdown','keydown'].forEach(ev=>document.addEventListener(ev,()=>{ultimoToque=Date.now();},true));
+  ['beforeunload','pagehide'].forEach(ev=>window.addEventListener(ev,()=>{saliendo=true;}));
+  const enReposo=()=>{
+    const pu=document.getElementById('puerta'),a=document.activeElement;
+    return !!pu?.classList.contains('open')&&!document.getElementById('mostrador')?.classList.contains('open')
+      &&!document.getElementById('moSheet')?.classList.contains('open')&&!(a&&/^(INPUT|TEXTAREA|SELECT)$/.test(a.tagName))
+      &&Date.now()-ultimoToque>2500;
+  };
+  const recargar=()=>{
+    if(!nueva||saliendo)return;
+    nueva=false;try{flushPersist();}catch{}
+    try{sessionStorage.setItem('aramo_actualizada','1');}catch{}
+    location.reload();
+  };
+  // Al abrir con internet la página ya llega nueva: si su código es el mismo que quedó
+  // guardado en la versión nueva, no hace falta recargar.
+  const yaEsNueva=async()=>{
+    try{
+      const nombre=(await caches.keys()).filter(k=>k.startsWith('aramo-shell-')).pop();
+      const r=nombre&&await (await caches.open(nombre)).match('./APP.html',{ignoreSearch:true});
+      if(!r)return false;
+      const txt=await r.text();
+      const usa=[...document.querySelectorAll('script[src],link[rel="stylesheet"][href]')].map(e=>e.getAttribute('src')||e.getAttribute('href')).filter(u=>!/^https?:/.test(u));
+      return usa.length>0&&usa.every(u=>txt.includes(u));
+    }catch{return false;}
+  };
+  navigator.serviceWorker.addEventListener('controllerchange',async()=>{
     if(!hadController)return;
     try{flushPersist();}catch{}
-    toast('⬆️ Nueva versión lista. Se usará al abrir de nuevo.','ok');
+    if(await yaEsNueva())return;
+    nueva=true;
+    if(document.visibilityState==='visible'&&!enReposo())toast('⬆️ Versión nueva lista: se pone sola al volver al menú o a la app','ok');
+    const mirar=setInterval(()=>{if(!nueva)clearInterval(mirar);else if(document.visibilityState==='visible'&&enReposo())recargar();},1000);
   });
+  // Al dejar la app: si se está yendo a otra página, el temporizador ya no corre y no se recarga.
+  document.addEventListener('visibilitychange',()=>{if(nueva&&document.visibilityState==='hidden')setTimeout(()=>{if(document.visibilityState==='hidden')recargar();},60);});
+  try{
+    if(sessionStorage.getItem('aramo_actualizada')){
+      sessionStorage.removeItem('aramo_actualizada');
+      const avisar=()=>{if(document.visibilityState!=='visible')return;document.removeEventListener('visibilitychange',avisar);setTimeout(()=>toast('✅ ARAMO actualizado a la versión nueva','ok'),900);};
+      document.addEventListener('visibilitychange',avisar);avisar();
+    }
+  }catch{}
   window.addEventListener('load',()=>navigator.serviceWorker.register('./service-worker.js',{updateViaCache:'none'}).then(reg=>{
     const check=()=>{try{reg?.update?.()?.catch?.(()=>{});}catch{}};
     document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='visible')check();});
