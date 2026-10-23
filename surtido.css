@@ -167,48 +167,71 @@ html[data-theme="dark"] .sx-nota{color:#fde68a}
 .sx-aviso button{flex:none;padding:8px 12px;border:0;border-radius:12px;background:#4ade80;color:#06210f;font:800 13px var(--sx-f);cursor:pointer}
 @media (prefers-reduced-motion:reduce){.sx-card,.sx-chip,.sx-dock,.sx-preg-in,.sx-aviso{transition:none}}
 
-/* ══ Tu pedido de hoy, dividido por sucursal ══ */
-.sx-lados{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin:0 0 12px}
-.sx-lados button{position:relative;display:flex;flex-direction:column;align-items:flex-start;gap:2px;min-width:0;padding:10px 12px 10px 14px;border:1.5px solid var(--sx-linea);border-radius:16px;background:var(--sx-card);color:var(--t);text-align:left;cursor:pointer;font-family:var(--sx-f);transition:border-color .2s,box-shadow .2s,background .2s}
-.sx-lados button::before{content:'';position:absolute;left:0;top:10px;bottom:10px;width:4px;border-radius:0 4px 4px 0;background:#22c55e;opacity:.35;transition:opacity .2s}
-.sx-lados button.angeles::before{background:#f97316}
-.sx-lados button.on{border-color:transparent;box-shadow:0 10px 22px -12px rgba(16,40,28,.45),inset 0 0 0 2px #22c55e;background:color-mix(in srgb,#22c55e 6%,var(--sx-card))}
-.sx-lados button.angeles.on{box-shadow:0 10px 22px -12px rgba(16,40,28,.45),inset 0 0 0 2px #f97316;background:color-mix(in srgb,#f97316 7%,var(--sx-card))}
-.sx-lados button.on::before{opacity:1}
-.sx-lados-n{font:800 14.5px var(--sx-f)}
-.sx-lados-d{max-width:100%;font:600 12px var(--sx-f);color:var(--m);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-.sx-lados-d b{color:var(--t);font-weight:800}
-.sx-lados em{font:700 11px var(--sx-f);font-style:normal;color:#b45309}
-.sx-lados em.ok{color:var(--pm)}
-.sx-columnas.dos .sx-col{display:none}
-.sx-columnas.dos[data-ver="moravia"] .sx-col.moravia,.sx-columnas.dos[data-ver="angeles"] .sx-col.angeles{display:block;animation:sxAbre .25s cubic-bezier(.22,1,.36,1)}
-.sx-col-h{display:none}
-@media (min-width:900px){
-  .sx-lados{display:none}
-  .sx-columnas.dos{display:grid;grid-template-columns:1fr 1fr;gap:16px;align-items:start}
-  .sx-columnas.dos .sx-col{display:block}
-  .sx-col-h{display:flex;align-items:baseline;justify-content:space-between;gap:10px;margin:0 0 10px;padding:10px 14px;border-radius:14px;font-family:var(--sx-f);background:var(--pm-t)}
-  .sx-col.angeles .sx-col-h{background:var(--pa-t)}
-  .sx-col-h b{font:800 15px var(--sx-f);color:var(--pm)}
-  .sx-col.angeles .sx-col-h b{color:var(--pa)}
-  .sx-col-h span{font:600 12.5px var(--sx-f);color:var(--m)}
-  .sx-columnas.dos .sx-grid{display:grid;columns:auto;gap:10px}
-  .sx-columnas.dos .sx-grid>.sx-card{margin:0}
-}
-.sx-vacio.chico{padding:14px}
-.sx-card.moravia{box-shadow:inset 3px 0 0 #22c55e,0 1px 2px rgba(16,40,28,.04),0 10px 26px -16px rgba(16,40,28,.28)}
-.sx-card.angeles{box-shadow:inset 3px 0 0 #f97316,0 1px 2px rgba(16,40,28,.04),0 10px 26px -16px rgba(16,40,28,.28)}
+/* ══ Tu pedido de hoy: las dos tiendas a la vista al mismo tiempo ══
+   Cabecera fija con Moravia | Los Ángeles. Por proveedor: su nombre y debajo dos columnas
+   (verde Moravia, naranja Los Ángeles) con lo que pidió cada tienda, un producto por fila. */
+.sx-tiendas{display:grid;grid-template-columns:1fr 1fr;gap:6px;margin:0 0 8px}
+/* Copia fija arriba al bajar por la lista (la pone sxCabeceraFija) */
+.sx-tiendas.sx-fija{position:fixed;top:0;z-index:60;margin:0;padding:calc(6px + env(safe-area-inset-top,0px)) 0 8px;background:color-mix(in srgb,var(--bg,#f4f7f5) 92%,transparent);backdrop-filter:blur(12px);-webkit-backdrop-filter:blur(12px);box-shadow:0 10px 18px -14px rgba(16,40,28,.45);opacity:0;transform:translateY(-10px);pointer-events:none;transition:opacity .16s,transform .16s}
+.sx-tiendas.sx-fija.open{opacity:1;transform:none}
+.sx-tiendas.sx-fija>div{padding:5px 10px}
+.sx-tiendas.sx-fija em{display:none}
+body.sx-arrastrando .sx-tiendas.sx-fija,#view-proveedores .pv-wrap.sx-con-texto #sxTiendasFija{opacity:0}
+.sx-tiendas.n1{grid-template-columns:1fr}
+.sx-tiendas>div{display:flex;flex-direction:column;gap:1px;min-width:0;padding:7px 10px;border-radius:13px;background:var(--pm-t);font-family:var(--sx-f)}
+.sx-tiendas>.angeles{background:var(--pa-t)}
+.sx-tiendas b{font:800 14px var(--sx-f);color:var(--pm);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.sx-tiendas .angeles b{color:var(--pa)}
+.sx-tiendas span{font:600 11.5px var(--sx-f);color:var(--m);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.sx-tiendas em{font:700 11px var(--sx-f);font-style:normal;color:#b45309}
+html[data-theme="dark"] .sx-tiendas em{color:#fbbf24}
+.sx-tiendas em.ok{color:var(--pm)}
+.sx-lista{display:grid;gap:8px}
+.sx-prov{padding:2px 5px 5px;border-radius:17px;background:var(--sx-card);border:1px solid var(--sx-linea);box-shadow:0 1px 2px rgba(16,40,28,.04),0 8px 20px -16px rgba(16,40,28,.3);outline:2px dashed transparent;outline-offset:2px;font-family:var(--sx-f);transition:outline-color .2s,background .2s,transform .18s}
+.sx-prov-h{display:flex;align-items:center;gap:8px;width:100%;min-height:36px;padding:2px 6px;border:0;background:none;color:var(--t);text-align:left;cursor:pointer;font-family:var(--sx-f)}
+.sx-prov-h::before{content:'';flex:none;width:9px;height:9px;border-radius:50%;background:var(--c)}
+.sx-prov-h b{flex:1;min-width:0;font:800 15px var(--sx-f);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.sx-prov-h span{flex:none;font:800 13px var(--sx-f);font-variant-numeric:tabular-nums}
+.sx-prov-h i{flex:none;font:400 20px/1 var(--sx-f);font-style:normal;color:var(--m)}
+.sx-par{display:grid;grid-template-columns:1fr 1fr;gap:5px}
+.sx-par.n1{grid-template-columns:1fr}
+.sx-lado{display:flex;flex-direction:column;gap:4px;min-width:0;padding:4px;border-radius:12px;background:var(--pm-t);transition:box-shadow .15s}
+.sx-lado.angeles{background:var(--pa-t)}
+.sx-lado.nada{align-items:center;justify-content:center;min-height:40px;background:none;box-shadow:inset 0 0 0 1.5px var(--sx-linea)}
+.sx-nada{font:700 15px var(--sx-f);color:var(--m);opacity:.45}
+.sx-ok{align-self:flex-start;padding:1px 8px;border-radius:999px;background:var(--sx-card);font:800 10.5px var(--sx-f);color:var(--pm)}
+.sx-lado.angeles .sx-ok{color:var(--pa)}
+.sx-lado.enviado .sx-chip{opacity:.66}
+.sx-lado .sx-nota{margin:2px 4px 1px;font-size:11.5px}
+/* Al arrastrar: el proveedor entero es el blanco; se marca la columna de la tienda que se pasa */
+.sx-prov.sx-meta{outline-color:color-mix(in srgb,var(--c) 45%,transparent)}
+.sx-prov.sx-sobre{outline-color:var(--c);outline-style:solid;transform:scale(1.01)}
+body[data-sx-lado="moravia"] .sx-prov.sx-sobre .sx-lado.moravia{box-shadow:inset 0 0 0 2px var(--pm)}
+body[data-sx-lado="angeles"] .sx-prov.sx-sobre .sx-lado.angeles{box-shadow:inset 0 0 0 2px var(--pa)}
 
 /* Pastilla de una tienda: puntitos para arrastrar + producto + cantidad */
 .sx-chip.uno{padding:0;gap:0;overflow:hidden}
-.sx-grip{align-self:stretch;flex:none;width:24px;display:grid;place-items:center;cursor:grab;touch-action:none;color:var(--m)}
+.sx-grip{align-self:stretch;flex:none;width:24px;display:grid;place-items:center;padding:0;border:0;background:none;cursor:grab;touch-action:none;color:var(--m);-webkit-tap-highlight-color:transparent}
 .sx-grip::before,.sx-grip-demo{content:'';display:inline-block;width:8px;height:14px;background:radial-gradient(circle,currentColor 1.25px,transparent 1.5px) 0 0/4px 4.6px;opacity:.55}
 .sx-chip.uno:hover .sx-grip::before{opacity:.9}
 .sx-chip-b{display:inline-flex;align-items:center;gap:6px;min-width:0;min-height:36px;padding:3px 4px 3px 0;border:0;background:none;color:inherit;font:inherit;text-align:left;cursor:pointer}
 .sx-uno{flex:none;display:inline-flex;align-items:baseline;gap:3px;padding:4px 10px;border-radius:999px;font:800 13px var(--sx-f);font-variant-numeric:tabular-nums;background:var(--pm-t);color:var(--pm)}
 .sx-chip.angeles .sx-uno{background:var(--pa-t);color:var(--pa)}
 .sx-uno small{font:700 10.5px var(--sx-f);opacity:.75}
-.sx-grip-demo{color:var(--m);margin-right:2px;vertical-align:-2px}
+.sx-grip-demo{color:var(--m);margin:0 1px;vertical-align:-2px}
+/* En cada columna: un producto por fila (en la compu, pastillas una al lado de la otra) */
+.sx-lado .sx-chip.uno{display:flex;width:100%;min-height:38px;border-radius:10px;background:var(--sx-card);box-shadow:0 1px 2px rgba(16,40,28,.07)}
+.sx-lado .sx-grip{width:22px}
+.sx-lado .sx-chip-b{flex:1;gap:5px;min-height:38px;padding:2px 3px 2px 0}
+.sx-lado .sx-e{font-size:15px}
+.sx-lado .sx-n{flex:1;max-width:none;font:700 13px/1.15 var(--sx-f);white-space:normal;overflow-wrap:anywhere;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
+.sx-lado .sx-uno{padding:3px 7px}
+@media (min-width:760px){
+  .sx-lado:not(.nada){flex-direction:row;flex-wrap:wrap;align-content:flex-start;gap:5px}
+  .sx-lado .sx-chip.uno{width:auto;max-width:100%}
+  .sx-lado .sx-n{max-width:170px}
+  .sx-lado .sx-nota{flex-basis:100%}
+}
 /* Al arrastrar: dónde se puede soltar */
 .sx-card.sx-meta{outline-color:color-mix(in srgb,var(--c) 45%,transparent)}
 .sx-card.sx-meta.sx-sobre{outline-color:var(--c);outline-style:solid}
