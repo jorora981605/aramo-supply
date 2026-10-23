@@ -221,11 +221,22 @@ body[data-sx-lado="angeles"] .sx-prov.sx-sobre .sx-lado.angeles{box-shadow:inset
 .sx-grip-demo{color:var(--m);margin:0 1px;vertical-align:-2px}
 /* En cada columna: un producto por fila (en la compu, pastillas una al lado de la otra) */
 .sx-lado .sx-chip.uno{display:flex;width:100%;min-height:38px;border-radius:10px;background:var(--sx-card);box-shadow:0 1px 2px rgba(16,40,28,.07)}
-.sx-lado .sx-grip{width:22px}
-.sx-lado .sx-chip-b{flex:1;gap:5px;min-height:38px;padding:2px 3px 2px 0}
+/* Botón ⇄ de cada fila: tocar = lista de proveedores; arrastrar = mover */
+.sx-lado .sx-grip{align-self:center;width:28px;height:28px;margin-left:4px;border-radius:50%;background:var(--pm-t);color:var(--pm);box-shadow:inset 0 0 0 1.5px color-mix(in srgb,var(--pm) 30%,transparent);transition:transform .12s,background .15s}
+.sx-lado.angeles .sx-grip{background:var(--pa-t);color:var(--pa);box-shadow:inset 0 0 0 1.5px color-mix(in srgb,var(--pa) 30%,transparent)}
+.sx-lado .sx-grip::before{display:none}
+.sx-lado .sx-grip .pdx-i{width:15px;height:15px;stroke-width:2.4}
+.sx-lado .sx-grip:active{transform:scale(.88)}
+@media (hover:hover){.sx-lado .sx-grip:hover{background:var(--pm);color:#fff}.sx-lado.angeles .sx-grip:hover{background:var(--pa)}}
+/* En el celular la fila es solo ⇄, nombre y cantidad (sin dibujito): así el nombre se lee entero */
+@media (max-width:559px){.sx-lado .sx-e{display:none}.sx-lado .sx-chip-b{padding-left:8px}}
+.sx-tablero-h small.sx-ayuda{display:block;line-height:1.55}
+.sx-mover-demo{display:inline-grid;place-items:center;width:20px;height:20px;border-radius:50%;background:var(--pm-t);color:var(--pm);vertical-align:-5px}
+.sx-mover-demo .pdx-i{width:12px;height:12px}
+.sx-lado .sx-chip-b{flex:1;gap:4px;min-height:40px;padding:2px 3px 2px 5px}
 .sx-lado .sx-e{font-size:15px}
-.sx-lado .sx-n{flex:1;max-width:none;font:700 13px/1.15 var(--sx-f);white-space:normal;overflow-wrap:anywhere;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
-.sx-lado .sx-uno{padding:3px 7px}
+.sx-lado .sx-n{flex:1;max-width:none;font:700 13px/1.15 var(--sx-f);white-space:normal;overflow-wrap:anywhere;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;hyphens:auto;-webkit-hyphens:auto}
+.sx-lado .sx-uno{padding:3px 6px}
 @media (min-width:760px){
   .sx-lado:not(.nada){flex-direction:row;flex-wrap:wrap;align-content:flex-start;gap:5px}
   .sx-lado .sx-chip.uno{width:auto;max-width:100%}
@@ -235,7 +246,7 @@ body[data-sx-lado="angeles"] .sx-prov.sx-sobre .sx-lado.angeles{box-shadow:inset
 /* Al arrastrar: dónde se puede soltar */
 .sx-card.sx-meta{outline-color:color-mix(in srgb,var(--c) 45%,transparent)}
 .sx-card.sx-meta.sx-sobre{outline-color:var(--c);outline-style:solid}
-.sx-dock-h em{margin-left:6px;padding:3px 9px;border-radius:999px;font:800 11.5px var(--sx-f);font-style:normal;background:var(--pm-t);color:var(--pm)}
+.sx-dock-h em{white-space:nowrap;margin-left:6px;padding:3px 9px;border-radius:999px;font:800 11.5px var(--sx-f);font-style:normal;background:var(--pm-t);color:var(--pm)}
 .sx-dock-h em.angeles{background:var(--pa-t);color:var(--pa)}
 
 /* ══ Ventanita para cambiar la cantidad ══ */

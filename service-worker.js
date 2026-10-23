@@ -1,4 +1,4 @@
-const CACHE_NAME = 'aramo-shell-v53-a-la-vista';
+const CACHE_NAME = 'aramo-shell-v54-boton-mover';
 const CDN_CACHE = 'aramo-cdn-v1';
 // Las páginas: al instalar se guardan junto con TODOS los archivos que cargan,
 // tal cual los piden (con su ?v=…). Así cada pantalla abre sin esperar a internet.
