@@ -725,13 +725,13 @@ function sxDatos(){
 // Proveedores: "Tu pedido de hoy" con las dos tiendas a la vista al mismo tiempo.
 // Una franja por proveedor y, debajo, dos columnas: Moravia (verde) y Los Ángeles (naranja),
 // cada una con lo que llenó esa tienda. Arriba queda fija la cabecera de las dos columnas.
-// Tocar un producto cambia su cantidad; arrastrarlo (puntitos) lo pasa a otro proveedor,
-// a la misma tienda.
+// Tocar un producto cambia su cantidad. El botón ⇄ de cada fila lo pasa a otro proveedor de la
+// misma tienda: tocarlo abre la lista de proveedores; arrastrarlo lo lleva hasta uno.
 function sxLado(d,side){
   const p=S.pedidos[d.prov]||{},lines=d.lines.filter(l=>l.q[side]>0),extras=d.extras.filter(x=>x.side===side);
   const sent=!!sentFlags(p)[side];
   const nota=String(p.notes?.['__note_'+side]||(side==='moravia'?p.note:'')||'').trim();
-  const filas=lines.map(l=>`<div class="sx-chip uno ${side}" data-prov="${esc(d.prov)}" data-pid="${esc(l.prod.id)}" data-lado="${side}"><button type="button" class="sx-grip" tabindex="-1" title="Arrastrar a otro proveedor" aria-hidden="true"></button><button type="button" class="sx-chip-b" data-sx-ed aria-label="${esc(niceName(l.prod.name))}: ${fmtQ(l.q[side])} ${esc(l.unit)} para ${SIDE_NAME[side]}. Tocá para cambiar la cantidad o pasarlo a otro proveedor."><span class="sx-e">${smartEmoji(l.prod)}</span><span class="sx-n">${esc(niceName(l.prod.name))}</span><span class="sx-uno">${fmtQ(l.q[side])}<small>${esc(uniCorta(l.unit))}</small></span></button></div>`).join('')
+  const filas=lines.map(l=>`<div class="sx-chip uno ${side}" data-prov="${esc(d.prov)}" data-pid="${esc(l.prod.id)}" data-lado="${side}"><button type="button" class="sx-grip" data-sx-mover title="Pasar a otro proveedor: tocá para elegir o arrastrá" aria-label="Pasar ${esc(niceName(l.prod.name))} de ${SIDE_NAME[side]} a otro proveedor">${ico('mover')}</button><button type="button" class="sx-chip-b" data-sx-ed aria-label="${esc(niceName(l.prod.name))}: ${fmtQ(l.q[side])} ${esc(l.unit)} para ${SIDE_NAME[side]}. Tocá para cambiar la cantidad o pasarlo a otro proveedor."><span class="sx-e">${smartEmoji(l.prod)}</span><span class="sx-n">${esc(niceName(l.prod.name))}</span><span class="sx-uno">${fmtQ(l.q[side])}<small>${esc(uniCorta(l.unit))}</small></span></button></div>`).join('')
     +extras.map(x=>`<div class="sx-chip uno extra ${side}"><button type="button" class="sx-chip-b" data-pd="open" data-prov="${esc(d.prov)}" aria-label="${esc(x.name||'Extra')}: se edita en el proveedor"><span class="sx-e">➕</span><span class="sx-n">${esc(x.name||'Extra')}</span><span class="sx-uno">${fmtQ(+x.qty)}<small>${esc(uniCorta(x.unit||'kg'))}</small></span></button></div>`).join('');
   return `<div class="sx-lado ${side}${sent?' enviado':''}${filas?'':' nada'}" data-lado="${side}" aria-label="${SIDE_NAME[side]}">
     ${sent&&filas?`<span class="sx-ok">✓ Enviado</span>`:''}${filas||'<span class="sx-nada" aria-label="Nada para '+SIDE_NAME[side]+'">—</span>'}
@@ -749,7 +749,7 @@ function sxRenderTablero(){
     const tot=ds.reduce((t,d)=>t+calcSide(side,d.prov),0),pend=ds.filter(d=>!sentFlags(S.pedidos[d.prov]||{})[side]).length;
     return `<div class="${side}"><b>${SIDE_ICO[side]} ${SIDE_NAME[side]}</b><span>${plural(n,'producto','productos')}${tot?` · ₡${fmt(tot)}`:''}</span>${n?(pend?`<em>${pend} por enviar</em>`:`<em class="ok">✓ todo enviado</em>`):''}</div>`;
   };
-  box.innerHTML=`<div class="sx-tablero-h"><h2>Tu pedido de hoy</h2><small>Tocá para cambiar · arrastrá <span class="sx-grip-demo" aria-hidden="true"></span> para pasar a otro proveedor</small></div>
+  box.innerHTML=`<div class="sx-tablero-h"><h2>Tu pedido de hoy</h2><small class="sx-ayuda">Tocá un producto para cambiar la cantidad · <span class="sx-mover-demo" aria-hidden="true">${ico('mover')}</span> para pasarlo a otro proveedor</small></div>
     <div class="sx-tiendas n${sides.length}">${sides.map(tienda).join('')}</div>
     <div class="sx-lista">${datos.map((d,i)=>`<section class="sx-prov" data-sx-drop="${esc(d.prov)}" style="--i:${i};--c:${sxColor(d.prov)}">
       <button type="button" class="sx-prov-h" data-pd="open" data-prov="${esc(d.prov)}" title="Abrir ${esc(d.prov)}"><b>${esc(d.prov)}</b>${d.tot?`<span>₡${fmt(d.tot)}</span>`:''}<i aria-hidden="true">›</i></button>
@@ -837,12 +837,14 @@ function xpContarPedido(body){
 }
 // ══════════════════════════════════════════
 // ⇄ MOVER un producto a otro proveedor y ✏️ EDITAR su cantidad
-// En "Tu pedido de hoy" cada pastilla es de una tienda (Moravia o Los Ángeles):
-// · Los puntitos (agarradera) arrastran al instante, con el dedo o el mouse.
-// · Mantener apretado el resto de la pastilla también la levanta; con el mouse basta arrastrar.
-// · Se suelta sobre otra tarjeta de la misma tienda o en la lista que sube desde abajo; cerca
-//   de los bordes la pantalla se mueve sola. Soltar sin moverse abre la lista para elegir.
-// · Un toque abre la ventanita: − y + grandes, cantidades rápidas, pasar a otro proveedor, quitar.
+// En "Tu pedido de hoy" cada fila es de una tienda (Moravia o Los Ángeles):
+// · El botón ⇄ de la fila: tocarlo abre la lista de proveedores para elegir; arrastrarlo lo
+//   levanta apenas se mueve el dedo o el mouse.
+// · Mantener apretado el resto de la fila también la levanta; con el mouse basta arrastrar.
+// · Se suelta sobre otro proveedor o en la lista que sube desde abajo; cerca de los bordes la
+//   pantalla se mueve sola. Soltar sin moverse abre la lista para elegir.
+// · Un toque en el producto abre la ventanita: − y + grandes, cantidades rápidas, pasar a otro
+//   proveedor, quitar.
 // En Pedido (pastillas con las dos tiendas) pregunta qué tienda pasar. Siempre con "Deshacer".
 // ══════════════════════════════════════════
 const SX={pend:null,sinClick:0,elegir:null,resp:null,ed:null,edT:0};
@@ -850,7 +852,7 @@ const sxLinea=(prov,pid)=>xpProvLines(prov).lines.find(l=>l.prod.id===pid)||null
 // Lo que de verdad se desplaza: en la app es la página entera; la vista solo si es más alta que su caja.
 const sxScroller=()=>{const s=document.querySelector('.view.active .scroll');return s&&s.scrollHeight>s.clientHeight+2?s:document.scrollingElement;};
 const sxProd=(prov,pid)=>(getAllProviders()[prov]?.products||[]).find(x=>x.id===pid)||null;
-function sxDock(desde,arrastrando,lado){
+function sxDock(desde,arrastrando,lado,prod){
   let dock=$('sxDock');
   if(!dock){
     dock=document.createElement('div');dock.id='sxDock';dock.className='sx-dock';dock.setAttribute('role','dialog');dock.setAttribute('aria-label','Pasar a otro proveedor');document.body.appendChild(dock);
@@ -863,9 +865,15 @@ function sxDock(desde,arrastrando,lado){
   dock.classList.toggle('elegir',!arrastrando);
   dock.dataset.lado=lado||'';
   const para=lado&&activeOrderSides().length>1?` <em class="${lado}">${SIDE_ICO[lado]} ${SIDE_NAME[lado]}</em>`:'';
-  dock.innerHTML=`<div class="sx-dock-h"><span>${ico('mover')}<b>${arrastrando?'Soltalo en el proveedor':'¿A quién se lo pedís?'}</b>${para}</span>${arrastrando?'':'<button type="button" data-sx-cerrar>Cancelar</button>'}</div>
+  dock.innerHTML=`<div class="sx-dock-h"><span>${ico('mover')}<b>${arrastrando?'Soltalo en el proveedor':prod?`¿A quién le pedís ${smartEmoji(prod)} ${esc(niceName(prod.name))}?`:'¿A quién se lo pedís?'}</b>${para}</span>${arrastrando?'':'<button type="button" data-sx-cerrar>Cancelar</button>'}</div>
     <div class="sx-dock-grid">${getProvNames().filter(n=>n!==desde).map(n=>`<button type="button" data-sx-drop="${esc(n)}" style="--c:${sxColor(n)}"><span class="sx-av">${esc(n.charAt(0).toUpperCase())}</span><span class="sx-dock-n">${esc(n)}</span></button>`).join('')}</div>`;
+  SX.dockT=Date.now();
   requestAnimationFrame(()=>dock.classList.add('open'));
+}
+// ⇄ tocado: la lista de proveedores para elegir a quién se le pide (solo esa tienda).
+function sxElegirProveedor(prov,pid,lado){
+  const prod=sxProd(prov,pid);if(!prod)return;
+  sxDock(prov,false,lado,prod);SX.elegir=h=>{sxCerrarDock();sxHacerLado(prov,pid,h,lado);};
 }
 function sxCerrarDock(){$('sxDock')?.classList.remove('open');}
 const sxValido=(st,t)=>!!t&&t.dataset.sxDrop!==st.chip.dataset.prov&&(!st.lado||!t.dataset.sxLado||t.dataset.sxLado===st.lado);
@@ -985,7 +993,7 @@ function sxEditar(prov,pid,lado){
       if(a==='mas')return sxPoner(q+1,true);
       if(a==='poner')return sxPoner(+b.dataset.n,true);
       if(a==='quitar'){const prod=sxProd(prov,pid),u=sxUnidad(),antes=q;sxPoner(0);sxCerrarEditor();sxAviso(`${niceName(prod.name)} quitado de ${SIDE_NAME[lado]}`,smartEmoji(prod),()=>{syncQty(prov,prod,lado,String(antes),u);xpRefresh();});return;}
-      if(a==='mover'){sxCerrarEditor();sxDock(prov,false,lado);SX.elegir=h=>{sxCerrarDock();sxHacerLado(prov,pid,h,lado);};}
+      if(a==='mover'){sxCerrarEditor();sxElegirProveedor(prov,pid,lado);}
     });
     ed.addEventListener('input',e=>{if(e.target.id==='sxEdQ'){const v=parseFloat(String(e.target.value).replace(',','.'));sxPoner(isNaN(v)?0:Math.max(0,v),false);}});
     ed.addEventListener('keydown',e=>{if(e.key==='Enter'&&e.target.id==='sxEdQ'){e.preventDefault();sxCerrarEditor();}});
@@ -1022,14 +1030,14 @@ document.addEventListener('pointerdown',e=>{
   const st={chip,x0:e.clientX,y0:e.clientY,x:e.clientX,y:e.clientY,id:e.pointerId,tipo:e.pointerType,activo:false};
   SX.pend=st;
   if(e.pointerType==='mouse')return;
-  if(e.target.closest('.sx-grip'))sxLevantar(st,e.clientX,e.clientY); // la agarradera arrastra al instante
+  if(e.target.closest('.sx-grip'))st.boton=true; // ⇄: arrastra apenas se mueve; si no, es un toque
   else st.timer=setTimeout(()=>{if(SX.pend===st&&!st.activo)sxLevantar(st,st.x,st.y);},250);
 },{passive:true});
 document.addEventListener('pointermove',e=>{
   const st=SX.pend;if(!st||e.pointerId!==st.id)return;
   if(!st.activo){
     const d=Math.hypot(e.clientX-st.x0,e.clientY-st.y0);st.x=e.clientX;st.y=e.clientY;
-    if(st.tipo==='mouse'){if(d>5)sxLevantar(st,e.clientX,e.clientY);}
+    if(st.tipo==='mouse'||st.boton){if(d>5)sxLevantar(st,e.clientX,e.clientY);}
     else if(d>10){clearTimeout(st.timer);SX.pend=null;} // era para bajar la pantalla
     return;
   }
@@ -1046,6 +1054,8 @@ const sxFin=e=>{
 document.addEventListener('pointerup',sxFin);document.addEventListener('pointercancel',sxFin);
 // Soltar después de arrastrar no cuenta como toque.
 document.addEventListener('click',e=>{if(Date.now()-SX.sinClick<450&&e.target.closest?.('.sx-chip,.sx-card')){e.stopPropagation();e.preventDefault();}},true);
+// Tocar fuera de la lista para elegir proveedor solo la cierra (no abre lo que está debajo).
+document.addEventListener('click',e=>{const d=$('sxDock');if(SX.elegir&&d?.classList.contains('open')&&Date.now()-(SX.dockT||0)>350&&!d.contains(e.target)){e.stopPropagation();e.preventDefault();SX.elegir=null;sxCerrarDock();}},true);
 document.addEventListener('contextmenu',e=>{if(e.target.closest?.('.sx-chip[data-pid]'))e.preventDefault();});
 document.addEventListener('keydown',e=>{
   if(e.key!=='Escape')return;
@@ -1054,6 +1064,8 @@ document.addEventListener('keydown',e=>{
 });
 // En "Tu pedido de hoy": un toque abre la ventanita de cantidad.
 $('sxTablero')?.addEventListener('click',e=>{
+  const mv=e.target.closest('[data-sx-mover]');
+  if(mv){const chip=mv.closest('.sx-chip');if(chip)sxElegirProveedor(chip.dataset.prov,chip.dataset.pid,chip.dataset.lado);return;}
   const b=e.target.closest('[data-sx-ed]');if(!b)return;
   const chip=b.closest('.sx-chip');if(chip)sxEditar(chip.dataset.prov,chip.dataset.pid,chip.dataset.lado);
 });
