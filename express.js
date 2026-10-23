@@ -717,15 +717,41 @@ function sxDatos(){
     .map(prov=>{const {lines,extras}=xpProvLines(prov);return{prov,lines,extras,sent:isSent(prov),tot:sideTotal(prov),n:lines.length+extras.length};})
     .filter(d=>d.n>0);
 }
-// Proveedores: "Tu pedido de hoy" arriba, en tarjetas sencillas.
+// Proveedores: "Tu pedido de hoy" dividido por sucursal. Cada tienda ve lo que ella llenó:
+// sus proveedores, sus cantidades, su total y si ya se le envió. En el celular se cambia de
+// tienda con dos pestañas; en la compu se ven las dos lado a lado.
+const SX_LADO_KEY='aramo_sx_lado';
+function sxLadoVisto(sides){let l='';try{l=localStorage.getItem(SX_LADO_KEY)||'';}catch{}return sides.includes(l)?l:sides[0];}
+function sxTarjetaLado(d,side,i){
+  const p=S.pedidos[d.prov]||{},lines=d.lines.filter(l=>l.q[side]>0),extras=d.extras.filter(x=>x.side===side);
+  const sent=!!sentFlags(p)[side],tot=calcSide(side,d.prov),n=lines.length+extras.length;
+  const nota=String(p.notes?.['__note_'+side]||(side==='moravia'?p.note:'')||'').trim();
+  return `<article class="sx-card ${side}${sent?' enviado':''}" data-sx-drop="${esc(d.prov)}" data-sx-lado="${side}" style="--i:${i};--c:${sxColor(d.prov)}">
+    <header class="sx-card-h"><button type="button" class="sx-card-id" data-pd="open" data-prov="${esc(d.prov)}" title="Abrir ${esc(d.prov)}"><span class="sx-av">${esc(d.prov.charAt(0).toUpperCase())}</span><span class="sx-card-t"><b>${esc(d.prov)}</b><small><i></i>${sent?'Enviado':'Por enviar'} · ${plural(n,'producto','productos')}</small></span></button>${tot?`<span class="sx-card-tot">₡${fmt(tot)}</span>`:''}</header>
+    <div class="sx-chips">
+      ${lines.map(l=>`<div class="sx-chip uno ${side}" data-prov="${esc(d.prov)}" data-pid="${esc(l.prod.id)}" data-lado="${side}"><span class="sx-grip" title="Arrastrar a otro proveedor" aria-hidden="true"></span><button type="button" class="sx-chip-b" data-sx-ed aria-label="${esc(niceName(l.prod.name))}: ${fmtQ(l.q[side])} ${esc(l.unit)} para ${SIDE_NAME[side]}. Tocá para cambiar la cantidad o pasarlo a otro proveedor."><span class="sx-e">${smartEmoji(l.prod)}</span><span class="sx-n">${esc(niceName(l.prod.name))}</span><span class="sx-uno">${fmtQ(l.q[side])}<small>${esc(uniCorta(l.unit))}</small></span></button></div>`).join('')}
+      ${extras.map(x=>`<div class="sx-chip uno extra ${side}"><button type="button" class="sx-chip-b" data-pd="open" data-prov="${esc(d.prov)}" aria-label="${esc(x.name||'Extra')}: se edita en el proveedor"><span class="sx-e">➕</span><span class="sx-n">${esc(x.name||'Extra')}</span><span class="sx-uno">${fmtQ(+x.qty)}<small>${esc(uniCorta(x.unit||'kg'))}</small></span></button></div>`).join('')}
+    </div>
+    ${nota?`<p class="sx-nota">📝 ${esc(nota)}</p>`:''}
+  </article>`;
+}
 function sxRenderTablero(){
   const box=$('sxTablero');if(!box)return;
-  const sides=activeOrderSides(),datos=sxDatos();
-  box.innerHTML=datos.length
-    ?`<div class="sx-tablero-h"><h2>Tu pedido de hoy</h2><small>${ico('mover')}Mantené apretado un producto y arrastralo a otro proveedor</small></div>
-      <div class="sx-grid">${datos.map((d,i)=>sxTarjeta(d,i,sides,'tablero')).join('')}</div>`
-    :`<div class="sx-vacio"><span>🧺</span><div><b>Todavía no hay productos</b><small>Buscá un producto arriba o abrí un proveedor abajo.</small></div></div>`;
   const bn=$('sxProvBarN');if(bn)bn.textContent=getProvNames().length;
+  const sides=activeOrderSides(),datos=sxDatos(),dos=sides.length>1,ver=sxLadoVisto(sides);
+  if(!datos.length){box.innerHTML=`<div class="sx-vacio"><span>🧺</span><div><b>Todavía no hay productos</b><small>Buscá un producto arriba o abrí un proveedor abajo.</small></div></div>`;return;}
+  const porLado=sides.map(side=>{
+    const ds=datos.filter(d=>d.lines.some(l=>l.q[side]>0)||d.extras.some(x=>x.side===side));
+    return{side,ds,n:ds.reduce((k,d)=>k+d.lines.filter(l=>l.q[side]>0).length+d.extras.filter(x=>x.side===side).length,0),
+      tot:ds.reduce((t,d)=>t+calcSide(side,d.prov),0),pend:ds.filter(d=>!sentFlags(S.pedidos[d.prov]||{})[side]).length};
+  });
+  box.innerHTML=`<div class="sx-tablero-h"><h2>Tu pedido de hoy</h2><small><span class="sx-grip-demo" aria-hidden="true"></span>Arrastrá desde los puntitos para pasar un producto a otro proveedor</small></div>
+    ${dos?`<div class="sx-lados" role="tablist" aria-label="Sucursal">${porLado.map(x=>`<button type="button" role="tab" class="${x.side}${x.side===ver?' on':''}" data-sx-tab="${x.side}" aria-selected="${x.side===ver}"><span class="sx-lados-n">${SIDE_ICO[x.side]} ${SIDE_NAME[x.side]}</span><span class="sx-lados-d"><b>₡${fmt(x.tot)}</b> · ${plural(x.n,'producto','productos')}</span>${x.pend?`<em>${x.pend} por enviar</em>`:`<em class="ok">enviado ✓</em>`}</button>`).join('')}</div>`:''}
+    <div class="sx-columnas${dos?' dos':''}" data-ver="${ver}">${porLado.map(x=>`<section class="sx-col ${x.side}" aria-label="Pedido de ${SIDE_NAME[x.side]}">
+      <div class="sx-col-h"><b>${SIDE_ICO[x.side]} ${SIDE_NAME[x.side]}</b><span>₡${fmt(x.tot)} · ${plural(x.n,'producto','productos')}${x.pend?` · ${x.pend} por enviar`:''}</span></div>
+      ${x.ds.length?`<div class="sx-grid">${x.ds.map((d,i)=>sxTarjetaLado(d,x.side,i)).join('')}</div>`
+        :`<div class="sx-vacio chico"><span>🧺</span><div><b>${SIDE_NAME[x.side]} todavía no pidió nada</b><small>Buscá un producto arriba o abrí un proveedor.</small></div></div>`}
+    </section>`).join('')}</div>`;
 }
 function xpRenderPedido(){
   const body=$('pedidoBody');if(!body)return;
@@ -790,15 +816,20 @@ function xpContarPedido(body){
   });
 }
 // ══════════════════════════════════════════
-// ⇄ MOVER UN PRODUCTO a otro proveedor
-// Mantener apretada la pastilla (o arrastrar con el mouse) y soltarla sobre otra tarjeta o
-// sobre un proveedor de la lista que sube desde abajo. Si el producto es de las dos tiendas,
-// pregunta: las dos, solo Moravia o solo Los Ángeles. Siempre con "Deshacer".
-// Mantener apretado y soltar sin moverse abre la misma lista para elegir con un toque.
+// ⇄ MOVER un producto a otro proveedor y ✏️ EDITAR su cantidad
+// En "Tu pedido de hoy" cada pastilla es de una tienda (Moravia o Los Ángeles):
+// · Los puntitos (agarradera) arrastran al instante, con el dedo o el mouse.
+// · Mantener apretado el resto de la pastilla también la levanta; con el mouse basta arrastrar.
+// · Se suelta sobre otra tarjeta de la misma tienda o en la lista que sube desde abajo; cerca
+//   de los bordes la pantalla se mueve sola. Soltar sin moverse abre la lista para elegir.
+// · Un toque abre la ventanita: − y + grandes, cantidades rápidas, pasar a otro proveedor, quitar.
+// En Pedido (pastillas con las dos tiendas) pregunta qué tienda pasar. Siempre con "Deshacer".
 // ══════════════════════════════════════════
-const SX={pend:null,sinClick:0,elegir:null,resp:null};
+const SX={pend:null,sinClick:0,elegir:null,resp:null,ed:null,edT:0};
 const sxLinea=(prov,pid)=>xpProvLines(prov).lines.find(l=>l.prod.id===pid)||null;
-function sxDock(desde,arrastrando){
+const sxScroller=()=>document.querySelector('.view.active .scroll')||document.scrollingElement;
+const sxProd=(prov,pid)=>(getAllProviders()[prov]?.products||[]).find(x=>x.id===pid)||null;
+function sxDock(desde,arrastrando,lado){
   let dock=$('sxDock');
   if(!dock){
     dock=document.createElement('div');dock.id='sxDock';dock.className='sx-dock';dock.setAttribute('role','dialog');dock.setAttribute('aria-label','Pasar a otro proveedor');document.body.appendChild(dock);
@@ -809,40 +840,51 @@ function sxDock(desde,arrastrando){
     });
   }
   dock.classList.toggle('elegir',!arrastrando);
-  dock.innerHTML=`<div class="sx-dock-h"><span>${ico('mover')}<b>${arrastrando?'Soltalo en el proveedor que querés':'¿A quién se lo pedís?'}</b></span>${arrastrando?'':'<button type="button" data-sx-cerrar>Cancelar</button>'}</div>
+  dock.dataset.lado=lado||'';
+  const para=lado&&activeOrderSides().length>1?` <em class="${lado}">${SIDE_ICO[lado]} ${SIDE_NAME[lado]}</em>`:'';
+  dock.innerHTML=`<div class="sx-dock-h"><span>${ico('mover')}<b>${arrastrando?'Soltalo en el proveedor':'¿A quién se lo pedís?'}</b>${para}</span>${arrastrando?'':'<button type="button" data-sx-cerrar>Cancelar</button>'}</div>
     <div class="sx-dock-grid">${getProvNames().filter(n=>n!==desde).map(n=>`<button type="button" data-sx-drop="${esc(n)}" style="--c:${sxColor(n)}"><span class="sx-av">${esc(n.charAt(0).toUpperCase())}</span><span class="sx-dock-n">${esc(n)}</span></button>`).join('')}</div>`;
   requestAnimationFrame(()=>dock.classList.add('open'));
 }
 function sxCerrarDock(){$('sxDock')?.classList.remove('open');}
+const sxValido=(st,t)=>!!t&&t.dataset.sxDrop!==st.chip.dataset.prov&&(!st.lado||!t.dataset.sxLado||t.dataset.sxLado===st.lado);
 function sxLevantar(st,x,y){
   st.activo=true;buzz(14);
+  st.lado=st.chip.dataset.lado||'';
   const r=st.chip.getBoundingClientRect();
-  st.dx=Math.min(x-r.left,r.width-20);st.dy=y-r.top;
-  const g=st.chip.cloneNode(true);g.className='sx-chip sx-fantasma';g.removeAttribute('data-pd');g.removeAttribute('data-pid');g.setAttribute('aria-hidden','true');
+  st.dx=Math.min(Math.max(x-r.left,12),r.width-12);st.dy=Math.min(Math.max(y-r.top,8),r.height-8);
+  const g=st.chip.cloneNode(true);g.classList.add('sx-fantasma');g.classList.remove('levantado');g.removeAttribute('data-pid');g.setAttribute('aria-hidden','true');g.style.width=r.width+'px';
   document.body.appendChild(g);st.g=g;
   st.chip.classList.add('levantado');document.body.classList.add('sx-arrastrando');
-  sxDock(st.chip.dataset.prov,true);
+  document.querySelectorAll('#sxTablero [data-sx-drop],#pedidoBody [data-sx-drop]').forEach(t=>{if(sxValido(st,t))t.classList.add('sx-meta');});
+  sxDock(st.chip.dataset.prov,true,st.lado);
   sxSeguir(st,x,y);
 }
 function sxSeguir(st,x,y){
   st.x=x;st.y=y;
-  st.g.style.transform=`translate(${x-st.dx}px,${y-st.dy}px) rotate(-3deg) scale(1.07)`;
+  st.g.style.transform=`translate(${x-st.dx}px,${y-st.dy}px) rotate(-3deg) scale(1.06)`;
   st.g.style.visibility='hidden';const el=document.elementFromPoint(x,y);st.g.style.visibility='';
-  const t=el?.closest?.('[data-sx-drop]'),destino=t&&t.dataset.sxDrop!==st.chip.dataset.prov?t:null;
-  if(st.sobre!==destino){st.sobre?.classList.remove('sx-sobre');destino?.classList.add('sx-sobre');st.sobre=destino;if(destino)buzz(6);}
+  const t=el?.closest?.('[data-sx-drop]'),destino=sxValido(st,t)?t:null;
+  if(st.sobre!==destino){st.sobre?.classList.remove('sx-sobre');destino?.classList.add('sx-sobre');st.sobre=destino;if(destino)buzz(8);}
+  // Cerca de arriba o de la lista de abajo, la pantalla se mueve sola.
   cancelAnimationFrame(st.raf);
-  if(y<90){const sube=()=>{window.scrollBy(0,-9);$('view-proveedores')?.querySelector('.scroll')?.scrollBy?.(0,-9);st.raf=requestAnimationFrame(sube);};st.raf=requestAnimationFrame(sube);}
+  const dock=$('sxDock'),abajo=dock?.classList.contains('open')?dock.getBoundingClientRect().top:innerHeight;
+  const vel=y<130?-Math.ceil((130-y)/7):(y>abajo-90&&y<abajo?Math.ceil((y-(abajo-90))/7):0);
+  if(vel){const sc=sxScroller(),mueve=()=>{if(!st.activo)return;sc.scrollBy(0,vel);st.raf=requestAnimationFrame(mueve);};st.raf=requestAnimationFrame(mueve);}
 }
 function sxTerminar(st){
-  cancelAnimationFrame(st.raf);st.g?.remove();st.chip.classList.remove('levantado');st.sobre?.classList.remove('sx-sobre');document.body.classList.remove('sx-arrastrando');
+  st.activo=false;cancelAnimationFrame(st.raf);st.g?.remove();st.chip.classList.remove('levantado');st.sobre?.classList.remove('sx-sobre');
+  document.querySelectorAll('.sx-meta').forEach(t=>t.classList.remove('sx-meta'));document.body.classList.remove('sx-arrastrando');
 }
 function sxSoltar(st){
-  const desde=st.chip.dataset.prov,pid=st.chip.dataset.pid,hacia=st.sobre?.dataset.sxDrop,quieto=Math.hypot(st.x-st.x0,st.y-st.y0)<12;
+  const desde=st.chip.dataset.prov,pid=st.chip.dataset.pid,lado=st.lado,hacia=st.sobre?.dataset.sxDrop,quieto=Math.hypot(st.x-st.x0,st.y-st.y0)<12;
   sxTerminar(st);SX.sinClick=Date.now();
-  if(hacia){sxCerrarDock();sxPreguntar(desde,pid,hacia);return;}
-  if(quieto){sxDock(desde,false);SX.elegir=h=>{sxCerrarDock();sxPreguntar(desde,pid,h);};return;}
+  const pasar=h=>lado?sxHacerLado(desde,pid,h,lado):sxPreguntar(desde,pid,h);
+  if(hacia){sxCerrarDock();pasar(hacia);return;}
+  if(quieto){sxDock(desde,false,lado);SX.elegir=h=>{sxCerrarDock();pasar(h);};return;}
   sxCerrarDock();
 }
+function sxHacerLado(desde,pid,hacia,lado){const l=sxLinea(desde,pid);if(l&&l.q[lado]>0)sxHacer(desde,pid,hacia,[lado],l);}
 function sxPreguntar(desde,pid,hacia){
   const l=sxLinea(desde,pid);if(!l||desde===hacia)return;
   const lados=activeOrderSides().filter(s=>l.q[s]>0);
@@ -869,7 +911,7 @@ function sxPreguntar(desde,pid,hacia){
 // Pasa la cantidad de cada tienda elegida. Si el otro proveedor no tiene ese producto, se le
 // agrega (con el precio del primero como punto de partida). Devuelve lo necesario para deshacer.
 function sxMover(desde,pid,hacia,lados){
-  const prodA=(getAllProviders()[desde]?.products||[]).find(x=>x.id===pid);if(!prodA||desde===hacia)return null;
+  const prodA=sxProd(desde,pid);if(!prodA||desde===hacia)return null;
   const key=normalizeText(prodA.name);
   let prodB=(getAllProviders()[hacia]?.products||[]).find(x=>normalizeText(x.name)===key);
   if(!prodB){
@@ -877,7 +919,7 @@ function sxMover(desde,pid,hacia,lados){
     const nuevo={id:'mv_'+Date.now().toString(36)+Math.random().toString(36).slice(2,6),name:prodA.name,emoji:prodA.emoji||'',unit:prodA.unit,agregado:Date.now()};
     (S.customProviders[hacia].products=S.customProviders[hacia].products||[]).push(nuevo);
     invalidateProvidersCache();
-    prodB=(getAllProviders()[hacia]?.products||[]).find(x=>x.id===nuevo.id)||nuevo;
+    prodB=sxProd(hacia,nuevo.id)||nuevo;
     const precio=getPrice(desde,pid);if(precio&&!getPrice(hacia,prodB.id))setPrice(hacia,prodB.id,precio);
   }
   const pA=getPedido(desde),pB=getPedido(hacia),antes=[];
@@ -906,17 +948,67 @@ function sxAviso(txt,e,deshacer){
   a.querySelector('button')?.addEventListener('click',()=>{a.classList.remove('open');deshacer();});
   a.classList.add('open');clearTimeout(_sxAvisoT);_sxAvisoT=setTimeout(()=>a.classList.remove('open'),7000);
 }
+
+// ── ✏️ Ventanita para cambiar la cantidad de una tienda ──
+function sxEditar(prov,pid,lado){
+  if(!sxProd(prov,pid))return;
+  let ed=$('sxEditor');
+  if(!ed){
+    ed=document.createElement('div');ed.id='sxEditor';ed.className='sx-editor';document.body.appendChild(ed);
+    ed.addEventListener('click',e=>{
+      if(e.target===ed)return sxCerrarEditor();
+      const b=e.target.closest('[data-sx-acc]');if(!b||!SX.ed)return;
+      const a=b.dataset.sxAcc,{prov,pid,lado}=SX.ed,q=sxQ();
+      if(a==='cerrar')return sxCerrarEditor();
+      if(a==='menos')return sxPoner(Math.max(0,q-1),true);
+      if(a==='mas')return sxPoner(q+1,true);
+      if(a==='poner')return sxPoner(+b.dataset.n,true);
+      if(a==='quitar'){const prod=sxProd(prov,pid),u=sxUnidad(),antes=q;sxPoner(0);sxCerrarEditor();sxAviso(`${niceName(prod.name)} quitado de ${SIDE_NAME[lado]}`,smartEmoji(prod),()=>{syncQty(prov,prod,lado,String(antes),u);xpRefresh();});return;}
+      if(a==='mover'){sxCerrarEditor();sxDock(prov,false,lado);SX.elegir=h=>{sxCerrarDock();sxHacerLado(prov,pid,h,lado);};}
+    });
+    ed.addEventListener('input',e=>{if(e.target.id==='sxEdQ'){const v=parseFloat(String(e.target.value).replace(',','.'));sxPoner(isNaN(v)?0:Math.max(0,v),false);}});
+    ed.addEventListener('keydown',e=>{if(e.key==='Enter'&&e.target.id==='sxEdQ'){e.preventDefault();sxCerrarEditor();}});
+  }
+  SX.ed={prov,pid,lado};
+  sxPintarEditor();
+  requestAnimationFrame(()=>ed.classList.add('open'));
+}
+function sxQ(){const {prov,pid,lado}=SX.ed;return +getPedido(prov).qtys?.[lado]?.[pid]?.qty||0;}
+function sxUnidad(){const {prov,pid,lado}=SX.ed;return getPedido(prov).qtys?.[lado]?.[pid]?.unit||sxProd(prov,pid)?.unit||'kg';}
+function sxPintarEditor(){
+  const ed=$('sxEditor');if(!ed||!SX.ed)return;
+  const {prov,pid,lado}=SX.ed,prod=sxProd(prov,pid),q=sxQ(),nom=esc(niceName(prod.name));
+  ed.innerHTML=`<div class="sx-ed-in ${lado}" role="dialog" aria-modal="true" aria-label="Cantidad de ${nom} para ${SIDE_NAME[lado]}">
+    <div class="sx-ed-cab"><span class="sx-ed-e">${smartEmoji(prod)}</span><div><h3>${nom}</h3><p>${esc(prov)} · <b class="${lado}">${SIDE_ICO[lado]} ${SIDE_NAME[lado]}</b></p></div><button type="button" class="sx-ed-x" data-sx-acc="cerrar" aria-label="Cerrar">✕</button></div>
+    <div class="sx-ed-paso"><button type="button" data-sx-acc="menos" aria-label="Uno menos">−</button><label><input id="sxEdQ" type="text" inputmode="decimal" autocomplete="off" value="${q?fmtQ(q):''}" placeholder="0" aria-label="Cantidad"><small>${esc(sxUnidad())}</small></label><button type="button" data-sx-acc="mas" aria-label="Uno más">+</button></div>
+    <div class="sx-ed-rapido" role="group" aria-label="Cantidades rápidas">${[1,2,3,5,10,20].map(n=>`<button type="button" data-sx-acc="poner" data-n="${n}" class="${q===n?'on':''}">${n}</button>`).join('')}</div>
+    <div class="sx-ed-acc"><button type="button" data-sx-acc="mover">${ico('mover')}Pasar a otro proveedor</button><button type="button" data-sx-acc="quitar" class="quitar">Quitar</button></div>
+    <button type="button" class="sx-ed-ok" data-sx-acc="cerrar">Listo</button>
+  </div>`;
+}
+function sxPoner(q,repintar){
+  const {prov,pid,lado}=SX.ed,prod=sxProd(prov,pid);if(!prod)return;
+  q=Math.round(q*1000)/1000;
+  syncQty(prov,prod,lado,q>0?String(q):'',sxUnidad());
+  if(repintar){sxPintarEditor();buzz(6);}
+  clearTimeout(SX.edT);SX.edT=setTimeout(xpRefresh,220);
+}
+function sxCerrarEditor(){$('sxEditor')?.classList.remove('open');SX.ed=null;xpRefresh();}
+
+// ── Toques y arrastres ──
 document.addEventListener('pointerdown',e=>{
   const chip=e.target.closest?.('.sx-chip[data-pid]');if(!chip||(e.pointerType==='mouse'&&e.button!==0))return;
   const st={chip,x0:e.clientX,y0:e.clientY,x:e.clientX,y:e.clientY,id:e.pointerId,tipo:e.pointerType,activo:false};
   SX.pend=st;
-  if(e.pointerType!=='mouse')st.timer=setTimeout(()=>{if(SX.pend===st&&!st.activo)sxLevantar(st,st.x,st.y);},320);
+  if(e.pointerType==='mouse')return;
+  if(e.target.closest('.sx-grip'))sxLevantar(st,e.clientX,e.clientY); // la agarradera arrastra al instante
+  else st.timer=setTimeout(()=>{if(SX.pend===st&&!st.activo)sxLevantar(st,st.x,st.y);},250);
 },{passive:true});
 document.addEventListener('pointermove',e=>{
   const st=SX.pend;if(!st||e.pointerId!==st.id)return;
   if(!st.activo){
     const d=Math.hypot(e.clientX-st.x0,e.clientY-st.y0);st.x=e.clientX;st.y=e.clientY;
-    if(st.tipo==='mouse'){if(d>6)sxLevantar(st,e.clientX,e.clientY);}
+    if(st.tipo==='mouse'){if(d>5)sxLevantar(st,e.clientX,e.clientY);}
     else if(d>10){clearTimeout(st.timer);SX.pend=null;} // era para bajar la pantalla
     return;
   }
@@ -931,13 +1023,25 @@ const sxFin=e=>{
   if(e.type==='pointercancel'){sxTerminar(st);sxCerrarDock();}else sxSoltar(st);
 };
 document.addEventListener('pointerup',sxFin);document.addEventListener('pointercancel',sxFin);
-// Soltar después de arrastrar no cuenta como toque (no abre la cantidad).
+// Soltar después de arrastrar no cuenta como toque.
 document.addEventListener('click',e=>{if(Date.now()-SX.sinClick<450&&e.target.closest?.('.sx-chip,.sx-card')){e.stopPropagation();e.preventDefault();}},true);
 document.addEventListener('contextmenu',e=>{if(e.target.closest?.('.sx-chip[data-pid]'))e.preventDefault();});
 document.addEventListener('keydown',e=>{
   if(e.key!=='Escape')return;
   if(SX.pend?.activo){const st=SX.pend;SX.pend=null;sxTerminar(st);}
-  SX.elegir=SX.resp=null;sxCerrarDock();$('sxPregunta')?.classList.remove('open');
+  SX.elegir=SX.resp=null;sxCerrarDock();$('sxPregunta')?.classList.remove('open');if(SX.ed)sxCerrarEditor();
+});
+// En "Tu pedido de hoy": cambiar de sucursal y abrir la ventanita de cantidad.
+$('sxTablero')?.addEventListener('click',e=>{
+  const tab=e.target.closest('[data-sx-tab]');
+  if(tab){
+    const lado=tab.dataset.sxTab;try{localStorage.setItem(SX_LADO_KEY,lado);}catch{}
+    $('sxTablero').querySelectorAll('[data-sx-tab]').forEach(b=>{const on=b===tab;b.classList.toggle('on',on);b.setAttribute('aria-selected',String(on));});
+    const cols=$('sxTablero').querySelector('.sx-columnas');if(cols)cols.dataset.ver=lado;
+    return;
+  }
+  const b=e.target.closest('[data-sx-ed]');if(!b)return;
+  const chip=b.closest('.sx-chip');if(chip)sxEditar(chip.dataset.prov,chip.dataset.pid,chip.dataset.lado);
 });
 function xpHistoryHtml(){
   const today=new Date().toISOString().slice(0,10);

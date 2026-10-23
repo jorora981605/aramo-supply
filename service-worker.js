@@ -1,4 +1,4 @@
-const CACHE_NAME = 'aramo-shell-v49-surtido-mover';
+const CACHE_NAME = 'aramo-shell-v50-surtido-sucursales';
 const CDN_CACHE = 'aramo-cdn-v1';
 // Las páginas: al instalar se guardan junto con TODOS los archivos que cargan,
 // tal cual los piden (con su ?v=…). Así cada pantalla abre sin esperar a internet.
