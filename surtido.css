@@ -22,16 +22,16 @@ html[data-theme="dark"] #view-proveedores,html[data-theme="dark"] #pedidoBody,ht
 #view-proveedores #pvTop{grid-area:1/2/2/3}
 #view-proveedores .pv-search{grid-area:2/1/3/-1}
 #view-proveedores #pvTop:empty{display:none}
-#view-proveedores .pv-wrap:has(#pvTop:empty) #pvSum{grid-column:1/-1}
+#view-proveedores .pv-wrap.sx-sin-reset #pvSum{grid-column:1/-1}
 #view-proveedores #pvResults:empty,#view-proveedores #pvParse[hidden],#view-proveedores #bothSummary{display:none!important}
 @media (min-width:560px){
   #view-proveedores .pv-wrap{grid-template-columns:minmax(0,1.3fr) minmax(0,1fr) auto}
   #view-proveedores #pvSum{grid-area:1/1/2/2}
   #view-proveedores .pv-search{grid-area:1/2/2/3}
   #view-proveedores #pvTop{grid-area:1/3/2/4}
-  #view-proveedores .pv-wrap:has(#pvTop:empty) .pv-search{grid-column:2/-1}
-  #view-proveedores .pv-wrap:has(#pvSearch:focus) .pv-search,#view-proveedores .pv-wrap:has(#pvSearch:not(:placeholder-shown)) .pv-search{grid-area:2/1/3/-1}
-  #view-proveedores .pv-wrap:has(#pvSearch:focus) #pvSum,#view-proveedores .pv-wrap:has(#pvSearch:not(:placeholder-shown)) #pvSum{grid-column:1/3}
+  #view-proveedores .pv-wrap.sx-sin-reset .pv-search{grid-column:2/-1}
+  #view-proveedores .pv-wrap.sx-buscando .pv-search{grid-area:2/1/3/-1}
+  #view-proveedores .pv-wrap.sx-buscando #pvSum{grid-column:1/3}
 }
 
 /* Tarjetitas de arriba */
@@ -120,8 +120,8 @@ html[data-theme="dark"] .sx-nota{color:#fde68a}
 .sx-pb-f{font-size:13px;color:var(--m);transition:transform .25s}
 .sx-abierto .sx-pb-f{transform:rotate(180deg)}
 #view-proveedores .pv-wrap:not(.sx-abierto) #providersNavList{display:none}
-#view-proveedores .pv-wrap:has(#pvSearch:not(:placeholder-shown)) #providersNavList{display:grid}
-#view-proveedores .pv-wrap:has(#pvSearch:not(:placeholder-shown)) #sxTablero{display:none}
+#view-proveedores .pv-wrap.sx-con-texto #providersNavList{display:grid}
+#view-proveedores .pv-wrap.sx-con-texto #sxTablero{display:none}
 #view-proveedores .sx-abierto #providersNavList{animation:sxAbre .3s cubic-bezier(.22,1,.36,1)}
 @keyframes sxAbre{from{opacity:0;transform:translateY(-6px)}}
 #view-proveedores #providersNavList{margin-top:-6px}
