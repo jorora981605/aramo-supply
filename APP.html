@@ -1111,6 +1111,9 @@ html[data-theme="dark"] .today-money-card{background:linear-gradient(145deg,#125
 
 <script>
 'use strict';
+// Orden alfabético en español, uno solo para toda la app: localeCompare con opciones arma uno
+// nuevo en cada comparación y con miles de productos eso tardaba casi medio segundo al abrir.
+const ORDEN_ES=new Intl.Collator('es',{sensitivity:'base'}).compare;
 // ══════════════════════════════════════════
 // UNITS & DEFAULT DATA
 // ══════════════════════════════════════════
@@ -1401,7 +1404,7 @@ function getAllProviders(){
   const result={};
   Object.keys(merged)
     .filter(name=>!merged[name]?.deleted)
-    .sort((a,b)=>a.localeCompare(b,'es',{sensitivity:'base'}))
+    .sort((a,b)=>ORDEN_ES(a,b))
     .forEach(name=>{
       const d=merged[name];
       result[name]=name==='Otros'?d:{...d,products:(d.products||[]).filter(p=>prodVivo(p,d.quitados)&&!borradoDeTodo(p))};
@@ -1429,7 +1432,7 @@ function getOtrosProducts(){
   (Array.isArray(window.ARAMO_XLSX_PRODUCTS)?window.ARAMO_XLSX_PRODUCTS:[]).forEach(add);
   const base=window.ARAMO_SUPPLIER_BASE?.providers||{};
   Object.values(base).forEach(data=>(data?.products||[]).forEach(add));
-  return [...catalog.values()].sort((a,b)=>a.name.localeCompare(b.name,'es',{sensitivity:'base'}));
+  return [...catalog.values()].sort((a,b)=>ORDEN_ES(a.name,b.name));
 }
 
 function migrateProviderKey(store,from,to){
@@ -2518,7 +2521,7 @@ function renderProdTable(){
     if(da!==db)return da-db;
     const ua=usos[a.id]||0, ub=usos[b.id]||0;
     if(ua!==ub)return ub-ua;
-    return a.name.localeCompare(b.name,'es',{sensitivity:'base'});
+    return ORDEN_ES(a.name,b.name);
   });
 
   const container=document.getElementById('prodCardList');
@@ -2864,7 +2867,9 @@ document.getElementById('noteAreaA').addEventListener('input',e=>syncBranchNote(
 // ══════════════════════════════════════════
 // UTILIDADES DE TEXTO
 // ══════════════════════════════════════════
-function normalizeText(s){return s.toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g,'').trim();}
+// Los mismos nombres se normalizan miles de veces: se guarda el resultado.
+const _normados=new Map();
+function normalizeText(s){let r=_normados.get(s);if(r===undefined){r=s.toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g,'').trim();if(_normados.size>20000)_normados.clear();_normados.set(s,r);}return r;}
 const REMOVED_PRODUCT_KEYS=new Set(['botella de un litro','botella 1l','chayote bolsa','coco completo','guiskil','guisquil','chile','chile normal','cebolla blanca']);
 function isRemovedProduct(product){return REMOVED_PRODUCT_KEYS.has(normalizeText(product?.name||''))||borradoDeTodo(product);}
 // Productos quitados: cada proveedor anota qué quitó y a qué hora (quitados), y la lista total
@@ -3485,7 +3490,7 @@ function renderCfgProveedores(){
       tit.textContent=`Productos de ${name} (${products.length})`;body.appendChild(tit);
       products
         .map((prod,idx)=>({prod,idx}))
-        .sort((a,b)=>a.prod.name.localeCompare(b.prod.name,'es',{sensitivity:'base'}))
+        .sort((a,b)=>ORDEN_ES(a.prod.name,b.prod.name))
         .forEach(({prod,idx})=>{
         const row=document.createElement('div');
         row.className='prod-cfg-row';
@@ -3560,7 +3565,7 @@ function getKnownProductCatalog(){
     });
     catalog.get(key).uses++;
   }));
-  return [...catalog.values()].sort((a,b)=>a.name.localeCompare(b.name,'es',{sensitivity:'base'}));
+  return [...catalog.values()].sort((a,b)=>ORDEN_ES(a.name,b.name));
 }
 
 function renderProductPicker(prov,body){
@@ -3703,8 +3708,8 @@ function getPriceCatalog(){
     });
   });
   return [...catalog.values()]
-    .map(item=>({...item,offers:item.offers.sort((a,b)=>a.prov.localeCompare(b.prov,'es',{sensitivity:'base'}))}))
-    .sort((a,b)=>a.name.localeCompare(b.name,'es',{sensitivity:'base'}));
+    .map(item=>({...item,offers:item.offers.sort((a,b)=>ORDEN_ES(a.prov,b.prov))}))
+    .sort((a,b)=>ORDEN_ES(a.name,b.name));
 }
 
 function renderPriceSearch(){
@@ -3810,7 +3815,7 @@ function closeGlobalSearch(){
           }
         });
       });
-      matches.sort((a,b)=>a.prod.name.localeCompare(b.prod.name,'es',{sensitivity:'base'})||a.prov.localeCompare(b.prov,'es',{sensitivity:'base'}));
+      matches.sort((a,b)=>ORDEN_ES(a.prod.name,b.prod.name)||ORDEN_ES(a.prov,b.prov));
 
       if(!matches.length){
         results.style.display='block';
@@ -3978,11 +3983,11 @@ if(isIOS && !isInStandalone && !dismissed){
   },3000);
 }
 </script>
-<script src="express.js?v=20261023-surtido-2"></script>
+<script src="express.js?v=20261023-rapida-1"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcode-generator/1.4.4/qrcode.min.js"></script>
 <script src="canasta-config.js?v=20261018-seguridad-1"></script>
 <script src="aramo-nube.js?v=20261020-circuito-6"></script>
-<script src="portadas.js?v=20261016-colores-1"></script>
+<script src="portadas.js?v=20261023-rapida-1"></script>
 <script src="puerta.js?v=20261020-circuito-11"></script>
 <script>
   // El menú, Mostrador y Surtido se desplazan verticalmente; no usar gestos

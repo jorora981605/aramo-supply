@@ -1,4 +1,4 @@
-const CACHE_NAME = 'aramo-shell-v50-surtido-sucursales';
+const CACHE_NAME = 'aramo-shell-v51-rapida';
 const CDN_CACHE = 'aramo-cdn-v1';
 // Las páginas: al instalar se guardan junto con TODOS los archivos que cargan,
 // tal cual los piden (con su ?v=…). Así cada pantalla abre sin esperar a internet.
@@ -54,7 +54,10 @@ self.addEventListener('activate', event => {
 
 // Calentar: fotos del Taller y archivos del POS que se cargan después, guardados por
 // detrás para que al entrar ya estén. Solo baja lo que falta.
-async function calentar() {
+// Una sola ronda a la vez (si la app se abre varias veces seguidas no se repite el trabajo).
+let calentando = null;
+function calentar() { return calentando || (calentando = calentarYa().finally(() => { calentando = null; })); }
+async function calentarYa() {
   const cache = await caches.open(CACHE_NAME);
   const quiero = new Set();
   const texto = async u => { try { const r = await (await cache.match(u) || fetch(u)); return r.ok ? await r.clone().text() : ''; } catch { return ''; } };
@@ -62,14 +65,15 @@ async function calentar() {
   for (const m of fotos.matchAll(/fotos\/[\w-]+\.webp/g)) quiero.add(new URL('./' + m[0], self.location).href);
   const pos = new URL('./pos/index.html', self.location).href;
   for (const u of archivosDe(await texto(pos), pos)) {
-    if (!/\/assets\/index-[\w-]+\.js$/.test(u)) continue;
+    if (!/\/assets\/index-[\w-]+\.js(\?.*)?$/.test(u)) continue;
     for (const m of (await texto(u)).matchAll(/"\.\/([\w-]+\.(?:js|css))"/g)) quiero.add(new URL(m[1], u).href);
   }
   quiero.add(new URL('./pos/sql/sql-wasm-browser.wasm', self.location).href);
-  for (const u of quiero) {
-    if (await cache.match(u)) continue;
-    try { const r = await fetch(u); if (r.ok) await cache.put(u, r); } catch {}
-  }
+  const faltan = [];
+  for (const u of quiero) if (!(await cache.match(u))) faltan.push(u);
+  // De a 4 en paralelo: termina rápido sin acaparar la conexión.
+  const bajar = async () => { for (let u; (u = faltan.shift());) { try { const r = await fetch(u); if (r.ok) await cache.put(u, r); } catch {} } };
+  await Promise.all([bajar(), bajar(), bajar(), bajar()]);
 }
 self.addEventListener('message', event => {
   if (event.data && event.data.tipo === 'calentar') event.waitUntil(calentar());
@@ -100,20 +104,26 @@ self.addEventListener('fetch', event => {
   event.respondWith((async () => {
     const pagina = request.mode === 'navigate';
 
-    // Las páginas principales deben buscar primero la versión publicada. Así
-    // una versión antigua del caché no puede ocultar una actualización del sitio.
+    // Las páginas buscan primero la versión publicada, así una versión vieja no oculta una
+    // actualización. Pero no se bajan enteras cada vez: se pregunta si cambiaron (si no, el
+    // servidor contesta casi sin datos) y, si internet tarda más de 1,5 s, abre lo guardado al
+    // instante y la página nueva queda lista para la próxima vez.
     if (pagina) {
-      try {
-        const response = await fetch(new Request(request, { cache: 'no-store' }));
-        if (response.ok) {
-          const copy = response.clone();
-          event.waitUntil(caches.open(CACHE_NAME).then(cache => cache.put(request, copy)));
-          return response;
-        }
-      } catch {}
+      const red = fetch(new Request(request, { cache: 'no-cache' })).then(response => {
+        if (response.ok) { const copy = response.clone(); caches.open(CACHE_NAME).then(cache => cache.put(request, copy)); }
+        return response;
+      });
       const guardado = await caches.match(request, { ignoreSearch: true });
-      if (guardado) return guardado;
-      return (await caches.match('./APP.html')) || Response.error();
+      if (!guardado) {
+        try { const r = await red; if (r.ok) return r; } catch {}
+        return (await caches.match('./APP.html')) || Response.error();
+      }
+      try {
+        const r = await Promise.race([red, new Promise(ok => setTimeout(() => ok(null), 1500))]);
+        if (r && r.ok) return r;
+      } catch {}
+      event.waitUntil(red.catch(() => {}));
+      return guardado;
     }
 
     const guardado = await caches.match(request);

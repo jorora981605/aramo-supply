@@ -1,0 +1,41 @@
+# ARAMO · Publicar la versión rápida.
+# En cada cambio que llega a main, GitHub compila la app (compilar.mjs: código y estilos
+# comprimidos, sin archivos internos) y la publica en GitHub Pages.
+# Si la compilación falla, el sitio se queda como estaba (no se publica nada roto).
+name: Publicar ARAMO
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: true
+
+jobs:
+  publicar:
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.publicado.outputs.page_url }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - name: Herramientas para comprimir
+        run: npm install --no-save --no-package-lock esbuild@0.25.0 html-minifier-terser@7.2.0
+      - name: Compilar
+        run: node compilar.mjs . dist
+      - uses: actions/configure-pages@v5
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: dist
+      - id: publicado
+        uses: actions/deploy-pages@v4

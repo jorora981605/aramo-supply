@@ -153,7 +153,9 @@ function pintar(root,D){
     document.getElementById('puerta')?.setAttribute('data-portada',v);
   }
   llenar(root,D);
-  ajustarHerramientas(root);
+  // Se mide en el siguiente cuadro y una sola vez: medir en cada repintado obligaba al
+  // navegador a recalcular toda la pantalla (lo más lento al abrir).
+  if(!pintar._aj){pintar._aj=requestAnimationFrame(()=>{pintar._aj=0;if(root.offsetParent!==null||root.getClientRects().length)ajustarHerramientas(root);});}
   return v;
 }
 

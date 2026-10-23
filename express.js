@@ -112,7 +112,7 @@ function xpIndex(){
     if(!g){g={key,name:niceName(prod.name),offers:[],tokens:xpTokens(key)};map.set(key,g);}
     g.offers.push({prov,prod,otros:prov==='Otros'});
   }));
-  _idx=[...map.values()].sort((a,b)=>a.name.localeCompare(b.name,'es',{sensitivity:'base'}));
+  _idx=[...map.values()].sort((a,b)=>ORDEN_ES(a.name,b.name));
   _idxSrc=provs;_idxMap=map;
   return _idx;
 }
@@ -151,7 +151,7 @@ function xpTargetOffer(g){
     if(ua!==ub)return ub-ua;
     const pa=xpPrice(a)||Infinity,pb=xpPrice(b)||Infinity;
     if(pa!==pb)return pa-pb;
-    return a.prov.localeCompare(b.prov,'es',{sensitivity:'base'});
+    return ORDEN_ES(a.prov,b.prov);
   })[0];
 }
 function xpResolveSides(branch){
@@ -350,8 +350,13 @@ function xpRenderProveedores(){
       :t.items?`<button type="button" class="pv-reset sx-mini" data-pv="reset" aria-label="Reiniciar pedido${sides.length===1?' de '+SIDE_NAME[sides[0]]:''}: borra las cantidades y empieza de cero" title="Borra las cantidades y empieza de cero"><span class="sx-mini-e">${ico('reiniciar')}</span><span class="sx-mini-t"><b>Reiniciar</b></span></button>`:'';
   }
   sxRenderTablero();
+  $('pvTop')?.closest('.pv-wrap')?.classList.toggle('sx-sin-reset',!$('pvTop')?.childElementCount);
+  sxMarcarBusqueda(); // también cuando el buscador se limpia solo
 }
 window.renderProveedoresNav=xpRenderProveedores;
+// El buscador avisa con clases (en vez de :has(), que obliga a revisar estilos en cada cambio).
+function sxMarcarBusqueda(){const i=$('pvSearch'),w=i?.closest('.pv-wrap');if(!w)return;const txt=!!i.value.trim();w.classList.toggle('sx-con-texto',txt);w.classList.toggle('sx-buscando',txt||document.activeElement===i);}
+['input','focus','blur'].forEach(ev=>$('pvSearch')?.addEventListener(ev,sxMarcarBusqueda));
 
 // Búsqueda: productos de todos los proveedores. Si lo escrito trae
 // cantidades ("10 tomate") se ofrece agregarlo directo al pedido.
@@ -713,7 +718,7 @@ function sxTarjeta(d,i,sides,modo){
   </article>`;
 }
 function sxDatos(){
-  return xpTotals().provs.slice().sort((a,b)=>(isSent(a)-isSent(b))||a.localeCompare(b,'es'))
+  return xpTotals().provs.slice().sort((a,b)=>(isSent(a)-isSent(b))||ORDEN_ES(a,b))
     .map(prov=>{const {lines,extras}=xpProvLines(prov);return{prov,lines,extras,sent:isSent(prov),tot:sideTotal(prov),n:lines.length+extras.length};})
     .filter(d=>d.n>0);
 }
@@ -757,7 +762,7 @@ function xpRenderPedido(){
   const body=$('pedidoBody');if(!body)return;
   const sides=activeOrderSides(),dos=sides.length>1;
   const t=xpTotals(),all=calcScopedAllProvs();
-  const provs=t.provs.slice().sort((a,b)=>(isSent(a)-isSent(b))||a.localeCompare(b,'es'));
+  const provs=t.provs.slice().sort((a,b)=>(isSent(a)-isSent(b))||ORDEN_ES(a,b));
   const fecha=capital(new Date().toLocaleDateString('es-CR',{weekday:'long',day:'numeric',month:'long'}).replace(',',''));
   const datos=provs.map(prov=>{const {lines,extras}=xpProvLines(prov);return{prov,lines,extras,sent:isSent(prov),tot:sideTotal(prov),n:lines.length+extras.length};});
   const enviados=datos.filter(d=>d.sent).length,porEnviar=datos.length-enviados;
