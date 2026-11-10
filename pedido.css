@@ -54,6 +54,8 @@ html[data-theme="dark"] #pedidoBody{
 .pdx-ley .angeles span i{background:#fb923c;box-shadow:0 0 0 3px rgba(251,146,60,.2)}
 .pdx-ley b{display:block;margin-top:3px;font:800 19px var(--pdx-f);color:#fff;font-variant-numeric:tabular-nums}
 .pdx-ley small{display:block;font:600 12px var(--pdx-f);color:#9fc7b0}
+.pdx-ley .sx-upd{display:block;margin-top:3px;font:700 11.5px var(--pdx-f);color:#bbf7d0;font-variant-numeric:tabular-nums;line-height:1.3}
+.pdx-ley .angeles .sx-upd{color:#fed7aa}
 .pdx-chips{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px}
 .pdx-chip{min-width:0;padding:11px 12px;border-radius:16px;background:rgba(255,255,255,.07);border:1px solid rgba(255,255,255,.11)}
 .pdx-chip b{display:block;font:800 23px/1.05 var(--pdx-f);color:#fff;font-variant-numeric:tabular-nums}

@@ -738,6 +738,20 @@ function sxLado(d,side){
     ${nota?`<p class="sx-nota">📝 ${esc(nota)}</p>`:''}
   </div>`;
 }
+// Última actualización del pedido de una tienda: la hora más reciente que markUnsent dejó en
+// notes.__upd_<tienda> de cualquier proveedor. Se muestra entre el nombre y los productos.
+function sxUltimoCambio(side){return Object.values(S.pedidos||{}).reduce((m,p)=>Math.max(m,+p?.notes?.['__upd_'+side]||0),0);}
+function sxCuando(t){
+  const d=new Date(t),hoy=new Date(),ayer=new Date(hoy.getFullYear(),hoy.getMonth(),hoy.getDate()-1);
+  const dia=d.toDateString()===hoy.toDateString()?'Hoy':d.toDateString()===ayer.toDateString()?'Ayer':capital(d.toLocaleDateString('es-CR',{weekday:'short'}));
+  const junto=s=>s.replace(/\s/g,' '); // solo corta renglón en el " · "
+  return `${junto(dia+' '+d.toLocaleDateString('es-CR',{day:'numeric',month:'short'}))} · ${junto(d.toLocaleTimeString('es-CR',{hour:'numeric',minute:'2-digit'}))}`;
+}
+function sxActualizado(side){
+  const t=sxUltimoCambio(side);if(!t)return'';
+  const cuando=sxCuando(t);
+  return `<time class="sx-upd" datetime="${new Date(t).toISOString()}" title="Última actualización del pedido de ${SIDE_NAME[side]}: ${cuando}" aria-label="Actualizado ${cuando}">🕒 ${cuando}</time>`;
+}
 function sxRenderTablero(){
   const box=$('sxTablero');if(!box)return;
   const bn=$('sxProvBarN');if(bn)bn.textContent=getProvNames().length;
@@ -747,7 +761,7 @@ function sxRenderTablero(){
     const ds=datos.filter(d=>d.lines.some(l=>l.q[side]>0)||d.extras.some(x=>x.side===side));
     const n=ds.reduce((k,d)=>k+d.lines.filter(l=>l.q[side]>0).length+d.extras.filter(x=>x.side===side).length,0);
     const tot=ds.reduce((t,d)=>t+calcSide(side,d.prov),0),pend=ds.filter(d=>!sentFlags(S.pedidos[d.prov]||{})[side]).length;
-    return `<div class="${side}"><b>${SIDE_ICO[side]} ${SIDE_NAME[side]}</b><span>${plural(n,'producto','productos')}${tot?` · ₡${fmt(tot)}`:''}</span>${n?(pend?`<em>${pend} por enviar</em>`:`<em class="ok">✓ todo enviado</em>`):''}</div>`;
+    return `<div class="${side}"><b>${SIDE_ICO[side]} ${SIDE_NAME[side]}</b>${sxActualizado(side)}<span>${plural(n,'producto','productos')}${tot?` · ₡${fmt(tot)}`:''}</span>${n?(pend?`<em>${pend} por enviar</em>`:`<em class="ok">✓ todo enviado</em>`):''}</div>`;
   };
   box.innerHTML=`<div class="sx-tablero-h"><h2>Tu pedido de hoy</h2><small class="sx-ayuda">Tocá un producto para cambiar la cantidad · <span class="sx-mover-demo" aria-hidden="true">${ico('mover')}</span> para pasarlo a otro proveedor</small></div>
     <div class="sx-tiendas n${sides.length}">${sides.map(tienda).join('')}</div>
@@ -793,7 +807,7 @@ function xpRenderPedido(){
     html+=`<div class="pdx-cuerpo">
       <div class="pdx-col">
         <div class="pdx-total"><strong data-pdx-num="total" data-v="${all.total}">₡${fmt(all.total)}</strong><span>${dos?'total de las dos tiendas':'total del pedido'}</span></div>
-        ${dos?`${xpPartes(sides,all)}<div class="pdx-ley">${sides.map(s=>`<div class="${s}"><span><i></i>${SIDE_NAME[s]}</span><b data-pdx-num="${s}" data-v="${all[s]}">₡${fmt(all[s])}</b><small>${plural(nSide(s),'producto','productos')}</small></div>`).join('')}</div>`:''}
+        ${dos?`${xpPartes(sides,all)}<div class="pdx-ley">${sides.map(s=>`<div class="${s}"><span><i></i>${SIDE_NAME[s]}</span>${sxActualizado(s)}<b data-pdx-num="${s}" data-v="${all[s]}">₡${fmt(all[s])}</b><small>${plural(nSide(s),'producto','productos')}</small></div>`).join('')}</div>`:''}
       </div>
       <div class="pdx-col">
         <div class="pdx-chips">

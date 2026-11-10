@@ -706,8 +706,8 @@ html[data-theme="dark"] .today-money-card{background:linear-gradient(145deg,#125
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Caveat:wght@600;700&family=Chakra+Petch:wght@500;600;700&family=JetBrains+Mono:wght@500;600&family=Fraunces:opsz,wght@9..144,600;9..144,700&family=Plus+Jakarta+Sans:wght@500;600;700;800&display=swap" media="print" onload="this.media='all'">
 <link rel="stylesheet" href="puerta.css?v=20261013-perfil-1">
 <link rel="stylesheet" href="portadas.css?v=20261016-colores-1">
-<link rel="stylesheet" href="pedido.css?v=20261023-surtido-1">
-<link rel="stylesheet" href="surtido.css?v=20261023-boton-mover">
+<link rel="stylesheet" href="pedido.css?v=20261109-hora">
+<link rel="stylesheet" href="surtido.css?v=20261109-hora">
 </head>
 <body>
 <script>
@@ -1008,7 +1008,7 @@ html[data-theme="dark"] .today-money-card{background:linear-gradient(145deg,#125
         </div>
       </div>
 
-      <div class="app-version">ARAMO · versión <b>2026-10-23 · botón ⇄ para mover</b> · se actualiza sola</div>
+      <div class="app-version">ARAMO · versión <b>2026-11-09 · hora de cada pedido</b> · se actualiza sola</div>
 
       <div class="cfg-acc" data-acc="datos">
         <button class="cfg-acc-hdr">⚠️ Borrar TODA la aplicación <span class="cfg-acc-arrow">▾</span></button>
@@ -2129,6 +2129,9 @@ function markUnsent(prov,side='both'){
   if(side==='both'){p.sentByBranch.moravia=false;p.sentByBranch.angeles=false;p.sent=false;}
   else{p.sentByBranch[side]=false;p.sent=!!p.sentByBranch.moravia&&!!p.sentByBranch.angeles;}
   if(!p.notes)p.notes={};p.notes.__sentByBranch={...p.sentByBranch};
+  // Hora del último cambio de cada tienda. Viaja a la nube dentro de notes (n|__upd_moravia),
+  // así todos los teléfonos ven cuándo se actualizó el pedido de Moravia y el de Los Ángeles.
+  const ahora=Date.now();(side==='both'?['moravia','angeles']:[side]).forEach(s=>{p.notes['__upd_'+s]=ahora;});
 }
 
 // ══════════════════════════════════════════
@@ -4024,7 +4027,7 @@ if(isIOS && !isInStandalone && !dismissed){
   },3000);
 }
 </script>
-<script src="express.js?v=20261023-boton-mover"></script>
+<script src="express.js?v=20261109-hora"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcode-generator/1.4.4/qrcode.min.js"></script>
 <script src="canasta-config.js?v=20261018-seguridad-1"></script>
 <script src="aramo-nube.js?v=20261020-circuito-6"></script>

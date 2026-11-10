@@ -186,6 +186,9 @@ body.sx-arrastrando .sx-tiendas.sx-fija,#view-proveedores .pv-wrap.sx-con-texto 
 .sx-tiendas em{font:700 11px var(--sx-f);font-style:normal;color:#b45309}
 html[data-theme="dark"] .sx-tiendas em{color:#fbbf24}
 .sx-tiendas em.ok{color:var(--pm)}
+/* Última actualización del pedido de cada tienda (entre el nombre y los productos) */
+.sx-tiendas .sx-upd{font:700 11.5px var(--sx-f);color:var(--pm);font-variant-numeric:tabular-nums;line-height:1.3}
+.sx-tiendas .angeles .sx-upd{color:var(--pa)}
 .sx-lista{display:grid;gap:8px}
 .sx-prov{padding:2px 5px 5px;border-radius:17px;background:var(--sx-card);border:1px solid var(--sx-linea);box-shadow:0 1px 2px rgba(16,40,28,.04),0 8px 20px -16px rgba(16,40,28,.3);outline:2px dashed transparent;outline-offset:2px;font-family:var(--sx-f);transition:outline-color .2s,background .2s,transform .18s}
 .sx-prov-h{display:flex;align-items:center;gap:8px;width:100%;min-height:36px;padding:2px 6px;border:0;background:none;color:var(--t);text-align:left;cursor:pointer;font-family:var(--sx-f)}
