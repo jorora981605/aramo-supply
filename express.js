@@ -740,7 +740,11 @@ function sxLado(d,side){
 }
 // Última actualización del pedido de una tienda: la hora más reciente que markUnsent dejó en
 // notes.__upd_<tienda> de cualquier proveedor. Se muestra entre el nombre y los productos.
-function sxUltimoCambio(side){return Object.values(S.pedidos||{}).reduce((m,p)=>Math.max(m,+p?.notes?.['__upd_'+side]||0),0);}
+// Si un proveedor con productos de esa tienda todavía no tiene esa marca (se guardó antes de
+// que existiera), se usa la hora en que la nube lo guardó.
+function sxUltimoCambio(side){
+  return Object.entries(S.pedidos||{}).reduce((m,[prov,p])=>Math.max(m,+p?.notes?.['__upd_'+side]||(pedidoTieneLado(p,side)?+_horaNube[prov]||0:0)),0);
+}
 function sxCuando(t){
   const d=new Date(t),hoy=new Date(),ayer=new Date(hoy.getFullYear(),hoy.getMonth(),hoy.getDate()-1);
   const dia=d.toDateString()===hoy.toDateString()?'Hoy':d.toDateString()===ayer.toDateString()?'Ayer':capital(d.toLocaleDateString('es-CR',{weekday:'short'}));
