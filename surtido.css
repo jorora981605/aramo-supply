@@ -189,6 +189,12 @@ html[data-theme="dark"] .sx-tiendas em{color:#fbbf24}
 /* Última actualización del pedido de cada tienda (entre el nombre y los productos) */
 .sx-tiendas .sx-upd{font:700 11.5px var(--sx-f);color:var(--pm);font-variant-numeric:tabular-nums;line-height:1.3}
 .sx-tiendas .angeles .sx-upd{color:var(--pa)}
+/* Hora de la última modificación de cada pedido (una tienda a un proveedor) */
+.sx-hora{display:block;padding:1px 4px;font:700 11px/1.3 var(--sx-f);color:var(--pm);font-variant-numeric:tabular-nums}
+.sx-lado.angeles .sx-hora,.sx-hora.angeles{color:var(--pa)}
+.sx-horas{display:flex;flex-direction:column;gap:1px;margin-top:8px}
+.sx-horas .sx-hora{padding:0 2px}
+@media (min-width:760px){.sx-lado .sx-hora{flex-basis:100%}}
 .sx-lista{display:grid;gap:8px}
 .sx-prov{padding:2px 5px 5px;border-radius:17px;background:var(--sx-card);border:1px solid var(--sx-linea);box-shadow:0 1px 2px rgba(16,40,28,.04),0 8px 20px -16px rgba(16,40,28,.3);outline:2px dashed transparent;outline-offset:2px;font-family:var(--sx-f);transition:outline-color .2s,background .2s,transform .18s}
 .sx-prov-h{display:flex;align-items:center;gap:8px;width:100%;min-height:36px;padding:2px 6px;border:0;background:none;color:var(--t);text-align:left;cursor:pointer;font-family:var(--sx-f)}

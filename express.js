@@ -704,6 +704,7 @@ function sxTarjeta(d,i,sides,modo){
   const p=S.pedidos[d.prov]||{};
   const cant=(q,s)=>`<b class="${s}${q>0?'':' cero'}">${q>0?fmtQ(q):'·'}</b>`;
   const notas=sides.map(s=>{const n=String(p.notes?.['__note_'+s]||(s==='moravia'?p.note:'')||'').trim();return n?`<p class="sx-nota"><b>${SIDE_NAME[s]}:</b> ${esc(n)}</p>`:'';}).join('');
+  const horas=sides.map(s=>sxHoraTag(sxHora(p,s),`Pedido de ${SIDE_NAME[s]} a ${d.prov} modificado`,'sx-hora '+s,SIDE_NAME[s]+' · ')).join('');
   return `<article class="sx-card${d.sent?' enviado':''}" data-sx-drop="${esc(d.prov)}" style="--i:${i};--c:${sxColor(d.prov)}">
     <header class="sx-card-h">
       <button type="button" class="sx-card-id" data-pd="open" data-prov="${esc(d.prov)}" title="Abrir ${esc(d.prov)}"><span class="sx-av">${esc(d.prov.charAt(0).toUpperCase())}</span><span class="sx-card-t"><b>${esc(d.prov)}</b><small><i></i>${d.sent?'Enviado':'Por enviar'} · ${plural(d.n,'producto','productos')}</small></span></button>
@@ -714,6 +715,7 @@ function sxTarjeta(d,i,sides,modo){
       ${d.lines.map(l=>`<button type="button" class="sx-chip" data-pd="line" data-prov="${esc(d.prov)}" data-pid="${esc(l.prod.id)}" aria-label="${esc(niceName(l.prod.name))}: ${sides.map(s=>SIDE_NAME[s]+' '+(l.q[s]||0)).join(', ')} ${esc(l.unit)}. Mantené apretado para pasarlo a otro proveedor."><span class="sx-e">${smartEmoji(l.prod)}</span><span class="sx-n">${esc(niceName(l.prod.name))}</span><span class="sx-q">${sides.map(s=>cant(l.q[s],s)).join('')}<small>${esc(uniCorta(l.unit))}</small></span></button>`).join('')}
       ${d.extras.map(x=>`<span class="sx-chip extra"><span class="sx-e">➕</span><span class="sx-n">${esc(x.name||'Extra')}</span><span class="sx-q">${sides.map(s=>cant(s===x.side?+x.qty:0,s)).join('')}<small>${esc(uniCorta(x.unit||'kg'))}</small></span></span>`).join('')}
     </div>
+    ${horas?`<div class="sx-horas">${horas}</div>`:''}
     ${notas}
   </article>`;
 }
@@ -734,28 +736,28 @@ function sxLado(d,side){
   const filas=lines.map(l=>`<div class="sx-chip uno ${side}" data-prov="${esc(d.prov)}" data-pid="${esc(l.prod.id)}" data-lado="${side}"><button type="button" class="sx-grip" data-sx-mover title="Pasar a otro proveedor: tocá para elegir o arrastrá" aria-label="Pasar ${esc(niceName(l.prod.name))} de ${SIDE_NAME[side]} a otro proveedor">${ico('mover')}</button><button type="button" class="sx-chip-b" data-sx-ed aria-label="${esc(niceName(l.prod.name))}: ${fmtQ(l.q[side])} ${esc(l.unit)} para ${SIDE_NAME[side]}. Tocá para cambiar la cantidad o pasarlo a otro proveedor."><span class="sx-e">${smartEmoji(l.prod)}</span><span class="sx-n">${esc(niceName(l.prod.name))}</span><span class="sx-uno">${fmtQ(l.q[side])}<small>${esc(uniCorta(l.unit))}</small></span></button></div>`).join('')
     +extras.map(x=>`<div class="sx-chip uno extra ${side}"><button type="button" class="sx-chip-b" data-pd="open" data-prov="${esc(d.prov)}" aria-label="${esc(x.name||'Extra')}: se edita en el proveedor"><span class="sx-e">➕</span><span class="sx-n">${esc(x.name||'Extra')}</span><span class="sx-uno">${fmtQ(+x.qty)}<small>${esc(uniCorta(x.unit||'kg'))}</small></span></button></div>`).join('');
   return `<div class="sx-lado ${side}${sent?' enviado':''}${filas?'':' nada'}" data-lado="${side}" aria-label="${SIDE_NAME[side]}">
-    ${sent&&filas?`<span class="sx-ok">✓ Enviado</span>`:''}${filas||'<span class="sx-nada" aria-label="Nada para '+SIDE_NAME[side]+'">—</span>'}
+    ${sxHoraTag(sxHora(p,side),`Pedido de ${SIDE_NAME[side]} a ${d.prov} modificado`,'sx-hora')}${sent&&filas?`<span class="sx-ok">✓ Enviado</span>`:''}${filas||'<span class="sx-nada" aria-label="Nada para '+SIDE_NAME[side]+'">—</span>'}
     ${nota?`<p class="sx-nota">📝 ${esc(nota)}</p>`:''}
   </div>`;
 }
-// Última actualización del pedido de una tienda: la hora más reciente que markUnsent dejó en
-// notes.__upd_<tienda> de cualquier proveedor. Se muestra entre el nombre y los productos.
-// Si un proveedor con productos de esa tienda todavía no tiene esa marca (se guardó antes de
-// que existiera), se usa la hora en que la nube lo guardó.
-function sxUltimoCambio(side){
-  return Object.entries(S.pedidos||{}).reduce((m,[prov,p])=>Math.max(m,+p?.notes?.['__upd_'+side]||(pedidoTieneLado(p,side)?+_horaNube[prov]||0:0)),0);
-}
+// Hora en que se modificó por última vez un pedido en específico (una tienda a un proveedor):
+// la deja markUnsent en notes.__upd_<tienda> solo cuando el pedido cambia. Un pedido vacío no
+// muestra hora (por ejemplo, después de reiniciar).
+function sxHora(p,side){return pedidoTieneLado(p,side)?+p?.notes?.['__upd_'+side]||0:0;}
+// Cabecera de cada tienda: el pedido modificado más recientemente de esa tienda.
+function sxUltimoCambio(side){return Object.values(S.pedidos||{}).reduce((m,p)=>Math.max(m,sxHora(p,side)),0);}
 function sxCuando(t){
   const d=new Date(t),hoy=new Date(),ayer=new Date(hoy.getFullYear(),hoy.getMonth(),hoy.getDate()-1);
   const dia=d.toDateString()===hoy.toDateString()?'Hoy':d.toDateString()===ayer.toDateString()?'Ayer':capital(d.toLocaleDateString('es-CR',{weekday:'short'}));
   const junto=s=>s.replace(/\s/g,' '); // solo corta renglón en el " · "
   return `${junto(dia+' '+d.toLocaleDateString('es-CR',{day:'numeric',month:'short'}))} · ${junto(d.toLocaleTimeString('es-CR',{hour:'numeric',minute:'2-digit'}))}`;
 }
-function sxActualizado(side){
-  const t=sxUltimoCambio(side);if(!t)return'';
+function sxHoraTag(t,titulo,cls,pre=''){
+  if(!t)return'';
   const cuando=sxCuando(t);
-  return `<time class="sx-upd" datetime="${new Date(t).toISOString()}" title="Última actualización del pedido de ${SIDE_NAME[side]}: ${cuando}" aria-label="Actualizado ${cuando}">🕒 ${cuando}</time>`;
+  return `<time class="${cls}" datetime="${new Date(t).toISOString()}" title="${esc(titulo)}: ${cuando}" aria-label="${esc(pre)}Modificado ${cuando}">🕒 ${esc(pre)}${cuando}</time>`;
 }
+function sxActualizado(side){return sxHoraTag(sxUltimoCambio(side),'Último pedido modificado de '+SIDE_NAME[side],'sx-upd');}
 function sxRenderTablero(){
   const box=$('sxTablero');if(!box)return;
   const bn=$('sxProvBarN');if(bn)bn.textContent=getProvNames().length;
@@ -1142,6 +1144,7 @@ function xpResetPedido(){
   Object.keys(S.pedidos).forEach(prov=>{
     const p=getPedido(prov);
     sides.forEach(side=>{
+      const tenia=pedidoTieneLado(p,side);
       p.qtys[side]={};p.extras[side]=[];
       Object.keys(p.notes).forEach(k=>{
         if(k.endsWith('__'+side)||k==='__note_'+side)delete p.notes[k];
@@ -1149,6 +1152,7 @@ function xpResetPedido(){
       });
       if(side==='moravia')p.note='';
       markUnsent(prov,side);
+      if(!tenia)delete p.notes['__upd_'+side]; // ya estaba vacío: no se modificó
     });
   });
   S.createSelection={};

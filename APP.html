@@ -707,7 +707,7 @@ html[data-theme="dark"] .today-money-card{background:linear-gradient(145deg,#125
 <link rel="stylesheet" href="puerta.css?v=20261013-perfil-1">
 <link rel="stylesheet" href="portadas.css?v=20261016-colores-1">
 <link rel="stylesheet" href="pedido.css?v=20261109-hora">
-<link rel="stylesheet" href="surtido.css?v=20261109-hora">
+<link rel="stylesheet" href="surtido.css?v=20261109-hora-3">
 </head>
 <body>
 <script>
@@ -1008,7 +1008,7 @@ html[data-theme="dark"] .today-money-card{background:linear-gradient(145deg,#125
         </div>
       </div>
 
-      <div class="app-version">ARAMO · versión <b>2026-11-09 · hora de cada tienda</b> · se actualiza sola</div>
+      <div class="app-version">ARAMO · versión <b>2026-11-09 · hora de cada pedido</b> · se actualiza sola</div>
 
       <div class="cfg-acc" data-acc="datos">
         <button class="cfg-acc-hdr">⚠️ Borrar TODA la aplicación <span class="cfg-acc-arrow">▾</span></button>
@@ -1747,14 +1747,6 @@ function pedidoRowToLocal(row){
 // borrarse lo que hizo el otro.
 let _syncBase=LS.get('aramo_syncbase',{});
 function saveSyncBase(){LS.set('aramo_syncbase',_syncBase);}
-// Hora en que la nube guardó cada proveedor (updated_at). Es el respaldo para mostrar cuándo
-// se actualizó un pedido guardado antes de que existiera notes.__upd_<tienda> (ver markUnsent).
-let _horaNube=LS.get('aramo_horanube',{});
-function anotarHoraNube(row){
-  const t=Date.parse(row?.updated_at||'')||0;
-  if(!row?.proveedor||!t||_horaNube[row.proveedor]===t)return false;
-  _horaNube[row.proveedor]=t;LS.set('aramo_horanube',_horaNube);return true;
-}
 function flattenPedido(p){
   const f={};
   if(!p)return f;
@@ -1850,7 +1842,7 @@ async function syncPedidoUp(prov){
   const p=S.pedidos[prov],row=pedidoToRow(prov,p),pushed=flattenPedido(p);
   const res=await supa.from('pedidos').upsert(row,{onConflict:'proveedor'});
   if(res.error)throw new Error(res.error.message);
-  _syncBase[prov]=pushed;saveSyncBase();anotarHoraNube(row);
+  _syncBase[prov]=pushed;saveSyncBase();
 }
 
 async function loadPedidosFromSupabase(){
@@ -1859,7 +1851,7 @@ async function loadPedidosFromSupabase(){
     if(error){console.warn('Supabase pedidos error:',error.message);return;}
     const remoteNames=new Set();
     let changed=false;
-    (data||[]).forEach(row=>{if(!row.proveedor)return;remoteNames.add(row.proveedor);if(anotarHoraNube(row))changed=true;if(mergeRemotePedidoRow(row))changed=true;});
+    (data||[]).forEach(row=>{if(!row.proveedor)return;remoteNames.add(row.proveedor);if(mergeRemotePedidoRow(row))changed=true;});
     Object.keys(S.pedidos).forEach(prov=>{
       if(remoteNames.has(prov))return;
       if(_syncBase[prov]&&!_dirtyProvs.has(prov)){delete S.pedidos[prov];delete _syncBase[prov];changed=true;} // otro teléfono lo borró
@@ -1878,7 +1870,7 @@ function initRealtimePedidos(){
       if(payload.eventType==='DELETE'){
         if(!_dirtyProvs.has(row.proveedor))delete S.pedidos[row.proveedor];
         delete _syncBase[row.proveedor];
-      }else{const hora=anotarHoraNube(row),cambio=mergeRemotePedidoRow(row);if(!cambio){saveSyncBase();if(hora)schedulePedidoRender();return;}}
+      }else if(!mergeRemotePedidoRow(row)){saveSyncBase();return;}
       saveSyncBase();saveLocalState();
       schedulePedidoRender();
       showPriceSyncDot();
@@ -2137,13 +2129,10 @@ function markUnsent(prov,side='both'){
   if(side==='both'){p.sentByBranch.moravia=false;p.sentByBranch.angeles=false;p.sent=false;}
   else{p.sentByBranch[side]=false;p.sent=!!p.sentByBranch.moravia&&!!p.sentByBranch.angeles;}
   if(!p.notes)p.notes={};p.notes.__sentByBranch={...p.sentByBranch};
-  // Hora del último cambio de cada tienda. Viaja a la nube dentro de notes (n|__upd_moravia),
-  // así todos los teléfonos ven cuándo se actualizó el pedido de Moravia y el de Los Ángeles.
-  // Si la otra tienda todavía no tiene hora propia, se le deja la que tenía en la nube (antes
-  // de que esta subida la cambie).
-  const ahora=Date.now(),marcar=side==='both'?['moravia','angeles']:[side];
-  ['moravia','angeles'].forEach(s=>{if(!marcar.includes(s)&&!p.notes['__upd_'+s]&&_horaNube[prov]&&pedidoTieneLado(p,s))p.notes['__upd_'+s]=_horaNube[prov];});
-  marcar.forEach(s=>{p.notes['__upd_'+s]=ahora;});
+  // Hora en que se modificó por última vez el pedido de cada tienda a este proveedor. Viaja a la
+  // nube dentro de notes (n|__upd_moravia), así todos los teléfonos la ven igual. Solo se llama
+  // cuando el pedido cambia de verdad (abrir la app o un proveedor no la toca).
+  const ahora=Date.now();(side==='both'?['moravia','angeles']:[side]).forEach(s=>{p.notes['__upd_'+s]=ahora;});
 }
 function pedidoTieneLado(p,side){return Object.values(p?.qtys?.[side]||{}).some(v=>+v?.qty>0)||(p?.extras?.[side]||[]).some(x=>+x?.qty>0);}
 
@@ -2480,15 +2469,19 @@ function renderProvStatus(){
 function syncQty(prov,prod,side,val,unit){
   const p=getPedido(prov);
   if(!p.qtys[side])p.qtys[side]={};
+  const antes=p.qtys[side][prod.id];
   if(!val||+val===0)delete p.qtys[side][prod.id];
   else p.qtys[side][prod.id]={qty:val,unit};
+  // Mismo número y misma unidad: no es un cambio (no mueve la hora ni lo marca sin enviar).
+  const qA=+antes?.qty||0,qD=+val||0,cambio=qA!==qD||(qD>0&&String(antes?.unit||'')!==String(unit||''));
   S.createSelection=S.createSelection||{};
   const hasQty=(+p.qtys.moravia?.[prod.id]?.qty||0)+(+p.qtys.angeles?.[prod.id]?.qty||0)>0;
   if(hasQty)S.createSelection[prod.id]={prov};
   else if(S.createSelection?.[prod.id]?.prov===prov)delete S.createSelection[prod.id];
   const directStatus=document.querySelector('#directProductsPanel [data-direct-status-add="'+prov+'|'+prod.id+'"]');
   if(directStatus){directStatus.textContent=hasQty?'✓ Ya agregaste producto':'○ No has agregado producto';directStatus.style.borderColor=hasQty?'var(--g)':'var(--b2)';directStatus.style.background=hasQty?'var(--gd)':'var(--card)';directStatus.style.color=hasQty?'var(--g)':'var(--m)';}
-  markUnsent(prov,side);updateProvTotals();updatePreview();renderProvStatus();renderHomeSummary();persist();
+  if(cambio)markUnsent(prov,side);
+  updateProvTotals();updatePreview();renderProvStatus();renderHomeSummary();persist();
 }
 
 function syncNote(prov,prod,val){
@@ -2867,7 +2860,7 @@ document.getElementById('btnDupMA').addEventListener('click',()=>{
   const p=getPedido(S.currentProv);
   p.qtys.angeles=JSON.parse(JSON.stringify(p.qtys.moravia));
   p.extras.angeles=JSON.parse(JSON.stringify(p.extras.moravia));
-  markUnsent(S.currentProv);renderProdTable();renderExtras('angeles');updateProvTotals();updatePreview();renderProvStatus();renderHomeSummary();persist();
+  markUnsent(S.currentProv,'angeles');renderProdTable();renderExtras('angeles');updateProvTotals();updatePreview();renderProvStatus();renderHomeSummary();persist();
   toast('Moravia → Los Ángeles copiado','ok');
 });
 
@@ -3782,7 +3775,7 @@ document.getElementById('modalPriceCompare').addEventListener('click',e=>{if(e.t
 async function resetAll(){
   if(!confirm('¿Reiniciar TODO? Se borrarán los pedidos del Mostrador, el Surtido, las canastas locales y los datos locales del POS. Se conservarán el catálogo, las sucursales y la cuenta de personal.'))return;
   try{await window.AramoNube?.borrarTodo?.();}catch(e){console.warn('No se pudo reiniciar la nube de encargos',e);}
-  ['aramo4','aramo_hist','aramo_prices','aramo_lp','aramo_syncbase','aramo_horanube','aramo_order_scope','aramo_encargos_v1','aramo_encargos_pend','aramo_encargos_changes','aramo_reinicio_respaldo','aramo_borradores'].forEach(k=>localStorage.removeItem(k));
+  ['aramo4','aramo_hist','aramo_prices','aramo_lp','aramo_syncbase','aramo_order_scope','aramo_encargos_v1','aramo_encargos_pend','aramo_encargos_changes','aramo_reinicio_respaldo','aramo_borradores'].forEach(k=>localStorage.removeItem(k));
   try{sessionStorage.removeItem('pos_suc');}catch{}
   try{indexedDB.deleteDatabase('aramo-pos');}catch{}
   try{await supa.from('pedidos').delete().neq('proveedor','');}catch(e){console.warn('No se pudo limpiar pedidos antiguos',e);}
@@ -4040,7 +4033,7 @@ if(isIOS && !isInStandalone && !dismissed){
   },3000);
 }
 </script>
-<script src="express.js?v=20261109-hora-2"></script>
+<script src="express.js?v=20261109-hora-3"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcode-generator/1.4.4/qrcode.min.js"></script>
 <script src="canasta-config.js?v=20261018-seguridad-1"></script>
 <script src="aramo-nube.js?v=20261020-circuito-6"></script>
