@@ -290,3 +290,33 @@ html[data-theme="dark"] .sx-editor{--pm:#4ade80;--pa:#fb923c;--pm-t:rgba(74,222,
 html[data-theme="dark"] .sx-ed-acc button.quitar{color:#fca5a5}
 .sx-ed-ok{width:100%;min-height:52px;margin-top:10px;border:0;border-radius:16px;background:#0e4a30;color:#fff;font:800 16px var(--sx-f);cursor:pointer}
 html[data-theme="dark"] .sx-ed-ok{background:#1f7a4d}
+/* ── 📄 PDF del pedido (al final de la lista, arriba de Proveedores) ── */
+.sx-pdf-btn{display:flex;align-items:center;gap:12px;width:100%;min-height:62px;margin:12px 0 2px;padding:10px 14px;border:0;border-radius:18px;background:#0e4a30;color:#fff;text-align:left;cursor:pointer;font-family:var(--sx-f);box-shadow:0 10px 22px -14px rgba(14,74,48,.7);transition:transform .12s}
+.sx-pdf-btn:active{transform:scale(.98)}
+html[data-theme="dark"] .sx-pdf-btn{background:#1f7a4d}
+.sx-pdf-i{display:grid;place-items:center;flex:none;width:38px;height:38px;border-radius:12px;background:rgba(255,255,255,.14)}
+.sx-pdf-i .pdx-i{width:21px;height:21px}
+.sx-pdf-t{flex:1;min-width:0}
+.sx-pdf-t b{display:block;font:800 15.5px var(--sx-f)}
+.sx-pdf-t small{display:block;margin-top:1px;font:600 12px var(--sx-f);color:rgba(255,255,255,.78)}
+.sx-pdf-f{font-size:22px;line-height:1;opacity:.8}
+.sx-pdf-ico{display:grid;place-items:center;flex:none;width:46px;height:46px;border-radius:15px;background:var(--pm-t);color:var(--pm)}
+.sx-pdf-ico .pdx-i{width:24px;height:24px}
+.sx-pdf-estado{margin:14px 0 0;padding:10px 12px;border-radius:14px;background:var(--sx-tile);font:700 13.5px var(--sx-f);color:var(--m)}
+.sx-pdf-estado.listo{background:var(--pm-t);color:var(--pm)}
+.sx-pdf-estado.error{background:#fef2f2;color:#b91c1c}
+html[data-theme="dark"] .sx-pdf-estado.error{background:rgba(220,38,38,.15);color:#fca5a5}
+.sx-pdf-estado button{margin-left:6px;padding:3px 10px;border:0;border-radius:999px;background:#b91c1c;color:#fff;font:700 12px var(--sx-f);cursor:pointer}
+.sx-pdf-wa{display:flex;align-items:center;justify-content:center;gap:9px;width:100%;min-height:54px;margin-top:12px;border:0;border-radius:16px;background:#25d366;color:#05371b;font:800 16px var(--sx-f);cursor:pointer}
+.sx-pdf-wa .pdx-i{width:20px;height:20px}
+.sx-pdf-acc{display:flex;gap:8px;margin-top:8px}
+.sx-pdf-acc button{flex:1;display:inline-flex;align-items:center;justify-content:center;gap:8px;min-height:46px;border:1.5px solid var(--sx-linea);border-radius:15px;background:var(--card,#fff);color:var(--t);font:700 14px var(--sx-f);cursor:pointer}
+.sx-pdf-acc .pdx-i{width:17px;height:17px}
+.sx-pdf-wa:disabled,.sx-pdf-acc button:disabled{opacity:.45;cursor:default}
+.sx-pdf-num{display:flex;align-items:center;gap:10px;margin-top:12px;font:700 13px var(--sx-f);color:var(--m)}
+.sx-pdf-num span{flex:none}
+.sx-pdf-num input{flex:1;min-width:0;height:42px;padding:0 12px;border:1.5px solid var(--sx-linea);border-radius:12px;background:var(--sx-tile);color:var(--t);font:700 15px var(--sx-f);outline:none}
+.sx-pdf-num input:focus{border-color:var(--pm)}
+.sx-pdf-auto{display:flex;align-items:flex-start;gap:10px;margin-top:14px;font:600 13px/1.35 var(--sx-f);color:var(--t);cursor:pointer}
+.sx-pdf-auto input{flex:none;width:20px;height:20px;margin:0;accent-color:#16a34a}
+.sx-pdf-ayuda{margin:10px 0 0;font:600 12px/1.4 var(--sx-f);color:var(--m)}

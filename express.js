@@ -685,6 +685,8 @@ const PDX_ICO={
   canasta:'<path d="M5 10h14l-1.5 9a2 2 0 0 1-2 1.7h-7a2 2 0 0 1-2-1.7z"/><path d="m9 10 3-6 3 6"/>',
   mover:'<path d="M17 4l3 3-3 3"/><path d="M20 7H8"/><path d="M7 20l-3-3 3-3"/><path d="M4 17h12"/>',
   reiniciar:'<path d="M3 12a9 9 0 1 0 2.6-6.4"/><path d="M3 4v5h5"/>',
+  hoja:'<path d="M14 3H6a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9z"/><path d="M14 3v6h6"/><path d="M8 13h8M8 17h5"/>',
+  bajar:'<path d="M12 3v12"/><path d="m7 10 5 5 5-5"/><path d="M5 21h14"/>',
 };
 const ico=(k,cls='')=>`<svg class="pdx-i${cls?' '+cls:''}" viewBox="0 0 24 24" aria-hidden="true">${PDX_ICO[k]}</svg>`;
 const PDX_COLORES=['#0f766e','#7c3aed','#c2410c','#0369a1','#be185d','#4d7c0f','#a16207','#4338ca','#0e7490','#b91c1c'];
@@ -774,8 +776,10 @@ function sxRenderTablero(){
     <div class="sx-lista">${datos.map((d,i)=>`<section class="sx-prov" data-sx-drop="${esc(d.prov)}" style="--i:${i};--c:${sxColor(d.prov)}">
       <button type="button" class="sx-prov-h" data-pd="open" data-prov="${esc(d.prov)}" title="Abrir ${esc(d.prov)}"><b>${esc(d.prov)}</b>${d.tot?`<span>₡${fmt(d.tot)}</span>`:''}<i aria-hidden="true">›</i></button>
       <div class="sx-par n${sides.length}">${sides.map(s=>sxLado(d,s)).join('')}</div>
-    </section>`).join('')}</div>`;
+    </section>`).join('')}</div>
+    <button type="button" class="sx-pdf-btn" data-sx-pdf><span class="sx-pdf-i">${ico('hoja')}</span><span class="sx-pdf-t"><b>PDF del pedido</b><small>La hoja de siempre en 3 columnas · mandala a tu WhatsApp</small></span><span class="sx-pdf-f" aria-hidden="true">›</span></button>`;
   sxCabeceraFija();
+  hojaPrecargar();
 }
 // La cabecera Moravia | Los Ángeles queda arriba mientras se recorre la lista. La página se
 // desplaza entera (no la vista), así que "sticky" no sirve: se muestra una copia fija.
@@ -793,6 +797,243 @@ let _sxFijaRaf=0;
 const sxFijaLuego=()=>{if(!_sxFijaRaf)_sxFijaRaf=requestAnimationFrame(()=>{_sxFijaRaf=0;sxCabeceraFija();});};
 addEventListener('scroll',sxFijaLuego,{passive:true,capture:true});
 addEventListener('resize',sxFijaLuego,{passive:true});
+
+// ══════════════════════════════════════════
+// 📄 PDF DEL PEDIDO — la hoja de siempre
+// ══════════════════════════════════════════
+// Una hoja carta con tres columnas y cada proveedor en el mismo lugar que en la hoja de papel
+// que usan. Cada lugar acepta los nombres como estén escritos en la app; los proveedores sin
+// lugar fijo van al centro, debajo de Luisa, y "Otros" llena la tabla CONSEGUIR.
+// #1 = Moravia y #2 = Los Ángeles, igual que en la lista de WhatsApp.
+const HOJA_COLUMNAS=[
+  [['alex'],['arturo'],['dani','danny'],['matias'],['yader'],['aleman']],
+  [['abner'],'FECHA',['luisa'],'SUELTOS','CONSEGUIR','NOTA'],
+  [['henry'],['mincho','nincho'],['barbas'],['pajaro'],['colas'],['perla']],
+];
+const HOJA_NUM={moravia:1,angeles:2};
+const HOJA_FIRMA='JRRLEPIZ';
+const HOJA_COLOR={verde:[134,239,172],rosa:[249,168,212],amarillo:[254,240,138],celeste:[103,232,249],tinta:[17,24,39],gris:[150,150,150],linea:[40,40,40]};
+const JSPDF_URL='https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js';
+const hojaClave=s=>String(s||'').normalize('NFD').replace(/[̀-ͯ]/g,'').toLowerCase().replace(/[^a-z0-9]+/g,' ').trim();
+// La letra del PDF solo trae los caracteres de Latin-1: ₡ pasa a ¢ y se quitan los emojis.
+const hojaTxt=s=>String(s||'').replace(/₡/g,'¢').replace(/[‘’]/g,"'").replace(/[“”]/g,'"').replace(/[–—]/g,'-').replace(/[^\x20-\x7e\xa0-\xff]/g,'').replace(/\s+/g,' ').trim();
+function hojaFecha(d=new Date()){return capital(d.toLocaleDateString('es-CR',{weekday:'long'}))+' '+d.toLocaleDateString('es-CR',{day:'2-digit',month:'2-digit',year:'numeric'});}
+function hojaGrupos(prov){
+  const p=S.pedidos[prov]||{},{lines,extras}=xpProvLines(prov);
+  return activeOrderSides().map(s=>({
+    n:HOJA_NUM[s],
+    items:[...lines.filter(l=>l.q[s]>0).map(l=>({t:`${fmtQ(l.q[s])} ${uniCorta(l.unit)} ${niceName(l.prod.name)}`,nota:getProductNote(p,l.prod.id,s)})),
+      ...extras.filter(x=>x.side===s).map(x=>({t:`${fmtQ(+x.qty)} ${uniCorta(x.unit||'kg')} ${x.name||'Extra'}`}))],
+    nota:getBranchNote(p,s),
+  })).filter(g=>g.items.length||g.nota);
+}
+// Qué va en cada lugar de la hoja.
+function hojaPlan(){
+  const todos=getProvNames(),conPedido=new Set(todos.filter(hasData)),usados=new Set();
+  const cols=HOJA_COLUMNAS.map(col=>col.map(lugar=>{
+    if(typeof lugar==='string')return[{tipo:lugar}];
+    const m=todos.filter(p=>!usados.has(p)&&hojaClave(p).split(' ').some(w=>lugar.includes(w)));
+    m.forEach(p=>usados.add(p));
+    const activos=m.filter(p=>conPedido.has(p));
+    // Sin pedido hoy: el nombre queda en su lugar, en gris.
+    return activos.length?activos.map(p=>({tipo:'prov',prov:p})):[{tipo:'vacio',nombre:m[0]||capital(lugar[0])}];
+  }));
+  const otros=todos.filter(p=>!usados.has(p)&&hojaClave(p)==='otros');
+  otros.forEach(p=>usados.add(p));
+  const sueltos=todos.filter(p=>!usados.has(p)&&conPedido.has(p)).sort(ORDEN_ES).map(p=>({tipo:'prov',prov:p}));
+  const filas=[];
+  otros.filter(p=>conPedido.has(p)).forEach(prov=>{
+    const {lines,extras}=xpProvLines(prov);
+    lines.forEach(l=>filas.push({t:niceName(l.prod.name),u:uniCorta(l.unit),q:l.q}));
+    extras.forEach(x=>filas.push({t:x.name||'Extra',u:uniCorta(x.unit||'kg'),q:{[x.side]:+x.qty}}));
+  });
+  return cols.map(col=>col.flat().flatMap(b=>b.tipo==='SUELTOS'?sueltos:b.tipo==='CONSEGUIR'?[{...b,filas}]:[b]));
+}
+// Dibuja un bloque de la hoja (o solo lo mide si dibujar=false) y devuelve su alto.
+function hojaBloque(doc,b,f,x,y,w,dibujar,alto=0){
+  const C=HOJA_COLOR,pad=Math.max(4,f*.55),lh=1.22;
+  let cy=pad;
+  const fuente=(sz,est)=>{doc.setFont('helvetica',est);doc.setFontSize(sz);};
+  const ancho=(s,sz,est)=>{fuente(sz,est);return doc.getTextWidth(s);};
+  const partir=(s,sz,est,max)=>{fuente(sz,est);return doc.splitTextToSize(s,max);};
+  const texto=(s,xx,yy,sz,est,color,opt={})=>{fuente(sz,est);if(dibujar){doc.setTextColor(...color);doc.text(s,xx,yy,{baseline:'top',...opt});}};
+  const marcar=(xx,yy,ww,hh,color)=>{if(dibujar){doc.setFillColor(...color);doc.rect(xx,yy,ww,hh,'F');}};
+  // Texto centrado con el marcador de color detrás, como en la hoja.
+  const etiqueta=(s,cx,sz,color,tinta=C.tinta)=>{
+    const t=partir(s,sz,'bold',w-2*pad-12)[0]||'',tw=ancho(t,sz,'bold');
+    if(color)marcar(cx-tw/2-7,y+cy-1,tw+14,sz*1.18,color);
+    texto(t,cx,y+cy,sz,'bold',tinta,{align:'center'});
+  };
+  const resaltadas=(s,sz,est,sangria)=>partir(s,sz,est,w-2*pad-sangria-4).forEach(ln=>{
+    marcar(x+pad+sangria-2,y+cy-.5,ancho(ln,sz,est)+4,sz*1.16,C.amarillo);
+    texto(ln,x+pad+sangria,y+cy,sz,est,C.tinta);cy+=sz*lh;
+  });
+  if(b.tipo==='prov'||b.tipo==='vacio'){
+    const nombre=hojaTxt(b.prov||b.nombre);
+    if(b.tipo==='vacio'){etiqueta(nombre,x+w/2,f*1.2,null,C.gris);return cy+f*1.2*lh+pad;}
+    etiqueta(nombre,x+w/2,f*1.3,C.verde);cy+=f*1.3*lh+3;
+    hojaGrupos(b.prov).forEach(g=>{
+      etiqueta('#'+g.n,x+w/2,f*1.05,C.rosa);cy+=f*1.05*lh+2;
+      g.items.forEach(it=>{
+        partir(hojaTxt(it.t),f,'normal',w-2*pad-8).forEach((ln,i)=>{texto(ln,x+pad+(i?8:0),y+cy,f,'normal',C.tinta);cy+=f*lh;});
+        if(it.nota)resaltadas('('+hojaTxt(it.nota)+')',f*.92,'italic',12);
+      });
+      if(g.nota)resaltadas('Nota: '+hojaTxt(g.nota),f*.92,'bold',2);
+      cy+=f*.4;
+    });
+    return cy+pad;
+  }
+  if(b.tipo==='FECHA'){
+    const sz=f*1.12;
+    marcar(x+pad,y+cy,w-2*pad,sz*1.55,C.celeste);
+    texto(hojaTxt(`${hojaFecha()}   ${HOJA_FIRMA}`),x+w/2,y+cy+sz*.28,sz,'bold',C.tinta,{align:'center'});
+    return cy+sz*1.55+pad;
+  }
+  if(b.tipo==='CONSEGUIR'){
+    const qw=Math.max(34,f*4.4),x2=x+w-2*qw,rh=f*1.6,n=Math.max(b.filas.length,4);
+    etiqueta('CONSEGUIR',x+(x2-x)/2,f*1.1,C.verde);
+    ['#1','#2'].forEach((et,i)=>etiqueta(et,x2+qw*i+qw/2,f,C.rosa));
+    cy+=f*1.1*lh+3;
+    const y0=y+cy;
+    if(dibujar){
+      doc.setDrawColor(...C.linea);doc.setLineWidth(.5);
+      for(let i=0;i<=n;i++)doc.line(x,y0+i*rh,x+w,y0+i*rh);
+      doc.line(x2,y0,x2,y0+n*rh);doc.line(x2+qw,y0,x2+qw,y0+n*rh);
+    }
+    b.filas.forEach((r,i)=>{
+      const yy=y0+i*rh+(rh-f)/2;
+      texto(partir(hojaTxt(r.t),f,'normal',x2-x-pad-2)[0]||'',x+pad,yy,f,'normal',C.tinta);
+      ['moravia','angeles'].forEach((s,j)=>{if(+r.q[s]>0)texto(`${fmtQ(r.q[s])} ${hojaTxt(r.u)}`,x2+qw*j+qw/2,yy,f,'normal',C.tinta,{align:'center'});});
+    });
+    return cy+n*rh+pad;
+  }
+  if(b.tipo==='NOTA'){
+    // Renglones para escribir a mano; si sobra espacio en la hoja, llenan hasta abajo.
+    const sz=f*1.1,tw=ancho('Nota:',sz,'bold'),rh=f*1.75;
+    marcar(x+pad-2,y+cy-1,tw+12,sz*1.18,C.rosa);
+    texto('Nota:',x+pad+4,y+cy,sz,'bold',C.tinta);
+    cy+=sz*lh+2;
+    const n=Math.max(3,Math.floor((alto-cy-pad)/rh));
+    if(dibujar){doc.setDrawColor(...C.linea);doc.setLineWidth(.4);for(let i=1;i<=n;i++)doc.line(x+pad,y+cy+i*rh,x+w-pad,y+cy+i*rh);}
+    return cy+n*rh+pad;
+  }
+  return 0;
+}
+function hojaDibujar(doc){
+  const W=doc.internal.pageSize.getWidth(),H=doc.internal.pageSize.getHeight(),M=20,arriba=M,abajo=H-M,colW=(W-2*M)/3;
+  const cols=hojaPlan();
+  const medir=f=>cols.map(col=>col.reduce((t,b)=>t+hojaBloque(doc,b,f,0,0,colW,false),0));
+  // La letra más grande con la que todo cabe en una sola hoja (si no cabe ni en 6, sigue en otra).
+  let f=10.5;while(f>6&&Math.max(...medir(f))>abajo-arriba)f-=.25;
+  const cabe=Math.max(...medir(f))<=abajo-arriba;
+  let paginas=1;
+  const marco=()=>{doc.setDrawColor(...HOJA_COLOR.linea);doc.setLineWidth(1.1);doc.rect(M,arriba,W-2*M,abajo-arriba);doc.line(M+colW,arriba,M+colW,abajo);doc.line(M+2*colW,arriba,M+2*colW,abajo);};
+  marco();
+  cols.forEach((col,ci)=>{
+    const x=M+ci*colW,hs=col.map(b=>hojaBloque(doc,b,f,0,0,colW,false));
+    // En una sola hoja, los recuadros se estiran hasta abajo como en el papel (en el centro, la Nota).
+    const sobra=cabe?(abajo-arriba)-hs.reduce((a,b)=>a+b,0):0,iNota=col.findIndex(b=>b.tipo==='NOTA');
+    let pag=1,y=arriba;
+    col.forEach((b,i)=>{
+      let h=hs[i];
+      if(sobra>0)h+=iNota>=0?(i===iNota?sobra:0):sobra/col.length;
+      if(!cabe&&y+h>abajo&&y>arriba){pag++;if(pag>paginas){doc.addPage('letter');paginas=pag;marco();}y=arriba;}
+      doc.setPage(pag);
+      hojaBloque(doc,b,f,x,y,colW,true,h);
+      if(i<col.length-1){doc.setDrawColor(...HOJA_COLOR.linea);doc.setLineWidth(.8);doc.line(x,y+h,x+colW,y+h);}
+      y+=h;
+    });
+  });
+  return{paginas,provs:cols.flat().filter(b=>b.tipo==='prov').length,letra:f};
+}
+let _jspdf=null,_hojaPrecarga=false;
+function hojaCargarJsPDF(){
+  if(window.jspdf?.jsPDF)return Promise.resolve();
+  return _jspdf||(_jspdf=new Promise((ok,mal)=>{
+    const s=document.createElement('script');s.src=JSPDF_URL;
+    s.onload=()=>window.jspdf?.jsPDF?ok():mal(new Error('No se pudo preparar el PDF'));
+    s.onerror=()=>{_jspdf=null;s.remove();mal(new Error('No se pudo cargar el PDF. Revisá el internet y probá otra vez.'));};
+    document.head.appendChild(s);
+  }));
+}
+// Se baja por detrás una sola vez, así al tocar el botón el PDF sale enseguida.
+function hojaPrecargar(){if(_hojaPrecarga||window.jspdf)return;_hojaPrecarga=true;setTimeout(()=>hojaCargarJsPDF().catch(()=>{}),4000);}
+async function hojaPdfHacer(){
+  await hojaCargarJsPDF();
+  const doc=new window.jspdf.jsPDF({unit:'pt',format:'letter'}),d=new Date();
+  const info=hojaDibujar(doc);
+  const nombre=`Pedido ARAMO ${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}.pdf`;
+  doc.setProperties({title:nombre.replace(/\.pdf$/,''),author:'ARAMO'});
+  return{...info,file:new File([doc.output('blob')],nombre,{type:'application/pdf'})};
+}
+// ── Ventanita del PDF: descargar o mandarlo al WhatsApp propio ──
+const hojaAuto=()=>LS.get('aramo_pdf_auto',false)===true;
+const hojaMiNumero=()=>LS.get('aramo_mi_wa','')||(S.pdfWa||[]).find(c=>(c?.tel||'').trim())?.tel||'';
+const hojaEsCompu=()=>matchMedia('(hover:hover) and (pointer:fine)').matches;
+// En el teléfono se comparte el archivo a WhatsApp. En la compu se descarga y se abre el chat
+// propio directamente (el menú de compartir de Windows no siempre trae WhatsApp).
+function hojaPuedeCompartir(){if(hojaEsCompu())return false;try{return !!navigator.canShare?.({files:[new File(['x'],'p.pdf',{type:'application/pdf'})]});}catch{return false;}}
+function hojaPdfAbrir(){
+  let h=$('sxPdf');
+  if(!h){
+    h=document.createElement('div');h.id='sxPdf';h.className='sx-editor sx-pdf';document.body.appendChild(h);
+    h.addEventListener('click',e=>{
+      if(e.target===h)return hojaPdfCerrar();
+      const a=e.target.closest('[data-pdf]')?.dataset.pdf;
+      if(a==='cerrar')hojaPdfCerrar();else if(a==='wa')hojaPdfWhatsApp();else if(a==='bajar')hojaPdfBajar();else if(a==='ver')hojaPdfVer();else if(a==='otra')hojaPdfAbrir();
+    });
+    h.addEventListener('change',e=>{if(e.target.id==='sxPdfAuto')LS.set('aramo_pdf_auto',e.target.checked);});
+    h.addEventListener('input',e=>{if(e.target.id==='sxPdfNum')LS.set('aramo_mi_wa',e.target.value.trim());});
+  }
+  const vez=SX.pdfVez=(SX.pdfVez||0)+1; // si se cierra antes de terminar, el resultado se descarta
+  SX.pdf={estado:'armando'};hojaPdfPintar();
+  requestAnimationFrame(()=>h.classList.add('open'));
+  hojaPdfHacer().then(r=>{
+    if(SX.pdfVez!==vez)return;
+    SX.pdf={estado:'listo',...r};hojaPdfPintar();
+    if(hojaAuto())hojaPdfWhatsApp(true);
+  }).catch(err=>{if(SX.pdfVez!==vez)return;SX.pdf={estado:'error',msg:err?.message||'No se pudo hacer el PDF'};hojaPdfPintar();});
+}
+function hojaPdfCerrar(){SX.pdfVez=(SX.pdfVez||0)+1;$('sxPdf')?.classList.remove('open');}
+function hojaPdfPintar(){
+  const h=$('sxPdf');if(!h)return;
+  const st=SX.pdf||{},listo=st.estado==='listo',dis=listo?'':' disabled',compartir=hojaPuedeCompartir(),compu=hojaEsCompu();
+  const estado=st.estado==='armando'?'Armando el PDF…':st.estado==='error'?`⚠️ ${esc(st.msg)} <button type="button" data-pdf="otra">Probar otra vez</button>`:`✓ Listo: ${plural(st.provs,'proveedor','proveedores')} · ${plural(st.paginas,'hoja','hojas')}`;
+  h.innerHTML=`<div class="sx-ed-in" role="dialog" aria-modal="true" aria-label="PDF del pedido">
+    <div class="sx-ed-cab"><span class="sx-pdf-ico">${ico('hoja')}</span><div><h3>PDF del pedido</h3><p>${esc(hojaFecha())} · la hoja de 3 columnas</p></div><button type="button" class="sx-ed-x" data-pdf="cerrar" aria-label="Cerrar">✕</button></div>
+    <p class="sx-pdf-estado ${st.estado||''}" role="status">${estado}</p>
+    <button type="button" class="sx-pdf-wa" data-pdf="wa"${dis}>${ico('mensaje')}Mandar a mi WhatsApp</button>
+    <div class="sx-pdf-acc"><button type="button" data-pdf="bajar"${dis}>${ico('bajar')}Descargar</button>${compu?`<button type="button" data-pdf="ver"${dis}>${ico('hoja')}Ver</button>`:''}</div>
+    ${compartir?'':`<label class="sx-pdf-num"><span>Mi número de WhatsApp</span><input id="sxPdfNum" type="tel" inputmode="tel" autocomplete="tel" placeholder="8888 8888" value="${esc(hojaMiNumero())}"></label>`}
+    <label class="sx-pdf-auto"><input type="checkbox" id="sxPdfAuto"${hojaAuto()?' checked':''}><span>Mandármelo a WhatsApp cada vez que toco <b>PDF del pedido</b></span></label>
+    <p class="sx-pdf-ayuda">${compartir?'Se abre WhatsApp con el PDF: elegí tu propio chat (sale como «Tú») y tocá enviar.':'Se descarga el PDF y se abre tu chat de WhatsApp: adjuntalo con el clip 📎 y enviá.'}</p>
+  </div>`;
+}
+// WhatsApp no deja que una página mande un archivo sola: se abre con el PDF listo y se toca enviar.
+async function hojaPdfWhatsApp(solo){
+  const f=SX.pdf?.file;if(!f)return;
+  const texto=`Pedido ARAMO · ${hojaFecha()}`;
+  if(hojaPuedeCompartir()){
+    try{await navigator.share({files:[f],title:f.name.replace(/\.pdf$/,''),text:texto});return;}
+    catch(e){
+      if(e?.name==='AbortError')return;
+      if(solo){toast('Tocá «Mandar a mi WhatsApp» para enviarlo','ok');return;} // el permiso del toque ya venció
+    }
+  }
+  hojaPdfBajar();
+  const num=normalizeCostaRicaPhone(hojaMiNumero());
+  window.open(`https://wa.me/${num}?text=${encodeURIComponent(texto+'\n(adjunto el PDF que se descargó)')}`,'_blank');
+}
+function hojaPdfBajar(){
+  const f=SX.pdf?.file;if(!f)return;
+  const u=URL.createObjectURL(f),a=document.createElement('a');
+  a.href=u;a.download=f.name;document.body.appendChild(a);a.click();a.remove();
+  setTimeout(()=>URL.revokeObjectURL(u),60000);
+  toast('⬇️ PDF descargado','ok');
+}
+function hojaPdfVer(){const f=SX.pdf?.file;if(!f)return;const u=URL.createObjectURL(f);window.open(u,'_blank');setTimeout(()=>URL.revokeObjectURL(u),300000);}
+$('sxTablero')?.addEventListener('click',e=>{if(e.target.closest('[data-sx-pdf]'))hojaPdfAbrir();});
+document.addEventListener('keydown',e=>{if(e.key==='Escape'&&$('sxPdf')?.classList.contains('open'))hojaPdfCerrar();});
 function xpRenderPedido(){
   const body=$('pedidoBody');if(!body)return;
   const sides=activeOrderSides(),dos=sides.length>1;
