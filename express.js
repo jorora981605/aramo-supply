@@ -801,19 +801,20 @@ addEventListener('resize',sxFijaLuego,{passive:true});
 // ══════════════════════════════════════════
 // 📄 PDF DEL PEDIDO — la hoja de siempre
 // ══════════════════════════════════════════
-// Una hoja carta con tres columnas y TODOS los proveedores, cada uno siempre en el mismo lugar,
-// como en la hoja de papel: a la izquierda los de fruta, a la derecha los de verdura y en el
-// centro el resto. Un proveedor sin pedido ocupa una sola línea con su nombre en gris. Cada
-// lugar acepta los nombres como estén escritos en la app; uno nuevo sin lugar va al centro,
-// antes de CONSEGUIR, que se llena con "Otros". #1 = Moravia y #2 = Los Ángeles.
+// Una hoja carta con tres columnas y los proveedores a los que se les pidió algo, cada uno
+// siempre en su lugar, como en la hoja de papel: a la izquierda los de fruta, a la derecha los
+// de verdura y en el centro el resto. Cada lugar acepta los nombres como estén escritos en la
+// app; uno nuevo sin lugar va al centro, antes de CONSEGUIR, que se llena con "Otros".
+// #1 = Moravia y #2 = Los Ángeles.
 const HOJA_COLUMNAS=[
   [['alex'],['arturo'],['dani','danny'],['matias'],['yader'],['aleman'],['vega'],['juan carlos'],['anthony'],['salomon']],
   [['abner'],'FECHA',['luisa'],['walter'],['roger'],['fresh'],['jesus'],['vilma'],['elamos'],['susanavo'],'SUELTOS','CONSEGUIR','NOTA'],
   [['henry'],['mincho','nincho'],['barbas'],['pajaro'],['colas'],['perla'],['sandra'],['david'],['chiqui'],['edgardo'],['noe']],
 ];
 const HOJA_NUM={moravia:1,angeles:2};
-const HOJA_FIRMA='JRRLEPIZ';
-const HOJA_COLOR={verde:[134,239,172],rosa:[249,168,212],amarillo:[254,240,138],celeste:[103,232,249],tinta:[17,24,39],unidad:[90,90,90],gris:[150,150,150],raya:[185,185,185],linea:[40,40,40]};
+// Los tres encargados del pedido: el que lo hace se elige al sacar el PDF y va a la par de la fecha.
+const HOJA_FIRMAS=['JRRL','JARL','JRRP'];
+const HOJA_COLOR={verde:[134,239,172],rosa:[249,168,212],amarillo:[254,240,138],celeste:[103,232,249],tinta:[17,24,39],marca:[14,74,48],unidad:[110,110,110],suave:[120,128,124],raya:[222,227,224],borde:[206,215,210],sombra:[233,237,235],blanco:[255,255,255]};
 const JSPDF_URL='https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js';
 const hojaClave=s=>String(s||'').normalize('NFD').replace(/[̀-ͯ]/g,'').toLowerCase().replace(/[^a-z0-9]+/g,' ').trim();
 // La letra del PDF solo trae los caracteres de Latin-1: ₡ pasa a ¢ y se quitan los emojis.
@@ -828,21 +829,19 @@ function hojaGrupos(prov){
     nota:getBranchNote(p,s),
   })).filter(g=>g.items.length||g.nota);
 }
-// Qué va en cada lugar de la hoja.
-function hojaPlan(){
+// Qué va en cada lugar de la hoja: solo los proveedores con pedido, cada uno en su lugar de siempre.
+function hojaPlan(firma){
   const todos=getProvNames(),conPedido=new Set(todos.filter(hasData)),usados=new Set();
   const calza=(p,lugar)=>{const k=hojaClave(p);return lugar.some(a=>k===a||k.split(' ').includes(a));};
-  // Sin pedido hoy: el nombre queda en su lugar, en gris y en una sola línea.
-  const bloque=p=>({tipo:conPedido.has(p)?'prov':'vacio',prov:p});
   const cols=HOJA_COLUMNAS.map(col=>col.map(lugar=>{
-    if(typeof lugar==='string')return[{tipo:lugar}];
+    if(typeof lugar==='string')return[{tipo:lugar,firma}];
     const m=todos.filter(p=>!usados.has(p)&&calza(p,lugar));
     m.forEach(p=>usados.add(p));
-    return m.map(bloque);
+    return m.filter(p=>conPedido.has(p)).map(p=>({tipo:'prov',prov:p}));
   }));
   const otros=todos.filter(p=>!usados.has(p)&&hojaClave(p)==='otros');
   otros.forEach(p=>usados.add(p));
-  const sueltos=todos.filter(p=>!usados.has(p)).sort(ORDEN_ES).map(bloque);
+  const sueltos=todos.filter(p=>!usados.has(p)&&conPedido.has(p)).sort(ORDEN_ES).map(p=>({tipo:'prov',prov:p}));
   const filas=[];
   otros.filter(p=>conPedido.has(p)).forEach(prov=>{
     const {lines,extras}=xpProvLines(prov);
@@ -851,118 +850,129 @@ function hojaPlan(){
   });
   return cols.map(col=>col.flat().flatMap(b=>b.tipo==='SUELTOS'?sueltos:b.tipo==='CONSEGUIR'?[{...b,filas}]:[b]));
 }
-// Dibuja un bloque de la hoja (o solo lo mide si dibujar=false) y devuelve su alto.
+// Dibuja el contenido de una tarjeta (o solo lo mide si dibujar=false) y devuelve su alto.
 function hojaBloque(doc,b,f,x,y,w,dibujar,alto=0){
-  const C=HOJA_COLOR,pad=Math.max(4,f*.55),lh=1.22;
+  const C=HOJA_COLOR,pad=Math.max(5,f*.72),lh=1.24;
   let cy=pad;
   const fuente=(sz,est)=>{doc.setFont('helvetica',est);doc.setFontSize(sz);};
   const ancho=(s,sz,est)=>{fuente(sz,est);return doc.getTextWidth(s);};
   const partir=(s,sz,est,max)=>{fuente(sz,est);return doc.splitTextToSize(s,max);};
   const texto=(s,xx,yy,sz,est,color,opt={})=>{fuente(sz,est);if(dibujar){doc.setTextColor(...color);doc.text(s,xx,yy,{baseline:'top',...opt});}};
-  const marcar=(xx,yy,ww,hh,color)=>{if(dibujar){doc.setFillColor(...color);doc.rect(xx,yy,ww,hh,'F');}};
-  // Texto centrado con el marcador de color detrás, como en la hoja.
-  const etiqueta=(s,cx,sz,color,tinta=C.tinta)=>{
-    const t=partir(s,sz,'bold',w-2*pad-12)[0]||'',tw=ancho(t,sz,'bold');
-    if(color)marcar(cx-tw/2-7,y+cy-1,tw+14,sz*1.18,color);
-    texto(t,cx,y+cy,sz,'bold',tinta,{align:'center'});
+  const marcar=(xx,yy,ww,hh,color,r=0)=>{if(dibujar){doc.setFillColor(...color);if(r)doc.roundedRect(xx,yy,ww,hh,r,r,'F');else doc.rect(xx,yy,ww,hh,'F');}};
+  const raya=(x1,yy,x2)=>{if(dibujar){doc.setDrawColor(...C.raya);doc.setLineWidth(.6);doc.line(x1,yy,x2,yy);}};
+  // Texto con el marcador de color detrás, como en la hoja de papel. Devuelve el ancho marcado.
+  const etiqueta=(s,xx,sz,color,centrar=true)=>{
+    const t=partir(s,sz,'bold',w-2*pad-12)[0]||'',tw=ancho(t,sz,'bold'),x0=centrar?xx-tw/2:xx;
+    marcar(x0-6,y+cy-1.3,tw+12,sz*1.22,color,2.5);
+    texto(t,x0,y+cy,sz,'bold',C.tinta);
+    return tw+12;
   };
   const resaltadas=(s,sz,est,xx,ww)=>partir(s,sz,est,ww).forEach(ln=>{
-    marcar(xx-2,y+cy-.5,ancho(ln,sz,est)+4,sz*1.16,C.amarillo);
+    marcar(xx-2,y+cy-.6,ancho(ln,sz,est)+4,sz*1.18,C.amarillo,1.5);
     texto(ln,xx,y+cy,sz,est,C.tinta);cy+=sz*lh;
   });
-  if(b.tipo==='vacio'){
-    // Sin pedido: solo el nombre, en una línea angosta.
-    const sz=f*1.02,aire=Math.max(2.5,f*.3);
-    texto(partir(hojaTxt(b.prov),sz,'bold',w-2*pad)[0]||'',x+w/2,y+aire,sz,'bold',C.gris,{align:'center'});
-    return aire*2+sz*1.15;
-  }
   if(b.tipo==='prov'){
-    etiqueta(hojaTxt(b.prov),x+w/2,f*1.3,C.verde);cy+=f*1.3*lh+4;
+    etiqueta(hojaTxt(b.prov),x+w/2,f*1.32,C.verde);cy+=f*1.32*lh+5;
     const grupos=hojaGrupos(b.prov),todos=grupos.flatMap(g=>g.items);
-    // Columnas fijas dentro del recuadro: cantidad (alineada a la derecha) | unidad | producto.
+    // Columnas fijas dentro de la tarjeta: cantidad (alineada a la derecha) | unidad | producto.
     const qW=Math.max(0,...todos.map(it=>ancho(hojaTxt(it.q),f,'bold'))),uW=Math.max(0,...todos.map(it=>ancho(hojaTxt(it.u),f*.9,'normal')));
-    const xq=x+pad+qW,xu=xq+3.5,xn=xu+uW+(uW?5:1.5),wn=x+w-pad-xn;
+    const xq=x+pad+5+qW,xu=xq+3.5,xn=xu+uW+(uW?5:1.5),wn=x+w-pad-xn;
     grupos.forEach((g,gi)=>{
-      if(gi){
-        // #1 y #2 bien separados: aire y una raya suave entre los dos.
-        cy+=f*.5;
-        if(dibujar){doc.setDrawColor(...C.raya);doc.setLineWidth(.6);doc.setLineDashPattern([2,2],0);doc.line(x+pad+4,y+cy,x+w-pad-4,y+cy);doc.setLineDashPattern([],0);}
-        cy+=f*.65;
-      }
-      etiqueta('#'+g.n,x+w/2,f*1.05,C.rosa);cy+=f*1.05*lh+3;
+      if(gi)cy+=f*.8; // #1 y #2 bien separados
+      // #1 / #2 en rosado y una raya fina hasta el borde de la tarjeta.
+      const sz=f*1.02,ew=etiqueta('#'+g.n,x+pad+6,sz,C.rosa,false);
+      raya(x+pad+ew+3,y+cy+sz*.5,x+w-pad);cy+=sz*lh+4;
       g.items.forEach(it=>{
         texto(hojaTxt(it.q),xq,y+cy,f,'bold',C.tinta,{align:'right'});
         texto(hojaTxt(it.u),xu,y+cy+f*.08,f*.9,'normal',C.unidad);
         partir(hojaTxt(it.t),f,'normal',wn).forEach(ln=>{texto(ln,xn,y+cy,f,'normal',C.tinta);cy+=f*lh;});
         if(it.nota)resaltadas('('+hojaTxt(it.nota)+')',f*.9,'italic',xn+2,wn-4);
+        cy+=f*.14;
       });
-      if(g.nota){cy+=f*.2;resaltadas('Nota: '+hojaTxt(g.nota),f*.92,'bold',x+pad+2,w-2*pad-4);}
+      if(g.nota){cy+=f*.25;resaltadas('Nota: '+hojaTxt(g.nota),f*.92,'bold',x+pad+4,w-2*pad-8);}
     });
-    return cy+pad+f*.15;
+    return cy+pad;
   }
   if(b.tipo==='FECHA'){
-    const sz=f*1.12;
-    marcar(x+pad,y+cy,w-2*pad,sz*1.55,C.celeste);
-    texto(hojaTxt(`${hojaFecha()}   ${HOJA_FIRMA}`),x+w/2,y+cy+sz*.28,sz,'bold',C.tinta,{align:'center'});
-    return cy+sz*1.55+pad;
+    // La barra celeste con la fecha y el encargado, igual que en la hoja.
+    const sz=f*1.12,h=sz*1.7;
+    marcar(x,y,w,h,C.celeste,3);
+    texto(hojaTxt(`${hojaFecha()}   ${b.firma||''}`),x+w/2,y+(h-sz)/2+sz*.05,sz,'bold',C.tinta,{align:'center'});
+    return h;
   }
   if(b.tipo==='CONSEGUIR'){
-    const qw=Math.max(34,f*4.4),x2=x+w-2*qw,rh=f*1.6,n=Math.max(b.filas.length,4);
-    etiqueta('CONSEGUIR',x+(x2-x)/2,f*1.1,C.verde);
+    const qw=Math.max(32,f*4.2),x2=x+w-pad-2*qw,rh=f*1.7,n=Math.max(b.filas.length,3);
+    etiqueta('CONSEGUIR',x+pad+6,f*1.1,C.verde,false);
     ['#1','#2'].forEach((et,i)=>etiqueta(et,x2+qw*i+qw/2,f,C.rosa));
-    cy+=f*1.1*lh+3;
+    cy+=f*1.1*lh+5;
     const y0=y+cy;
     if(dibujar){
-      doc.setDrawColor(...C.linea);doc.setLineWidth(.5);
-      for(let i=0;i<=n;i++)doc.line(x,y0+i*rh,x+w,y0+i*rh);
+      doc.setDrawColor(...C.raya);doc.setLineWidth(.6);
+      for(let i=0;i<=n;i++)doc.line(x+pad,y0+i*rh,x+w-pad,y0+i*rh);
       doc.line(x2,y0,x2,y0+n*rh);doc.line(x2+qw,y0,x2+qw,y0+n*rh);
     }
     b.filas.forEach((r,i)=>{
       const yy=y0+i*rh+(rh-f)/2;
-      texto(partir(hojaTxt(r.t),f,'normal',x2-x-pad-2)[0]||'',x+pad,yy,f,'normal',C.tinta);
-      ['moravia','angeles'].forEach((s,j)=>{if(+r.q[s]>0)texto(`${fmtQ(r.q[s])} ${hojaTxt(r.u)}`,x2+qw*j+qw/2,yy,f,'normal',C.tinta,{align:'center'});});
+      texto(partir(hojaTxt(r.t),f,'normal',x2-x-pad-4)[0]||'',x+pad+3,yy,f,'normal',C.tinta);
+      ['moravia','angeles'].forEach((s,j)=>{if(+r.q[s]>0)texto(`${fmtQ(r.q[s])} ${hojaTxt(r.u)}`,x2+qw*j+qw/2,yy,f,'bold',C.tinta,{align:'center'});});
     });
     return cy+n*rh+pad;
   }
   if(b.tipo==='NOTA'){
     // Renglones para escribir a mano; si sobra espacio en la hoja, llenan hasta abajo.
-    const sz=f*1.1,tw=ancho('Nota:',sz,'bold'),rh=f*1.75;
-    marcar(x+pad-2,y+cy-1,tw+12,sz*1.18,C.rosa);
-    texto('Nota:',x+pad+4,y+cy,sz,'bold',C.tinta);
-    cy+=sz*lh+2;
-    const n=Math.max(3,Math.floor((alto-cy-pad)/rh));
-    if(dibujar){doc.setDrawColor(...C.linea);doc.setLineWidth(.4);for(let i=1;i<=n;i++)doc.line(x+pad,y+cy+i*rh,x+w-pad,y+cy+i*rh);}
+    etiqueta('Nota:',x+pad+6,f*1.1,C.rosa,false);cy+=f*1.1*lh+2;
+    const rh=f*1.8,n=Math.max(3,Math.floor((alto-cy-pad)/rh));
+    if(dibujar){doc.setDrawColor(...C.raya);doc.setLineWidth(.6);for(let i=1;i<=n;i++)doc.line(x+pad,y+cy+i*rh,x+w-pad,y+cy+i*rh);}
     return cy+n*rh+pad;
   }
   return 0;
 }
-function hojaDibujar(doc){
-  const W=doc.internal.pageSize.getWidth(),H=doc.internal.pageSize.getHeight(),M=20,arriba=M,abajo=H-M,colW=(W-2*M)/3;
-  const cols=hojaPlan();
-  const medir=f=>cols.map(col=>col.reduce((t,b)=>t+hojaBloque(doc,b,f,0,0,colW,false),0));
+function hojaDibujar(doc,firma){
+  const C=HOJA_COLOR,W=doc.internal.pageSize.getWidth(),H=doc.internal.pageSize.getHeight();
+  const M=24,CAB=24,G=10,V=8,arriba=M+CAB,abajo=H-M,colW=(W-2*M-2*G)/3,disp=abajo-arriba;
+  const cols=hojaPlan(firma);
+  const altoCol=(col,f)=>col.reduce((t,b)=>t+hojaBloque(doc,b,f,0,0,colW,false),0)+V*Math.max(0,col.length-1);
   // La letra más grande con la que todo cabe en una sola hoja (si no cabe ni en 5,5, sigue en otra).
-  let f=12;while(f>5.5&&Math.max(...medir(f))>abajo-arriba)f-=.25;
-  const cabe=Math.max(...medir(f))<=abajo-arriba;
+  let f=12.5;while(f>5.5&&Math.max(...cols.map(c=>altoCol(c,f)))>disp)f-=.25;
+  const cabe=Math.max(...cols.map(c=>altoCol(c,f)))<=disp;
+  // Encabezado fino: la marca a la izquierda y qué es #1 y #2 a la derecha.
+  const cabecera=()=>{
+    doc.setFont('helvetica','bold');doc.setFontSize(12);doc.setTextColor(...C.marca);doc.text('ARAMO',M,M,{baseline:'top'});
+    const aw=doc.getTextWidth('ARAMO');
+    doc.setFont('helvetica','normal');doc.setFontSize(9.5);doc.setTextColor(...C.suave);doc.text('Pedido a proveedores',M+aw+7,M+2,{baseline:'top'});
+    let xx=W-M;
+    [['#2','Los Ángeles'],['#1','Moravia']].forEach(([n,t])=>{
+      doc.setFont('helvetica','normal');doc.setFontSize(9.5);const tw=doc.getTextWidth(t);xx-=tw;
+      doc.setTextColor(...C.suave);doc.text(t,xx,M+2,{baseline:'top'});
+      doc.setFont('helvetica','bold');doc.setFontSize(9);const nw=doc.getTextWidth(n);xx-=nw+14;
+      doc.setFillColor(...C.rosa);doc.roundedRect(xx,M,nw+10,13,2.5,2.5,'F');
+      doc.setTextColor(...C.tinta);doc.text(n,xx+5,M+2.2,{baseline:'top'});xx-=12;
+    });
+    doc.setDrawColor(...C.borde);doc.setLineWidth(.8);doc.line(M,M+CAB-7,W-M,M+CAB-7);
+  };
+  // Tarjeta: sombra suave, fondo blanco y borde redondeado.
+  const tarjeta=(x,y,h)=>{
+    doc.setFillColor(...C.sombra);doc.roundedRect(x+1.2,y+1.6,colW,h,6,6,'F');
+    doc.setFillColor(...C.blanco);doc.setDrawColor(...C.borde);doc.setLineWidth(.8);doc.roundedRect(x,y,colW,h,6,6,'FD');
+  };
   let paginas=1;
-  const marco=()=>{doc.setDrawColor(...HOJA_COLOR.linea);doc.setLineWidth(1.1);doc.rect(M,arriba,W-2*M,abajo-arriba);doc.line(M+colW,arriba,M+colW,abajo);doc.line(M+2*colW,arriba,M+2*colW,abajo);};
-  marco();
+  cabecera();
   cols.forEach((col,ci)=>{
-    const x=M+ci*colW,hs=col.map(b=>hojaBloque(doc,b,f,0,0,colW,false));
-    // Cada recuadro mide lo que tiene; el último de la columna llega hasta abajo (en el centro, la Nota).
-    const sobra=cabe?(abajo-arriba)-hs.reduce((a,b)=>a+b,0):0;
+    const x=M+ci*(colW+G),hs=col.map(b=>hojaBloque(doc,b,f,0,0,colW,false));
+    // En una sola hoja, la Nota del centro llega hasta abajo.
+    const sobra=cabe?disp-(hs.reduce((a,b)=>a+b,0)+V*Math.max(0,col.length-1)):0;
     let pag=1,y=arriba;
     col.forEach((b,i)=>{
       let h=hs[i];
-      if(sobra>0&&i===col.length-1)h+=sobra;
-      if(!cabe&&y+h>abajo&&y>arriba){pag++;if(pag>paginas){doc.addPage('letter');paginas=pag;marco();}y=arriba;}
+      if(b.tipo==='NOTA'&&sobra>0)h+=sobra;
+      if(!cabe&&y+h>abajo&&y>arriba){pag++;if(pag>paginas){doc.addPage('letter');paginas=pag;cabecera();}y=arriba;}
       doc.setPage(pag);
+      if(b.tipo!=='FECHA')tarjeta(x,y,h);
       hojaBloque(doc,b,f,x,y,colW,true,h);
-      if(i<col.length-1){doc.setDrawColor(...HOJA_COLOR.linea);doc.setLineWidth(.7);doc.line(x,y+h,x+colW,y+h);}
-      y+=h;
+      y+=h+V;
     });
   });
-  const bloques=cols.flat();
-  return{paginas,provs:bloques.filter(b=>b.tipo==='prov').length,total:bloques.filter(b=>b.tipo==='prov'||b.tipo==='vacio').length,letra:f};
+  return{paginas,provs:cols.flat().filter(b=>b.tipo==='prov').length,letra:f};
 }
 let _jspdf=null,_hojaPrecarga=false;
 function hojaCargarJsPDF(){
@@ -976,16 +986,17 @@ function hojaCargarJsPDF(){
 }
 // Se baja por detrás una sola vez, así al tocar el botón el PDF sale enseguida.
 function hojaPrecargar(){if(_hojaPrecarga||window.jspdf)return;_hojaPrecarga=true;setTimeout(()=>hojaCargarJsPDF().catch(()=>{}),4000);}
-async function hojaPdfHacer(){
+async function hojaPdfHacer(firma){
   await hojaCargarJsPDF();
   const doc=new window.jspdf.jsPDF({unit:'pt',format:'letter'}),d=new Date();
-  const info=hojaDibujar(doc);
-  const nombre=`Pedido ARAMO ${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}.pdf`;
+  const info=hojaDibujar(doc,firma);
+  const nombre=`Pedido ARAMO ${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')} ${firma}.pdf`;
   doc.setProperties({title:nombre.replace(/\.pdf$/,''),author:'ARAMO'});
   return{...info,file:new File([doc.output('blob')],nombre,{type:'application/pdf'})};
 }
 // ── Ventanita del PDF: descargar o mandarlo al WhatsApp propio ──
 const hojaAuto=()=>LS.get('aramo_pdf_auto',false)===true;
+const hojaFirma=()=>{const n=LS.get('aramo_pdf_firma','');return HOJA_FIRMAS.includes(n)?n:'';};
 const hojaMiNumero=()=>LS.get('aramo_mi_wa','')||(S.pdfWa||[]).find(c=>(c?.tel||'').trim())?.tel||'';
 const hojaEsCompu=()=>matchMedia('(hover:hover) and (pointer:fine)').matches;
 // En el teléfono se comparte el archivo a WhatsApp. En la compu se descarga y se abre el chat
@@ -997,16 +1008,23 @@ function hojaPdfAbrir(){
     h=document.createElement('div');h.id='sxPdf';h.className='sx-editor sx-pdf';document.body.appendChild(h);
     h.addEventListener('click',e=>{
       if(e.target===h)return hojaPdfCerrar();
+      const fi=e.target.closest('[data-pdf-firma]');
+      if(fi){if(fi.dataset.pdfFirma!==hojaFirma()||SX.pdf?.estado!=='listo'){LS.set('aramo_pdf_firma',fi.dataset.pdfFirma);hojaPdfArmar();}return;}
       const a=e.target.closest('[data-pdf]')?.dataset.pdf;
-      if(a==='cerrar')hojaPdfCerrar();else if(a==='wa')hojaPdfWhatsApp();else if(a==='bajar')hojaPdfBajar();else if(a==='ver')hojaPdfVer();else if(a==='otra')hojaPdfAbrir();
+      if(a==='cerrar')hojaPdfCerrar();else if(a==='wa')hojaPdfWhatsApp();else if(a==='bajar')hojaPdfBajar();else if(a==='ver')hojaPdfVer();else if(a==='otra')hojaPdfArmar();
     });
     h.addEventListener('change',e=>{if(e.target.id==='sxPdfAuto')LS.set('aramo_pdf_auto',e.target.checked);});
     h.addEventListener('input',e=>{if(e.target.id==='sxPdfNum')LS.set('aramo_mi_wa',e.target.value.trim());});
   }
-  const vez=SX.pdfVez=(SX.pdfVez||0)+1; // si se cierra antes de terminar, el resultado se descarta
-  SX.pdf={estado:'armando'};hojaPdfPintar();
   requestAnimationFrame(()=>h.classList.add('open'));
-  hojaPdfHacer().then(r=>{
+  hojaPdfArmar();
+}
+// Arma el PDF con el encargado elegido; si en este teléfono todavía no se eligió, lo pregunta.
+function hojaPdfArmar(){
+  const firma=hojaFirma(),vez=SX.pdfVez=(SX.pdfVez||0)+1; // si se cierra antes de terminar, el resultado se descarta
+  if(!firma){SX.pdf={estado:'firma'};hojaPdfPintar();return;}
+  SX.pdf={estado:'armando'};hojaPdfPintar();
+  hojaPdfHacer(firma).then(r=>{
     if(SX.pdfVez!==vez)return;
     SX.pdf={estado:'listo',...r};hojaPdfPintar();
     if(hojaAuto())hojaPdfWhatsApp(true);
@@ -1016,9 +1034,11 @@ function hojaPdfCerrar(){SX.pdfVez=(SX.pdfVez||0)+1;$('sxPdf')?.classList.remove
 function hojaPdfPintar(){
   const h=$('sxPdf');if(!h)return;
   const st=SX.pdf||{},listo=st.estado==='listo',dis=listo?'':' disabled',compartir=hojaPuedeCompartir(),compu=hojaEsCompu();
-  const estado=st.estado==='armando'?'Armando el PDF…':st.estado==='error'?`⚠️ ${esc(st.msg)} <button type="button" data-pdf="otra">Probar otra vez</button>`:`✓ Listo: ${st.provs} de ${st.total} proveedores con pedido · ${plural(st.paginas,'hoja','hojas')}`;
+  const firma=hojaFirma();
+  const estado=st.estado==='firma'?'Elegí quién hace el pedido para armar el PDF':st.estado==='armando'?'Armando el PDF…':st.estado==='error'?`⚠️ ${esc(st.msg)} <button type="button" data-pdf="otra">Probar otra vez</button>`:`✓ Listo: ${plural(st.provs,'proveedor','proveedores')} · ${plural(st.paginas,'hoja','hojas')}`;
   h.innerHTML=`<div class="sx-ed-in" role="dialog" aria-modal="true" aria-label="PDF del pedido">
     <div class="sx-ed-cab"><span class="sx-pdf-ico">${ico('hoja')}</span><div><h3>PDF del pedido</h3><p>${esc(hojaFecha())} · la hoja de 3 columnas</p></div><button type="button" class="sx-ed-x" data-pdf="cerrar" aria-label="Cerrar">✕</button></div>
+    <div class="sx-pdf-firma"><span id="sxPdfFirmaT">¿Quién hace el pedido?</span><div role="radiogroup" aria-labelledby="sxPdfFirmaT">${HOJA_FIRMAS.map(n=>`<button type="button" role="radio" aria-checked="${n===firma}" class="${n===firma?'on':''}" data-pdf-firma="${n}">${n}</button>`).join('')}</div></div>
     <p class="sx-pdf-estado ${st.estado||''}" role="status">${estado}</p>
     <button type="button" class="sx-pdf-wa" data-pdf="wa"${dis}>${ico('mensaje')}Mandar a mi WhatsApp</button>
     <div class="sx-pdf-acc"><button type="button" data-pdf="bajar"${dis}>${ico('bajar')}Descargar</button>${compu?`<button type="button" data-pdf="ver"${dis}>${ico('hoja')}Ver</button>`:''}</div>

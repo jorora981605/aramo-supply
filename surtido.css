@@ -320,3 +320,12 @@ html[data-theme="dark"] .sx-pdf-estado.error{background:rgba(220,38,38,.15);colo
 .sx-pdf-auto{display:flex;align-items:flex-start;gap:10px;margin-top:14px;font:600 13px/1.35 var(--sx-f);color:var(--t);cursor:pointer}
 .sx-pdf-auto input{flex:none;width:20px;height:20px;margin:0;accent-color:#16a34a}
 .sx-pdf-ayuda{margin:10px 0 0;font:600 12px/1.4 var(--sx-f);color:var(--m)}
+/* Quién hace el pedido (va a la par de la fecha en el PDF) */
+.sx-pdf-firma{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-top:14px;font:700 13px var(--sx-f);color:var(--m)}
+.sx-pdf-firma>div{display:grid;grid-template-columns:repeat(3,1fr);gap:6px;flex:1;min-width:210px}
+.sx-pdf-firma button{min-height:42px;border:1.5px solid var(--sx-linea);border-radius:13px;background:var(--card,#fff);color:var(--t);font:800 14.5px var(--sx-f);letter-spacing:.5px;cursor:pointer;transition:transform .1s}
+.sx-pdf-firma button:active{transform:scale(.95)}
+.sx-pdf-firma button.on{border-color:#0891b2;background:#cffafe;color:#0e4a5a}
+html[data-theme="dark"] .sx-pdf-firma button.on{border-color:#22d3ee;background:rgba(34,211,238,.16);color:#a5f3fc}
+.sx-pdf-estado.firma{background:#fef9c3;color:#854d0e}
+html[data-theme="dark"] .sx-pdf-estado.firma{background:rgba(250,204,21,.14);color:#fde68a}
