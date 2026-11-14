@@ -290,15 +290,15 @@ html[data-theme="dark"] .sx-editor{--pm:#4ade80;--pa:#fb923c;--pm-t:rgba(74,222,
 html[data-theme="dark"] .sx-ed-acc button.quitar{color:#fca5a5}
 .sx-ed-ok{width:100%;min-height:52px;margin-top:10px;border:0;border-radius:16px;background:#0e4a30;color:#fff;font:800 16px var(--sx-f);cursor:pointer}
 html[data-theme="dark"] .sx-ed-ok{background:#1f7a4d}
-/* ── 📄 PDF del pedido (al final de la lista, arriba de Proveedores) ── */
-.sx-pdf-btn{display:flex;align-items:center;gap:12px;width:100%;min-height:62px;margin:12px 0 2px;padding:10px 14px;border:0;border-radius:18px;background:#0e4a30;color:#fff;text-align:left;cursor:pointer;font-family:var(--sx-f);box-shadow:0 10px 22px -14px rgba(14,74,48,.7);transition:transform .12s}
+/* ── 📄 PDF del pedido: barra larga debajo de "Tu pedido de hoy" ── */
+.sx-pdf-btn{display:flex;align-items:center;gap:11px;width:100%;min-height:50px;margin:2px 0 10px;padding:7px 12px 7px 8px;border:0;border-radius:15px;background:#0e4a30;color:#fff;text-align:left;cursor:pointer;font-family:var(--sx-f);box-shadow:0 8px 18px -12px rgba(14,74,48,.7);transition:transform .12s}
 .sx-pdf-btn:active{transform:scale(.98)}
 html[data-theme="dark"] .sx-pdf-btn{background:#1f7a4d}
-.sx-pdf-i{display:grid;place-items:center;flex:none;width:38px;height:38px;border-radius:12px;background:rgba(255,255,255,.14)}
-.sx-pdf-i .pdx-i{width:21px;height:21px}
-.sx-pdf-t{flex:1;min-width:0}
-.sx-pdf-t b{display:block;font:800 15.5px var(--sx-f)}
-.sx-pdf-t small{display:block;margin-top:1px;font:600 12px var(--sx-f);color:rgba(255,255,255,.78)}
+.sx-pdf-i{display:grid;place-items:center;flex:none;width:34px;height:34px;border-radius:10px;background:rgba(255,255,255,.14)}
+.sx-pdf-i .pdx-i{width:19px;height:19px}
+.sx-pdf-t{flex:1;min-width:0;display:flex;align-items:baseline;gap:8px;flex-wrap:wrap}
+.sx-pdf-t b{font:800 15px var(--sx-f);white-space:nowrap}
+.sx-pdf-t small{font:600 12px var(--sx-f);color:rgba(255,255,255,.78);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .sx-pdf-f{font-size:22px;line-height:1;opacity:.8}
 .sx-pdf-ico{display:grid;place-items:center;flex:none;width:46px;height:46px;border-radius:15px;background:var(--pm-t);color:var(--pm)}
 .sx-pdf-ico .pdx-i{width:24px;height:24px}

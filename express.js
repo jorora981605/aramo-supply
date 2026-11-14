@@ -746,8 +746,10 @@ function sxLado(d,side){
 // la deja markUnsent en notes.__upd_<tienda> solo cuando el pedido cambia. Un pedido vacío no
 // muestra hora (por ejemplo, después de reiniciar).
 function sxHora(p,side){return pedidoTieneLado(p,side)?+p?.notes?.['__upd_'+side]||0:0;}
-// Cabecera de cada tienda: el pedido modificado más recientemente de esa tienda.
-function sxUltimoCambio(side){return Object.values(S.pedidos||{}).reduce((m,p)=>Math.max(m,sxHora(p,side)),0);}
+// Cabecera de cada tienda: el último movimiento en cualquiera de sus pedidos, desde "Ambos" o desde
+// la pestaña de la tienda. Cuenta aunque el pedido haya quedado vacío (quitar o pasar a otro
+// proveedor su único producto también es un movimiento).
+function sxUltimoCambio(side){return Object.values(S.pedidos||{}).reduce((m,p)=>Math.max(m,+p?.notes?.['__upd_'+side]||0),0);}
 function sxCuando(t){
   const d=new Date(t),hoy=new Date(),ayer=new Date(hoy.getFullYear(),hoy.getMonth(),hoy.getDate()-1);
   const dia=d.toDateString()===hoy.toDateString()?'Hoy':d.toDateString()===ayer.toDateString()?'Ayer':capital(d.toLocaleDateString('es-CR',{weekday:'short'}));
@@ -772,12 +774,12 @@ function sxRenderTablero(){
     return `<div class="${side}"><b>${SIDE_ICO[side]} ${SIDE_NAME[side]}</b>${sxActualizado(side)}<span>${plural(n,'producto','productos')}${tot?` · ₡${fmt(tot)}`:''}</span>${n?(pend?`<em>${pend} por enviar</em>`:`<em class="ok">✓ todo enviado</em>`):''}</div>`;
   };
   box.innerHTML=`<div class="sx-tablero-h"><h2>Tu pedido de hoy</h2><small class="sx-ayuda">Tocá un producto para cambiar la cantidad · <span class="sx-mover-demo" aria-hidden="true">${ico('mover')}</span> para pasarlo a otro proveedor</small></div>
+    <button type="button" class="sx-pdf-btn" data-sx-pdf><span class="sx-pdf-i">${ico('hoja')}</span><span class="sx-pdf-t"><b>PDF del pedido</b><small>3 columnas · mandalo a tu WhatsApp</small></span><span class="sx-pdf-f" aria-hidden="true">›</span></button>
     <div class="sx-tiendas n${sides.length}">${sides.map(tienda).join('')}</div>
     <div class="sx-lista">${datos.map((d,i)=>`<section class="sx-prov" data-sx-drop="${esc(d.prov)}" style="--i:${i};--c:${sxColor(d.prov)}">
       <button type="button" class="sx-prov-h" data-pd="open" data-prov="${esc(d.prov)}" title="Abrir ${esc(d.prov)}"><b>${esc(d.prov)}</b>${d.tot?`<span>₡${fmt(d.tot)}</span>`:''}<i aria-hidden="true">›</i></button>
       <div class="sx-par n${sides.length}">${sides.map(s=>sxLado(d,s)).join('')}</div>
-    </section>`).join('')}</div>
-    <button type="button" class="sx-pdf-btn" data-sx-pdf><span class="sx-pdf-i">${ico('hoja')}</span><span class="sx-pdf-t"><b>PDF del pedido</b><small>La hoja de siempre en 3 columnas · mandala a tu WhatsApp</small></span><span class="sx-pdf-f" aria-hidden="true">›</span></button>`;
+    </section>`).join('')}</div>`;
   sxCabeceraFija();
   hojaPrecargar();
 }
@@ -875,7 +877,7 @@ function hojaBloque(doc,b,f,x,y,w,dibujar,alto=0){
     etiqueta(hojaTxt(b.prov),x+w/2,f*1.32,C.verde);cy+=f*1.32*lh+5;
     const grupos=hojaGrupos(b.prov),todos=grupos.flatMap(g=>g.items);
     // Columnas fijas dentro de la tarjeta: cantidad (alineada a la derecha) | unidad | producto.
-    const qW=Math.max(0,...todos.map(it=>ancho(hojaTxt(it.q),f,'bold'))),uW=Math.max(0,...todos.map(it=>ancho(hojaTxt(it.u),f*.9,'normal')));
+    const qW=Math.max(0,...todos.map(it=>ancho(hojaTxt(it.q),f,'bold'))),uW=Math.max(0,...todos.map(it=>ancho(hojaTxt(it.u),f*.9,'bold')));
     const xq=x+pad+5+qW,xu=xq+3.5,xn=xu+uW+(uW?5:1.5),wn=x+w-pad-xn;
     grupos.forEach((g,gi)=>{
       if(gi)cy+=f*.8; // #1 y #2 bien separados
@@ -884,7 +886,7 @@ function hojaBloque(doc,b,f,x,y,w,dibujar,alto=0){
       raya(x+pad+ew+3,y+cy+sz*.5,x+w-pad);cy+=sz*lh+4;
       g.items.forEach(it=>{
         texto(hojaTxt(it.q),xq,y+cy,f,'bold',C.tinta,{align:'right'});
-        texto(hojaTxt(it.u),xu,y+cy+f*.08,f*.9,'normal',C.unidad);
+        texto(hojaTxt(it.u),xu,y+cy+f*.08,f*.9,'bold',C.tinta); // cantidad y unidad en negrita: "30 u"
         partir(hojaTxt(it.t),f,'normal',wn).forEach(ln=>{texto(ln,xn,y+cy,f,'normal',C.tinta);cy+=f*lh;});
         if(it.nota)resaltadas('('+hojaTxt(it.nota)+')',f*.9,'italic',xn+2,wn-4);
         cy+=f*.14;
@@ -901,10 +903,10 @@ function hojaBloque(doc,b,f,x,y,w,dibujar,alto=0){
     return h;
   }
   if(b.tipo==='CONSEGUIR'){
-    const qw=Math.max(32,f*4.2),x2=x+w-pad-2*qw,rh=f*1.7,n=Math.max(b.filas.length,3);
-    etiqueta('CONSEGUIR',x+pad+6,f*1.1,C.verde,false);
-    ['#1','#2'].forEach((et,i)=>etiqueta(et,x2+qw*i+qw/2,f,C.rosa));
-    cy+=f*1.1*lh+5;
+    const qw=Math.max(34,f*4.4),x2=x+w-pad-2*qw,rh=f*1.7,n=Math.max(b.filas.length,3);
+    // El título va en su propio renglón y #1 / #2 encima de su columna: nada se encima.
+    etiqueta('CONSEGUIR',x+pad+6,f*1.1,C.verde,false);cy+=f*1.1*lh+6;
+    ['#1','#2'].forEach((et,i)=>etiqueta(et,x2+qw*i+qw/2,f,C.rosa));cy+=f*lh+4;
     const y0=y+cy;
     if(dibujar){
       doc.setDrawColor(...C.raya);doc.setLineWidth(.6);
