@@ -1,4 +1,4 @@
-const CACHE_NAME = 'aramo-shell-v58-pdf-hoja';
+const CACHE_NAME = 'aramo-shell-v59-pdf-ordenado';
 const CDN_CACHE = 'aramo-cdn-v1';
 // Las páginas: al instalar se guardan junto con TODOS los archivos que cargan,
 // tal cual los piden (con su ?v=…). Así cada pantalla abre sin esperar a internet.

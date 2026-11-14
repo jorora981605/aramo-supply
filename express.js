@@ -801,18 +801,19 @@ addEventListener('resize',sxFijaLuego,{passive:true});
 // ══════════════════════════════════════════
 // 📄 PDF DEL PEDIDO — la hoja de siempre
 // ══════════════════════════════════════════
-// Una hoja carta con tres columnas y cada proveedor en el mismo lugar que en la hoja de papel
-// que usan. Cada lugar acepta los nombres como estén escritos en la app; los proveedores sin
-// lugar fijo van al centro, debajo de Luisa, y "Otros" llena la tabla CONSEGUIR.
-// #1 = Moravia y #2 = Los Ángeles, igual que en la lista de WhatsApp.
+// Una hoja carta con tres columnas y TODOS los proveedores, cada uno siempre en el mismo lugar,
+// como en la hoja de papel: a la izquierda los de fruta, a la derecha los de verdura y en el
+// centro el resto. Un proveedor sin pedido ocupa una sola línea con su nombre en gris. Cada
+// lugar acepta los nombres como estén escritos en la app; uno nuevo sin lugar va al centro,
+// antes de CONSEGUIR, que se llena con "Otros". #1 = Moravia y #2 = Los Ángeles.
 const HOJA_COLUMNAS=[
-  [['alex'],['arturo'],['dani','danny'],['matias'],['yader'],['aleman']],
-  [['abner'],'FECHA',['luisa'],'SUELTOS','CONSEGUIR','NOTA'],
-  [['henry'],['mincho','nincho'],['barbas'],['pajaro'],['colas'],['perla']],
+  [['alex'],['arturo'],['dani','danny'],['matias'],['yader'],['aleman'],['vega'],['juan carlos'],['anthony'],['salomon']],
+  [['abner'],'FECHA',['luisa'],['walter'],['roger'],['fresh'],['jesus'],['vilma'],['elamos'],['susanavo'],'SUELTOS','CONSEGUIR','NOTA'],
+  [['henry'],['mincho','nincho'],['barbas'],['pajaro'],['colas'],['perla'],['sandra'],['david'],['chiqui'],['edgardo'],['noe']],
 ];
 const HOJA_NUM={moravia:1,angeles:2};
 const HOJA_FIRMA='JRRLEPIZ';
-const HOJA_COLOR={verde:[134,239,172],rosa:[249,168,212],amarillo:[254,240,138],celeste:[103,232,249],tinta:[17,24,39],gris:[150,150,150],linea:[40,40,40]};
+const HOJA_COLOR={verde:[134,239,172],rosa:[249,168,212],amarillo:[254,240,138],celeste:[103,232,249],tinta:[17,24,39],unidad:[90,90,90],gris:[150,150,150],raya:[185,185,185],linea:[40,40,40]};
 const JSPDF_URL='https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js';
 const hojaClave=s=>String(s||'').normalize('NFD').replace(/[̀-ͯ]/g,'').toLowerCase().replace(/[^a-z0-9]+/g,' ').trim();
 // La letra del PDF solo trae los caracteres de Latin-1: ₡ pasa a ¢ y se quitan los emojis.
@@ -822,25 +823,26 @@ function hojaGrupos(prov){
   const p=S.pedidos[prov]||{},{lines,extras}=xpProvLines(prov);
   return activeOrderSides().map(s=>({
     n:HOJA_NUM[s],
-    items:[...lines.filter(l=>l.q[s]>0).map(l=>({t:`${fmtQ(l.q[s])} ${uniCorta(l.unit)} ${niceName(l.prod.name)}`,nota:getProductNote(p,l.prod.id,s)})),
-      ...extras.filter(x=>x.side===s).map(x=>({t:`${fmtQ(+x.qty)} ${uniCorta(x.unit||'kg')} ${x.name||'Extra'}`}))],
+    items:[...lines.filter(l=>l.q[s]>0).map(l=>({q:fmtQ(l.q[s]),u:uniCorta(l.unit),t:niceName(l.prod.name),nota:getProductNote(p,l.prod.id,s)})),
+      ...extras.filter(x=>x.side===s).map(x=>({q:fmtQ(+x.qty),u:uniCorta(x.unit||'kg'),t:x.name||'Extra'}))],
     nota:getBranchNote(p,s),
   })).filter(g=>g.items.length||g.nota);
 }
 // Qué va en cada lugar de la hoja.
 function hojaPlan(){
   const todos=getProvNames(),conPedido=new Set(todos.filter(hasData)),usados=new Set();
+  const calza=(p,lugar)=>{const k=hojaClave(p);return lugar.some(a=>k===a||k.split(' ').includes(a));};
+  // Sin pedido hoy: el nombre queda en su lugar, en gris y en una sola línea.
+  const bloque=p=>({tipo:conPedido.has(p)?'prov':'vacio',prov:p});
   const cols=HOJA_COLUMNAS.map(col=>col.map(lugar=>{
     if(typeof lugar==='string')return[{tipo:lugar}];
-    const m=todos.filter(p=>!usados.has(p)&&hojaClave(p).split(' ').some(w=>lugar.includes(w)));
+    const m=todos.filter(p=>!usados.has(p)&&calza(p,lugar));
     m.forEach(p=>usados.add(p));
-    const activos=m.filter(p=>conPedido.has(p));
-    // Sin pedido hoy: el nombre queda en su lugar, en gris.
-    return activos.length?activos.map(p=>({tipo:'prov',prov:p})):[{tipo:'vacio',nombre:m[0]||capital(lugar[0])}];
+    return m.map(bloque);
   }));
   const otros=todos.filter(p=>!usados.has(p)&&hojaClave(p)==='otros');
   otros.forEach(p=>usados.add(p));
-  const sueltos=todos.filter(p=>!usados.has(p)&&conPedido.has(p)).sort(ORDEN_ES).map(p=>({tipo:'prov',prov:p}));
+  const sueltos=todos.filter(p=>!usados.has(p)).sort(ORDEN_ES).map(bloque);
   const filas=[];
   otros.filter(p=>conPedido.has(p)).forEach(prov=>{
     const {lines,extras}=xpProvLines(prov);
@@ -864,24 +866,39 @@ function hojaBloque(doc,b,f,x,y,w,dibujar,alto=0){
     if(color)marcar(cx-tw/2-7,y+cy-1,tw+14,sz*1.18,color);
     texto(t,cx,y+cy,sz,'bold',tinta,{align:'center'});
   };
-  const resaltadas=(s,sz,est,sangria)=>partir(s,sz,est,w-2*pad-sangria-4).forEach(ln=>{
-    marcar(x+pad+sangria-2,y+cy-.5,ancho(ln,sz,est)+4,sz*1.16,C.amarillo);
-    texto(ln,x+pad+sangria,y+cy,sz,est,C.tinta);cy+=sz*lh;
+  const resaltadas=(s,sz,est,xx,ww)=>partir(s,sz,est,ww).forEach(ln=>{
+    marcar(xx-2,y+cy-.5,ancho(ln,sz,est)+4,sz*1.16,C.amarillo);
+    texto(ln,xx,y+cy,sz,est,C.tinta);cy+=sz*lh;
   });
-  if(b.tipo==='prov'||b.tipo==='vacio'){
-    const nombre=hojaTxt(b.prov||b.nombre);
-    if(b.tipo==='vacio'){etiqueta(nombre,x+w/2,f*1.2,null,C.gris);return cy+f*1.2*lh+pad;}
-    etiqueta(nombre,x+w/2,f*1.3,C.verde);cy+=f*1.3*lh+3;
-    hojaGrupos(b.prov).forEach(g=>{
-      etiqueta('#'+g.n,x+w/2,f*1.05,C.rosa);cy+=f*1.05*lh+2;
+  if(b.tipo==='vacio'){
+    // Sin pedido: solo el nombre, en una línea angosta.
+    const sz=f*1.02,aire=Math.max(2.5,f*.3);
+    texto(partir(hojaTxt(b.prov),sz,'bold',w-2*pad)[0]||'',x+w/2,y+aire,sz,'bold',C.gris,{align:'center'});
+    return aire*2+sz*1.15;
+  }
+  if(b.tipo==='prov'){
+    etiqueta(hojaTxt(b.prov),x+w/2,f*1.3,C.verde);cy+=f*1.3*lh+4;
+    const grupos=hojaGrupos(b.prov),todos=grupos.flatMap(g=>g.items);
+    // Columnas fijas dentro del recuadro: cantidad (alineada a la derecha) | unidad | producto.
+    const qW=Math.max(0,...todos.map(it=>ancho(hojaTxt(it.q),f,'bold'))),uW=Math.max(0,...todos.map(it=>ancho(hojaTxt(it.u),f*.9,'normal')));
+    const xq=x+pad+qW,xu=xq+3.5,xn=xu+uW+(uW?5:1.5),wn=x+w-pad-xn;
+    grupos.forEach((g,gi)=>{
+      if(gi){
+        // #1 y #2 bien separados: aire y una raya suave entre los dos.
+        cy+=f*.5;
+        if(dibujar){doc.setDrawColor(...C.raya);doc.setLineWidth(.6);doc.setLineDashPattern([2,2],0);doc.line(x+pad+4,y+cy,x+w-pad-4,y+cy);doc.setLineDashPattern([],0);}
+        cy+=f*.65;
+      }
+      etiqueta('#'+g.n,x+w/2,f*1.05,C.rosa);cy+=f*1.05*lh+3;
       g.items.forEach(it=>{
-        partir(hojaTxt(it.t),f,'normal',w-2*pad-8).forEach((ln,i)=>{texto(ln,x+pad+(i?8:0),y+cy,f,'normal',C.tinta);cy+=f*lh;});
-        if(it.nota)resaltadas('('+hojaTxt(it.nota)+')',f*.92,'italic',12);
+        texto(hojaTxt(it.q),xq,y+cy,f,'bold',C.tinta,{align:'right'});
+        texto(hojaTxt(it.u),xu,y+cy+f*.08,f*.9,'normal',C.unidad);
+        partir(hojaTxt(it.t),f,'normal',wn).forEach(ln=>{texto(ln,xn,y+cy,f,'normal',C.tinta);cy+=f*lh;});
+        if(it.nota)resaltadas('('+hojaTxt(it.nota)+')',f*.9,'italic',xn+2,wn-4);
       });
-      if(g.nota)resaltadas('Nota: '+hojaTxt(g.nota),f*.92,'bold',2);
-      cy+=f*.4;
+      if(g.nota){cy+=f*.2;resaltadas('Nota: '+hojaTxt(g.nota),f*.92,'bold',x+pad+2,w-2*pad-4);}
     });
-    return cy+pad;
+    return cy+pad+f*.15;
   }
   if(b.tipo==='FECHA'){
     const sz=f*1.12;
@@ -923,28 +940,29 @@ function hojaDibujar(doc){
   const W=doc.internal.pageSize.getWidth(),H=doc.internal.pageSize.getHeight(),M=20,arriba=M,abajo=H-M,colW=(W-2*M)/3;
   const cols=hojaPlan();
   const medir=f=>cols.map(col=>col.reduce((t,b)=>t+hojaBloque(doc,b,f,0,0,colW,false),0));
-  // La letra más grande con la que todo cabe en una sola hoja (si no cabe ni en 6, sigue en otra).
-  let f=10.5;while(f>6&&Math.max(...medir(f))>abajo-arriba)f-=.25;
+  // La letra más grande con la que todo cabe en una sola hoja (si no cabe ni en 5,5, sigue en otra).
+  let f=12;while(f>5.5&&Math.max(...medir(f))>abajo-arriba)f-=.25;
   const cabe=Math.max(...medir(f))<=abajo-arriba;
   let paginas=1;
   const marco=()=>{doc.setDrawColor(...HOJA_COLOR.linea);doc.setLineWidth(1.1);doc.rect(M,arriba,W-2*M,abajo-arriba);doc.line(M+colW,arriba,M+colW,abajo);doc.line(M+2*colW,arriba,M+2*colW,abajo);};
   marco();
   cols.forEach((col,ci)=>{
     const x=M+ci*colW,hs=col.map(b=>hojaBloque(doc,b,f,0,0,colW,false));
-    // En una sola hoja, los recuadros se estiran hasta abajo como en el papel (en el centro, la Nota).
-    const sobra=cabe?(abajo-arriba)-hs.reduce((a,b)=>a+b,0):0,iNota=col.findIndex(b=>b.tipo==='NOTA');
+    // Cada recuadro mide lo que tiene; el último de la columna llega hasta abajo (en el centro, la Nota).
+    const sobra=cabe?(abajo-arriba)-hs.reduce((a,b)=>a+b,0):0;
     let pag=1,y=arriba;
     col.forEach((b,i)=>{
       let h=hs[i];
-      if(sobra>0)h+=iNota>=0?(i===iNota?sobra:0):sobra/col.length;
+      if(sobra>0&&i===col.length-1)h+=sobra;
       if(!cabe&&y+h>abajo&&y>arriba){pag++;if(pag>paginas){doc.addPage('letter');paginas=pag;marco();}y=arriba;}
       doc.setPage(pag);
       hojaBloque(doc,b,f,x,y,colW,true,h);
-      if(i<col.length-1){doc.setDrawColor(...HOJA_COLOR.linea);doc.setLineWidth(.8);doc.line(x,y+h,x+colW,y+h);}
+      if(i<col.length-1){doc.setDrawColor(...HOJA_COLOR.linea);doc.setLineWidth(.7);doc.line(x,y+h,x+colW,y+h);}
       y+=h;
     });
   });
-  return{paginas,provs:cols.flat().filter(b=>b.tipo==='prov').length,letra:f};
+  const bloques=cols.flat();
+  return{paginas,provs:bloques.filter(b=>b.tipo==='prov').length,total:bloques.filter(b=>b.tipo==='prov'||b.tipo==='vacio').length,letra:f};
 }
 let _jspdf=null,_hojaPrecarga=false;
 function hojaCargarJsPDF(){
@@ -998,7 +1016,7 @@ function hojaPdfCerrar(){SX.pdfVez=(SX.pdfVez||0)+1;$('sxPdf')?.classList.remove
 function hojaPdfPintar(){
   const h=$('sxPdf');if(!h)return;
   const st=SX.pdf||{},listo=st.estado==='listo',dis=listo?'':' disabled',compartir=hojaPuedeCompartir(),compu=hojaEsCompu();
-  const estado=st.estado==='armando'?'Armando el PDF…':st.estado==='error'?`⚠️ ${esc(st.msg)} <button type="button" data-pdf="otra">Probar otra vez</button>`:`✓ Listo: ${plural(st.provs,'proveedor','proveedores')} · ${plural(st.paginas,'hoja','hojas')}`;
+  const estado=st.estado==='armando'?'Armando el PDF…':st.estado==='error'?`⚠️ ${esc(st.msg)} <button type="button" data-pdf="otra">Probar otra vez</button>`:`✓ Listo: ${st.provs} de ${st.total} proveedores con pedido · ${plural(st.paginas,'hoja','hojas')}`;
   h.innerHTML=`<div class="sx-ed-in" role="dialog" aria-modal="true" aria-label="PDF del pedido">
     <div class="sx-ed-cab"><span class="sx-pdf-ico">${ico('hoja')}</span><div><h3>PDF del pedido</h3><p>${esc(hojaFecha())} · la hoja de 3 columnas</p></div><button type="button" class="sx-ed-x" data-pdf="cerrar" aria-label="Cerrar">✕</button></div>
     <p class="sx-pdf-estado ${st.estado||''}" role="status">${estado}</p>
