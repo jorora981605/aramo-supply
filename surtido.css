@@ -334,8 +334,8 @@ html[data-theme="dark"] .sx-pdf-estado.firma{background:rgba(250,204,21,.14);col
 .sx-pdf-btn.ci-btn{margin-top:-2px;background:linear-gradient(135deg,#b45309,#92400e);box-shadow:0 8px 18px -12px rgba(146,64,14,.75)}
 .sx-vacio+.sx-pdf-btn.ci-btn{margin-top:10px}
 .ci{position:fixed;inset:0;z-index:10060;display:flex;align-items:center;justify-content:center;background:rgba(8,20,14,.5);backdrop-filter:blur(4px);-webkit-backdrop-filter:blur(4px);opacity:0;pointer-events:none;transition:opacity .2s;font-family:var(--sx-f);
-  --sx-f:'Plus Jakarta Sans',var(--fn);--sx-s:'Fraunces',Georgia,serif;--pm:#15803d;--pm-t:#e7f6ec;--sx-linea:rgba(16,40,28,.1);--sx-tile:#f3f7f4;--ci-am:#b45309;--ci-am-t:#fef3c7;--ci-fondo:#f4f7f5}
-html[data-theme="dark"] .ci{--pm:#4ade80;--pm-t:rgba(74,222,128,.12);--sx-linea:rgba(255,255,255,.1);--sx-tile:rgba(255,255,255,.05);--ci-am:#fbbf24;--ci-am-t:rgba(251,191,36,.14);--ci-fondo:var(--bg,#0c100e)}
+  --sx-f:'Plus Jakarta Sans',var(--fn);--sx-s:'Fraunces',Georgia,serif;--pm:#15803d;--pm-t:#e7f6ec;--sx-linea:rgba(16,40,28,.1);--sx-tile:#f3f7f4;--ci-am:#b45309;--pa:#c2410c;--pa-t:#fdeee4;--ci-am-t:#fef3c7;--ci-fondo:#f4f7f5}
+html[data-theme="dark"] .ci{--pm:#4ade80;--pm-t:rgba(74,222,128,.12);--pa:#fb923c;--pa-t:rgba(251,146,60,.13);--sx-linea:rgba(255,255,255,.1);--sx-tile:rgba(255,255,255,.05);--ci-am:#fbbf24;--ci-am-t:rgba(251,191,36,.14);--ci-fondo:var(--bg,#0c100e)}
 .ci.open{opacity:1;pointer-events:auto}
 html.ci-abierto,html.ci-abierto body{overflow:hidden}
 .ci-in{display:flex;flex-direction:column;width:100%;height:100%;background:var(--ci-fondo);color:var(--t);transform:translateY(24px);transition:transform .28s cubic-bezier(.22,1,.36,1)}
@@ -479,3 +479,34 @@ html[data-theme="dark"] .ci-res.sobra{background:rgba(37,99,235,.22);color:#bfdb
 .ci-h small{display:block;margin-top:1px;font:600 12px var(--sx-f);color:var(--m)}
 .ci-h button{flex:none;display:grid;place-items:center;width:42px;height:42px;border:0;border-radius:13px;background:#25d366;color:#05371b;cursor:pointer}
 .ci-h .pdx-i{width:19px;height:19px}
+/* Lo de cada tienda: verde Moravia, naranja Los Ángeles */
+.ci-prov-tiendas{display:grid;grid-template-columns:1fr 1fr;gap:6px;margin:-2px 0 12px}
+.ci-prov-tiendas>span{display:flex;align-items:center;gap:6px;min-width:0;padding:7px 10px;border-radius:13px;font:700 12.5px var(--sx-f);white-space:nowrap}
+.ci-prov-tiendas>span>span{min-width:0;overflow:hidden;text-overflow:ellipsis}
+.ci-prov-tiendas i{font-style:normal}
+.ci-prov-tiendas b{margin-left:auto;font:800 14.5px var(--sx-f);font-variant-numeric:tabular-nums}
+.ci-prov-tiendas>.moravia,.ci-tienda.moravia,.ci-td.moravia{background:var(--pm-t);color:var(--pm)}
+.ci-prov-tiendas>.angeles,.ci-tienda.angeles,.ci-td.angeles{background:var(--pa-t);color:var(--pa)}
+.ci-rep{display:flex;flex-wrap:wrap;align-items:center;gap:6px;margin-top:8px}
+.ci-tienda{display:inline-flex;align-items:center;gap:5px;min-height:34px;padding:3px 11px 3px 9px;border-radius:999px;font:700 12.5px var(--sx-f);cursor:default}
+label.ci-tienda{cursor:text}
+.ci-tienda i{font-style:normal;font-size:13px}
+.ci-tienda input{width:42px;height:28px;padding:0;border:0;border-radius:9px;background:var(--card,#fff);color:inherit;text-align:center;font:800 16px var(--sx-f);font-variant-numeric:tabular-nums;outline:none;box-shadow:inset 0 0 0 1.5px color-mix(in srgb,currentColor 35%,transparent)}
+.ci-tienda input:focus{box-shadow:inset 0 0 0 2px currentColor}
+.ci-tienda b{font:800 14px var(--sx-f);font-variant-numeric:tabular-nums}
+.ci-tienda em{font:800 13px var(--sx-f);font-style:normal;font-variant-numeric:tabular-nums}
+.ci-tn{display:none}
+@media (min-width:480px){.ci-tn{display:inline}}
+.ci-ped:empty{display:none}
+.ci-para{min-height:34px;padding:0 12px;border:1.5px solid var(--sx-linea);border-radius:999px;background:var(--card,#fff);color:var(--m);font:700 12.5px var(--sx-f);cursor:pointer}
+.ci-para b{color:var(--t)}
+.ci-para-m{font:700 12.5px var(--sx-f);font-style:normal;color:var(--m);font-variant-numeric:tabular-nums}
+.ci-tiendas-w{margin-top:14px}
+.ci-tiendas{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.ci-td{min-width:0;padding:12px 12px 11px;border-radius:19px;box-shadow:inset 0 0 0 1.5px color-mix(in srgb,currentColor 22%,transparent)}
+.ci-td>span{display:block;font:800 13px var(--sx-f);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.ci-td strong{display:block;margin-top:3px;font:600 27px/1.12 var(--sx-s);color:var(--t);font-variant-numeric:tabular-nums;white-space:nowrap}
+.ci-td small{display:block;margin-top:4px;font:600 11.5px/1.4 var(--sx-f);color:var(--m)}
+.ci-td .ci-td-p{margin-top:5px;font-weight:700;color:var(--t)}
+.ci-nota{margin:8px 2px 0;font:600 12px/1.4 var(--sx-f);color:var(--m)}
+.ci-td small:empty{display:none}

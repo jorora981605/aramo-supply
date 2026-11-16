@@ -1097,6 +1097,8 @@ document.addEventListener('keydown',e=>{
 const CI_PAGOS=[['efectivo','💵','Efectivo'],['tarjeta','💳','Tarjeta'],['sinpe','📱','SINPE']];
 const CI_PAGO_NOMBRE=Object.fromEntries(CI_PAGOS.map(([k,e,n])=>[k,e+' '+n]));
 const CI_GASTOS=['Carretillero','Gasolina','Parqueo','Comida'];
+const CI_TIENDAS=['moravia','angeles'];
+const CI_PARA={mitad:'½ y ½',moravia:SIDE_ICO.moravia+' '+SIDE_NAME.moravia,angeles:SIDE_ICO.angeles+' '+SIDE_NAME.angeles};
 const CI_VENCE=18*3600e3; // un cierre que nadie toca en 18 horas ya es de otra compra
 const CI={st:null,pintado:null,seguro:0};
 const ciPlata=v=>+String(v??'').replace(/\D/g,'')||0; // colones, solo dígitos: "4.500" = 4500
@@ -1105,8 +1107,10 @@ const ciNum=n=>String(+(+n||0).toFixed(2));
 const ciId=()=>Date.now().toString(36)+Math.random().toString(36).slice(2,6);
 const ciVacio=v=>String(v??'').trim()==='';
 function ciNuevo(){return{inicio:Date.now(),toque:0,firma:hojaFirma(),paso:null,llevo:null,regreso:null,provs:{},gastos:[]};}
+// Un producto "tocado" tiene algo escrito a mano: cantidad, precio o reparto entre tiendas.
+const ciTocado=it=>it.q!=null||it.precio!=null||it.qm!=null;
 function ciTieneDatos(st){
-  return st.llevo!=null||st.regreso!=null||st.gastos.length>0||Object.values(st.provs).some(cp=>cp.mas?.length||Object.values(cp.items).some(it=>it.q!=null||it.precio!=null));
+  return st.llevo!=null||st.regreso!=null||st.gastos.length>0||Object.values(st.provs).some(cp=>cp.mas?.length||Object.values(cp.items).some(ciTocado));
 }
 function ciLeer(){const st=LS.get('aramo_cierre',null);return st?.provs&&Array.isArray(st.gastos)?st:null;}
 const ciVigente=st=>!!st&&Date.now()-(st.toque||st.inicio)<=CI_VENCE;
@@ -1144,14 +1148,14 @@ function ciSincronizar(st){
     const lineas=ciLineas(prov);if(!lineas.length)return;
     vistos.add(prov);
     const cp=st.provs[prov]||(st.provs[prov]={pago:ciPagoDe(prov),items:{},mas:[]}),nuevos={};
-    lineas.forEach(l=>{const v=cp.items[l.k]||{};nuevos[l.k]={...l,q:v.q??null,precio:v.precio??null};});
-    Object.entries(cp.items).forEach(([k,it])=>{if(!nuevos[k]&&(it.q!=null||it.precio!=null))nuevos[k]={...it,fuera:true};});
+    lineas.forEach(l=>{const v=cp.items[l.k]||{};nuevos[l.k]={...l,q:v.q??null,precio:v.precio??null,qm:v.qm??null};});
+    Object.entries(cp.items).forEach(([k,it])=>{if(!nuevos[k]&&ciTocado(it))nuevos[k]={...it,fuera:true};});
     cp.items=nuevos;
   });
   Object.keys(st.provs).forEach(prov=>{
     if(vistos.has(prov))return;
     const cp=st.provs[prov];
-    Object.entries(cp.items).forEach(([k,it])=>{if(it.q==null&&it.precio==null)delete cp.items[k];else it.fuera=true;});
+    Object.entries(cp.items).forEach(([k,it])=>{if(!ciTocado(it))delete cp.items[k];else it.fuera=true;});
     if(!Object.keys(cp.items).length&&!cp.mas?.length)delete st.provs[prov];
   });
 }
@@ -1161,25 +1165,46 @@ function ciPrecioAntes(prov,it){
   const ult=+LS.get('aramo_cierre_precios',{})[prov+'|'+it.k]||0;
   return(it.pid&&it.base?+getPrice(prov,it.pid)||0:0)||ult||+it.lista||0;
 }
+// Cuánto de lo que llegó es de cada tienda: si llegó lo pedido, lo que pidió cada una; si llegó
+// otra cantidad, se reparte según lo que pidió cada una (y se puede corregir a mano).
+function ciReparto(q,pm,pa,qm){
+  const r2=n=>Math.round(n*100)/100;
+  if(!(pa>0))return[q,0];
+  if(!(pm>0))return[0,q];
+  if(qm!=null){const m=Math.min(q,Math.max(0,qm));return[m,r2(q-m)];}
+  if(r2(q)===r2(pm+pa))return[pm,pa];
+  const x=q*pm/(pm+pa),m=[q,pm,pa].every(Number.isInteger)?Math.round(x):r2(x);
+  return[m,r2(q-m)];
+}
+const ciTiendaVacia=()=>({compras:0,gastos:0,total:0,pago:{efectivo:0,tarjeta:0,sinpe:0}});
 function ciCalc(st){
-  const porPago={efectivo:0,tarjeta:0,sinpe:0};
+  const porPago={efectivo:0,tarjeta:0,sinpe:0},tiendas={moravia:ciTiendaVacia(),angeles:ciTiendaVacia()};
   const provs=Object.keys(st.provs).sort(ORDEN_ES).map(prov=>{
     const cp=st.provs[prov];
     const items=Object.values(cp.items).map(it=>{
-      const pedido=Math.round(((+it.pm||0)+(+it.pa||0))*100)/100,q=it.q??pedido,antes=ciPrecioAntes(prov,it),precio=it.precio??antes;
-      return{k:it.k,t:it.t,e:it.e,u:it.u,pm:+it.pm||0,pa:+it.pa||0,pedido,q,precio,antes:it.precio==null&&antes>0,sub:Math.round(q*precio),falta:q>0&&!(precio>0),fuera:!!it.fuera};
+      const pm=+it.pm||0,pa=+it.pa||0,pedido=Math.round((pm+pa)*100)/100,q=it.q??pedido,antes=ciPrecioAntes(prov,it),precio=it.precio??antes;
+      const [qm,qa]=ciReparto(q,pm,pa,it.qm),sub=Math.round(q*precio),sm=Math.round(qm*precio);
+      return{k:it.k,t:it.t,e:it.e,u:it.u,pm,pa,pedido,q,qm,qa,ambas:pm>0&&pa>0,precio,antes:it.precio==null&&antes>0,sub,sm,sa:sub-sm,falta:q>0&&!(precio>0),fuera:!!it.fuera};
     });
-    const mas=(cp.mas||[]).map(x=>{const q=+x.q||0,precio=+x.precio||0;return{id:x.id,t:x.t||'',q,precio,sub:Math.round(q*precio),falta:q>0&&!(precio>0)};});
-    const total=[...items,...mas].reduce((t,i)=>t+i.sub,0),faltan=[...items,...mas].filter(i=>i.falta).length;
+    const mas=(cp.mas||[]).map(x=>{
+      const q=+x.q||0,precio=+x.precio||0,sub=Math.round(q*precio),para=CI_PARA[x.para]?x.para:'mitad';
+      const sm=para==='moravia'?sub:para==='angeles'?0:Math.round(sub/2);
+      return{id:x.id,t:x.t||'',q,precio,para,sub,sm,sa:sub-sm,falta:q>0&&!(precio>0)};
+    });
+    const todo=[...items,...mas],total=todo.reduce((t,i)=>t+i.sub,0),tm=todo.reduce((t,i)=>t+i.sm,0),faltan=todo.filter(i=>i.falta).length;
     const pago=CI_PAGO_NOMBRE[cp.pago]?cp.pago:'efectivo';
     porPago[pago]+=total;
-    return{prov,pago,visto:!!cp.visto,items,mas,total,faltan};
+    [['moravia',tm],['angeles',total-tm]].forEach(([s,v])=>{tiendas[s].compras+=v;tiendas[s].pago[pago]+=v;});
+    return{prov,pago,visto:!!cp.visto,items,mas,total,tm,ta:total-tm,faltan};
   });
-  const gastos=st.gastos.map(g=>({id:g.id,t:g.t||'',monto:+g.monto||0,pago:CI_PAGO_NOMBRE[g.pago]?g.pago:'efectivo'}));
-  gastos.forEach(g=>{porPago[g.pago]+=g.monto;});
-  const compras=provs.reduce((t,p)=>t+p.total,0),gastado=gastos.reduce((t,g)=>t+g.monto,0);
+  // Los gastos del viaje se reparten según lo que compró cada tienda (mitad y mitad si no hay compras).
+  const compras=provs.reduce((t,p)=>t+p.total,0),parteM=compras?tiendas.moravia.compras/compras:.5;
+  const gastos=st.gastos.map(g=>{const monto=+g.monto||0,gm=Math.round(monto*parteM);return{id:g.id,t:g.t||'',monto,pago:CI_PAGO_NOMBRE[g.pago]?g.pago:'efectivo',gm,ga:monto-gm};});
+  gastos.forEach(g=>{porPago[g.pago]+=g.monto;[['moravia',g.gm],['angeles',g.ga]].forEach(([s,v])=>{tiendas[s].gastos+=v;tiendas[s].pago[g.pago]+=v;});});
+  CI_TIENDAS.forEach(s=>{tiendas[s].total=tiendas[s].compras+tiendas[s].gastos;});
+  const gastado=gastos.reduce((t,g)=>t+g.monto,0);
   const debe=st.llevo!=null?st.llevo-porPago.efectivo:null,dif=debe!=null&&st.regreso!=null?st.regreso-debe:null;
-  return{inicio:st.inicio,firma:st.firma,provs,gastos,porPago,compras,gastado,total:compras+gastado,llevo:st.llevo,regreso:st.regreso,debe,dif};
+  return{inicio:st.inicio,firma:st.firma,provs,gastos,porPago,tiendas,compras,gastado,total:compras+gastado,llevo:st.llevo,regreso:st.regreso,debe,dif};
 }
 function ciArchivar(st){
   const c=ciCalc(st),h=LS.get('aramo_cierres',[]);
@@ -1189,10 +1214,14 @@ function ciArchivar(st){
 // ── Textos que cambian mientras se escribe ──
 const ciTxtSub=it=>it.q>0?(it.precio>0?'₡'+fmt(it.sub):'falta precio'):'no vino';
 function ciTxtPed(it){
-  const tiendas=[it.pm>0?'#1 '+fmtQ(it.pm):'',it.pa>0?'#2 '+fmtQ(it.pa):''].filter(Boolean).join(' · ');
-  const base=!(it.q>0)?`No vino · pediste ${fmtQ(it.pedido)}`:it.q!==it.pedido?`Llegó ${fmtQ(it.q)} de ${fmtQ(it.pedido)}`:`Pediste ${fmtQ(it.pedido)} ${it.u}`;
-  return[base,tiendas,it.fuera?'ya no está en el pedido':'',it.antes?'precio anterior':''].filter(Boolean).join(' · ');
+  const pidio=it.ambas?` · pediste ${SIDE_ICO.moravia} ${fmtQ(it.pm)} · ${SIDE_ICO.angeles} ${fmtQ(it.pa)}`:'';
+  const base=!(it.q>0)?`No vino · pediste ${fmtQ(it.pedido)} ${it.u}`:it.q!==it.pedido?`Llegó ${fmtQ(it.q)} de ${fmtQ(it.pedido)}${pidio}`:'';
+  return[base,it.fuera?'ya no está en el pedido':'',it.antes?'precio anterior':''].filter(Boolean).join(' · ');
 }
+const ciTxtPara=x=>`${SIDE_ICO.moravia} ₡${fmt(x.sm)} · ${SIDE_ICO.angeles} ₡${fmt(x.sa)}`;
+const ciTxtComp=t=>`Compras ₡${fmt(t.compras)}${t.gastos?` + gastos ₡${fmt(t.gastos)}`:''}`;
+const ciTxtGastos=t=>t.gastos?`Gastos del viaje ₡${fmt(t.gastos)}`:'';
+const ciTxtPagos=pg=>CI_PAGOS.filter(([k])=>pg[k]>0).map(([k,e])=>`${e} ₡${fmt(pg[k])}`).join(' · ')||'—';
 const ciTxtFaltan=p=>`${plural(p.items.length+p.mas.length,'producto','productos')} · ${p.faltan?`falta${p.faltan===1?'':'n'} ${plural(p.faltan,'precio','precios')}`:'✓ todo con precio'}`;
 const ciTxtDebe=c=>c.debe==null?'—':(c.debe<0?'− ₡':'₡')+fmt(Math.abs(c.debe));
 function ciCuadre(c){
@@ -1215,18 +1244,30 @@ function ciFila(it){
   return `<li class="ci-it${it.q>0?'':' cero'}${it.falta?' falta':''}" data-ci-k="${esc(it.k)}">
     <div class="ci-it-n"><span class="ci-e" aria-hidden="true">${esc(it.e)}</span><b>${esc(it.t)}</b><em data-ci-v="sub">${ciTxtSub(it)}</em></div>
     <div class="ci-it-c">${ciPaso(it.q,'data-ci-q',`Cuántos ${esc(it.u)} de ${esc(it.t)} llegaron`)}<span class="ci-u">${esc(it.u)}</span><span class="ci-por" aria-hidden="true">×</span>${ciPrecio(it.precio,'data-ci-p',`Precio de ${esc(it.t)} por ${esc(it.u)}`)}</div>
+    <div class="ci-rep">${ciPildora(it,'moravia')}${ciPildora(it,'angeles')}</div>
     <small class="ci-ped" data-ci-v="ped">${esc(ciTxtPed(it))}</small>
   </li>`;
+}
+// Lo que le toca a cada tienda (verde Moravia, naranja Los Ángeles). Si pidieron las dos, la
+// cantidad de cada una se puede corregir: la otra se ajusta sola para que sume lo que llegó.
+function ciPildora(it,s){
+  const m=s==='moravia',k=m?'m':'a',q=m?it.qm:it.qa;
+  if(!it.ambas&&!((m?it.pm:it.pa)>0))return'';
+  const tag=it.ambas?'label':'span';
+  const num=it.ambas?`<input data-ci-q${k} inputmode="decimal" enterkeyhint="next" autocomplete="off" value="${ciNum(q)}" aria-label="${esc(it.u)} de ${esc(it.t)} para ${SIDE_NAME[s]}">`:`<b data-ci-v="q${k}">${fmtQ(q)}</b>`;
+  return `<${tag} class="ci-tienda ${s}" title="${SIDE_NAME[s]}"><i aria-hidden="true">${SIDE_ICO[s]}</i><span class="ci-tn">${SIDE_NAME[s]}</span>${num}<em data-ci-v="s${k}">₡${fmt(m?it.sm:it.sa)}</em></${tag}>`;
 }
 function ciFilaMas(x){
   return `<li class="ci-it mas${x.falta?' falta':''}" data-ci-mas="${esc(x.id)}">
     <div class="ci-it-n"><span class="ci-e" aria-hidden="true">🛒</span><input data-ci-mt value="${esc(x.t)}" placeholder="¿Qué compraste?" aria-label="Qué compraste" enterkeyhint="next" autocomplete="off"><em data-ci-v="sub">${ciTxtSub(x)}</em><button type="button" class="ci-del" data-ci="mas-del" aria-label="Quitar">✕</button></div>
     <div class="ci-it-c">${ciPaso(x.q,'data-ci-mq','Cantidad')}<span class="ci-por" aria-hidden="true">×</span>${ciPrecio(x.precio,'data-ci-mp','Precio')}</div>
+    <div class="ci-rep"><button type="button" class="ci-para" data-ci="mas-para" aria-label="Para qué tienda es: ${esc(CI_PARA[x.para])}. Tocá para cambiar">Para <b>${CI_PARA[x.para]}</b></button><em class="ci-para-m" data-ci-v="mpara">${ciTxtPara(x)}</em></div>
   </li>`;
 }
 function ciPasoProv(p){
   return `<section class="ci-prov" style="--c:${sxColor(p.prov)}">
     <div class="ci-prov-h"><span class="sx-av" aria-hidden="true">${esc(p.prov.charAt(0).toUpperCase())}</span><div><h4>${esc(p.prov)}</h4><small data-ci-v="pfaltan">${ciTxtFaltan(p)}</small></div><b class="ci-prov-tot" data-ci-v="ptot">₡${fmt(p.total)}</b></div>
+    <div class="ci-prov-tiendas">${CI_TIENDAS.map(s=>`<span class="${s}"><i aria-hidden="true">${SIDE_ICO[s]}</i><span>${SIDE_NAME[s]}</span><b data-ci-v="pt:${s}">₡${fmt(s==='moravia'?p.tm:p.ta)}</b></span>`).join('')}</div>
     <div class="ci-pago"><span id="ciPagoT">Le pagué con</span><div role="radiogroup" aria-labelledby="ciPagoT">${CI_PAGOS.map(([k,e,n])=>`<button type="button" role="radio" aria-checked="${k===p.pago}" class="${k}${k===p.pago?' on':''}" data-ci-pago="${k}"><span aria-hidden="true">${e}</span>${n}</button>`).join('')}</div></div>
     <ul class="ci-items">${p.items.map(ciFila).join('')}${p.mas.map(ciFilaMas).join('')}</ul>
     <button type="button" class="ci-add" data-ci="mas-add">＋ Algo que no estaba en el pedido</button>
@@ -1240,6 +1281,11 @@ function ciPasoCierre(c,st){
     <div class="ci-hero">
       <small>Total de compras${c.gastado?' y gastos':''}</small><strong data-ci-v="total">₡${fmt(c.total)}</strong>
       <div class="ci-tres">${CI_PAGOS.map(([k,e,nm])=>`<div class="${k}"><span>${e} ${nm}</span><b data-ci-v="pp:${k}">₡${fmt(c.porPago[k])}</b></div>`).join('')}</div>
+    </div>
+    <div class="ci-tiendas-w">
+      <h4>🏪 Lo que gastó cada tienda</h4>
+      <div class="ci-tiendas">${CI_TIENDAS.map(s=>{const t=c.tiendas[s];return`<div class="ci-td ${s}"><span>${SIDE_ICO[s]} ${SIDE_NAME[s]}</span><strong data-ci-v="t:${s}">₡${fmt(t.total)}</strong><small data-ci-v="tc:${s}">Compras ₡${fmt(t.compras)}</small><small data-ci-v="tg:${s}">${ciTxtGastos(t)}</small><small class="ci-td-p" data-ci-v="tp:${s}">${ciTxtPagos(t.pago)}</small></div>`;}).join('')}</div>
+      ${c.gastos.length?'<p class="ci-nota">Los gastos del viaje se reparten según lo que compró cada tienda.</p>':''}
     </div>
     ${n?'':`<p class="ci-aviso">Todavía no hay pedido: el cierre sale de lo que se pidió en Surtido.</p>`}
     ${faltan.length?`<p class="ci-aviso">⚠️ Falta precio en ${faltan.map(j=>`<button type="button" data-ci-ir="${j}">${esc(c.provs[j].prov)}</button>`).join(' ')}</p>`:''}
@@ -1256,10 +1302,10 @@ function ciPasoCierre(c,st){
       ${c.gastos.length?`<ul>${c.gastos.map(ciFilaGasto).join('')}</ul>`:''}
       <div class="ci-gchips">${CI_GASTOS.map(g=>`<button type="button" data-ci-gadd="${g}">＋ ${g}</button>`).join('')}<button type="button" data-ci-gadd="">＋ Otro</button></div>
     </div>
-    ${n?`<div class="ci-lista"><h4>Por proveedor</h4>${c.provs.map((p,j)=>`<button type="button" class="ci-lp${p.faltan?' falta':''}" data-ci-ir="${j}" style="--c:${sxColor(p.prov)}"><span class="sx-av" aria-hidden="true">${esc(p.prov.charAt(0).toUpperCase())}</span><span class="ci-lp-t"><b>${esc(p.prov)}</b><small>${CI_PAGO_NOMBRE[p.pago]}${p.faltan?' · falta precio':''}</small></span><em>₡${fmt(p.total)}</em></button>`).join('')}</div>`:''}
+    ${n?`<div class="ci-lista"><h4>Por proveedor</h4>${c.provs.map((p,j)=>`<button type="button" class="ci-lp${p.faltan?' falta':''}" data-ci-ir="${j}" style="--c:${sxColor(p.prov)}"><span class="sx-av" aria-hidden="true">${esc(p.prov.charAt(0).toUpperCase())}</span><span class="ci-lp-t"><b>${esc(p.prov)}</b><small>${CI_PAGO_NOMBRE[p.pago]} · ${SIDE_ICO.moravia} ₡${fmt(p.tm)} · ${SIDE_ICO.angeles} ₡${fmt(p.ta)}${p.faltan?' · falta precio':''}</small></span><em>₡${fmt(p.total)}</em></button>`).join('')}</div>`:''}
     <div class="sx-pdf-firma ci-firma"><span id="ciFirmaT">¿Quién hizo las compras?</span><div role="radiogroup" aria-labelledby="ciFirmaT">${HOJA_FIRMAS.map(f=>`<button type="button" role="radio" aria-checked="${f===st.firma}" class="${f===st.firma?'on':''}" data-ci-firma="${f}">${f}</button>`).join('')}</div></div>
     <button type="button" class="sx-pdf-wa" data-ci="wa"${n||c.gastos.length?'':' disabled'}>${ico('mensaje')}Mandar el cierre a mi WhatsApp</button>
-    ${hist.length?`<details class="ci-hist"><summary>Cierres guardados <b>${hist.length}</b></summary>${hist.map((x,j)=>`<div class="ci-h"><span><b>${esc(ciDia(x.inicio,{weekday:'short',day:'numeric',month:'short'}))}${x.firma?' · '+esc(x.firma):''}</b><small>₡${fmt(x.total)} · ${esc(ciCuadre(x).txt)}</small></span><button type="button" data-ci="hist-wa" data-ci-h="${j}" aria-label="Mandar ese cierre a WhatsApp" title="Mandar a WhatsApp">${ico('mensaje')}</button></div>`).join('')}</details>`:''}
+    ${hist.length?`<details class="ci-hist"><summary>Cierres guardados <b>${hist.length}</b></summary>${hist.map((x,j)=>`<div class="ci-h"><span><b>${esc(ciDia(x.inicio,{weekday:'short',day:'numeric',month:'short'}))}${x.firma?' · '+esc(x.firma):''}</b><small>₡${fmt(x.total)}${x.tiendas?` · ${SIDE_ICO.moravia} ₡${fmt(x.tiendas.moravia.total)} · ${SIDE_ICO.angeles} ₡${fmt(x.tiendas.angeles.total)}`:''} · ${esc(ciCuadre(x).txt)}</small></span><button type="button" data-ci="hist-wa" data-ci-h="${j}" aria-label="Mandar ese cierre a WhatsApp" title="Mandar a WhatsApp">${ico('mensaje')}</button></div>`).join('')}</details>`:''}
   </section>`;
 }
 function ciIndice(c){const i=c.provs.findIndex(p=>p.prov===CI.st.paso);return i>=0?i:CI.st.paso===''||!c.provs.length?c.provs.length:0;}
@@ -1297,10 +1343,16 @@ function ciPatch(){
   CI_PAGOS.forEach(([k])=>pon(h,'pp:'+k,'₡'+fmt(c.porPago[k])));
   pon(h,'ef','− ₡'+fmt(c.porPago.efectivo));pon(h,'debe',ciTxtDebe(c));
   const r=h.querySelector('[data-ci-res]');if(r){const cu=ciCuadre(c);r.textContent=cu.txt;r.className='ci-res '+cu.cls;}
+  CI_TIENDAS.forEach(s=>{const t=c.tiendas[s];pon(h,'t:'+s,'₡'+fmt(t.total));pon(h,'tc:'+s,'Compras ₡'+fmt(t.compras));pon(h,'tg:'+s,ciTxtGastos(t));pon(h,'tp:'+s,ciTxtPagos(t.pago));});
   if(p){
-    pon(h,'ptot','₡'+fmt(p.total));pon(h,'pfaltan',ciTxtFaltan(p));
-    p.items.forEach(it=>{const li=h.querySelector(`[data-ci-k="${CSS.escape(it.k)}"]`);if(!li)return;li.classList.toggle('cero',!(it.q>0));li.classList.toggle('falta',it.falta);pon(li,'sub',ciTxtSub(it));pon(li,'ped',ciTxtPed(it));});
-    p.mas.forEach(x=>{const li=h.querySelector(`[data-ci-mas="${CSS.escape(x.id)}"]`);if(!li)return;li.classList.toggle('falta',x.falta);pon(li,'sub',ciTxtSub(x));});
+    pon(h,'ptot','₡'+fmt(p.total));pon(h,'pfaltan',ciTxtFaltan(p));pon(h,'pt:moravia','₡'+fmt(p.tm));pon(h,'pt:angeles','₡'+fmt(p.ta));
+    p.items.forEach(it=>{
+      const li=h.querySelector(`[data-ci-k="${CSS.escape(it.k)}"]`);if(!li)return;
+      li.classList.toggle('cero',!(it.q>0));li.classList.toggle('falta',it.falta);pon(li,'sub',ciTxtSub(it));pon(li,'ped',ciTxtPed(it));
+      li.querySelectorAll('[data-ci-qm],[data-ci-qa]').forEach(inp=>{if(inp===document.activeElement)return;const v=ciNum(inp.matches('[data-ci-qm]')?it.qm:it.qa);if(inp.value!==v)inp.value=v;});
+      pon(li,'qm',fmtQ(it.qm));pon(li,'qa',fmtQ(it.qa));pon(li,'sm','₡'+fmt(it.sm));pon(li,'sa','₡'+fmt(it.sa));
+    });
+    p.mas.forEach(x=>{const li=h.querySelector(`[data-ci-mas="${CSS.escape(x.id)}"]`);if(!li)return;li.classList.toggle('falta',x.falta);pon(li,'sub',ciTxtSub(x));pon(li,'mpara',ciTxtPara(x));});
   }
   c.provs.forEach((q,j)=>{const b=h.querySelector(`.ci-pasos [data-ci-ir="${j}"]`);if(b)b.className=ciClaseProv(q)+(q.prov===st.paso?' on':'');});
 }
@@ -1363,10 +1415,13 @@ function ciClick(e){
     const inp=e.target.closest('.ci-q')?.querySelector('input');if(!inp)return;
     inp.value=ciNum(Math.max(0,ciCant(inp.value)+(a==='mas1'?1:-1)));ciEntrada(inp);buzz(8);
   }else if(a==='mas-add'&&cp){
-    const x={id:ciId(),t:'',q:1,precio:null};cp.mas.push(x);cp.visto=true;ciGuardar();ciPintar();
+    const x={id:ciId(),t:'',q:1,precio:null,para:'mitad'};cp.mas.push(x);cp.visto=true;ciGuardar();ciPintar();
     h.querySelector(`[data-ci-mas="${x.id}"] [data-ci-mt]`)?.focus();
   }else if(a==='mas-del'&&cp){
     const id=e.target.closest('[data-ci-mas]')?.dataset.ciMas;cp.mas=cp.mas.filter(x=>x.id!==id);ciGuardar();ciPintar();
+  }else if(a==='mas-para'&&cp){
+    const x=cp.mas.find(m=>m.id===e.target.closest('[data-ci-mas]')?.dataset.ciMas),ks=Object.keys(CI_PARA);if(!x)return;
+    x.para=ks[(ks.indexOf(x.para||'mitad')+1)%ks.length];ciGuardar();ciPintar();
   }else if(a==='g-del'){st.gastos=st.gastos.filter(x=>x.id!==gid);ciGuardar();ciPintar();}
   else if(a==='g-pago'&&g){const ks=CI_PAGOS.map(x=>x[0]);g.pago=ks[(ks.indexOf(g.pago)+1)%ks.length];ciGuardar();ciPintar();}
   else if(a==='wa')ciMandar(ciCalc(st));
@@ -1375,9 +1430,14 @@ function ciClick(e){
 }
 function ciEntrada(t){
   const st=CI.st,cp=st.provs[st.paso],num=v=>ciVacio(v)?null:ciPlata(v);
-  if(t.matches('[data-ci-q],[data-ci-p]')){
+  if(t.matches('[data-ci-q],[data-ci-p],[data-ci-qm],[data-ci-qa]')){
     const it=cp?.items[t.closest('[data-ci-k]')?.dataset.ciK];if(!it)return;
-    if(t.matches('[data-ci-q]'))it.q=ciVacio(t.value)?null:ciCant(t.value);else it.precio=num(t.value);
+    if(t.matches('[data-ci-q]')){it.q=ciVacio(t.value)?null:ciCant(t.value);it.qm=null;} // otro total: se vuelve a repartir solo
+    else if(t.matches('[data-ci-p]'))it.precio=num(t.value);
+    else{ // reparto a mano: la otra tienda se queda con el resto
+      const q=it.q??Math.round(((+it.pm||0)+(+it.pa||0))*100)/100,v=ciVacio(t.value)?null:ciCant(t.value);
+      it.qm=v==null?null:t.matches('[data-ci-qm]')?v:Math.round((q-v)*100)/100;
+    }
     cp.visto=true;
   }else if(t.matches('[data-ci-mt],[data-ci-mq],[data-ci-mp]')){
     const x=cp?.mas.find(m=>m.id===t.closest('[data-ci-mas]')?.dataset.ciMas);if(!x)return;
@@ -1394,9 +1454,10 @@ function ciEntrada(t){
 // guardado para el próximo cierre (y como precio del producto si es la misma unidad).
 function ciCambio(e){
   const t=e.target,st=CI.st,prov=st.paso,k=t.closest('[data-ci-k]')?.dataset.ciK;
-  if(!k||!t.matches('[data-ci-q],[data-ci-p]'))return;
+  if(!k||!t.matches('[data-ci-q],[data-ci-p],[data-ci-qm],[data-ci-qa]'))return;
   const it=st.provs[prov]?.items[k],calc=ciCalc(st).provs.find(p=>p.prov===prov)?.items.find(x=>x.k===k);if(!it||!calc)return;
   if(t.matches('[data-ci-q]')){t.value=ciNum(calc.q);return;}
+  if(t.matches('[data-ci-qm],[data-ci-qa]')){t.value=ciNum(t.matches('[data-ci-qm]')?calc.qm:calc.qa);return;}
   t.value=calc.precio>0?calc.precio:'';
   if(!(it.precio>0))return;
   const m=LS.get('aramo_cierre_precios',{});m[prov+'|'+k]=it.precio;LS.set('aramo_cierre_precios',m);
@@ -1422,15 +1483,20 @@ function ciTerminar(btn){
 function ciMensaje(c){
   const L=['*Cierre de compras ARAMO*',hojaFecha(new Date(c.inicio))+(c.firma?' · '+c.firma:''),''];
   c.provs.forEach(p=>{
-    L.push(`*${p.prov}* · ${CI_PAGO_NOMBRE[p.pago]} · ₡${fmt(p.total)}`);
+    L.push(`*${p.prov}* · ${CI_PAGO_NOMBRE[p.pago]} · ₡${fmt(p.total)}${p.tm!=null?` (${SIDE_ICO.moravia} ₡${fmt(p.tm)} · ${SIDE_ICO.angeles} ₡${fmt(p.ta)})`:''}`);
     p.items.forEach(it=>{
-      const ped=it.q!==it.pedido?` (pedí ${fmtQ(it.pedido)})`:'';
+      const ped=(it.q!==it.pedido?` (pedí ${fmtQ(it.pedido)})`:'')+(it.ambas&&it.q>0?` → ${SIDE_ICO.moravia} ${fmtQ(it.qm)} · ${SIDE_ICO.angeles} ${fmtQ(it.qa)}`:'');
       L.push(!(it.q>0)?`   ${it.t}: no vino (pedí ${fmtQ(it.pedido)} ${it.u})`:it.precio>0?`   ${fmtQ(it.q)} ${it.u} ${it.t} × ₡${fmt(it.precio)} = ₡${fmt(it.sub)}${ped}`:`   ${fmtQ(it.q)} ${it.u} ${it.t}: falta precio${ped}`);
     });
-    p.mas.filter(x=>x.q>0).forEach(x=>L.push(`   + ${fmtQ(x.q)} ${x.t||'Otro'} × ₡${fmt(x.precio)} = ₡${fmt(x.sub)}`));
+    p.mas.filter(x=>x.q>0).forEach(x=>L.push(`   + ${fmtQ(x.q)} ${x.t||'Otro'} × ₡${fmt(x.precio)} = ₡${fmt(x.sub)}${x.para?` (${CI_PARA[x.para]})`:''}`));
     L.push('');
   });
   if(c.gastos.length){L.push('*Gastos del viaje*');c.gastos.forEach(g=>L.push(`   ${g.t||'Gasto'} · ${CI_PAGO_NOMBRE[g.pago]} · ₡${fmt(g.monto)}`));L.push('');}
+  if(c.tiendas){
+    L.push('*Lo que gastó cada tienda*');
+    CI_TIENDAS.forEach(s=>{const t=c.tiendas[s];L.push(`${SIDE_ICO[s]} ${SIDE_NAME[s]}: *₡${fmt(t.total)}*`,`   ${ciTxtComp(t)}`,`   ${ciTxtPagos(t.pago)}`);});
+    L.push('');
+  }
   L.push(`*Total: ₡${fmt(c.total)}*`,...CI_PAGOS.map(([k,e,n])=>`${e} ${n}: ₡${fmt(c.porPago[k])}`));
   if(c.llevo!=null){
     L.push('',`Me llevé: ₡${fmt(c.llevo)}`,`Tienen que volver: ${ciTxtDebe(c)}`);
