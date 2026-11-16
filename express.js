@@ -687,6 +687,7 @@ const PDX_ICO={
   reiniciar:'<path d="M3 12a9 9 0 1 0 2.6-6.4"/><path d="M3 4v5h5"/>',
   hoja:'<path d="M14 3H6a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9z"/><path d="M14 3v6h6"/><path d="M8 13h8M8 17h5"/>',
   bajar:'<path d="M12 3v12"/><path d="m7 10 5 5 5-5"/><path d="M5 21h14"/>',
+  recibo:'<path d="M6 2h12v20l-3-2-3 2-3-2-3 2z"/><path d="M9 7h6M9 11h6M9 15h4"/>',
 };
 const ico=(k,cls='')=>`<svg class="pdx-i${cls?' '+cls:''}" viewBox="0 0 24 24" aria-hidden="true">${PDX_ICO[k]}</svg>`;
 const PDX_COLORES=['#0f766e','#7c3aed','#c2410c','#0369a1','#be185d','#4d7c0f','#a16207','#4338ca','#0e7490','#b91c1c'];
@@ -766,7 +767,12 @@ function sxRenderTablero(){
   const box=$('sxTablero');if(!box)return;
   const bn=$('sxProvBarN');if(bn)bn.textContent=getProvNames().length;
   const sides=activeOrderSides(),datos=sxDatos();
-  if(!datos.length){box.innerHTML=`<div class="sx-vacio"><span>🧺</span><div><b>Todavía no hay productos</b><small>Buscá un producto arriba o abrí un proveedor abajo.</small></div></div>`;return;}
+  if(!datos.length){
+    // Un cierre a medio llenar sigue a mano aunque ya se haya reiniciado el pedido.
+    const st=sides.length>1?CI.st||ciLeer():null;
+    box.innerHTML=`<div class="sx-vacio"><span>🧺</span><div><b>Todavía no hay productos</b><small>Buscá un producto arriba o abrí un proveedor abajo.</small></div></div>${ciVigente(st)&&ciTieneDatos(st)?ciBarra():''}`;
+    return;
+  }
   const tienda=side=>{
     const ds=datos.filter(d=>d.lines.some(l=>l.q[side]>0)||d.extras.some(x=>x.side===side));
     const n=ds.reduce((k,d)=>k+d.lines.filter(l=>l.q[side]>0).length+d.extras.filter(x=>x.side===side).length,0);
@@ -775,6 +781,7 @@ function sxRenderTablero(){
   };
   box.innerHTML=`<div class="sx-tablero-h"><h2>Tu pedido de hoy</h2><small class="sx-ayuda">Tocá un producto para cambiar la cantidad · <span class="sx-mover-demo" aria-hidden="true">${ico('mover')}</span> para pasarlo a otro proveedor</small></div>
     <button type="button" class="sx-pdf-btn" data-sx-pdf><span class="sx-pdf-i">${ico('hoja')}</span><span class="sx-pdf-t"><b>PDF del pedido</b><small>3 columnas · mandalo a tu WhatsApp</small></span><span class="sx-pdf-f" aria-hidden="true">›</span></button>
+    ${sides.length>1?ciBarra():''}
     <div class="sx-tiendas n${sides.length}">${sides.map(tienda).join('')}</div>
     <div class="sx-lista">${datos.map((d,i)=>`<section class="sx-prov" data-sx-drop="${esc(d.prov)}" style="--i:${i};--c:${sxColor(d.prov)}">
       <button type="button" class="sx-prov-h" data-pd="open" data-prov="${esc(d.prov)}" title="Abrir ${esc(d.prov)}"><b>${esc(d.prov)}</b>${d.tot?`<span>₡${fmt(d.tot)}</span>`:''}<i aria-hidden="true">›</i></button>
@@ -1072,8 +1079,367 @@ function hojaPdfBajar(){
   toast('⬇️ PDF descargado','ok');
 }
 function hojaPdfVer(){const f=SX.pdf?.file;if(!f)return;const u=URL.createObjectURL(f);window.open(u,'_blank');setTimeout(()=>URL.revokeObjectURL(u),300000);}
-$('sxTablero')?.addEventListener('click',e=>{if(e.target.closest('[data-sx-pdf]'))hojaPdfAbrir();});
-document.addEventListener('keydown',e=>{if(e.key==='Escape'&&$('sxPdf')?.classList.contains('open'))hojaPdfCerrar();});
+$('sxTablero')?.addEventListener('click',e=>{if(e.target.closest('[data-sx-pdf]'))hojaPdfAbrir();else if(e.target.closest('[data-sx-cierre]'))ciAbrir();});
+document.addEventListener('keydown',e=>{
+  if(e.key!=='Escape')return;
+  if($('sxPdf')?.classList.contains('open'))hojaPdfCerrar();else if($('sxCierre')?.classList.contains('open'))ciCerrar();
+});
+
+// ══════════════════════════════════════════
+// 🧾 CIERRE DE COMPRAS — lo que llegó, a cuánto y cómo se pagó
+// ══════════════════════════════════════════
+// Al volver de comprar se recorre un proveedor a la vez, en orden alfabético. Cada producto trae
+// lo que se pidió (las dos tiendas juntas) y su precio anterior: si llegó menos se baja con −, se
+// escribe el precio de hoy y el monto se multiplica solo. Al final, el cierre: cuánto se pagó en
+// efectivo, tarjeta y SINPE, los gastos del viaje y si la plata que volvió cuadra con la que se
+// llevó. Se guarda en este teléfono (aramo_cierre) y se manda al WhatsApp propio. El precio de
+// hoy queda como precio del producto (si es la misma unidad) para el pedido y el próximo cierre.
+const CI_PAGOS=[['efectivo','💵','Efectivo'],['tarjeta','💳','Tarjeta'],['sinpe','📱','SINPE']];
+const CI_PAGO_NOMBRE=Object.fromEntries(CI_PAGOS.map(([k,e,n])=>[k,e+' '+n]));
+const CI_GASTOS=['Carretillero','Gasolina','Parqueo','Comida'];
+const CI_VENCE=18*3600e3; // un cierre que nadie toca en 18 horas ya es de otra compra
+const CI={st:null,pintado:null,seguro:0};
+const ciPlata=v=>+String(v??'').replace(/\D/g,'')||0; // colones, solo dígitos: "4.500" = 4500
+const ciCant=v=>{const n=parseFloat(String(v??'').replace(',','.'));return n>0?Math.round(n*100)/100:0;};
+const ciNum=n=>String(+(+n||0).toFixed(2));
+const ciId=()=>Date.now().toString(36)+Math.random().toString(36).slice(2,6);
+const ciVacio=v=>String(v??'').trim()==='';
+function ciNuevo(){return{inicio:Date.now(),toque:0,firma:hojaFirma(),paso:null,llevo:null,regreso:null,provs:{},gastos:[]};}
+function ciTieneDatos(st){
+  return st.llevo!=null||st.regreso!=null||st.gastos.length>0||Object.values(st.provs).some(cp=>cp.mas?.length||Object.values(cp.items).some(it=>it.q!=null||it.precio!=null));
+}
+function ciLeer(){const st=LS.get('aramo_cierre',null);return st?.provs&&Array.isArray(st.gastos)?st:null;}
+const ciVigente=st=>!!st&&Date.now()-(st.toque||st.inicio)<=CI_VENCE;
+function ciCargar(){
+  let st=CI.st||ciLeer();
+  if(st&&!ciVigente(st)){if(ciTieneDatos(st))ciArchivar(st);st=null;}
+  CI.st=st||ciNuevo();
+  ciSincronizar(CI.st);
+  return CI.st;
+}
+function ciGuardar(){CI.st.toque=Date.now();LS.set('aramo_cierre',CI.st);}
+const ciPagoDe=prov=>{const k=LS.get('aramo_cierre_pagos',{})[prov];return CI_PAGO_NOMBRE[k]?k:'efectivo';};
+function ciRecordarPago(prov,k){const m=LS.get('aramo_cierre_pagos',{});m[prov]=k;LS.set('aramo_cierre_pagos',m);}
+// Lo que se le pidió a un proveedor, con Moravia (#1) y Los Ángeles (#2) juntas por producto y unidad.
+function ciLineas(prov){
+  const p=S.pedidos[prov];if(!p)return[];
+  const m=new Map();
+  const sumar=(k,base,s,q)=>{const it=m.get(k)||{k,...base,pm:0,pa:0};it[s==='moravia'?'pm':'pa']+=q;m.set(k,it);};
+  (getAllProviders()[prov]?.products||[]).forEach(prod=>['moravia','angeles'].forEach(s=>{
+    const v=p.qtys?.[s]?.[prod.id],q=+v?.qty||0;if(!(q>0))return;
+    const u=uniCorta(normUnit(v.unit||prod.unit));
+    sumar('p:'+prod.id+'|'+u,{pid:prod.id,base:u===uniCorta(normUnit(prod.unit)),t:niceName(prod.name),e:smartEmoji(prod),u},s,q);
+  }));
+  ['moravia','angeles'].forEach(s=>(p.extras?.[s]||[]).forEach(x=>{
+    const q=+x.qty||0;if(!(q>0))return;
+    const u=uniCorta(x.unit||'kg');
+    sumar('x:'+hojaClave(x.name||'extra')+'|'+u,{t:x.name||'Extra',e:'➕',u,lista:+x.price||0},s,q);
+  }));
+  return[...m.values()];
+}
+// Trae al cierre lo que hay pedido ahora. Lo que ya se llenó se respeta aunque el pedido cambie.
+function ciSincronizar(st){
+  const vistos=new Set();
+  getProvNames().forEach(prov=>{
+    const lineas=ciLineas(prov);if(!lineas.length)return;
+    vistos.add(prov);
+    const cp=st.provs[prov]||(st.provs[prov]={pago:ciPagoDe(prov),items:{},mas:[]}),nuevos={};
+    lineas.forEach(l=>{const v=cp.items[l.k]||{};nuevos[l.k]={...l,q:v.q??null,precio:v.precio??null};});
+    Object.entries(cp.items).forEach(([k,it])=>{if(!nuevos[k]&&(it.q!=null||it.precio!=null))nuevos[k]={...it,fuera:true};});
+    cp.items=nuevos;
+  });
+  Object.keys(st.provs).forEach(prov=>{
+    if(vistos.has(prov))return;
+    const cp=st.provs[prov];
+    Object.entries(cp.items).forEach(([k,it])=>{if(it.q==null&&it.precio==null)delete cp.items[k];else it.fuera=true;});
+    if(!Object.keys(cp.items).length&&!cp.mas?.length)delete st.provs[prov];
+  });
+}
+// Precio que se propone mientras no se escriba el de hoy: el del producto (misma unidad) o el
+// último que se pagó en un cierre.
+function ciPrecioAntes(prov,it){
+  const ult=+LS.get('aramo_cierre_precios',{})[prov+'|'+it.k]||0;
+  return(it.pid&&it.base?+getPrice(prov,it.pid)||0:0)||ult||+it.lista||0;
+}
+function ciCalc(st){
+  const porPago={efectivo:0,tarjeta:0,sinpe:0};
+  const provs=Object.keys(st.provs).sort(ORDEN_ES).map(prov=>{
+    const cp=st.provs[prov];
+    const items=Object.values(cp.items).map(it=>{
+      const pedido=Math.round(((+it.pm||0)+(+it.pa||0))*100)/100,q=it.q??pedido,antes=ciPrecioAntes(prov,it),precio=it.precio??antes;
+      return{k:it.k,t:it.t,e:it.e,u:it.u,pm:+it.pm||0,pa:+it.pa||0,pedido,q,precio,antes:it.precio==null&&antes>0,sub:Math.round(q*precio),falta:q>0&&!(precio>0),fuera:!!it.fuera};
+    });
+    const mas=(cp.mas||[]).map(x=>{const q=+x.q||0,precio=+x.precio||0;return{id:x.id,t:x.t||'',q,precio,sub:Math.round(q*precio),falta:q>0&&!(precio>0)};});
+    const total=[...items,...mas].reduce((t,i)=>t+i.sub,0),faltan=[...items,...mas].filter(i=>i.falta).length;
+    const pago=CI_PAGO_NOMBRE[cp.pago]?cp.pago:'efectivo';
+    porPago[pago]+=total;
+    return{prov,pago,visto:!!cp.visto,items,mas,total,faltan};
+  });
+  const gastos=st.gastos.map(g=>({id:g.id,t:g.t||'',monto:+g.monto||0,pago:CI_PAGO_NOMBRE[g.pago]?g.pago:'efectivo'}));
+  gastos.forEach(g=>{porPago[g.pago]+=g.monto;});
+  const compras=provs.reduce((t,p)=>t+p.total,0),gastado=gastos.reduce((t,g)=>t+g.monto,0);
+  const debe=st.llevo!=null?st.llevo-porPago.efectivo:null,dif=debe!=null&&st.regreso!=null?st.regreso-debe:null;
+  return{inicio:st.inicio,firma:st.firma,provs,gastos,porPago,compras,gastado,total:compras+gastado,llevo:st.llevo,regreso:st.regreso,debe,dif};
+}
+function ciArchivar(st){
+  const c=ciCalc(st),h=LS.get('aramo_cierres',[]);
+  h.unshift({...c,id:ciId(),guardado:Date.now(),provs:c.provs.map(p=>({...p,items:p.items.map(({k,e,antes,fuera,...it})=>it)}))});
+  LS.set('aramo_cierres',h.slice(0,30));
+}
+// ── Textos que cambian mientras se escribe ──
+const ciTxtSub=it=>it.q>0?(it.precio>0?'₡'+fmt(it.sub):'falta precio'):'no vino';
+function ciTxtPed(it){
+  const tiendas=[it.pm>0?'#1 '+fmtQ(it.pm):'',it.pa>0?'#2 '+fmtQ(it.pa):''].filter(Boolean).join(' · ');
+  const base=!(it.q>0)?`No vino · pediste ${fmtQ(it.pedido)}`:it.q!==it.pedido?`Llegó ${fmtQ(it.q)} de ${fmtQ(it.pedido)}`:`Pediste ${fmtQ(it.pedido)} ${it.u}`;
+  return[base,tiendas,it.fuera?'ya no está en el pedido':'',it.antes?'precio anterior':''].filter(Boolean).join(' · ');
+}
+const ciTxtFaltan=p=>`${plural(p.items.length+p.mas.length,'producto','productos')} · ${p.faltan?`falta${p.faltan===1?'':'n'} ${plural(p.faltan,'precio','precios')}`:'✓ todo con precio'}`;
+const ciTxtDebe=c=>c.debe==null?'—':(c.debe<0?'− ₡':'₡')+fmt(Math.abs(c.debe));
+function ciCuadre(c){
+  if(c.llevo==null)return{cls:'',txt:'Escribí cuánto te llevaste'};
+  if(c.regreso==null)return{cls:'',txt:`Tienen que volver ${ciTxtDebe(c)}`};
+  if(c.dif===0)return{cls:'ok',txt:'✓ Cuadra perfecto'};
+  return c.dif<0?{cls:'falta',txt:`Faltan ₡${fmt(-c.dif)}`}:{cls:'sobra',txt:`Sobran ₡${fmt(c.dif)}`};
+}
+const ciClaseProv=p=>!p.visto?'':p.faltan?'falta':'ok';
+// ── Barra en "Tu pedido de hoy" (solo en Ambos) ──
+function ciBarra(){
+  const st=CI.st||ciLeer(),c=ciVigente(st)&&ciTieneDatos(st)?ciCalc(st):null;
+  const sub=c?`En curso · ₡${fmt(c.total)} · ${c.provs.filter(p=>p.visto&&!p.faltan).length} de ${c.provs.length} listos`:'Precios de lo que llegó · efectivo, tarjeta y SINPE';
+  return `<button type="button" class="sx-pdf-btn ci-btn" data-sx-cierre><span class="sx-pdf-i">${ico('recibo')}</span><span class="sx-pdf-t"><b>Cierre de compras</b><small>${esc(sub)}</small></span><span class="sx-pdf-f" aria-hidden="true">›</span></button>`;
+}
+// ── Pantalla ──
+const ciPaso=(v,attr,label)=>`<span class="ci-q"><button type="button" data-ci="menos" tabindex="-1" aria-label="Uno menos">−</button><input ${attr} inputmode="decimal" enterkeyhint="next" autocomplete="off" value="${ciNum(v)}" aria-label="${label}"><button type="button" data-ci="mas1" tabindex="-1" aria-label="Uno más">+</button></span>`;
+const ciPrecio=(v,attr,label,ph='precio')=>`<label class="ci-p"><span aria-hidden="true">₡</span><input ${attr} inputmode="numeric" enterkeyhint="next" autocomplete="off" value="${v>0?v:''}" placeholder="${ph}" aria-label="${label}"></label>`;
+function ciFila(it){
+  return `<li class="ci-it${it.q>0?'':' cero'}${it.falta?' falta':''}" data-ci-k="${esc(it.k)}">
+    <div class="ci-it-n"><span class="ci-e" aria-hidden="true">${esc(it.e)}</span><b>${esc(it.t)}</b><em data-ci-v="sub">${ciTxtSub(it)}</em></div>
+    <div class="ci-it-c">${ciPaso(it.q,'data-ci-q',`Cuántos ${esc(it.u)} de ${esc(it.t)} llegaron`)}<span class="ci-u">${esc(it.u)}</span><span class="ci-por" aria-hidden="true">×</span>${ciPrecio(it.precio,'data-ci-p',`Precio de ${esc(it.t)} por ${esc(it.u)}`)}</div>
+    <small class="ci-ped" data-ci-v="ped">${esc(ciTxtPed(it))}</small>
+  </li>`;
+}
+function ciFilaMas(x){
+  return `<li class="ci-it mas${x.falta?' falta':''}" data-ci-mas="${esc(x.id)}">
+    <div class="ci-it-n"><span class="ci-e" aria-hidden="true">🛒</span><input data-ci-mt value="${esc(x.t)}" placeholder="¿Qué compraste?" aria-label="Qué compraste" enterkeyhint="next" autocomplete="off"><em data-ci-v="sub">${ciTxtSub(x)}</em><button type="button" class="ci-del" data-ci="mas-del" aria-label="Quitar">✕</button></div>
+    <div class="ci-it-c">${ciPaso(x.q,'data-ci-mq','Cantidad')}<span class="ci-por" aria-hidden="true">×</span>${ciPrecio(x.precio,'data-ci-mp','Precio')}</div>
+  </li>`;
+}
+function ciPasoProv(p){
+  return `<section class="ci-prov" style="--c:${sxColor(p.prov)}">
+    <div class="ci-prov-h"><span class="sx-av" aria-hidden="true">${esc(p.prov.charAt(0).toUpperCase())}</span><div><h4>${esc(p.prov)}</h4><small data-ci-v="pfaltan">${ciTxtFaltan(p)}</small></div><b class="ci-prov-tot" data-ci-v="ptot">₡${fmt(p.total)}</b></div>
+    <div class="ci-pago"><span id="ciPagoT">Le pagué con</span><div role="radiogroup" aria-labelledby="ciPagoT">${CI_PAGOS.map(([k,e,n])=>`<button type="button" role="radio" aria-checked="${k===p.pago}" class="${k}${k===p.pago?' on':''}" data-ci-pago="${k}"><span aria-hidden="true">${e}</span>${n}</button>`).join('')}</div></div>
+    <ul class="ci-items">${p.items.map(ciFila).join('')}${p.mas.map(ciFilaMas).join('')}</ul>
+    <button type="button" class="ci-add" data-ci="mas-add">＋ Algo que no estaba en el pedido</button>
+  </section>`;
+}
+const ciFilaGasto=g=>`<li class="ci-g" data-ci-g="${esc(g.id)}"><input data-ci-gt value="${esc(g.t)}" placeholder="¿Qué fue?" aria-label="Qué gasto fue" enterkeyhint="next" autocomplete="off">${ciPrecio(g.monto,'data-ci-gm','Cuánto fue','0')}<button type="button" class="ci-gp ${g.pago}" data-ci="g-pago" aria-label="Pagado con ${CI_PAGO_NOMBRE[g.pago]}; tocá para cambiar">${CI_PAGO_NOMBRE[g.pago]}</button><button type="button" class="ci-del" data-ci="g-del" aria-label="Quitar gasto">✕</button></li>`;
+const ciDia=(t,o={weekday:'long',day:'numeric',month:'long'})=>capital(new Date(t).toLocaleDateString('es-CR',o));
+function ciPasoCierre(c,st){
+  const n=c.provs.length,cu=ciCuadre(c),hist=LS.get('aramo_cierres',[]),faltan=c.provs.map((p,j)=>p.faltan?j:-1).filter(j=>j>=0);
+  return `<section class="ci-fin">
+    <div class="ci-hero">
+      <small>Total de compras${c.gastado?' y gastos':''}</small><strong data-ci-v="total">₡${fmt(c.total)}</strong>
+      <div class="ci-tres">${CI_PAGOS.map(([k,e,nm])=>`<div class="${k}"><span>${e} ${nm}</span><b data-ci-v="pp:${k}">₡${fmt(c.porPago[k])}</b></div>`).join('')}</div>
+    </div>
+    ${n?'':`<p class="ci-aviso">Todavía no hay pedido: el cierre sale de lo que se pidió en Surtido.</p>`}
+    ${faltan.length?`<p class="ci-aviso">⚠️ Falta precio en ${faltan.map(j=>`<button type="button" data-ci-ir="${j}">${esc(c.provs[j].prov)}</button>`).join(' ')}</p>`:''}
+    <div class="ci-caja">
+      <h4>💵 Plata en efectivo</h4>
+      <div class="ci-linea"><span>Me llevé</span>${ciPrecio(st.llevo,'data-ci-llevo','Cuánta plata en efectivo te llevaste','0')}</div>
+      <div class="ci-linea"><span>Pagué en efectivo</span><b data-ci-v="ef">− ₡${fmt(c.porPago.efectivo)}</b></div>
+      <div class="ci-linea"><span>Tienen que volver</span><b data-ci-v="debe">${ciTxtDebe(c)}</b></div>
+      <div class="ci-linea"><span>Regresé</span>${ciPrecio(st.regreso,'data-ci-regreso','Cuánta plata en efectivo regresaste','0')}</div>
+      <p class="ci-res ${cu.cls}" data-ci-res role="status">${cu.txt}</p>
+    </div>
+    <div class="ci-gastos">
+      <h4>🚚 Gastos del viaje <small>también entran en el cierre</small></h4>
+      ${c.gastos.length?`<ul>${c.gastos.map(ciFilaGasto).join('')}</ul>`:''}
+      <div class="ci-gchips">${CI_GASTOS.map(g=>`<button type="button" data-ci-gadd="${g}">＋ ${g}</button>`).join('')}<button type="button" data-ci-gadd="">＋ Otro</button></div>
+    </div>
+    ${n?`<div class="ci-lista"><h4>Por proveedor</h4>${c.provs.map((p,j)=>`<button type="button" class="ci-lp${p.faltan?' falta':''}" data-ci-ir="${j}" style="--c:${sxColor(p.prov)}"><span class="sx-av" aria-hidden="true">${esc(p.prov.charAt(0).toUpperCase())}</span><span class="ci-lp-t"><b>${esc(p.prov)}</b><small>${CI_PAGO_NOMBRE[p.pago]}${p.faltan?' · falta precio':''}</small></span><em>₡${fmt(p.total)}</em></button>`).join('')}</div>`:''}
+    <div class="sx-pdf-firma ci-firma"><span id="ciFirmaT">¿Quién hizo las compras?</span><div role="radiogroup" aria-labelledby="ciFirmaT">${HOJA_FIRMAS.map(f=>`<button type="button" role="radio" aria-checked="${f===st.firma}" class="${f===st.firma?'on':''}" data-ci-firma="${f}">${f}</button>`).join('')}</div></div>
+    <button type="button" class="sx-pdf-wa" data-ci="wa"${n||c.gastos.length?'':' disabled'}>${ico('mensaje')}Mandar el cierre a mi WhatsApp</button>
+    ${hist.length?`<details class="ci-hist"><summary>Cierres guardados <b>${hist.length}</b></summary>${hist.map((x,j)=>`<div class="ci-h"><span><b>${esc(ciDia(x.inicio,{weekday:'short',day:'numeric',month:'short'}))}${x.firma?' · '+esc(x.firma):''}</b><small>₡${fmt(x.total)} · ${esc(ciCuadre(x).txt)}</small></span><button type="button" data-ci="hist-wa" data-ci-h="${j}" aria-label="Mandar ese cierre a WhatsApp" title="Mandar a WhatsApp">${ico('mensaje')}</button></div>`).join('')}</details>`:''}
+  </section>`;
+}
+function ciIndice(c){const i=c.provs.findIndex(p=>p.prov===CI.st.paso);return i>=0?i:CI.st.paso===''||!c.provs.length?c.provs.length:0;}
+function ciPintar(){
+  const h=$('sxCierre');if(!h)return;
+  const st=CI.st,c=ciCalc(st),n=c.provs.length,i=ciIndice(c),p=c.provs[i];
+  st.paso=p?p.prov:'';
+  const viejo=h.querySelector('.ci-cuerpo'),scroll=CI.pintado===st.paso&&viejo?viejo.scrollTop:0;
+  h.innerHTML=`<div class="ci-in" role="dialog" aria-modal="true" aria-labelledby="ciTit">
+    <header class="ci-cab">
+      <span class="ci-ico" aria-hidden="true">${ico('recibo')}</span>
+      <div class="ci-cab-t"><h3 id="ciTit">Cierre de compras</h3><p>${esc(ciDia(st.inicio))}</p></div>
+      <div class="ci-cab-tot"><small>Compras</small><b data-ci-v="total">₡${fmt(c.total)}</b></div>
+      <button type="button" class="sx-ed-x" data-ci="cerrar" aria-label="Cerrar">✕</button>
+    </header>
+    <nav class="ci-pasos" aria-label="Proveedores">${c.provs.map((q,j)=>`<button type="button" data-ci-ir="${j}" class="${ciClaseProv(q)}${j===i?' on':''}" style="--c:${sxColor(q.prov)}"${j===i?' aria-current="step"':''}><i aria-hidden="true"></i>${esc(q.prov)}</button>`).join('')}<button type="button" data-ci-ir="${n}" class="fin${i===n?' on':''}"${i===n?' aria-current="step"':''}>🧾 Cierre</button></nav>
+    <form class="ci-cuerpo" novalidate>${p?ciPasoProv(p):ciPasoCierre(c,st)}</form>
+    <footer class="ci-pie">
+      <button type="button" class="ci-ant" data-ci="ant"${i?'':' disabled'} aria-label="Anterior">‹</button>
+      ${p?`<button type="button" class="ci-sig" data-ci="sig"><span>${i<n-1?`Siguiente: <b>${esc(c.provs[i+1].prov)}</b>`:'<b>Ver el cierre</b>'}</span><i aria-hidden="true">›</i></button>`
+        :`<button type="button" class="ci-sig guardar" data-ci="guardar"${n||c.gastos.length?'':' disabled'}><span><b>✓ Terminar y guardar</b></span></button>`}
+    </footer>
+  </div>`;
+  CI.pintado=st.paso;CI.seguro=0;
+  const cuerpo=h.querySelector('.ci-cuerpo');if(scroll)cuerpo.scrollTop=scroll;
+  const on=h.querySelector('.ci-pasos .on'),nav=on?.parentElement;
+  if(on)nav.scrollLeft=on.offsetLeft-(nav.clientWidth-on.offsetWidth)/2;
+}
+// Cambia solo los números (sin volver a dibujar) para no sacar el teclado mientras se escribe.
+function ciPatch(){
+  const h=$('sxCierre');if(!h)return;
+  const st=CI.st,c=ciCalc(st),p=c.provs.find(x=>x.prov===st.paso);
+  const pon=(root,k,txt)=>root.querySelectorAll(`[data-ci-v="${k}"]`).forEach(el=>{if(el.textContent!==txt)el.textContent=txt;});
+  pon(h,'total','₡'+fmt(c.total));
+  CI_PAGOS.forEach(([k])=>pon(h,'pp:'+k,'₡'+fmt(c.porPago[k])));
+  pon(h,'ef','− ₡'+fmt(c.porPago.efectivo));pon(h,'debe',ciTxtDebe(c));
+  const r=h.querySelector('[data-ci-res]');if(r){const cu=ciCuadre(c);r.textContent=cu.txt;r.className='ci-res '+cu.cls;}
+  if(p){
+    pon(h,'ptot','₡'+fmt(p.total));pon(h,'pfaltan',ciTxtFaltan(p));
+    p.items.forEach(it=>{const li=h.querySelector(`[data-ci-k="${CSS.escape(it.k)}"]`);if(!li)return;li.classList.toggle('cero',!(it.q>0));li.classList.toggle('falta',it.falta);pon(li,'sub',ciTxtSub(it));pon(li,'ped',ciTxtPed(it));});
+    p.mas.forEach(x=>{const li=h.querySelector(`[data-ci-mas="${CSS.escape(x.id)}"]`);if(!li)return;li.classList.toggle('falta',x.falta);pon(li,'sub',ciTxtSub(x));});
+  }
+  c.provs.forEach((q,j)=>{const b=h.querySelector(`.ci-pasos [data-ci-ir="${j}"]`);if(b)b.className=ciClaseProv(q)+(q.prov===st.paso?' on':'');});
+}
+function ciAbrir(){
+  ciCargar();
+  let h=$('sxCierre');
+  if(!h){
+    h=document.createElement('div');h.id='sxCierre';h.className='ci';document.body.appendChild(h);
+    h.addEventListener('click',ciClick);
+    h.addEventListener('input',e=>ciEntrada(e.target));
+    h.addEventListener('change',ciCambio);
+    h.addEventListener('keydown',ciTecla);
+    h.addEventListener('submit',e=>e.preventDefault());
+    // Al entrar a un número se marca entero: se escribe encima sin borrar.
+    h.addEventListener('focusin',e=>{const t=e.target;if(t.matches?.('input[inputmode]'))setTimeout(()=>{try{if(document.activeElement===t)t.select();}catch{}},0);});
+  }
+  CI.pintado=null;ciPintar();
+  document.documentElement.classList.add('ci-abierto');
+  requestAnimationFrame(()=>h.classList.add('open'));
+}
+function ciCerrar(){
+  const h=$('sxCierre');if(!h)return;
+  if(h.contains(document.activeElement))document.activeElement.blur(); // guarda el precio que se estaba escribiendo
+  h.classList.remove('open');document.documentElement.classList.remove('ci-abierto');
+  sxRenderTablero();
+}
+function ciIr(j){
+  const st=CI.st,c=ciCalc(st),n=c.provs.length;
+  j=Math.max(0,Math.min(n,j));
+  if(st.provs[st.paso])st.provs[st.paso].visto=true;
+  st.paso=j<n?c.provs[j].prov:'';
+  ciGuardar();ciPintar();
+}
+function ciClick(e){
+  const h=$('sxCierre'),st=CI.st;
+  if(e.target===h)return ciCerrar();
+  const ir=e.target.closest('[data-ci-ir]');if(ir)return ciIr(+ir.dataset.ciIr);
+  const pg=e.target.closest('[data-ci-pago]'),cp=st.provs[st.paso];
+  if(pg&&cp){
+    cp.pago=pg.dataset.ciPago;cp.visto=true;ciRecordarPago(st.paso,cp.pago);
+    pg.parentElement.querySelectorAll('[data-ci-pago]').forEach(b=>{b.classList.toggle('on',b===pg);b.setAttribute('aria-checked',b===pg);});
+    ciGuardar();ciPatch();buzz(8);return;
+  }
+  const ga=e.target.closest('[data-ci-gadd]');
+  if(ga){
+    const g={id:ciId(),t:ga.dataset.ciGadd,monto:null,pago:'efectivo'};
+    st.gastos.push(g);ciGuardar();ciPintar();
+    h.querySelector(`[data-ci-g="${g.id}"] ${g.t?'[data-ci-gm]':'[data-ci-gt]'}`)?.focus();return;
+  }
+  const fi=e.target.closest('[data-ci-firma]');
+  if(fi){
+    st.firma=fi.dataset.ciFirma;ciGuardar();
+    h.querySelectorAll('[data-ci-firma]').forEach(b=>{b.classList.toggle('on',b===fi);b.setAttribute('aria-checked',b===fi);});return;
+  }
+  const a=e.target.closest('[data-ci]')?.dataset.ci;if(!a)return;
+  const gid=e.target.closest('[data-ci-g]')?.dataset.ciG,g=st.gastos.find(x=>x.id===gid);
+  if(a==='cerrar')ciCerrar();
+  else if(a==='ant'||a==='sig')ciIr(ciIndice(ciCalc(st))+(a==='sig'?1:-1));
+  else if(a==='menos'||a==='mas1'){
+    const inp=e.target.closest('.ci-q')?.querySelector('input');if(!inp)return;
+    inp.value=ciNum(Math.max(0,ciCant(inp.value)+(a==='mas1'?1:-1)));ciEntrada(inp);buzz(8);
+  }else if(a==='mas-add'&&cp){
+    const x={id:ciId(),t:'',q:1,precio:null};cp.mas.push(x);cp.visto=true;ciGuardar();ciPintar();
+    h.querySelector(`[data-ci-mas="${x.id}"] [data-ci-mt]`)?.focus();
+  }else if(a==='mas-del'&&cp){
+    const id=e.target.closest('[data-ci-mas]')?.dataset.ciMas;cp.mas=cp.mas.filter(x=>x.id!==id);ciGuardar();ciPintar();
+  }else if(a==='g-del'){st.gastos=st.gastos.filter(x=>x.id!==gid);ciGuardar();ciPintar();}
+  else if(a==='g-pago'&&g){const ks=CI_PAGOS.map(x=>x[0]);g.pago=ks[(ks.indexOf(g.pago)+1)%ks.length];ciGuardar();ciPintar();}
+  else if(a==='wa')ciMandar(ciCalc(st));
+  else if(a==='hist-wa'){const x=LS.get('aramo_cierres',[])[+e.target.closest('[data-ci-h]').dataset.ciH];if(x)ciMandar(x);}
+  else if(a==='guardar')ciTerminar(e.target.closest('[data-ci]'));
+}
+function ciEntrada(t){
+  const st=CI.st,cp=st.provs[st.paso],num=v=>ciVacio(v)?null:ciPlata(v);
+  if(t.matches('[data-ci-q],[data-ci-p]')){
+    const it=cp?.items[t.closest('[data-ci-k]')?.dataset.ciK];if(!it)return;
+    if(t.matches('[data-ci-q]'))it.q=ciVacio(t.value)?null:ciCant(t.value);else it.precio=num(t.value);
+    cp.visto=true;
+  }else if(t.matches('[data-ci-mt],[data-ci-mq],[data-ci-mp]')){
+    const x=cp?.mas.find(m=>m.id===t.closest('[data-ci-mas]')?.dataset.ciMas);if(!x)return;
+    if(t.matches('[data-ci-mt]'))x.t=t.value;else if(t.matches('[data-ci-mq]'))x.q=ciCant(t.value);else x.precio=num(t.value);
+  }else if(t.matches('[data-ci-llevo]'))st.llevo=num(t.value);
+  else if(t.matches('[data-ci-regreso]'))st.regreso=num(t.value);
+  else if(t.matches('[data-ci-gt],[data-ci-gm]')){
+    const g=st.gastos.find(x=>x.id===t.closest('[data-ci-g]')?.dataset.ciG);if(!g)return;
+    if(t.matches('[data-ci-gt]'))g.t=t.value;else g.monto=num(t.value);
+  }else return;
+  ciGuardar();ciPatch();
+}
+// Al salir de un campo: el vacío vuelve a lo pedido / al precio anterior, y el precio de hoy queda
+// guardado para el próximo cierre (y como precio del producto si es la misma unidad).
+function ciCambio(e){
+  const t=e.target,st=CI.st,prov=st.paso,k=t.closest('[data-ci-k]')?.dataset.ciK;
+  if(!k||!t.matches('[data-ci-q],[data-ci-p]'))return;
+  const it=st.provs[prov]?.items[k],calc=ciCalc(st).provs.find(p=>p.prov===prov)?.items.find(x=>x.k===k);if(!it||!calc)return;
+  if(t.matches('[data-ci-q]')){t.value=ciNum(calc.q);return;}
+  t.value=calc.precio>0?calc.precio:'';
+  if(!(it.precio>0))return;
+  const m=LS.get('aramo_cierre_precios',{});m[prov+'|'+k]=it.precio;LS.set('aramo_cierre_precios',m);
+  if(it.pid&&it.base&&String(it.precio)!==String(getPrice(prov,it.pid)))setPrice(prov,it.pid,String(it.precio));
+}
+// Enter salta al precio siguiente (o al campo siguiente): se llenan todos sin tocar la pantalla.
+function ciTecla(e){
+  const t=e.target;
+  if(e.key!=='Enter'||t.tagName!=='INPUT')return;
+  e.preventDefault();
+  const todos=[...$('sxCierre').querySelectorAll('.ci-cuerpo input')],resto=todos.slice(todos.indexOf(t)+1);
+  const sig=t.matches('[data-ci-p]')?resto.find(x=>x.matches('[data-ci-p]')):resto[0];
+  if(sig){sig.focus();sig.scrollIntoView({block:'nearest'});}else t.blur();
+}
+function ciTerminar(btn){
+  // Se toca dos veces para no cerrarlo sin querer.
+  if(Date.now()-CI.seguro>4000){CI.seguro=Date.now();btn.classList.add('seguro');btn.innerHTML='<span><b>¿Terminar? Tocá otra vez</b></span>';buzz(12);return;}
+  ciArchivar(CI.st);
+  CI.st=ciNuevo();LS.set('aramo_cierre',null);
+  ciCerrar();
+  toast('✓ Cierre guardado · lo ves en «Cierres guardados»','ok');
+}
+function ciMensaje(c){
+  const L=['*Cierre de compras ARAMO*',hojaFecha(new Date(c.inicio))+(c.firma?' · '+c.firma:''),''];
+  c.provs.forEach(p=>{
+    L.push(`*${p.prov}* · ${CI_PAGO_NOMBRE[p.pago]} · ₡${fmt(p.total)}`);
+    p.items.forEach(it=>{
+      const ped=it.q!==it.pedido?` (pedí ${fmtQ(it.pedido)})`:'';
+      L.push(!(it.q>0)?`   ${it.t}: no vino (pedí ${fmtQ(it.pedido)} ${it.u})`:it.precio>0?`   ${fmtQ(it.q)} ${it.u} ${it.t} × ₡${fmt(it.precio)} = ₡${fmt(it.sub)}${ped}`:`   ${fmtQ(it.q)} ${it.u} ${it.t}: falta precio${ped}`);
+    });
+    p.mas.filter(x=>x.q>0).forEach(x=>L.push(`   + ${fmtQ(x.q)} ${x.t||'Otro'} × ₡${fmt(x.precio)} = ₡${fmt(x.sub)}`));
+    L.push('');
+  });
+  if(c.gastos.length){L.push('*Gastos del viaje*');c.gastos.forEach(g=>L.push(`   ${g.t||'Gasto'} · ${CI_PAGO_NOMBRE[g.pago]} · ₡${fmt(g.monto)}`));L.push('');}
+  L.push(`*Total: ₡${fmt(c.total)}*`,...CI_PAGOS.map(([k,e,n])=>`${e} ${n}: ₡${fmt(c.porPago[k])}`));
+  if(c.llevo!=null){
+    L.push('',`Me llevé: ₡${fmt(c.llevo)}`,`Tienen que volver: ${ciTxtDebe(c)}`);
+    if(c.regreso!=null)L.push(`Regresé: ₡${fmt(c.regreso)}`);
+    L.push(`*${ciCuadre(c).txt}*`);
+  }
+  return L.join('\n');
+}
+function ciMandar(c){window.open(`https://wa.me/${normalizeCostaRicaPhone(hojaMiNumero())}?text=${encodeURIComponent(ciMensaje(c))}`,'_blank');}
 function xpRenderPedido(){
   const body=$('pedidoBody');if(!body)return;
   const sides=activeOrderSides(),dos=sides.length>1;
