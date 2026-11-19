@@ -109,6 +109,12 @@ body.sx-arrastrando{user-select:none;-webkit-user-select:none;cursor:grabbing}
 .sx-nota{margin:8px 2px 0;font:500 12px/1.4 var(--sx-f);color:#8a5a00}
 .sx-nota b{font-weight:800}
 html[data-theme="dark"] .sx-nota{color:#fde68a}
+.sx-prod-notas{display:grid;gap:2px;margin-top:8px;padding-top:7px;border-top:1px dashed var(--sx-linea)}
+.sx-prod-nota{margin:0 2px;font-size:11.5px}
+.sx-item-nota{display:block;flex-basis:100%;margin:0 8px 4px 32px;padding:3px 7px;border-left:3px solid var(--pm);font:600 11px/1.3 var(--sx-f);color:var(--pm);white-space:normal;overflow-wrap:anywhere}
+.sx-lado.angeles .sx-item-nota{border-color:var(--pa);color:var(--pa)}
+html[data-theme="dark"] .sx-item-nota{color:#86efac;border-color:#4ade80}
+html[data-theme="dark"] .sx-lado.angeles .sx-item-nota{color:#fdba74;border-color:#fb923c}
 
 /* ── Proveedores comprimidos en una barra ── */
 .sx-provbar{display:flex;align-items:center;gap:12px;width:100%;min-height:62px;padding:10px 14px;border:0;border-radius:18px;background:var(--sx-card);box-shadow:inset 0 0 0 1px var(--sx-linea),0 6px 18px -12px rgba(16,40,28,.3);color:var(--t);text-align:left;cursor:pointer;font-family:var(--sx-f)}
@@ -229,7 +235,7 @@ body[data-sx-lado="angeles"] .sx-prov.sx-sobre .sx-lado.angeles{box-shadow:inset
 .sx-uno small{font:700 10.5px var(--sx-f);opacity:.75}
 .sx-grip-demo{color:var(--m);margin:0 1px;vertical-align:-2px}
 /* En cada columna: un producto por fila (en la compu, pastillas una al lado de la otra) */
-.sx-lado .sx-chip.uno{display:flex;width:100%;min-height:38px;border-radius:10px;background:var(--sx-card);box-shadow:0 1px 2px rgba(16,40,28,.07)}
+.sx-lado .sx-chip.uno{display:flex;flex-wrap:wrap;width:100%;min-height:38px;border-radius:10px;background:var(--sx-card);box-shadow:0 1px 2px rgba(16,40,28,.07)}
 /* Botón ⇄ de cada fila: tocar = lista de proveedores; arrastrar = mover */
 .sx-lado .sx-grip{align-self:center;width:28px;height:28px;margin-left:4px;border-radius:50%;background:var(--pm-t);color:var(--pm);box-shadow:inset 0 0 0 1.5px color-mix(in srgb,var(--pm) 30%,transparent);transition:transform .12s,background .15s}
 .sx-lado.angeles .sx-grip{background:var(--pa-t);color:var(--pa);box-shadow:inset 0 0 0 1.5px color-mix(in srgb,var(--pa) 30%,transparent)}
@@ -284,6 +290,10 @@ html[data-theme="dark"] .sx-editor{--pm:#4ade80;--pa:#fb923c;--pm-t:rgba(74,222,
 .sx-ed-rapido{display:grid;grid-template-columns:repeat(6,1fr);gap:6px;margin-top:10px}
 .sx-ed-rapido button{height:42px;border:1.5px solid var(--sx-linea);border-radius:14px;background:var(--card,#fff);color:var(--t);font:800 15px var(--sx-f);cursor:pointer}
 .sx-ed-rapido button.on{border-color:var(--lc);background:var(--lt);color:var(--lc)}
+.sx-ed-nota{display:grid;gap:5px;margin-top:12px}
+.sx-ed-nota span{font:700 12.5px var(--sx-f);color:var(--m)}
+.sx-ed-nota input{width:100%;min-height:46px;padding:0 14px;border:0;border-radius:15px;background:var(--sx-tile);box-shadow:inset 0 0 0 1px var(--sx-linea);color:var(--t);font:600 15px var(--sx-f);outline:none}
+.sx-ed-nota input:focus{box-shadow:inset 0 0 0 2px var(--lc)}
 .sx-ed-acc{display:grid;grid-template-columns:1fr auto;gap:8px;margin-top:14px}
 .sx-ed-acc button{display:inline-flex;align-items:center;justify-content:center;gap:8px;min-height:46px;padding:0 14px;border:1.5px solid var(--sx-linea);border-radius:15px;background:var(--card,#fff);color:var(--t);font:700 14px var(--sx-f);cursor:pointer}
 .sx-ed-acc button.quitar{color:#b91c1c;border-color:color-mix(in srgb,#dc2626 28%,transparent)}

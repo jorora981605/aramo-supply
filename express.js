@@ -706,6 +706,13 @@ function sxColor(prov){return PDX_COLORES[[...String(prov)].reduce((h,c)=>(h*31+
 function sxTarjeta(d,i,sides,modo){
   const p=S.pedidos[d.prov]||{};
   const cant=(q,s)=>`<b class="${s}${q>0?'':' cero'}">${q>0?fmtQ(q):'·'}</b>`;
+  const notasProducto=sides.flatMap(s=>d.lines.filter(l=>l.q[s]>0).map(l=>{
+    const nota=getProductNote(p,l.prod.id,s);
+    return nota?{side:s,producto:niceName(l.prod.name),nota}:null;
+  }).filter(Boolean));
+  const notasProductoHTML=notasProducto.length
+    ?`<div class="sx-prod-notas">${notasProducto.map(x=>`<p class="sx-nota sx-prod-nota"><b>${SIDE_NAME[x.side]} · ${esc(x.producto)}:</b> ${esc(x.nota)}</p>`).join('')}</div>`
+    :'';
   const notas=sides.map(s=>{const n=String(p.notes?.['__note_'+s]||(s==='moravia'?p.note:'')||'').trim();return n?`<p class="sx-nota"><b>${SIDE_NAME[s]}:</b> ${esc(n)}</p>`:'';}).join('');
   const horas=sides.map(s=>sxHoraTag(sxHora(p,s),`Pedido de ${SIDE_NAME[s]} a ${d.prov} modificado`,'sx-hora '+s,SIDE_NAME[s]+' · ')).join('');
   return `<article class="sx-card${d.sent?' enviado':''}" data-sx-drop="${esc(d.prov)}" style="--i:${i};--c:${sxColor(d.prov)}">
@@ -718,6 +725,7 @@ function sxTarjeta(d,i,sides,modo){
       ${d.lines.map(l=>`<button type="button" class="sx-chip" data-pd="line" data-prov="${esc(d.prov)}" data-pid="${esc(l.prod.id)}" aria-label="${esc(niceName(l.prod.name))}: ${sides.map(s=>SIDE_NAME[s]+' '+(l.q[s]||0)).join(', ')} ${esc(l.unit)}. Mantené apretado para pasarlo a otro proveedor."><span class="sx-e">${smartEmoji(l.prod)}</span><span class="sx-n">${esc(niceName(l.prod.name))}</span><span class="sx-q">${sides.map(s=>cant(l.q[s],s)).join('')}<small>${esc(uniCorta(l.unit))}</small></span></button>`).join('')}
       ${d.extras.map(x=>`<span class="sx-chip extra"><span class="sx-e">➕</span><span class="sx-n">${esc(x.name||'Extra')}</span><span class="sx-q">${sides.map(s=>cant(s===x.side?+x.qty:0,s)).join('')}<small>${esc(uniCorta(x.unit||'kg'))}</small></span></span>`).join('')}
     </div>
+    ${notasProductoHTML}
     ${horas?`<div class="sx-horas">${horas}</div>`:''}
     ${notas}
   </article>`;
@@ -736,7 +744,10 @@ function sxLado(d,side){
   const p=S.pedidos[d.prov]||{},lines=d.lines.filter(l=>l.q[side]>0),extras=d.extras.filter(x=>x.side===side);
   const sent=!!sentFlags(p)[side];
   const nota=String(p.notes?.['__note_'+side]||(side==='moravia'?p.note:'')||'').trim();
-  const filas=lines.map(l=>`<div class="sx-chip uno ${side}" data-prov="${esc(d.prov)}" data-pid="${esc(l.prod.id)}" data-lado="${side}"><button type="button" class="sx-grip" data-sx-mover title="Pasar a otro proveedor: tocá para elegir o arrastrá" aria-label="Pasar ${esc(niceName(l.prod.name))} de ${SIDE_NAME[side]} a otro proveedor">${ico('mover')}</button><button type="button" class="sx-chip-b" data-sx-ed aria-label="${esc(niceName(l.prod.name))}: ${fmtQ(l.q[side])} ${esc(l.unit)} para ${SIDE_NAME[side]}. Tocá para cambiar la cantidad o pasarlo a otro proveedor."><span class="sx-e">${smartEmoji(l.prod)}</span><span class="sx-n">${esc(niceName(l.prod.name))}</span><span class="sx-uno">${fmtQ(l.q[side])}<small>${esc(uniCorta(l.unit))}</small></span></button></div>`).join('')
+  const filas=lines.map(l=>{
+    const productNote=getProductNote(p,l.prod.id,side);
+    return `<div class="sx-chip uno ${side}" data-prov="${esc(d.prov)}" data-pid="${esc(l.prod.id)}" data-lado="${side}"><button type="button" class="sx-grip" data-sx-mover title="Pasar a otro proveedor: tocá para elegir o arrastrá" aria-label="Pasar ${esc(niceName(l.prod.name))} de ${SIDE_NAME[side]} a otro proveedor">${ico('mover')}</button><button type="button" class="sx-chip-b" data-sx-ed aria-label="${esc(niceName(l.prod.name))}: ${fmtQ(l.q[side])} ${esc(l.unit)} para ${SIDE_NAME[side]}. Tocá para cambiar la cantidad o pasarlo a otro proveedor."><span class="sx-e">${smartEmoji(l.prod)}</span><span class="sx-n">${esc(niceName(l.prod.name))}</span><span class="sx-uno">${fmtQ(l.q[side])}<small>${esc(uniCorta(l.unit))}</small></span></button>${productNote?`<small class="sx-item-nota">📝 ${esc(productNote)}</small>`:''}</div>`;
+  }).join('')
     +extras.map(x=>`<div class="sx-chip uno extra ${side}"><button type="button" class="sx-chip-b" data-pd="open" data-prov="${esc(d.prov)}" aria-label="${esc(x.name||'Extra')}: se edita en el proveedor"><span class="sx-e">➕</span><span class="sx-n">${esc(x.name||'Extra')}</span><span class="sx-uno">${fmtQ(+x.qty)}<small>${esc(uniCorta(x.unit||'kg'))}</small></span></button></div>`).join('');
   return `<div class="sx-lado ${side}${sent?' enviado':''}${filas?'':' nada'}" data-lado="${side}" aria-label="${SIDE_NAME[side]}">
     ${sxHoraTag(sxHora(p,side),`Pedido de ${SIDE_NAME[side]} a ${d.prov} modificado`,'sx-hora')}${sent&&filas?`<span class="sx-ok">✓ Enviado</span>`:''}${filas||'<span class="sx-nada" aria-label="Nada para '+SIDE_NAME[side]+'">—</span>'}
@@ -1728,8 +1739,11 @@ function sxEditar(prov,pid,lado){
       if(a==='quitar'){const prod=sxProd(prov,pid),u=sxUnidad(),antes=q;sxPoner(0);sxCerrarEditor();sxAviso(`${niceName(prod.name)} quitado de ${SIDE_NAME[lado]}`,smartEmoji(prod),()=>{syncQty(prov,prod,lado,String(antes),u);xpRefresh();});return;}
       if(a==='mover'){sxCerrarEditor();sxElegirProveedor(prov,pid,lado);}
     });
-    ed.addEventListener('input',e=>{if(e.target.id==='sxEdQ'){const v=parseFloat(String(e.target.value).replace(',','.'));sxPoner(isNaN(v)?0:Math.max(0,v),false);}});
-    ed.addEventListener('keydown',e=>{if(e.key==='Enter'&&e.target.id==='sxEdQ'){e.preventDefault();sxCerrarEditor();}});
+    ed.addEventListener('input',e=>{
+      if(e.target.id==='sxEdQ'){const v=parseFloat(String(e.target.value).replace(',','.'));sxPoner(isNaN(v)?0:Math.max(0,v),false);}
+      else if(e.target.id==='sxEdNota'&&SX.ed){const prod=sxProd(SX.ed.prov,SX.ed.pid);if(prod)syncProductNote(SX.ed.prov,prod,SX.ed.lado,e.target.value);}
+    });
+    ed.addEventListener('keydown',e=>{if(e.key==='Enter'&&(e.target.id==='sxEdQ'||e.target.id==='sxEdNota')){e.preventDefault();sxCerrarEditor();}});
   }
   SX.ed={prov,pid,lado};
   sxPintarEditor();
@@ -1744,6 +1758,7 @@ function sxPintarEditor(){
     <div class="sx-ed-cab"><span class="sx-ed-e">${smartEmoji(prod)}</span><div><h3>${nom}</h3><p>${esc(prov)} · <b class="${lado}">${SIDE_ICO[lado]} ${SIDE_NAME[lado]}</b></p></div><button type="button" class="sx-ed-x" data-sx-acc="cerrar" aria-label="Cerrar">✕</button></div>
     <div class="sx-ed-paso"><button type="button" data-sx-acc="menos" aria-label="Uno menos">−</button><label><input id="sxEdQ" type="text" inputmode="decimal" autocomplete="off" value="${q?fmtQ(q):''}" placeholder="0" aria-label="Cantidad"><small>${esc(sxUnidad())}</small></label><button type="button" data-sx-acc="mas" aria-label="Uno más">+</button></div>
     <div class="sx-ed-rapido" role="group" aria-label="Cantidades rápidas">${[1,2,3,5,10,20].map(n=>`<button type="button" data-sx-acc="poner" data-n="${n}" class="${q===n?'on':''}">${n}</button>`).join('')}</div>
+    <label class="sx-ed-nota"><span>📝 Nota para ${SIDE_NAME[lado]}</span><input id="sxEdNota" type="text" autocomplete="off" enterkeyhint="done" maxlength="120" value="${esc(getProductNote(getPedido(prov),pid,lado))}" placeholder="Ej.: bien verdes, maduros, grandes…"></label>
     <div class="sx-ed-acc"><button type="button" data-sx-acc="mover">${ico('mover')}Pasar a otro proveedor</button><button type="button" data-sx-acc="quitar" class="quitar">Quitar</button></div>
     <button type="button" class="sx-ed-ok" data-sx-acc="cerrar">Listo</button>
   </div>`;
