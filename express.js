@@ -719,7 +719,7 @@ function sxTarjeta(d,i,sides,modo){
     <header class="sx-card-h">
       <button type="button" class="sx-card-id" data-pd="open" data-prov="${esc(d.prov)}" title="Abrir ${esc(d.prov)}"><span class="sx-av">${esc(d.prov.charAt(0).toUpperCase())}</span><span class="sx-card-t"><b>${esc(d.prov)}</b><small><i></i>${d.sent?'Enviado':'Por enviar'} · ${plural(d.n,'producto','productos')}</small></span></button>
       ${d.tot?`<span class="sx-card-tot">₡${fmt(d.tot)}</span>`:''}
-      ${modo==='pedido'?`<button type="button" class="sx-env${d.sent?' hecho':''}" data-pd="send" data-prov="${esc(d.prov)}" aria-label="${d.sent?'Reenviar':'Enviar'} el pedido a ${esc(d.prov)}" title="${d.sent?'Reenviar':'Enviar'} por WhatsApp">${ico(d.sent?'listo':'enviar')}</button>`:''}
+      ${modo==='pedido'?`<button type="button" class="sx-env${d.sent?' hecho':''}" data-pd="send" data-prov="${esc(d.prov)}" aria-label="${d.sent?'Reenviar':'Enviar'} el pedido a ${esc(d.prov)}" title="${d.sent?'Reenviar':'Enviar'} por WhatsApp">${ico(d.sent?'listo':'enviar')}<span class="sx-env-label">${d.sent?'Reenviar':'Enviar'}</span></button>`:''}
     </header>
     <div class="sx-chips">
       ${d.lines.map(l=>`<button type="button" class="sx-chip" data-pd="line" data-prov="${esc(d.prov)}" data-pid="${esc(l.prod.id)}" aria-label="${esc(niceName(l.prod.name))}: ${sides.map(s=>SIDE_NAME[s]+' '+(l.q[s]||0)).join(', ')} ${esc(l.unit)}. Mantené apretado para pasarlo a otro proveedor."><span class="sx-e">${smartEmoji(l.prod)}</span><span class="sx-n">${esc(niceName(l.prod.name))}</span><span class="sx-q">${sides.map(s=>cant(l.q[s],s)).join('')}<small>${esc(uniCorta(l.unit))}</small></span></button>`).join('')}
@@ -746,11 +746,11 @@ function sxLado(d,side){
   const nota=String(p.notes?.['__note_'+side]||(side==='moravia'?p.note:'')||'').trim();
   const filas=lines.map(l=>{
     const productNote=getProductNote(p,l.prod.id,side);
-    return `<div class="sx-chip uno ${side}" data-prov="${esc(d.prov)}" data-pid="${esc(l.prod.id)}" data-lado="${side}"><button type="button" class="sx-grip" data-sx-mover title="Pasar a otro proveedor: tocá para elegir o arrastrá" aria-label="Pasar ${esc(niceName(l.prod.name))} de ${SIDE_NAME[side]} a otro proveedor">${ico('mover')}</button><button type="button" class="sx-chip-b" data-sx-ed aria-label="${esc(niceName(l.prod.name))}: ${fmtQ(l.q[side])} ${esc(l.unit)} para ${SIDE_NAME[side]}. Tocá para cambiar la cantidad o pasarlo a otro proveedor."><span class="sx-e">${smartEmoji(l.prod)}</span><span class="sx-n">${esc(niceName(l.prod.name))}</span><span class="sx-uno">${fmtQ(l.q[side])}<small>${esc(uniCorta(l.unit))}</small></span></button>${productNote?`<small class="sx-item-nota">📝 ${esc(productNote)}</small>`:''}</div>`;
+    return `<div class="sx-chip uno ${side}" style="display:flex;flex-wrap:wrap;width:100%;max-width:none;box-sizing:border-box" data-prov="${esc(d.prov)}" data-pid="${esc(l.prod.id)}" data-lado="${side}"><button type="button" class="sx-grip" data-sx-mover title="Pasar a otro proveedor: tocá para elegir o arrastrá" aria-label="Pasar ${esc(niceName(l.prod.name))} de ${SIDE_NAME[side]} a otro proveedor">${ico('mover')}</button><button type="button" class="sx-chip-b" data-sx-ed aria-label="${esc(niceName(l.prod.name))}: ${fmtQ(l.q[side])} ${esc(l.unit)} para ${SIDE_NAME[side]}. Tocá para cambiar la cantidad o pasarlo a otro proveedor."><span class="sx-e">${smartEmoji(l.prod)}</span><span class="sx-n">${esc(niceName(l.prod.name))}</span><span class="sx-uno">${fmtQ(l.q[side])}<small>${esc(uniCorta(l.unit))}</small></span></button>${productNote?`<small class="sx-item-nota" style="flex:0 0 100%;width:calc(100% - 40px);box-sizing:border-box">📝 ${esc(productNote)}</small>`:''}</div>`;
   }).join('')
     +extras.map(x=>`<div class="sx-chip uno extra ${side}"><button type="button" class="sx-chip-b" data-pd="open" data-prov="${esc(d.prov)}" aria-label="${esc(x.name||'Extra')}: se edita en el proveedor"><span class="sx-e">➕</span><span class="sx-n">${esc(x.name||'Extra')}</span><span class="sx-uno">${fmtQ(+x.qty)}<small>${esc(uniCorta(x.unit||'kg'))}</small></span></button></div>`).join('');
-  return `<div class="sx-lado ${side}${sent?' enviado':''}${filas?'':' nada'}" data-lado="${side}" aria-label="${SIDE_NAME[side]}">
-    ${sxHoraTag(sxHora(p,side),`Pedido de ${SIDE_NAME[side]} a ${d.prov} modificado`,'sx-hora')}${sent&&filas?`<span class="sx-ok">✓ Enviado</span>`:''}${filas||'<span class="sx-nada" aria-label="Nada para '+SIDE_NAME[side]+'">—</span>'}
+  return `<div class="sx-lado ${side}${sent?' enviado':''}${filas?'':' nada'}" style="display:flex;flex-direction:column;align-items:stretch;flex-wrap:nowrap;gap:4px;width:100%;box-sizing:border-box" data-lado="${side}" aria-label="${SIDE_NAME[side]}">
+    ${sxHoraTag(sxHora(p,side),`Pedido de ${SIDE_NAME[side]} a ${d.prov} modificado`,'sx-hora')}<div class="sx-lado-items" style="display:flex;flex-direction:column;align-items:stretch;gap:5px;width:100%">${filas||'<span class="sx-nada" aria-label="Nada para '+SIDE_NAME[side]+'">—</span>'}</div>
     ${nota?`<p class="sx-nota">📝 ${esc(nota)}</p>`:''}
   </div>`;
 }
@@ -790,13 +790,21 @@ function sxRenderTablero(){
     const tot=ds.reduce((t,d)=>t+calcSide(side,d.prov),0),pend=ds.filter(d=>!sentFlags(S.pedidos[d.prov]||{})[side]).length;
     return `<div class="${side}"><b>${SIDE_ICO[side]} ${SIDE_NAME[side]}</b>${sxActualizado(side)}<span>${plural(n,'producto','productos')}${tot?` · ₡${fmt(tot)}`:''}</span>${n?(pend?`<em>${pend} por enviar</em>`:`<em class="ok">✓ todo enviado</em>`):''}</div>`;
   };
+  const estadoProveedor=d=>{
+    const p=S.pedidos[d.prov]||{};
+    const usados=sides.filter(s=>d.lines.some(l=>l.q[s]>0)||d.extras.some(x=>x.side===s));
+    const enviados=usados.filter(s=>sentFlags(p)[s]);
+    if(!enviados.length)return '';
+    const texto=enviados.length===usados.length?'✓ Enviado':`✓ ${enviados.length}/${usados.length} enviado`;
+    return `<span class="sx-prov-enviado${enviados.length<usados.length?' parcial':''}" title="${esc(enviados.map(s=>SIDE_NAME[s]).join(' y '))}: enviado">${texto}</span>`;
+  };
   box.innerHTML=`<div class="sx-tablero-h"><h2>Tu pedido de hoy</h2><small class="sx-ayuda">Tocá un producto para cambiar la cantidad · <span class="sx-mover-demo" aria-hidden="true">${ico('mover')}</span> para pasarlo a otro proveedor</small></div>
     <button type="button" class="sx-pdf-btn" data-sx-pdf><span class="sx-pdf-i">${ico('hoja')}</span><span class="sx-pdf-t"><b>PDF del pedido</b><small>3 columnas · mandalo a tu WhatsApp</small></span><span class="sx-pdf-f" aria-hidden="true">›</span></button>
     ${sides.length>1?ciBarra():''}
     <div class="sx-tiendas n${sides.length}">${sides.map(tienda).join('')}</div>
     <div class="sx-lista">${datos.map((d,i)=>`<section class="sx-prov" data-sx-drop="${esc(d.prov)}" style="--i:${i};--c:${sxColor(d.prov)}">
-      <button type="button" class="sx-prov-h" data-pd="open" data-prov="${esc(d.prov)}" title="Abrir ${esc(d.prov)}"><b>${esc(d.prov)}</b>${d.tot?`<span>₡${fmt(d.tot)}</span>`:''}<i aria-hidden="true">›</i></button>
-      <div class="sx-par n${sides.length}">${sides.map(s=>sxLado(d,s)).join('')}</div>
+      <button type="button" class="sx-prov-h" data-pd="open" data-prov="${esc(d.prov)}" title="Abrir ${esc(d.prov)}"><b>${esc(d.prov)}</b>${estadoProveedor(d)}${d.tot?`<span>₡${fmt(d.tot)}</span>`:''}<i aria-hidden="true">›</i></button>
+      <div class="sx-par n${sides.length}" style="display:flex;flex-direction:column;align-items:stretch;gap:7px;width:100%">${sides.map(s=>sxLado(d,s)).join('')}</div>
     </section>`).join('')}</div>`;
   sxCabeceraFija();
   hojaPrecargar();
@@ -1111,7 +1119,10 @@ const CI_GASTOS=['Carretillero','Gasolina','Parqueo','Comida'];
 const CI_TIENDAS=['moravia','angeles'];
 const CI_PARA={mitad:'½ y ½',moravia:SIDE_ICO.moravia+' '+SIDE_NAME.moravia,angeles:SIDE_ICO.angeles+' '+SIDE_NAME.angeles};
 const CI_VENCE=18*3600e3; // un cierre que nadie toca en 18 horas ya es de otra compra
-const CI={st:null,pintado:null,seguro:0};
+// El cierre se escribe muchas veces mientras se teclea. Mantener el estado en
+// memoria y agrupar el guardado evita bloquear el hilo principal con
+// JSON.stringify + localStorage en cada tecla.
+const CI={st:null,pintado:null,seguro:0,saveTimer:0,patchFrame:0,calc:null,calcSt:null,precios:null};
 const ciPlata=v=>+String(v??'').replace(/\D/g,'')||0; // colones, solo dígitos: "4.500" = 4500
 const ciCant=v=>{const n=parseFloat(String(v??'').replace(',','.'));return n>0?Math.round(n*100)/100:0;};
 const ciNum=n=>String(+(+n||0).toFixed(2));
@@ -1130,9 +1141,31 @@ function ciCargar(){
   if(st&&!ciVigente(st)){if(ciTieneDatos(st))ciArchivar(st);st=null;}
   CI.st=st||ciNuevo();
   ciSincronizar(CI.st);
+  ciInvalidar();
   return CI.st;
 }
-function ciGuardar(){CI.st.toque=Date.now();LS.set('aramo_cierre',CI.st);}
+function ciInvalidar(){CI.calc=null;CI.calcSt=null;}
+function ciGuardarAhora(){
+  if(CI.saveTimer){clearTimeout(CI.saveTimer);CI.saveTimer=0;}
+  if(!CI.st)return;
+  CI.st.toque=Date.now();
+  LS.set('aramo_cierre',CI.st);
+}
+function ciGuardar(){
+  if(!CI.st)return;
+  ciInvalidar();
+  CI.st.toque=Date.now();
+  clearTimeout(CI.saveTimer);
+  CI.saveTimer=setTimeout(()=>{CI.saveTimer=0;LS.set('aramo_cierre',CI.st);},220);
+}
+function ciProgramarPatch(){
+  if(CI.patchFrame)return;
+  CI.patchFrame=requestAnimationFrame(()=>{CI.patchFrame=0;ciPatch();});
+}
+function ciPrecios(){
+  if(!CI.precios)CI.precios=LS.get('aramo_cierre_precios',{})||{};
+  return CI.precios;
+}
 const ciPagoDe=prov=>{const k=LS.get('aramo_cierre_pagos',{})[prov];return CI_PAGO_NOMBRE[k]?k:'efectivo';};
 function ciRecordarPago(prov,k){const m=LS.get('aramo_cierre_pagos',{});m[prov]=k;LS.set('aramo_cierre_pagos',m);}
 // Lo que se le pidió a un proveedor, con Moravia (#1) y Los Ángeles (#2) juntas por producto y unidad.
@@ -1173,7 +1206,7 @@ function ciSincronizar(st){
 // Precio que se propone mientras no se escriba el de hoy: el del producto (misma unidad) o el
 // último que se pagó en un cierre.
 function ciPrecioAntes(prov,it){
-  const ult=+LS.get('aramo_cierre_precios',{})[prov+'|'+it.k]||0;
+  const ult=+ciPrecios()[prov+'|'+it.k]||0;
   return(it.pid&&it.base?+getPrice(prov,it.pid)||0:0)||ult||+it.lista||0;
 }
 // Cuánto de lo que llegó es de cada tienda: si llegó lo pedido, lo que pidió cada una; si llegó
@@ -1189,6 +1222,7 @@ function ciReparto(q,pm,pa,qm){
 }
 const ciTiendaVacia=()=>({compras:0,gastos:0,total:0,pago:{efectivo:0,tarjeta:0,sinpe:0}});
 function ciCalc(st){
+  if(CI.calcSt===st&&CI.calc)return CI.calc;
   const porPago={efectivo:0,tarjeta:0,sinpe:0},tiendas={moravia:ciTiendaVacia(),angeles:ciTiendaVacia()};
   const provs=Object.keys(st.provs).sort(ORDEN_ES).map(prov=>{
     const cp=st.provs[prov];
@@ -1215,7 +1249,9 @@ function ciCalc(st){
   CI_TIENDAS.forEach(s=>{tiendas[s].total=tiendas[s].compras+tiendas[s].gastos;});
   const gastado=gastos.reduce((t,g)=>t+g.monto,0);
   const debe=st.llevo!=null?st.llevo-porPago.efectivo:null,dif=debe!=null&&st.regreso!=null?st.regreso-debe:null;
-  return{inicio:st.inicio,firma:st.firma,provs,gastos,porPago,tiendas,compras,gastado,total:compras+gastado,llevo:st.llevo,regreso:st.regreso,debe,dif};
+  const salida={inicio:st.inicio,firma:st.firma,provs,gastos,porPago,tiendas,compras,gastado,total:compras+gastado,llevo:st.llevo,regreso:st.regreso,debe,dif};
+  CI.calcSt=st;CI.calc=salida;
+  return salida;
 }
 function ciArchivar(st){
   const c=ciCalc(st),h=LS.get('aramo_cierres',[]);
@@ -1384,8 +1420,9 @@ function ciAbrir(){
   document.documentElement.classList.add('ci-abierto');
   requestAnimationFrame(()=>h.classList.add('open'));
 }
-function ciCerrar(){
+function ciCerrar(guardar=true){
   const h=$('sxCierre');if(!h)return;
+  if(guardar)ciGuardarAhora();
   if(h.contains(document.activeElement))document.activeElement.blur(); // guarda el precio que se estaba escribiendo
   h.classList.remove('open');document.documentElement.classList.remove('ci-abierto');
   sxRenderTablero();
@@ -1459,7 +1496,7 @@ function ciEntrada(t){
     const g=st.gastos.find(x=>x.id===t.closest('[data-ci-g]')?.dataset.ciG);if(!g)return;
     if(t.matches('[data-ci-gt]'))g.t=t.value;else g.monto=num(t.value);
   }else return;
-  ciGuardar();ciPatch();
+  ciGuardar();ciProgramarPatch();
 }
 // Al salir de un campo: el vacío vuelve a lo pedido / al precio anterior, y el precio de hoy queda
 // guardado para el próximo cierre (y como precio del producto si es la misma unidad).
@@ -1471,7 +1508,7 @@ function ciCambio(e){
   if(t.matches('[data-ci-qm],[data-ci-qa]')){t.value=ciNum(t.matches('[data-ci-qm]')?calc.qm:calc.qa);return;}
   t.value=calc.precio>0?calc.precio:'';
   if(!(it.precio>0))return;
-  const m=LS.get('aramo_cierre_precios',{});m[prov+'|'+k]=it.precio;LS.set('aramo_cierre_precios',m);
+  const m=ciPrecios();m[prov+'|'+k]=it.precio;LS.set('aramo_cierre_precios',m);
   if(it.pid&&it.base&&String(it.precio)!==String(getPrice(prov,it.pid)))setPrice(prov,it.pid,String(it.precio));
 }
 // Enter salta al precio siguiente (o al campo siguiente): se llenan todos sin tocar la pantalla.
@@ -1486,9 +1523,10 @@ function ciTecla(e){
 function ciTerminar(btn){
   // Se toca dos veces para no cerrarlo sin querer.
   if(Date.now()-CI.seguro>4000){CI.seguro=Date.now();btn.classList.add('seguro');btn.innerHTML='<span><b>¿Terminar? Tocá otra vez</b></span>';buzz(12);return;}
+  ciGuardarAhora();
   ciArchivar(CI.st);
   CI.st=ciNuevo();LS.set('aramo_cierre',null);
-  ciCerrar();
+  ciCerrar(false);
   toast('✓ Cierre guardado · lo ves en «Cierres guardados»','ok');
 }
 function ciMensaje(c){
