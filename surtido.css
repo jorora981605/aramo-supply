@@ -6,13 +6,10 @@
    Verde = Moravia · Naranja = Los Ángeles. Lo dibuja express.js (sxTarjeta, sxMover…).
    ══════════════════════════════════════════════════════════════════════ */
 #view-proveedores,#pedidoBody,.sx-dock,.sx-pregunta,.sx-aviso,.sx-fantasma{
-  --sx-f:'Plus Jakarta Sans',var(--fn);--sx-s:'Fraunces',Georgia,'Times New Roman',serif;
-  --pm:#15803d;--pa:#c2410c;--pm-t:#e7f6ec;--pa-t:#fdeee4;
-  --sx-card:var(--card,#fff);--sx-linea:rgba(16,40,28,.09);--sx-tile:#f3f7f4;--sx-tinta:#0e4a30;
-}
-html[data-theme="dark"] #view-proveedores,html[data-theme="dark"] #pedidoBody,html[data-theme="dark"] .sx-dock,html[data-theme="dark"] .sx-pregunta,html[data-theme="dark"] .sx-aviso,html[data-theme="dark"] .sx-fantasma{
-  --pm:#4ade80;--pa:#fb923c;--pm-t:rgba(74,222,128,.12);--pa-t:rgba(251,146,60,.13);
-  --sx-linea:rgba(255,255,255,.08);--sx-tile:rgba(255,255,255,.05);--sx-tinta:#1f7a4d;
+  /* Capa de alias (rediseño, fase 1): todo sale de los tokens --ar-* y cambia solo con el tema */
+  --sx-f:var(--ar-f-ui);--sx-s:var(--ar-f-display);
+  --pm:var(--ar-moravia-tinta);--pa:var(--ar-angeles-tinta);--pm-t:var(--ar-moravia-suave);--pa-t:var(--ar-angeles-suave);
+  --sx-card:var(--ar-sup);--sx-linea:var(--ar-borde);--sx-tile:var(--ar-sup-2);--sx-tinta:var(--ar-primario);
 }
 
 /* ── Proveedores: acomodo ── */
@@ -272,8 +269,7 @@ body[data-sx-lado="angeles"] .sx-prov.sx-sobre .sx-lado.angeles{box-shadow:inset
 .sx-dock-h em.angeles{background:var(--pa-t);color:var(--pa)}
 
 /* ══ Ventanita para cambiar la cantidad ══ */
-.sx-editor{position:fixed;inset:0;z-index:10060;display:grid;place-items:end center;background:rgba(8,20,14,.45);backdrop-filter:blur(4px);-webkit-backdrop-filter:blur(4px);opacity:0;pointer-events:none;transition:opacity .2s;font-family:var(--sx-f);--sx-f:'Plus Jakarta Sans',var(--fn);--sx-s:'Fraunces',Georgia,serif;--pm:#15803d;--pa:#c2410c;--pm-t:#e7f6ec;--pa-t:#fdeee4;--sx-linea:rgba(16,40,28,.1);--sx-tile:#f3f7f4}
-html[data-theme="dark"] .sx-editor{--pm:#4ade80;--pa:#fb923c;--pm-t:rgba(74,222,128,.12);--pa-t:rgba(251,146,60,.13);--sx-linea:rgba(255,255,255,.1);--sx-tile:rgba(255,255,255,.05)}
+.sx-editor{position:fixed;inset:0;z-index:10060;display:grid;place-items:end center;background:rgba(8,20,14,.45);backdrop-filter:blur(4px);-webkit-backdrop-filter:blur(4px);opacity:0;pointer-events:none;transition:opacity .2s;font-family:var(--sx-f);--sx-f:var(--ar-f-ui);--sx-s:var(--ar-f-display);--pm:var(--ar-moravia-tinta);--pa:var(--ar-angeles-tinta);--pm-t:var(--ar-moravia-suave);--pa-t:var(--ar-angeles-suave);--sx-linea:var(--ar-borde);--sx-tile:var(--ar-sup-2)}
 .sx-editor.open{opacity:1;pointer-events:auto}
 @media (min-width:600px){.sx-editor{place-items:center}}
 .sx-ed-in{--lc:var(--pm);--lt:var(--pm-t);width:min(440px,100%);padding:18px 18px calc(18px + env(safe-area-inset-bottom,0px));border-radius:26px 26px 0 0;background:var(--card,#fff);color:var(--t);box-shadow:0 -20px 50px -20px rgba(0,0,0,.45);transform:translateY(30px);transition:transform .28s cubic-bezier(.22,1,.36,1)}
@@ -351,8 +347,7 @@ html[data-theme="dark"] .sx-pdf-estado.firma{background:rgba(250,204,21,.14);col
 .sx-pdf-btn.ci-btn{margin-top:-2px;background:linear-gradient(135deg,#b45309,#92400e);box-shadow:0 8px 18px -12px rgba(146,64,14,.75)}
 .sx-vacio+.sx-pdf-btn.ci-btn{margin-top:10px}
 .ci{position:fixed;inset:0;z-index:10060;display:flex;align-items:center;justify-content:center;background:rgba(8,20,14,.5);backdrop-filter:blur(4px);-webkit-backdrop-filter:blur(4px);opacity:0;pointer-events:none;transition:opacity .2s;font-family:var(--sx-f);
-  --sx-f:'Plus Jakarta Sans',var(--fn);--sx-s:'Fraunces',Georgia,serif;--pm:#15803d;--pm-t:#e7f6ec;--sx-linea:rgba(16,40,28,.1);--sx-tile:#f3f7f4;--ci-am:#b45309;--pa:#c2410c;--pa-t:#fdeee4;--ci-am-t:#fef3c7;--ci-fondo:#f4f7f5}
-html[data-theme="dark"] .ci{--pm:#4ade80;--pm-t:rgba(74,222,128,.12);--pa:#fb923c;--pa-t:rgba(251,146,60,.13);--sx-linea:rgba(255,255,255,.1);--sx-tile:rgba(255,255,255,.05);--ci-am:#fbbf24;--ci-am-t:rgba(251,191,36,.14);--ci-fondo:var(--bg,#0c100e)}
+  --sx-f:var(--ar-f-ui);--sx-s:var(--ar-f-display);--pm:var(--ar-moravia-tinta);--pm-t:var(--ar-moravia-suave);--sx-linea:var(--ar-borde);--sx-tile:var(--ar-sup-2);--ci-am:var(--ar-pendiente-tinta);--pa:var(--ar-angeles-tinta);--pa-t:var(--ar-angeles-suave);--ci-am-t:var(--ar-pendiente-suave);--ci-fondo:var(--ar-fondo)}
 .ci.open{opacity:1;pointer-events:auto}
 html.ci-abierto,html.ci-abierto body{overflow:hidden}
 .ci-in{display:flex;flex-direction:column;width:100%;height:100%;background:var(--ci-fondo);color:var(--t);transform:translateY(24px);transition:transform .28s cubic-bezier(.22,1,.36,1)}
@@ -540,3 +535,63 @@ label.ci-tienda{cursor:text}
 .sx-card-id,.sx-card-tot,.sx-env{width:100%!important}
 .sx-card-tot{align-self:flex-start!important}
 .sx-env{height:44px!important;border-radius:12px!important}
+
+/* ══ Automático 1 (2026-11-23): Lo de siempre · precios que cambiaron · avisar lo que faltó · el más barato · la semana ══ */
+/* Lo de siempre: botón en "Tu pedido de hoy" (grande y verde cuando el pedido está vacío) */
+.sx-pdf-btn.au-btn{background:var(--ar-sup);color:var(--ar-tinta);box-shadow:inset 0 0 0 1.5px var(--ar-moravia-borde),var(--ar-s1)}
+.sx-pdf-btn.au-btn .sx-pdf-i{color:var(--ar-moravia-tinta)}
+.sx-pdf-btn.au-btn small{color:var(--ar-tinta-2)}
+.sx-pdf-btn.au-btn.grande{min-height:64px;margin-top:10px;background:var(--ar-primario);color:#fff;box-shadow:0 10px 22px -14px rgba(14,74,48,.8)}
+.sx-pdf-btn.au-btn.grande .sx-pdf-i,.sx-pdf-btn.au-btn.grande small{color:rgba(255,255,255,.88)}
+.sx-pdf-btn.au-btn.grande b{font-size:16.5px}
+.au-ayuda{margin:0 0 12px;font:500 15px/1.45 var(--ar-f-ui);color:var(--ar-tinta-2)}
+.au-lista{list-style:none;margin:0;padding:0;display:grid;gap:8px}
+.au-fila{position:relative;display:flex;align-items:flex-start;gap:12px;min-height:56px;padding:12px;border:1.5px solid var(--ar-borde);border-radius:var(--ar-r-md);background:var(--ar-sup);cursor:pointer;transition:opacity var(--ar-m1),border-color var(--ar-m1)}
+.au-fila input{position:absolute;opacity:0;width:1px;height:1px}
+.au-fila .ui-casilla-caja{margin-top:7px}
+.au-fila input:checked+.ui-casilla-caja{background:var(--ar-primario);border-color:var(--ar-primario);color:#fff}
+.au-fila input:focus-visible+.ui-casilla-caja{outline:3px solid var(--ar-foco-c);outline-offset:2px}
+.au-fila:has(input:checked){border-color:var(--ar-moravia-borde)}
+.au-fila:has(input:not(:checked)){opacity:.62}
+.au-t{display:flex;flex-direction:column;gap:3px;min-width:0}
+.au-t b{font:700 17px/1.25 var(--ar-f-ui);color:var(--ar-tinta)}
+.au-t small{font:500 15px/1.35 var(--ar-f-ui);color:var(--ar-tinta-2)}
+.au-t small.moravia{color:var(--ar-moravia-tinta)}
+.au-t small.angeles{color:var(--ar-angeles-tinta)}
+.au-t small.au-cuando{font-size:14px;color:var(--ar-tinta-3)}
+/* Cierre: precio que subió o bajó mucho */
+.ci-it.sube .ci-ped{color:var(--ar-peligro-tinta);font-weight:700}
+.ci-it.baja .ci-ped{color:var(--ar-moravia-tinta);font-weight:700}
+.ci-cambios{margin-top:14px;padding:12px 14px;border-radius:15px;background:var(--ar-sup);box-shadow:inset 0 0 0 1px var(--ar-borde)}
+.ci-cambios ul{list-style:none;margin:0;padding:0;display:grid;gap:6px}
+.ci-cambios li{display:flex;flex-wrap:wrap;align-items:baseline;justify-content:space-between;gap:4px 10px;font:600 14px/1.35 var(--sx-f);color:var(--t)}
+.ci-cambios li small{font-weight:600;color:var(--m)}
+.ci-cb-p{white-space:nowrap}
+.ci-cambios li em{font-style:normal;font-weight:800}
+.ci-cambios li.sube em{color:var(--ar-peligro-tinta)}
+.ci-cambios li.baja em{color:var(--ar-moravia-tinta)}
+/* Cierre: avisarle al proveedor lo que no vino */
+.ci-reclamo{display:flex;align-items:center;gap:10px;width:100%;min-height:52px;margin-top:10px;padding:10px 14px;border:0;border-radius:15px;background:var(--ar-wa);color:var(--ar-wa-tinta);font:700 15px/1.3 var(--sx-f);text-align:left;cursor:pointer}
+.ci-reclamo[hidden]{display:none}
+.ci-reclamo span{flex:1;min-width:0}
+.ci-reclamo em{flex:none;display:grid;place-items:center;min-width:28px;height:28px;padding:0 8px;border-radius:999px;background:rgba(255,255,255,.22);font:800 14px var(--sx-f);font-style:normal}
+.ci-reclamo.hecho{background:var(--ar-sup);color:var(--ar-tinta);box-shadow:inset 0 0 0 1.5px var(--ar-borde)}
+.ci-reclamo.hecho em{background:var(--ar-hundido)}
+.ci-reclamo:active{transform:scale(.98)}
+/* Pasar a otro proveedor: el precio de cada uno y el más barato */
+.sx-dock-h>span:has(.sx-dock-ahora){flex-wrap:wrap;row-gap:2px}
+.sx-dock-ahora{flex:0 0 100%;padding-left:30px;font:600 13px var(--sx-f);color:var(--m)}
+.sx-dock-p{display:block;margin-top:2px;font:600 11.5px var(--sx-f);color:var(--m);overflow:hidden;text-overflow:ellipsis}
+.sx-dock-grid button.barato{border-color:var(--ar-hecho);background:color-mix(in srgb,var(--ar-hecho) 11%,var(--sx-card))}
+.sx-dock-grid button.barato .sx-dock-p{color:var(--ar-moravia-tinta);font-weight:800}
+/* Enviar: esta semana contra la pasada */
+.au-sem-w:empty{display:none}
+.au-sem-w{margin:18px 0 8px}
+.au-semana{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px}
+.au-sem-t{display:flex;flex-direction:column;gap:3px;padding:14px;border-radius:var(--ar-r-md);background:var(--ar-sup);box-shadow:inset 0 0 0 1px var(--ar-borde)}
+.au-sem-t span{font:700 14px var(--ar-f-ui);color:var(--ar-moravia-tinta)}
+.au-sem-t.angeles span{color:var(--ar-angeles-tinta)}
+.au-sem-t strong{font:800 22px var(--ar-f-ui);color:var(--ar-tinta)}
+.au-sem-t small{font:600 14px/1.35 var(--ar-f-ui);color:var(--ar-tinta-2)}
+.au-sem-top{margin:10px 2px 0;font:500 14.5px/1.5 var(--ar-f-ui);color:var(--ar-tinta-2)}
+.au-sem-top b{color:var(--ar-tinta)}

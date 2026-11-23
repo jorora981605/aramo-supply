@@ -5,8 +5,9 @@
 
 /* ── Comunes ── */
 /* Cada puerta con su color, sin repetir: Mostrador naranja · Surtido verde · Taller morado · POS negro */
-.po{--po-urg:#d4451f;--po-aviso:#d98a12;--po-ok:#0f8a52;--po-s:#0d7a4a;--po-s2:#16a463;--po-t:#5b21b6;--po-t2:#8b5cf6;--po-p:#0b0c0f;--po-p2:#3a3f48;--po-m:#c2410c;--po-m-tx:#fff;--po-m-tinte:#f97316}
-html[data-theme="dark"] .po{--po-m:#ff8a3d;--po-m-tx:#1c0d03}
+/* Capa de alias (rediseño, fase 1): los colores de las puertas y de los estados salen de los tokens --ar-* */
+.po{--po-urg:var(--ar-peligro);--po-aviso:var(--ar-pendiente);--po-ok:var(--ar-hecho);--po-s:var(--ar-p-surtido);--po-s2:var(--ar-v500);--po-t:var(--ar-p-taller);--po-t2:color-mix(in srgb,var(--ar-p-taller) 72%,#fff);--po-p:var(--ar-p-pos);--po-p2:var(--ar-grafito2);--po-m:var(--ar-acento);--po-m-tx:#fff;--po-m-tinte:var(--ar-o500)}
+html[data-theme="dark"] .po{--po-m:var(--ar-o400);--po-m-tx:var(--ar-o900)}
 .po-tools{display:flex;align-items:center;gap:8px;margin-left:auto;flex:none}
 .po-chip{display:inline-flex;align-items:center;gap:6px;min-height:36px;padding:0 12px;border-radius:999px;border:1px solid var(--b);background:var(--card);color:var(--t);font:800 12px var(--fn);white-space:nowrap;cursor:pointer;transition:transform .12s,border-color .2s}
 .po-chip:active{transform:scale(.95)}

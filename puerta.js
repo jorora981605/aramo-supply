@@ -61,7 +61,8 @@ function uberLink(o){
 }
 function abrir(url){const w=window.open(url,'_blank','noopener');if(!w)location.href=url;}
 let _tt=0;
-function toast(m){let t=$('moToast');if(!t){t=document.createElement('div');t.id='moToast';t.className='mo-toast';t.setAttribute('role','status');document.body.appendChild(t);}t.textContent=m;t.classList.add('show');clearTimeout(_tt);_tt=setTimeout(()=>t.classList.remove('show'),2800);}
+// Un solo sistema de avisos (aramo-ui.js). Arriba, como siempre: abajo taparía Pesar y Cobrar.
+function toast(m){AramoUI.aviso(m,{id:'moToast',arriba:true,icono:false});}
 // La campana suena SOLO cuando llega un pedido nuevo al Mostrador (y en "Probar").
 function campana(fuerte){
   if(!R.sonido)return;

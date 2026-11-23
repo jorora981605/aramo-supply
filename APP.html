@@ -2,39 +2,53 @@
 <html lang="es">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="apple-mobile-web-app-title" content="ARAMO">
 <meta name="mobile-web-app-capable" content="yes">
-<meta name="theme-color" content="#f4f7f5">
+<meta name="theme-color" content="#f8f7f2">
 <meta name="description" content="Sistema de pedidos ARAMO Supply">
 <link rel="manifest" href="./manifest.json">
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.117.0"></script>
 <script src="catalogo-productos.js"></script>
 <script src="supplier-base.js"></script>
+<!-- Sistema de diseño ARAMO: tokens y letras locales. Va PRIMERO. -->
+<script>
+// Letras de la marca. PRIMERA visita: esperan a que la app termine de abrir (no le quitan internet a lo
+// importante) y mientras tanto se ve la letra del aparato. Desde la segunda ya están guardadas y salen de una vez.
+(function(d){var h=d.documentElement,ya=false;try{ya=localStorage.getItem('aramo_letras')==='1';}catch(e){}
+  if(ya){['jakarta-latin'].forEach(function(f){var l=d.createElement('link');l.rel='preload';l.as='font';l.type='font/woff2';l.crossOrigin='anonymous';l.href='fuentes/'+f+'.woff2';d.head.appendChild(l);});return;}
+  h.classList.add('espera-letras');
+  // al terminar de abrir: se piden las letras y, cuando ya están guardadas, se anota para la próxima vez
+  addEventListener('load',function(){setTimeout(function(){h.classList.remove('espera-letras');
+    var ok=function(){try{localStorage.setItem('aramo_letras','1');}catch(e){}};
+    try{d.fonts.load('600 16px "Plus Jakarta Sans"').then(ok,function(){});}catch(e){ok();}},60);});
+})(document);
+</script>
+<link rel="stylesheet" href="aramo-ui.css?v=20261122-fase1">
 <link rel="apple-touch-icon" href="./icon.png">
 <link rel="icon" href="./icon.png">
 <title>ARAMO</title>
 <style>
 *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
 :root{
-  --bg:#0a0a0a;--s:#121212;--card:#1b1b1b;--ch:#212121;--b:#2a2a2a;--b2:#363636;
-  --g:#00d67a;--gd:rgba(0,214,122,.12);--gg:rgba(0,214,122,.28);--gh:#1aff96;
-  --o:#ff8f24;--od:rgba(255,143,36,.12);--og:rgba(255,143,36,.30);--oh:#ffab55;
-  --t:#f5f5f5;--m:#7d7d7d;--sb:#2e2e2e;
-  --fn:-apple-system,BlinkMacSystemFont,"SF Pro Display","Segoe UI",system-ui,sans-serif;
-  --mo:"SF Mono","Fira Code",Consolas,monospace;
-  --r1:14px;--r2:9px;--r3:6px;
-  --sh:0 8px 32px rgba(0,0,0,.5);
+  /* Capa de alias (rediseño, fase 1): las variables viejas apuntan a los tokens --ar-* de aramo-ui.css.
+     El claro y el oscuro los cambian los tokens; aquí no se repite nada por tema. */
+  --bg:var(--ar-fondo);--s:var(--ar-sup);--card:var(--ar-sup);--ch:var(--ar-sup-2);--sb:var(--ar-sup-2);--b:var(--ar-borde);--b2:var(--ar-borde-2);
+  --g:var(--ar-moravia-tinta);--gd:var(--ar-moravia-suave);--gg:var(--ar-moravia-borde);--gh:var(--ar-v500);
+  --o:var(--ar-angeles-tinta);--od:var(--ar-angeles-suave);--og:var(--ar-angeles-borde);--oh:var(--ar-o500);
+  --t:var(--ar-tinta);--m:var(--ar-tinta-3);
+  --fn:var(--ar-f-ui);--mo:var(--ar-f-ui);
+  --r1:var(--ar-r-md);--r2:var(--ar-r-sm);--r3:var(--ar-r-xs);
+  --sh:var(--ar-s2);
   --tr:all .15s cubic-bezier(.4,0,.2,1);
-  --grad:linear-gradient(90deg,var(--g),var(--o));
-  --chrome:linear-gradient(155deg,#1c3626 0%,#202020 45%,#3a230f 100%);
-  --chrome-soft:linear-gradient(155deg,#183020 0%,#1a1a1a 45%,#33200e 100%);
-  --chrome-bar:linear-gradient(100deg,rgba(0,168,96,.16) 0%,rgba(15,15,15,.94) 45%,rgba(255,143,36,.14) 100%);
-  --chrome-hi:inset 0 1px 0 rgba(255,255,255,.09),inset 0 -16px 26px rgba(0,0,0,.5),0 6px 16px rgba(0,0,0,.35);
-  --chrome-hi-sm:inset 0 1px 0 rgba(255,255,255,.08),inset 0 -2px 4px rgba(0,0,0,.4);
-  --chrome-flat:linear-gradient(155deg,#242424 0%,#181818 50%,#0e0e0e 100%);
+  --grad:linear-gradient(90deg,var(--ar-moravia),var(--ar-angeles));
+  /* --g y --o apuntan al tono "tinta" (700): en la app vieja son sobre todo letra chica, y con 600 el naranja no llega a 4,5:1 */
+  --chrome:var(--ar-sup);--chrome-soft:var(--ar-sup);--chrome-bar:color-mix(in srgb,var(--ar-fondo) 92%,transparent);
+  --chrome-hi:var(--ar-s2);--chrome-hi-sm:var(--ar-s1);--chrome-flat:var(--ar-sup-2);
+  /* Las ventanitas y los avisos nuevos van encima de las capas viejas (la más alta es 10070) */
+  --ar-z-hoja:20000;--ar-z-aviso:20100;--ar-z-alarma:20200;
 }
 html{background:var(--bg);color:var(--t);font-family:var(--fn);-webkit-font-smoothing:antialiased;font-size:17px}
 body{
@@ -442,22 +456,6 @@ body[data-order-scope="lasr"] .direct-qty-grid{grid-template-columns:1fr!importa
 }
 
 /* ARAMO SIMPLE — claro por defecto, táctil y siempre visible */
-:root{
-  --bg:#f4f7f5;--s:#fff;--card:#fff;--ch:#edf3ef;--b:#dbe5df;--b2:#c3d2c9;
-  --g:#087a4c;--gd:rgba(8,122,76,.09);--gg:rgba(8,122,76,.24);--gh:#0a965d;
-  --o:#b95f0a;--od:rgba(185,95,10,.09);--og:rgba(185,95,10,.24);--oh:#d87818;
-  --t:#15221b;--m:#5c6b62;--sb:#e8eeea;--sh:0 12px 30px rgba(32,64,45,.10);
-  --chrome:#fff;--chrome-soft:#fff;--chrome-bar:rgba(255,255,255,.96);
-  --chrome-hi:0 8px 24px rgba(32,64,45,.08);--chrome-hi-sm:0 3px 12px rgba(32,64,45,.07);--chrome-flat:#f7faf8;
-}
-html[data-theme="dark"]{
-  --bg:#0c100e;--s:#141a17;--card:#1a211d;--ch:#202923;--b:#2d3932;--b2:#405046;
-  --g:#43dc94;--gd:rgba(67,220,148,.12);--gg:rgba(67,220,148,.28);--gh:#70eaae;
-  --o:#ffad5c;--od:rgba(255,173,92,.12);--og:rgba(255,173,92,.3);--oh:#ffc17e;
-  --t:#f4f7f5;--m:#a7b2ab;--sb:#273029;--sh:0 12px 32px rgba(0,0,0,.35);
-  --chrome:#1a211d;--chrome-soft:#171d1a;--chrome-bar:rgba(20,26,23,.96);
-  --chrome-hi:0 8px 24px rgba(0,0,0,.28);--chrome-hi-sm:0 3px 12px rgba(0,0,0,.22);--chrome-flat:#202823;
-}
 html,body{background:var(--bg);color:var(--t)}
 body{background:linear-gradient(180deg,var(--gd),transparent 260px),var(--bg);font-size:17px}
 .app{min-height:100dvh;padding-bottom:calc(82px + env(safe-area-inset-bottom,0px))}
@@ -699,13 +697,10 @@ html[data-theme="dark"] .today-money-card{background:linear-gradient(145deg,#125
 }
 </style>
 <link rel="stylesheet" href="express.css?v=20261020-premium-2">
-<link rel="preconnect" href="https://fonts.googleapis.com">
-<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Caveat:wght@600;700&family=Chakra+Petch:wght@500;600;700&family=JetBrains+Mono:wght@500;600&family=Fraunces:opsz,wght@9..144,600;9..144,700&family=Plus+Jakarta+Sans:wght@500;600;700;800&display=swap" media="print" onload="this.media='all'">
 <link rel="stylesheet" href="puerta.css?v=20261013-perfil-1">
-<link rel="stylesheet" href="portadas.css?v=20261016-colores-1">
-<link rel="stylesheet" href="pedido.css?v=20261109-hora">
-<link rel="stylesheet" href="surtido.css?v=20261119-lista-4">
+<link rel="stylesheet" href="portadas.css?v=20261122-fase1">
+<link rel="stylesheet" href="pedido.css?v=20261122-fase1">
+<link rel="stylesheet" href="surtido.css?v=20261123-auto1">
 </head>
 <body>
 <script>
@@ -715,7 +710,8 @@ html[data-theme="dark"] .today-money-card{background:linear-gradient(145deg,#125
 (function(){try{
   if(location.hash||/[?&](pos|portada)=/.test(location.search)||!sessionStorage.getItem('aramo_local_sesion'))return;
   var f=JSON.parse(localStorage.getItem('aramo_portada_foto')||'null');if(!f||!f.html||f.v!==+(localStorage.getItem('aramo_portada')||2))return;
-  document.documentElement.dataset.theme=localStorage.getItem('aramo_theme')||'light';
+  var t=localStorage.getItem('aramo_theme')||'light';if(t==='auto')t=matchMedia('(prefers-color-scheme: dark)').matches?'dark':'light';
+  document.documentElement.dataset.theme=t;
   document.body.insertAdjacentHTML('afterbegin','<div class="pu open" id="puFoto" data-portada="'+f.v+'" aria-hidden="true"><div class="'+f.cls+'">'+f.html+'</div></div>');
   document.body.classList.add('pu-lock');
   // un toque mientras termina de cargar no se pierde: puerta.js lo cumple apenas está lista
@@ -1006,7 +1002,7 @@ html[data-theme="dark"] .today-money-card{background:linear-gradient(145deg,#125
         </div>
       </div>
 
-      <div class="app-version">ARAMO · versión <b>2026-11-19 · notas a la vista</b> · se actualiza sola</div>
+      <div class="app-version">ARAMO · versión <b>2026-11-23 · automático 1</b> · se actualiza sola</div>
 
       <div class="cfg-acc" data-acc="datos">
         <button class="cfg-acc-hdr">⚠️ Borrar TODA la aplicación <span class="cfg-acc-arrow">▾</span></button>
@@ -2024,7 +2020,8 @@ let historicoCache={};
 
 async function loadHistoricoFromSupabase(){
   try{
-    const{data,error}=await supa.from('historico_diario').select('*').order('fecha',{ascending:false}).limit(200);
+    // Sin el detalle de productos (pesa): ese solo se pide cuando se usa "Lo de siempre".
+    const{data,error}=await supa.from('historico_diario').select('id,fecha,proveedor,total_moravia,total_angeles,total,enviado_moravia,enviado_angeles,updated_at').order('fecha',{ascending:false}).limit(200);
     if(error){console.warn('Error cargando histórico:',error.message);return;}
     historicoCache={};
     (data||[]).forEach(row=>{historicoCache[row.id]=row;});
@@ -2060,9 +2057,29 @@ function pushHistoricoToSupabase(prov,side,tM,tA){
     updated_at:new Date().toISOString(),
   };
   historicoCache[id]=row;
-  supa.from('historico_diario').upsert(row,{onConflict:'id'}).then(({error})=>{
-    if(error)console.warn('Error sincronizando histórico:',error.message);
+  // Lo que se pidió de cada producto (para "Lo de siempre"): {v,t,q:{tienda:{producto:[cantidad,unidad]}},x:{tienda:[[nombre,cantidad,unidad]]}}.
+  // Necesita la columna historico_diario.detalle (supabase-historico-detalle.sql). Si todavía no existe, se guarda como antes.
+  const conDetalle=_histDetalle!==false?{...row,detalle:detalleDelPedido(prov)}:row;
+  supa.from('historico_diario').upsert(conDetalle,{onConflict:'id'}).then(({error})=>{
+    if(!error){if(conDetalle!==row)_histDetalle=true;return;}
+    if(conDetalle!==row&&/detalle|PGRST204|42703/.test((error.code||'')+' '+(error.message||''))){
+      _histDetalle=false;
+      supa.from('historico_diario').upsert(row,{onConflict:'id'}).then(({error:e2})=>{if(e2)console.warn('Error sincronizando histórico:',e2.message);});
+      return;
+    }
+    console.warn('Error sincronizando histórico:',error.message);
   });
+}
+let _histDetalle=null;   // null = no se sabe aún · false = la nube no tiene la columna (se deja de mandar en esta sesión)
+function detalleDelPedido(prov){
+  const p=S.pedidos[prov]||{},q={},x={};
+  ['moravia','angeles'].forEach(s=>{
+    const o={};Object.entries(p.qtys?.[s]||{}).forEach(([pid,v])=>{if(+v?.qty>0)o[pid]=[+v.qty,v.unit||''];});
+    if(Object.keys(o).length)q[s]=o;
+    const a=(p.extras?.[s]||[]).filter(e=>+e?.qty>0).map(e=>[String(e.name||''),+e.qty,e.unit||'']);
+    if(a.length)x[s]=a;
+  });
+  return{v:1,t:Date.now(),q,x};
 }
 
 const fmt=n=>Number(n||0).toLocaleString('es-CR');
@@ -3173,6 +3190,50 @@ function renderHistorico(){
   }).join('');
 }
 
+// ── Esta semana contra la pasada (hasta el mismo día), por tienda y por proveedor ──
+// Se pide a la nube solo al abrir Estado de hoy (y cada 10 minutos como mucho).
+const _semana={filas:null,t:0,cargando:false};
+const _fechaTxt=d=>d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');
+async function cargarSemana(){
+  if(_semana.cargando||Date.now()-_semana.t<(_semana.filas?10*60e3:60e3))return;   // sin conexión: se reintenta al minuto
+  _semana.cargando=true;
+  try{
+    const desde=new Date();desde.setDate(desde.getDate()-16);
+    const{data,error}=await supa.from('historico_diario').select('fecha,proveedor,total_moravia,total_angeles').gte('fecha',_fechaTxt(desde)).limit(2000);
+    if(!error)_semana.filas=data||[];
+  }catch(e){console.warn('Semana: sin datos',e?.message||e);}
+  _semana.t=Date.now();_semana.cargando=false;
+  renderSemana();
+}
+function calcSemana(filas,hoy=new Date()){
+  const dow=(hoy.getDay()+6)%7,lunes=new Date(hoy.getFullYear(),hoy.getMonth(),hoy.getDate()-dow);
+  const dias=f=>Math.round((new Date(f+'T00:00:00')-lunes)/864e5);
+  // La fecha de la nube va en hora UTC (un pedido de la noche cae al día siguiente): se compara hasta el último día con datos.
+  const esta=filas.filter(r=>{const d=dias(r.fecha);return d>=0&&d<=6;}),hasta=esta.reduce((m,r)=>Math.max(m,dias(r.fecha)),dow);
+  const pasada=filas.filter(r=>{const d=dias(r.fecha)+7;return d>=0&&d<=hasta;});
+  const suma=(a,k)=>a.reduce((t,r)=>t+(+r[k]||0),0);
+  const tiendas={moravia:{ahora:suma(esta,'total_moravia'),antes:suma(pasada,'total_moravia')},angeles:{ahora:suma(esta,'total_angeles'),antes:suma(pasada,'total_angeles')}};
+  const porProv={};
+  esta.forEach(r=>{(porProv[r.proveedor]=porProv[r.proveedor]||{ahora:0,antes:0}).ahora+=(+r.total_moravia||0)+(+r.total_angeles||0);});
+  pasada.forEach(r=>{(porProv[r.proveedor]=porProv[r.proveedor]||{ahora:0,antes:0}).antes+=(+r.total_moravia||0)+(+r.total_angeles||0);});
+  const cambios=Object.entries(porProv).map(([prov,v])=>({prov,dif:v.ahora-v.antes})).filter(x=>Math.abs(x.dif)>=1000).sort((a,b)=>Math.abs(b.dif)-Math.abs(a.dif)).slice(0,3);
+  return{tiendas,cambios,hasta,hayAntes:pasada.length>0,hayAhora:esta.length>0};
+}
+function renderSemana(){
+  const el=document.getElementById('resSemana');if(!el)return;
+  cargarSemana();
+  if(!_semana.filas){el.innerHTML='';return;}
+  const s=calcSemana(_semana.filas);
+  if(!s.hayAhora&&!s.hayAntes){el.innerHTML='';return;}
+  const DIAS=['lunes','martes','miércoles','jueves','viernes','sábado','domingo'];
+  const pct=(a,b)=>b>0?Math.round((a-b)/b*100):null;
+  const tienda=(k,nom)=>{const t=s.tiendas[k],p=pct(t.ahora,t.antes);
+    return `<div class="au-sem-t ${k} scope-branch-${k}"><span>${nom}</span><strong>₡${fmt(t.ahora)}</strong><small>${p==null?'sin datos de la semana pasada':`${p>0?'▲':p<0?'▼':'='} ${Math.abs(p)} % · la pasada ₡${fmt(t.antes)}`}</small></div>`;};
+  el.innerHTML=`<div class="today-section-title"><span>Esta semana</span><small>${s.hasta?`contra la pasada, de lunes a ${DIAS[Math.min(6,s.hasta)]}`:'contra el lunes pasado'}</small></div>
+    <div class="au-semana">${tienda('moravia','Moravia')}${tienda('angeles','Los Ángeles')}</div>
+    ${s.cambios.length&&s.hayAntes?`<p class="au-sem-top">Lo que más cambió: ${s.cambios.map(x=>`<b>${summaryEsc(x.prov)}</b> ${x.dif>0?'▲':'▼'} ₡${fmt(Math.abs(x.dif))}`).join(' · ')}</p>`:''}`;
+}
+
 setInterval(()=>{
   if(document.getElementById('view-resumen')?.classList.contains('active'))renderResumen();
 },15000);
@@ -3790,9 +3851,9 @@ async function resetAll(){
 // ══════════════════════════════════════════
 let _tt;
 function toast(msg,type=''){
-  const el=document.getElementById('toast');
-  el.textContent=msg;el.className='toast show '+type;
-  clearTimeout(_tt);_tt=setTimeout(()=>el.className='toast',2600);
+  // Un solo sistema de avisos (aramo-ui.js). La firma no cambia: toast(texto, 'ok' | 'err' | '').
+  const el=document.getElementById('toast');if(el)el.textContent=msg;
+  AramoUI.aviso(msg,{tipo:type==='err'?'error':'ok',icono:type?undefined:false});
 }
 
 // ══════════════════════════════════════════
@@ -3864,16 +3925,21 @@ function inp_globalGoTo(provName, prodId){
 }
 
 // Tema claro por defecto; la preferencia queda guardada en este dispositivo.
-function applyTheme(theme){
+function applyTheme(pref){
+  // pref: 'light' | 'dark' | 'auto' (sigue al teléfono). La página siempre queda en light o dark.
+  const theme=pref==='dark'||(pref==='auto'&&matchMedia('(prefers-color-scheme: dark)').matches)?'dark':'light';
   document.documentElement.dataset.theme=theme;
-  localStorage.setItem('aramo_theme',theme);
+  localStorage.setItem('aramo_theme',pref);
   const button=document.getElementById('themeToggle');
   if(button){
     button.textContent=theme==='dark'?'☀️':'🌙';
     button.setAttribute('aria-label',theme==='dark'?'Usar tema claro':'Usar tema oscuro');
   }
-  document.querySelector('meta[name="theme-color"]').content=theme==='dark'?'#0c100e':'#f4f7f5';
+  document.querySelector('meta[name="theme-color"]').content=theme==='dark'?'#0e1310':'#f8f7f2';
 }
+// Se guarda en una constante: si no, el navegador puede botar el aviso de cambio de tema del teléfono.
+const _temaDelTelefono=matchMedia('(prefers-color-scheme: dark)');
+_temaDelTelefono.addEventListener('change',()=>{if(localStorage.getItem('aramo_theme')==='auto')applyTheme('auto');});
 document.getElementById('themeToggle').addEventListener('click',()=>{
   applyTheme(document.documentElement.dataset.theme==='dark'?'light':'dark');
 });
@@ -4034,12 +4100,15 @@ if(isIOS && !isInStandalone && !dismissed){
   },3000);
 }
 </script>
-<script src="express.js?v=20261119-lista-4"></script>
+<!-- Íconos y ventanitas del sistema de diseño: antes de express.js, que ya los usa -->
+<script src="iconos.js?v=20261122-fase1"></script>
+<script src="aramo-ui.js?v=20261122-fase1"></script>
+<script src="express.js?v=20261123-auto1"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcode-generator/1.4.4/qrcode.min.js"></script>
 <script src="canasta-config.js?v=20261018-seguridad-1"></script>
 <script src="aramo-nube.js?v=20261020-circuito-6"></script>
 <script src="portadas.js?v=20261023-rapida-1"></script>
-<script src="puerta.js?v=20261020-circuito-11"></script>
+<script src="puerta.js?v=20261122-fase1"></script>
 <script>
   // El menú, Mostrador y Surtido se desplazan verticalmente; no usar gestos
   // horizontales como Atrás/Adelante del navegador en el teléfono.

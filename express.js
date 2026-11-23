@@ -286,6 +286,152 @@ function xpApplyQtys(prov,qtys){
 }
 
 // ══════════════════════════════════════════
+// ✨ LO DE SIEMPRE PARA TODO EL PEDIDO — aprende del día de la semana
+// ══════════════════════════════════════════
+// Cada envío deja en la nube lo que se pidió de cada producto (historico_diario.detalle, ver
+// pushHistoricoToSupabase). Con eso, más lo que guarda este teléfono (aramo_hist), se arma el pedido
+// de hoy con lo que se suele pedir ESTE día de la semana: solo a los proveedores que se piden ese día
+// y solo donde no hay nada escrito. Mientras no haya historia de ese día, propone lo de la última vez.
+// La jornada empieza a las 6 a. m.: un pedido mandado a la 1 de la madrugada cuenta para la noche anterior.
+const AU={nube:[],nubeT:0,cargando:null,cache:null};
+const AU_DIAS=['domingo','lunes','martes','miércoles','jueves','viernes','sábado'];
+const auJornada=t=>new Date(+t-6*3600e3);
+const auDiaTxt=d=>d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');
+const auHoySem=()=>auJornada(Date.now()).getDay();
+function auDeNube(r){
+  const d=r?.detalle;if(!d||!(+d.t>0)||!d.q)return null;
+  const qtys={moravia:{},angeles:{}};
+  ['moravia','angeles'].forEach(s=>Object.entries(d.q[s]||{}).forEach(([pid,v])=>{if(Array.isArray(v)&&+v[0]>0)qtys[s][pid]={qty:+v[0],unit:v[1]||''};}));
+  return{provider:r.proveedor,t:+d.t,qtys};
+}
+// Pide a la nube solo los días que sirven: el mismo día de la semana de las últimas 5 semanas y los
+// últimos 4 días (la fecha de la nube va en hora UTC, así que también se pide el día siguiente).
+function auCargar(){
+  if(AU.cargando||Date.now()-AU.nubeT<20*60e3||typeof supa==='undefined')return AU.cargando;
+  const hoy=auJornada(Date.now()),fechas=new Set(),agregar=(base,dias)=>{const d=new Date(base);d.setDate(d.getDate()+dias);fechas.add(auDiaTxt(d));};
+  for(let w=1;w<=5;w++){agregar(hoy,-7*w);agregar(hoy,-7*w+1);}
+  for(let k=0;k<=4;k++)agregar(hoy,-k+1);
+  const antes=auPendientes().lista.length;
+  AU.cargando=Promise.resolve().then(()=>supa.from('historico_diario').select('proveedor,detalle').in('fecha',[...fechas]).not('detalle','is',null).limit(1500))
+    .then(({data,error})=>{if(error)throw error;AU.nube=(data||[]).map(auDeNube).filter(Boolean);AU.cache=null;})
+    .catch(e=>console.warn('Lo de siempre: sin historial de la nube todavía',e?.message||e)) // sin la columna nueva sigue con lo del teléfono
+    .finally(()=>{AU.nubeT=Date.now();AU.cargando=null;if(auPendientes().lista.length!==antes)sxRenderTablero();});
+  return AU.cargando;
+}
+// Un pedido por proveedor y por jornada (el último que se mandó), del más nuevo al más viejo. Sin la jornada de hoy.
+function auHistoria(){
+  const hoy=auDiaTxt(auJornada(Date.now())),loc=histGet(),key=AU.nubeT+'|'+AU.nube.length+'|'+(loc[0]?.id||'')+'|'+loc.length+'|'+hoy;
+  if(AU.cache?.key===key)return AU.cache.porProv;
+  const mejor=new Map();
+  const meter=e=>{
+    if(!e?.provider||!(e.t>0))return;
+    const j=auJornada(e.t),dia=auDiaTxt(j);if(dia===hoy)return;
+    const k=e.provider+'|'+dia,y=mejor.get(k);
+    if(!y||e.t>y.t)mejor.set(k,{provider:e.provider,t:e.t,qtys:e.qtys||{},sem:j.getDay()});
+  };
+  AU.nube.forEach(meter);
+  loc.forEach(h=>meter({provider:h.provider,t:Date.parse(h.date),qtys:h.qtys}));
+  const porProv={};
+  mejor.forEach(e=>{(porProv[e.provider]=porProv[e.provider]||[]).push(e);});
+  Object.values(porProv).forEach(a=>a.sort((x,y)=>y.t-x.t));
+  AU.cache={key,porProv};
+  return porProv;
+}
+// Lo de siempre de un proveedor: las últimas (hasta 4) veces que se le pidió este día de la semana.
+// Un producto entra si salió en al menos la mitad de esas veces; la cantidad es la del medio.
+function auSugerir(prov,hist){
+  const sem=auHoySem(),hace=Date.now()-36*864e5;
+  const veces=(hist[prov]||[]).filter(e=>e.sem===sem&&e.t>hace).slice(0,4);
+  if(!veces.length)return null;
+  const need=Math.max(1,Math.ceil(veces.length/2)),qtys={moravia:{},angeles:{}};let n=0;
+  ['moravia','angeles'].forEach(s=>{
+    const vals={};
+    veces.forEach(e=>Object.entries(e.qtys?.[s]||{}).forEach(([pid,v])=>{if(+v?.qty>0)(vals[pid]=vals[pid]||[]).push({q:+v.qty,u:v.unit});}));
+    Object.entries(vals).forEach(([pid,arr])=>{if(arr.length<need)return;const qs=arr.map(a=>a.q).sort((a,b)=>a-b);qtys[s][pid]={qty:qs[Math.floor(qs.length/2)],unit:arr[0].u};n++;});
+  });
+  return n?{qtys,veces:veces.length,t:veces[0].t}:null;
+}
+// Mientras no haya historia de este día de la semana: lo de la última vez (de los últimos 4 días).
+function auUltimo(prov,hist){
+  const e=(hist[prov]||[])[0];
+  return e&&Date.now()-e.t<4*864e5?{qtys:e.qtys,veces:1,t:e.t}:null;
+}
+// Proveedores con algo que proponer en una tienda que todavía no tiene nada escrito.
+function auPendientes(){
+  const hist=auHistoria(),sides=activeOrderSides(),provs=getProvNames();
+  const modo=provs.some(p=>auSugerir(p,hist))?'semana':'ultimo',lista=[];
+  provs.forEach(prov=>{
+    const sug=modo==='semana'?auSugerir(prov,hist):auUltimo(prov,hist);if(!sug)return;
+    const ids=new Set((getAllProviders()[prov]?.products||[]).map(x=>x.id)),porLado={};let n=0;
+    sides.forEach(s=>{
+      if(pedidoTieneLado(S.pedidos[prov],s))return;   // lo que ya está escrito no se toca
+      const pids=Object.keys(sug.qtys[s]||{}).filter(pid=>ids.has(pid));
+      if(pids.length){porLado[s]=pids;n+=pids.length;}
+    });
+    if(n)lista.push({prov,sug,porLado,n});
+  });
+  return{modo,lista};
+}
+function auTextoDia(modo){return modo==='semana'?`lo que se suele pedir los ${AU_DIAS[auHoySem()]}`:'lo que pediste la última vez';}
+function auBoton(vacio){
+  auCargar();
+  const r=auPendientes();if(!r.lista.length)return'';
+  const k=r.lista.length,sub=`${plural(k,'proveedor','proveedores')} · ${auTextoDia(r.modo)}`;
+  return `<button type="button" class="sx-pdf-btn au-btn${vacio?' grande':''}" data-sx-siempre><span class="sx-pdf-i">${ico('estrella')}</span><span class="sx-pdf-t"><b>${vacio?'Armar el pedido con lo de siempre':`Falta lo de siempre de ${plural(k,'proveedor','proveedores')}`}</b><small>${esc(vacio?sub:capital(auTextoDia(r.modo)))}</small></span><span class="sx-pdf-f" aria-hidden="true">›</span></button>`;
+}
+function auAbrir(){
+  const {modo,lista}=auPendientes();
+  if(!lista.length){AramoUI.aviso('No hay nada que proponer: ya está todo escrito',{tipo:'info'});return;}
+  const sides=activeOrderSides(),dos=sides.length>1;
+  const h=AramoUI.hoja({titulo:'Lo de siempre',sub:capital(auTextoDia(modo)),clase:'au-hoja',foco:'titulo'});
+  const nombres=(prov,pids)=>pids.map(pid=>niceName(xpProd(prov,pid)?.name||pid)).join(', ');
+  const cuando=t=>new Date(t).toLocaleDateString('es-CR',{weekday:'short',day:'numeric',month:'short'}).replace(',','');
+  const dia=AU_DIAS[auHoySem()],dias=/s$/.test(dia)?dia:dia+'s';   // los lunes, los sábados
+  const deDonde=s=>s.veces>1?`Sale de ${s.veces} ${dias} · el último fue el ${cuando(s.t)}`:capital(cuando(s.t));
+  h.cuerpo.innerHTML=`<p class="au-ayuda">Se llena solo donde no hay nada escrito. Después lo revisás y lo enviás como siempre.</p>
+    <ul class="au-lista">${lista.map((x,i)=>`<li><label class="au-fila" style="--c:${sxColor(x.prov)}">
+      <input type="checkbox" checked data-au="${i}"><span class="ui-casilla-caja" aria-hidden="true">${ico('ok')}</span>
+      <span class="sx-av" aria-hidden="true">${esc(x.prov.charAt(0).toUpperCase())}</span>
+      <span class="au-t"><b>${esc(x.prov)}</b>${sides.filter(s=>x.porLado[s]).map(s=>`<small class="${s}">${dos?SIDE_ICO[s]+' ':''}${esc(nombres(x.prov,x.porLado[s]))}</small>`).join('')}<small class="au-cuando">${esc(deDonde(x.sug))}</small></span>
+    </label></li>`).join('')}</ul>`;
+  const no=document.createElement('button');no.type='button';no.className='ui-btn ui-btn--secundario ui-btn--l';no.textContent='Cancelar';
+  const si=document.createElement('button');si.type='button';si.className='ui-btn ui-btn--primario ui-btn--l ui-crece';
+  const contar=()=>{const k=h.cuerpo.querySelectorAll('[data-au]:checked').length;si.textContent=k?`Poner ${plural(k,'pedido','pedidos')}`:'Elegí al menos uno';si.disabled=!k;};
+  h.cuerpo.addEventListener('change',contar);contar();
+  no.addEventListener('click',()=>h.cerrar());
+  si.addEventListener('click',()=>{const sel=[...h.cuerpo.querySelectorAll('[data-au]:checked')].map(c=>lista[+c.dataset.au]);h.cerrar();auPoner(sel);});
+  h.pie.appendChild(no);h.pie.appendChild(si);
+}
+function auPoner(sel){
+  const antes={},nuevos=[];let n=0;
+  sel.forEach(({prov,sug,porLado})=>{
+    const p=getPedido(prov),prods=new Map((getAllProviders()[prov]?.products||[]).map(x=>[x.id,x]));
+    Object.entries(porLado).forEach(([s,pids])=>{
+      if(pedidoTieneLado(p,s))return;
+      let cambio=false;
+      pids.forEach(pid=>{
+        const prod=prods.get(pid),v=sug.qtys[s]?.[pid];if(!prod||!(+v?.qty>0))return;
+        if(!antes[prov])antes[prov]=JSON.parse(JSON.stringify(p));
+        if(!p.qtys[s])p.qtys[s]={};
+        p.qtys[s][pid]={qty:String(+(+v.qty).toFixed(2)),unit:normUnit(v.unit||prod.unit)};
+        S.createSelection=S.createSelection||{};
+        if(!S.createSelection[pid]){S.createSelection[pid]={prov};nuevos.push(pid);}
+        n++;cambio=true;
+      });
+      if(cambio)markUnsent(prov,s);
+    });
+  });
+  const provs=Object.keys(antes);
+  if(!provs.length){AramoUI.aviso('No había nada para poner',{tipo:'info'});return;}
+  persist();xpRefresh();buzz(12);
+  AramoUI.aviso(`✓ ${plural(provs.length,'pedido','pedidos')} con lo de siempre (${plural(n,'producto','productos')}). Revisalos antes de enviar.`,{ms:9000,deshacer:()=>{
+    provs.forEach(prov=>{S.pedidos[prov]=antes[prov];markProvDirty(prov);});
+    nuevos.forEach(pid=>{if(S.createSelection?.[pid])delete S.createSelection[pid];});
+    persist();xpRefresh();AramoUI.aviso('Listo, quedó como estaba',{tipo:'info'});
+  }});
+}
+
+// ══════════════════════════════════════════
 // RESUMEN DEL PEDIDO
 // ══════════════════════════════════════════
 function xpProvLines(prov){
@@ -689,7 +835,9 @@ const PDX_ICO={
   bajar:'<path d="M12 3v12"/><path d="m7 10 5 5 5-5"/><path d="M5 21h14"/>',
   recibo:'<path d="M6 2h12v20l-3-2-3 2-3-2-3 2z"/><path d="M9 7h6M9 11h6M9 15h4"/>',
 };
-const ico=(k,cls='')=>`<svg class="pdx-i${cls?' '+cls:''}" viewBox="0 0 24 24" aria-hidden="true">${PDX_ICO[k]}</svg>`;
+// Un solo juego de íconos (iconos.js). Estos son los nombres de antes → los de ahora.
+const PDX_A={lapiz:'editar',listo:'ok',hoja:'pdf',bajar:'descargar'};
+const ico=(k,cls='')=>window.icono?window.icono(PDX_A[k]||k,{t:18,clase:'pdx-i'+(cls?' '+cls:'')}):`<svg class="pdx-i${cls?' '+cls:''}" viewBox="0 0 24 24" aria-hidden="true">${PDX_ICO[k]}</svg>`;
 const PDX_COLORES=['#0f766e','#7c3aed','#c2410c','#0369a1','#be185d','#4d7c0f','#a16207','#4338ca','#0e7490','#b91c1c'];
 // Barra que muestra cuánto pide cada tienda (verde Moravia, naranja Los Ángeles).
 function xpPartes(sides,valores){
@@ -781,7 +929,7 @@ function sxRenderTablero(){
   if(!datos.length){
     // Un cierre a medio llenar sigue a mano aunque ya se haya reiniciado el pedido.
     const st=sides.length>1?CI.st||ciLeer():null;
-    box.innerHTML=`<div class="sx-vacio"><span>🧺</span><div><b>Todavía no hay productos</b><small>Buscá un producto arriba o abrí un proveedor abajo.</small></div></div>${ciVigente(st)&&ciTieneDatos(st)?ciBarra():''}`;
+    box.innerHTML=`<div class="sx-vacio"><span>🧺</span><div><b>Todavía no hay productos</b><small>Buscá un producto arriba o abrí un proveedor abajo.</small></div></div>${auBoton(true)}${ciVigente(st)&&ciTieneDatos(st)?ciBarra():''}`;
     return;
   }
   const tienda=side=>{
@@ -801,6 +949,7 @@ function sxRenderTablero(){
   box.innerHTML=`<div class="sx-tablero-h"><h2>Tu pedido de hoy</h2><small class="sx-ayuda">Tocá un producto para cambiar la cantidad · <span class="sx-mover-demo" aria-hidden="true">${ico('mover')}</span> para pasarlo a otro proveedor</small></div>
     <button type="button" class="sx-pdf-btn" data-sx-pdf><span class="sx-pdf-i">${ico('hoja')}</span><span class="sx-pdf-t"><b>PDF del pedido</b><small>3 columnas · mandalo a tu WhatsApp</small></span><span class="sx-pdf-f" aria-hidden="true">›</span></button>
     ${sides.length>1?ciBarra():''}
+    ${auBoton(false)}
     <div class="sx-tiendas n${sides.length}">${sides.map(tienda).join('')}</div>
     <div class="sx-lista">${datos.map((d,i)=>`<section class="sx-prov" data-sx-drop="${esc(d.prov)}" style="--i:${i};--c:${sxColor(d.prov)}">
       <button type="button" class="sx-prov-h" data-pd="open" data-prov="${esc(d.prov)}" title="Abrir ${esc(d.prov)}"><b>${esc(d.prov)}</b>${estadoProveedor(d)}${d.tot?`<span>₡${fmt(d.tot)}</span>`:''}<i aria-hidden="true">›</i></button>
@@ -1098,7 +1247,7 @@ function hojaPdfBajar(){
   toast('⬇️ PDF descargado','ok');
 }
 function hojaPdfVer(){const f=SX.pdf?.file;if(!f)return;const u=URL.createObjectURL(f);window.open(u,'_blank');setTimeout(()=>URL.revokeObjectURL(u),300000);}
-$('sxTablero')?.addEventListener('click',e=>{if(e.target.closest('[data-sx-pdf]'))hojaPdfAbrir();else if(e.target.closest('[data-sx-cierre]'))ciAbrir();});
+$('sxTablero')?.addEventListener('click',e=>{if(e.target.closest('[data-sx-pdf]'))hojaPdfAbrir();else if(e.target.closest('[data-sx-cierre]'))ciAbrir();else if(e.target.closest('[data-sx-siempre]'))auAbrir();});
 document.addEventListener('keydown',e=>{
   if(e.key!=='Escape')return;
   if($('sxPdf')?.classList.contains('open'))hojaPdfCerrar();else if($('sxCierre')?.classList.contains('open'))ciCerrar();
@@ -1192,7 +1341,7 @@ function ciSincronizar(st){
     const lineas=ciLineas(prov);if(!lineas.length)return;
     vistos.add(prov);
     const cp=st.provs[prov]||(st.provs[prov]={pago:ciPagoDe(prov),items:{},mas:[]}),nuevos={};
-    lineas.forEach(l=>{const v=cp.items[l.k]||{};nuevos[l.k]={...l,q:v.q??null,precio:v.precio??null,qm:v.qm??null};});
+    lineas.forEach(l=>{const v=cp.items[l.k]||{};nuevos[l.k]={...l,q:v.q??null,precio:v.precio??null,qm:v.qm??null,ref:v.ref??null};});
     Object.entries(cp.items).forEach(([k,it])=>{if(!nuevos[k]&&ciTocado(it))nuevos[k]={...it,fuera:true};});
     cp.items=nuevos;
   });
@@ -1229,7 +1378,8 @@ function ciCalc(st){
     const items=Object.values(cp.items).map(it=>{
       const pm=+it.pm||0,pa=+it.pa||0,pedido=Math.round((pm+pa)*100)/100,q=it.q??pedido,antes=ciPrecioAntes(prov,it),precio=it.precio??antes;
       const [qm,qa]=ciReparto(q,pm,pa,it.qm),sub=Math.round(q*precio),sm=Math.round(qm*precio);
-      return{k:it.k,t:it.t,e:it.e,u:it.u,pm,pa,pedido,q,qm,qa,ambas:pm>0&&pa>0,precio,antes:it.precio==null&&antes>0,sub,sm,sa:sub-sm,falta:q>0&&!(precio>0),fuera:!!it.fuera};
+      const ref=+it.ref||0,cambio=it.precio!=null&&ref>0&&precio>0?(precio-ref)/ref:0;
+      return{k:it.k,t:it.t,e:it.e,u:it.u,pm,pa,pedido,q,qm,qa,ambas:pm>0&&pa>0,precio,antes:it.precio==null&&antes>0,sub,sm,sa:sub-sm,falta:q>0&&!(precio>0),fuera:!!it.fuera,ref,cambio};
     });
     const mas=(cp.mas||[]).map(x=>{
       const q=+x.q||0,precio=+x.precio||0,sub=Math.round(q*precio),para=CI_PARA[x.para]?x.para:'mitad';
@@ -1263,8 +1413,29 @@ const ciTxtSub=it=>it.q>0?(it.precio>0?'₡'+fmt(it.sub):'falta precio'):'no vin
 function ciTxtPed(it){
   const pidio=it.ambas?` · pediste ${SIDE_ICO.moravia} ${fmtQ(it.pm)} · ${SIDE_ICO.angeles} ${fmtQ(it.pa)}`:'';
   const base=!(it.q>0)?`No vino · pediste ${fmtQ(it.pedido)} ${it.u}`:it.q!==it.pedido?`Llegó ${fmtQ(it.q)} de ${fmtQ(it.pedido)}${pidio}`:'';
-  return[base,it.fuera?'ya no está en el pedido':'',it.antes?'precio anterior':''].filter(Boolean).join(' · ');
+  return[base,it.fuera?'ya no está en el pedido':'',it.antes?'precio anterior':'',ciCambioTxt(it)].filter(Boolean).join(' · ');
 }
+// Precio que cambió mucho contra el de la vez pasada (desde 10 %): se marca en la fila, en el cierre y en el mensaje.
+const CI_CAMBIO=.1;
+const ciSaltoPrecio=it=>Math.abs(+it.cambio||0)>=CI_CAMBIO&&it.q>0;
+const ciCambioPct=it=>Math.round(Math.abs(it.cambio)*100)+' %';
+const ciCambioTxt=it=>ciSaltoPrecio(it)?`${it.cambio>0?'▲ subió':'▼ bajó'} ${ciCambioPct(it)} (antes ₡${fmt(it.ref)})`:'';
+const ciCambios=c=>c.provs.flatMap(p=>p.items.filter(ciSaltoPrecio).map(it=>({...it,prov:p.prov})));
+// Lo que no vino o vino de menos: se le puede avisar al proveedor por WhatsApp.
+const ciFaltantes=p=>p.items.filter(it=>it.pedido>0&&it.q<it.pedido);
+function ciReclamoMsg(p){
+  const L=[`Buenas, ${p.prov}. Del pedido de hoy:`,''];
+  ciFaltantes(p).forEach(it=>L.push(it.q>0?`• ${it.t}: vinieron ${fmtQ(it.q)} de ${fmtQ(it.pedido)} ${it.u}`:`• ${it.t}: no vino (pedí ${fmtQ(it.pedido)} ${it.u})`));
+  L.push('','¿Me confirma, por favor? Gracias.');
+  return L.join('\n');
+}
+function ciReclamar(p){
+  if(!p||!ciFaltantes(p).length)return;
+  const c=S.waContacts?.[p.prov],tel=(Array.isArray(c)?c:[c]).map(x=>x?normalizeCostaRicaPhone(x):'').find(Boolean)||'';
+  window.open(`https://wa.me/${tel}?text=${encodeURIComponent(ciReclamoMsg(p))}`,'_blank');
+  const cp=CI.st.provs[p.prov];if(cp){cp.avisado=Date.now();ciGuardar();ciPintar();}
+}
+const ciTxtReclamo=(p,cp)=>cp?.avisado?`Ya le avisaste a <b>${esc(p.prov)}</b> · mandar otra vez`:`Avisarle a <b>${esc(p.prov)}</b> lo que faltó`;
 const ciTxtPara=x=>`${SIDE_ICO.moravia} ₡${fmt(x.sm)} · ${SIDE_ICO.angeles} ₡${fmt(x.sa)}`;
 const ciTxtComp=t=>`Compras ₡${fmt(t.compras)}${t.gastos?` + gastos ₡${fmt(t.gastos)}`:''}`;
 const ciTxtGastos=t=>t.gastos?`Gastos del viaje ₡${fmt(t.gastos)}`:'';
@@ -1288,7 +1459,7 @@ function ciBarra(){
 const ciPaso=(v,attr,label)=>`<span class="ci-q"><button type="button" data-ci="menos" tabindex="-1" aria-label="Uno menos">−</button><input ${attr} inputmode="decimal" enterkeyhint="next" autocomplete="off" value="${ciNum(v)}" aria-label="${label}"><button type="button" data-ci="mas1" tabindex="-1" aria-label="Uno más">+</button></span>`;
 const ciPrecio=(v,attr,label,ph='precio')=>`<label class="ci-p"><span aria-hidden="true">₡</span><input ${attr} inputmode="numeric" enterkeyhint="next" autocomplete="off" value="${v>0?v:''}" placeholder="${ph}" aria-label="${label}"></label>`;
 function ciFila(it){
-  return `<li class="ci-it${it.q>0?'':' cero'}${it.falta?' falta':''}" data-ci-k="${esc(it.k)}">
+  return `<li class="ci-it${it.q>0?'':' cero'}${it.falta?' falta':''}${ciSaltoPrecio(it)?(it.cambio>0?' sube':' baja'):''}" data-ci-k="${esc(it.k)}">
     <div class="ci-it-n"><span class="ci-e" aria-hidden="true">${esc(it.e)}</span><b>${esc(it.t)}</b><em data-ci-v="sub">${ciTxtSub(it)}</em></div>
     <div class="ci-it-c">${ciPaso(it.q,'data-ci-q',`Cuántos ${esc(it.u)} de ${esc(it.t)} llegaron`)}<span class="ci-u">${esc(it.u)}</span><span class="ci-por" aria-hidden="true">×</span>${ciPrecio(it.precio,'data-ci-p',`Precio de ${esc(it.t)} por ${esc(it.u)}`)}</div>
     <div class="ci-rep">${ciPildora(it,'moravia')}${ciPildora(it,'angeles')}</div>
@@ -1317,6 +1488,7 @@ function ciPasoProv(p){
     <div class="ci-prov-tiendas">${CI_TIENDAS.map(s=>`<span class="${s}"><i aria-hidden="true">${SIDE_ICO[s]}</i><span>${SIDE_NAME[s]}</span><b data-ci-v="pt:${s}">₡${fmt(s==='moravia'?p.tm:p.ta)}</b></span>`).join('')}</div>
     <div class="ci-pago"><span id="ciPagoT">Le pagué con</span><div role="radiogroup" aria-labelledby="ciPagoT">${CI_PAGOS.map(([k,e,n])=>`<button type="button" role="radio" aria-checked="${k===p.pago}" class="${k}${k===p.pago?' on':''}" data-ci-pago="${k}"><span aria-hidden="true">${e}</span>${n}</button>`).join('')}</div></div>
     <ul class="ci-items">${p.items.map(ciFila).join('')}${p.mas.map(ciFilaMas).join('')}</ul>
+    <button type="button" class="ci-reclamo${CI.st.provs[p.prov]?.avisado?' hecho':''}" data-ci="reclamo"${ciFaltantes(p).length?'':' hidden'}>${ico('mensaje')}<span>${ciTxtReclamo(p,CI.st.provs[p.prov])}</span><em data-ci-v="nreclamo">${ciFaltantes(p).length}</em></button>
     <button type="button" class="ci-add" data-ci="mas-add">＋ Algo que no estaba en el pedido</button>
   </section>`;
 }
@@ -1334,6 +1506,7 @@ function ciPasoCierre(c,st){
       <div class="ci-tiendas">${CI_TIENDAS.map(s=>{const t=c.tiendas[s];return`<div class="ci-td ${s}"><span>${SIDE_ICO[s]} ${SIDE_NAME[s]}</span><strong data-ci-v="t:${s}">₡${fmt(t.total)}</strong><small data-ci-v="tc:${s}">Compras ₡${fmt(t.compras)}</small><small data-ci-v="tg:${s}">${ciTxtGastos(t)}</small><small class="ci-td-p" data-ci-v="tp:${s}">${ciTxtPagos(t.pago)}</small></div>`;}).join('')}</div>
       ${c.gastos.length?'<p class="ci-nota">Los gastos del viaje se reparten según lo que compró cada tienda.</p>':''}
     </div>
+    ${(cambios=>cambios.length?`<div class="ci-cambios"><h4>📈 Precios que cambiaron <small>desde 10 % contra la vez pasada</small></h4><ul>${cambios.map(it=>`<li class="${it.cambio>0?'sube':'baja'}"><span class="ci-cb-n"><span aria-hidden="true">${esc(it.e)}</span> <b>${esc(it.t)}</b> <small>${esc(it.prov)}</small></span><span class="ci-cb-p">₡${fmt(it.ref)} → <b>₡${fmt(it.precio)}</b> <em>${it.cambio>0?'▲':'▼'} ${ciCambioPct(it)}</em></span></li>`).join('')}</ul></div>`:'')(ciCambios(c))}
     ${n?'':`<p class="ci-aviso">Todavía no hay pedido: el cierre sale de lo que se pidió en Surtido.</p>`}
     ${faltan.length?`<p class="ci-aviso">⚠️ Falta precio en ${faltan.map(j=>`<button type="button" data-ci-ir="${j}">${esc(c.provs[j].prov)}</button>`).join(' ')}</p>`:''}
     <div class="ci-caja">
@@ -1396,10 +1569,12 @@ function ciPatch(){
     p.items.forEach(it=>{
       const li=h.querySelector(`[data-ci-k="${CSS.escape(it.k)}"]`);if(!li)return;
       li.classList.toggle('cero',!(it.q>0));li.classList.toggle('falta',it.falta);pon(li,'sub',ciTxtSub(it));pon(li,'ped',ciTxtPed(it));
+      li.classList.toggle('sube',ciSaltoPrecio(it)&&it.cambio>0);li.classList.toggle('baja',ciSaltoPrecio(it)&&it.cambio<0);
       li.querySelectorAll('[data-ci-qm],[data-ci-qa]').forEach(inp=>{if(inp===document.activeElement)return;const v=ciNum(inp.matches('[data-ci-qm]')?it.qm:it.qa);if(inp.value!==v)inp.value=v;});
       pon(li,'qm',fmtQ(it.qm));pon(li,'qa',fmtQ(it.qa));pon(li,'sm','₡'+fmt(it.sm));pon(li,'sa','₡'+fmt(it.sa));
     });
     p.mas.forEach(x=>{const li=h.querySelector(`[data-ci-mas="${CSS.escape(x.id)}"]`);if(!li)return;li.classList.toggle('falta',x.falta);pon(li,'sub',ciTxtSub(x));pon(li,'mpara',ciTxtPara(x));});
+    const rb=h.querySelector('[data-ci="reclamo"]');if(rb){const k=ciFaltantes(p).length;rb.hidden=!k;pon(rb,'nreclamo',String(k));}
   }
   c.provs.forEach((q,j)=>{const b=h.querySelector(`.ci-pasos [data-ci-ir="${j}"]`);if(b)b.className=ciClaseProv(q)+(q.prov===st.paso?' on':'');});
 }
@@ -1475,13 +1650,18 @@ function ciClick(e){
   else if(a==='wa')ciMandar(ciCalc(st));
   else if(a==='hist-wa'){const x=LS.get('aramo_cierres',[])[+e.target.closest('[data-ci-h]').dataset.ciH];if(x)ciMandar(x);}
   else if(a==='guardar')ciTerminar(e.target.closest('[data-ci]'));
+  else if(a==='reclamo')ciReclamar(ciCalc(st).provs.find(x=>x.prov===st.paso));
 }
 function ciEntrada(t){
   const st=CI.st,cp=st.provs[st.paso],num=v=>ciVacio(v)?null:ciPlata(v);
   if(t.matches('[data-ci-q],[data-ci-p],[data-ci-qm],[data-ci-qa]')){
     const it=cp?.items[t.closest('[data-ci-k]')?.dataset.ciK];if(!it)return;
     if(t.matches('[data-ci-q]')){it.q=ciVacio(t.value)?null:ciCant(t.value);it.qm=null;} // otro total: se vuelve a repartir solo
-    else if(t.matches('[data-ci-p]'))it.precio=num(t.value);
+    else if(t.matches('[data-ci-p]')){
+      // El precio de antes se guarda la primera vez que se escribe el de hoy (después el de hoy queda como precio del producto).
+      if(it.precio==null&&it.ref==null){const r=ciPrecioAntes(st.paso,it);if(r>0)it.ref=r;}
+      it.precio=num(t.value);
+    }
     else{ // reparto a mano: la otra tienda se queda con el resto
       const q=it.q??Math.round(((+it.pm||0)+(+it.pa||0))*100)/100,v=ciVacio(t.value)?null:ciCant(t.value);
       it.qm=v==null?null:t.matches('[data-ci-qm]')?v:Math.round((q-v)*100)/100;
@@ -1540,6 +1720,8 @@ function ciMensaje(c){
     p.mas.filter(x=>x.q>0).forEach(x=>L.push(`   + ${fmtQ(x.q)} ${x.t||'Otro'} × ₡${fmt(x.precio)} = ₡${fmt(x.sub)}${x.para?` (${CI_PARA[x.para]})`:''}`));
     L.push('');
   });
+  const cambios=ciCambios(c);
+  if(cambios.length){L.push('*Precios que cambiaron*');cambios.forEach(it=>L.push(`   ${it.cambio>0?'▲':'▼'} ${it.t} (${it.prov}): ₡${fmt(it.ref)} → ₡${fmt(it.precio)} · ${ciCambioPct(it)}`));L.push('');}
   if(c.gastos.length){L.push('*Gastos del viaje*');c.gastos.forEach(g=>L.push(`   ${g.t||'Gasto'} · ${CI_PAGO_NOMBRE[g.pago]} · ₡${fmt(g.monto)}`));L.push('');}
   if(c.tiendas){
     L.push('*Lo que gastó cada tienda*');
@@ -1600,10 +1782,12 @@ function xpRenderPedido(){
     html+=`<div class="sx-grid">${datos.filter(d=>_pdFiltro==='todos'||(_pdFiltro==='pend'?!d.sent:d.sent)).map((d,i)=>sxTarjeta(d,i,sides,'pedido')).join('')}</div>`;
     html+=`<button type="button" class="pd-reset pdx-reset" data-pd="reset">🗑️ Reiniciar pedido${sides.length===1?' de '+SIDE_NAME[sides[0]]:''}</button>`;
   }
+  html+='<div id="resSemana" class="au-sem-w"></div>';   // esta semana contra la pasada (renderSemana, APP.html)
   html+=xpHistoryHtml();
   // La entrada animada solo al abrir la pestaña (si no, cada cambio en vivo la repetiría).
   if(_pdEntrar){body.classList.add('pdx-entra');clearTimeout(_pdT);_pdT=setTimeout(()=>body.classList.remove('pdx-entra'),1600);_pdEntrar=false;}
   body.innerHTML=html;
+  if(typeof renderSemana==='function')renderSemana();
   xpContarPedido(body);
 }
 // Los números suben solos hasta su valor cuando cambian (o al abrir la pestaña).
@@ -1634,6 +1818,21 @@ const sxLinea=(prov,pid)=>xpProvLines(prov).lines.find(l=>l.prod.id===pid)||null
 // Lo que de verdad se desplaza: en la app es la página entera; la vista solo si es más alta que su caja.
 const sxScroller=()=>{const s=document.querySelector('.view.active .scroll');return s&&s.scrollHeight>s.clientHeight+2?s:document.scrollingElement;};
 const sxProd=(prov,pid)=>(getAllProviders()[prov]?.products||[]).find(x=>x.id===pid)||null;
+// Precio que cada proveedor tiene para el mismo producto (mismo código o mismo nombre). El más
+// barato se marca solo si es de la misma unidad y más barato que el proveedor de ahora.
+function sxPreciosDe(desde,prod){
+  const nom=normalizeText(niceName(prod.name)),u=normUnit(prod.unit),por={};
+  const ahora=+getPrice(desde,prod.id)||0;let min=ahora||Infinity,mejor=null;
+  getProvNames().forEach(n=>{
+    if(n===desde)return;
+    const otro=(getAllProviders()[n]?.products||[]).find(x=>x.id===prod.id)||(getAllProviders()[n]?.products||[]).find(x=>normalizeText(niceName(x.name))===nom);
+    const precio=otro?+getPrice(n,otro.id)||0:0;if(!(precio>0))return;
+    const uo=normUnit(otro.unit);por[n]={precio,u:uniCorta(uo)};
+    if(uo===u&&precio<min){min=precio;mejor=n;}
+  });
+  if(mejor)por[mejor].barato=true;
+  return{ahora,por};
+}
 function sxDock(desde,arrastrando,lado,prod){
   let dock=$('sxDock');
   if(!dock){
@@ -1647,8 +1846,10 @@ function sxDock(desde,arrastrando,lado,prod){
   dock.classList.toggle('elegir',!arrastrando);
   dock.dataset.lado=lado||'';
   const para=lado&&activeOrderSides().length>1?` <em class="${lado}">${SIDE_ICO[lado]} ${SIDE_NAME[lado]}</em>`:'';
-  dock.innerHTML=`<div class="sx-dock-h"><span>${ico('mover')}<b>${arrastrando?'Soltalo en el proveedor':prod?`¿A quién le pedís ${smartEmoji(prod)} ${esc(niceName(prod.name))}?`:'¿A quién se lo pedís?'}</b>${para}</span>${arrastrando?'':'<button type="button" data-sx-cerrar>Cancelar</button>'}</div>
-    <div class="sx-dock-grid">${getProvNames().filter(n=>n!==desde).map(n=>`<button type="button" data-sx-drop="${esc(n)}" style="--c:${sxColor(n)}"><span class="sx-av">${esc(n.charAt(0).toUpperCase())}</span><span class="sx-dock-n">${esc(n)}</span></button>`).join('')}</div>`;
+  const pr=prod?sxPreciosDe(desde,prod):null;
+  const ahora=pr?.ahora?` <small class="sx-dock-ahora">Con ${esc(desde)}: ₡${fmt(pr.ahora)}/${esc(uniCorta(normUnit(prod.unit)))}</small>`:'';
+  dock.innerHTML=`<div class="sx-dock-h"><span>${ico('mover')}<b>${arrastrando?'Soltalo en el proveedor':prod?`¿A quién le pedís ${smartEmoji(prod)} ${esc(niceName(prod.name))}?`:'¿A quién se lo pedís?'}</b>${para}${ahora}</span>${arrastrando?'':'<button type="button" data-sx-cerrar>Cancelar</button>'}</div>
+    <div class="sx-dock-grid">${getProvNames().filter(n=>n!==desde).map(n=>{const x=pr?.por[n];return`<button type="button" data-sx-drop="${esc(n)}" style="--c:${sxColor(n)}"${x?.barato?' class="barato"':''}><span class="sx-av">${esc(n.charAt(0).toUpperCase())}</span><span class="sx-dock-n">${esc(n)}${x?`<small class="sx-dock-p">₡${fmt(x.precio)}/${esc(x.u)}${x.barato?' · el más barato':''}</small>`:''}</span></button>`;}).join('')}</div>`;
   SX.dockT=Date.now();
   requestAnimationFrame(()=>dock.classList.add('open'));
 }
@@ -1752,12 +1953,9 @@ function sxHacer(desde,pid,hacia,lados,l){
     antes.forEach(([prov,prod,side,q,u])=>syncQty(prov,prod,side,q?String(q):'',u));xpRefresh();
   });
 }
-let _sxAvisoT=0;
 function sxAviso(txt,e,deshacer){
-  let a=$('sxAviso');if(!a){a=document.createElement('div');a.id='sxAviso';a.className='sx-aviso';a.setAttribute('role','status');document.body.appendChild(a);}
-  a.innerHTML=`<span class="sx-aviso-e">${e||'⇄'}</span><span class="sx-aviso-t">${esc(txt)}</span>${deshacer?'<button type="button">Deshacer</button>':''}`;
-  a.querySelector('button')?.addEventListener('click',()=>{a.classList.remove('open');deshacer();});
-  a.classList.add('open');clearTimeout(_sxAvisoT);_sxAvisoT=setTimeout(()=>a.classList.remove('open'),7000);
+  // Un solo sistema de avisos (aramo-ui.js). Se conserva el id para lo que ya lo buscaba.
+  AramoUI.aviso(txt,{id:'sxAviso',deshacer:deshacer||null});
 }
 
 // ── ✏️ Ventanita para cambiar la cantidad de una tienda ──

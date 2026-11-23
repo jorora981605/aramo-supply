@@ -6,16 +6,13 @@
    ══════════════════════════════════════════════════════════════════════ */
 #pedidoBody{
   width:min(1120px,100%);
-  --pdx-f:'Plus Jakarta Sans',var(--fn);
-  --pdx-s:'Fraunces',Georgia,'Times New Roman',serif;
-  --pm:#15803d;--pa:#c2410c;
-  --pm-t:#e7f6ec;--pa-t:#fdeee4;
-  --pdx-card:#fff;--pdx-linea:rgba(16,40,28,.09);--pdx-tile:#f5f8f6;--pdx-tinta:#0e4a30;
+  /* Capa de alias (rediseño, fase 1): todo sale de los tokens --ar-* y cambia solo con el tema */
+  --pdx-f:var(--ar-f-ui);
+  --pdx-s:var(--ar-f-display);
+  --pm:var(--ar-moravia-tinta);--pa:var(--ar-angeles-tinta);
+  --pm-t:var(--ar-moravia-suave);--pa-t:var(--ar-angeles-suave);
+  --pdx-card:var(--ar-sup);--pdx-linea:var(--ar-borde);--pdx-tile:var(--ar-sup-2);--pdx-tinta:var(--ar-primario);
   font-family:var(--pdx-f);
-}
-html[data-theme="dark"] #pedidoBody{
-  --pm:#4ade80;--pa:#fb923c;--pm-t:rgba(74,222,128,.12);--pa-t:rgba(251,146,60,.13);
-  --pdx-card:var(--card);--pdx-linea:rgba(255,255,255,.08);--pdx-tile:rgba(255,255,255,.04);--pdx-tinta:#1f7a4d;
 }
 .pdx-i{width:18px;height:18px;flex:none;fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
 

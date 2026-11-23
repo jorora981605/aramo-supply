@@ -10,18 +10,19 @@
 *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
 :root{
   color-scheme:light;
-  --bg:#f8f5ee;--card:#ffffff;--card-2:#fbf9f4;--soft:#f0ece2;
-  --ink:#15231a;--ink-2:#2f3e34;--muted:#6d7b71;
-  --line:rgba(21,35,26,.08);--line-2:rgba(21,35,26,.15);
-  --g:#1f8c45;--g-2:#5fb247;--g-ink:#ffffff;--g-soft:rgba(31,140,69,.10);
-  --o:#e9762b;--o-2:#f5a04f;--o-soft:rgba(233,118,43,.12);
-  --r:#d33b2b;--warn:#b06a00;--azul:#2c6fd6;
+  /* Capa de alias (rediseño, fase 1): los nombres del Taller apuntan a los tokens --ar-* de aramo-ui.css */
+  --bg:var(--ar-fondo);--card:var(--ar-sup);--card-2:var(--ar-sup-2);--soft:var(--ar-hundido);
+  --ink:var(--ar-tinta);--ink-2:var(--ar-tinta-2);--muted:var(--ar-tinta-3);
+  --line:color-mix(in srgb,var(--ar-tinta) 9%,transparent);--line-2:color-mix(in srgb,var(--ar-tinta) 16%,transparent);
+  --g:var(--ar-v600);--g-2:#5fb247;--g-ink:#ffffff;--g-soft:color-mix(in srgb,var(--ar-v600) 10%,transparent);
+  --o:var(--ar-o600);--o-2:#f5a04f;--o-soft:color-mix(in srgb,var(--ar-o600) 12%,transparent);
+  --r:var(--ar-peligro);--warn:#b06a00;--azul:#2c6fd6;
   --inv:#15231a;--inv-ink:#ffffff;--inv-mut:rgba(255,255,255,.62);
   --sh-1:0 1px 2px rgba(21,35,26,.05),0 6px 18px rgba(21,35,26,.06);
   --sh-2:0 14px 36px rgba(21,35,26,.14);
   --sh-bar:0 18px 44px rgba(21,35,26,.30);
-  --display:"Fraunces",Georgia,"Times New Roman",serif;
-  --body:"Plus Jakarta Sans",system-ui,-apple-system,"Segoe UI",sans-serif;
+  --display:var(--ar-f-display);
+  --body:var(--ar-f-ui);
   --top:env(safe-area-inset-top,0px);--bot:env(safe-area-inset-bottom,0px);
   --resorte:cubic-bezier(.34,1.56,.64,1);--suave:cubic-bezier(.22,1,.36,1);
   --pc:#4cb35a;--rc:#1f8c45;--hero1:#1f8c45;--hero2:#0d5126;
@@ -29,12 +30,10 @@
 }
 :root[data-theme="dark"]{
   color-scheme:dark;
-  --bg:#0b120e;--card:#141e18;--card-2:#19251e;--soft:rgba(255,255,255,.065);
-  --ink:#eef4ef;--ink-2:#d3ded6;--muted:#93a598;
-  --line:rgba(255,255,255,.07);--line-2:rgba(255,255,255,.14);
-  --g:#4cc96c;--g-2:#a8e05c;--g-ink:#05210f;--g-soft:rgba(76,201,108,.14);
-  --o:#ff9b52;--o-2:#ffbb78;--o-soft:rgba(255,155,82,.14);
-  --r:#ff6b5d;--warn:#ffc35a;--azul:#7ab8ff;
+  /* fondo, tarjetas, tinta y líneas ya los cambian los tokens; aquí solo lo propio del oscuro del Taller */
+  --g:var(--ar-v400);--g-2:#a8e05c;--g-ink:#05210f;--g-soft:color-mix(in srgb,var(--ar-v400) 14%,transparent);
+  --o:var(--ar-o300);--o-2:#ffbb78;--o-soft:color-mix(in srgb,var(--ar-o300) 14%,transparent);
+ --warn:#ffc35a;--azul:#7ab8ff;
   --inv:#1e2b23;--inv-ink:#eef4ef;--inv-mut:rgba(238,244,239,.6);
   --sh-1:0 1px 0 rgba(255,255,255,.035) inset,0 8px 22px rgba(0,0,0,.3);
   --sh-2:0 16px 40px rgba(0,0,0,.5);
@@ -754,8 +753,8 @@ html.mini .fondo{display:none}
 .sinpe-info b{display:block;font-size:16px;font-weight:800;color:var(--ink)}
 .sinpe-info small{display:block;margin-top:2px;font-size:12.5px;color:var(--muted)}
 /* Extensiones de operación: cuenta, entrega, ayuda y comprobantes */
-.cuenta-segura,.factura-box,.comprobante-box,.sust-propuesta,.pedido-extra,.envio-est{margin:12px 0;padding:13px;border:1px solid rgba(0,214,122,.28);border-radius:14px;background:rgba(0,214,122,.08)}
-.cuenta-segura{display:flex;flex-direction:column;gap:8px}.cuenta-segura small,.comprobante-box small{display:block;color:var(--m);line-height:1.45}.auth-line,.factura-fields{display:grid;grid-template-columns:1fr auto;gap:8px}.factura-fields{grid-template-columns:1fr 1fr;margin-top:9px}.factura-fields input,.auth-line input{min-width:0;padding:10px;border-radius:9px;border:1px solid var(--b);background:var(--s);color:var(--t)}.legal-check{display:block;margin:12px 2px;color:var(--m);font-size:12px;line-height:1.5}.legal-check input{accent-color:var(--g);margin-right:6px}.legal-check a,.legal-foot a{color:var(--g)}.dir-guardadas{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:9px}.dir-guardadas small{width:100%;color:var(--m)}.dir-chip{border:1px solid var(--b);border-radius:999px;background:var(--chrome-flat);color:var(--t);padding:7px 10px}.dir-chip.on{border-color:var(--g);color:var(--g);background:var(--gd)}.envio-est{font-size:13px;color:var(--g)}.envio-est small{display:block;margin-top:4px;color:var(--m)}.promo-strip{margin:12px 0}.promo-card{display:flex;align-items:center;gap:8px;margin:8px 0;padding:12px 14px;border:1px solid var(--og);border-radius:14px;background:linear-gradient(145deg,var(--od),var(--chrome));}.promo-card b{font-size:14px}.promo-card small{flex:1;color:var(--m)}.home-extras{padding-bottom:30px}.ayuda{padding:0}.ayuda>summary{display:flex;align-items:center;justify-content:space-between;cursor:pointer;padding:14px 16px;margin:0;list-style:none}.ayuda>summary::-webkit-details-marker{display:none}.ayuda>summary::after{content:'＋';font-size:18px;color:var(--g)}.ayuda[open]>summary::after{content:'−'}.ayuda-contenido{padding:0 16px 12px}.ayuda-contenido details{padding:10px 0;border-top:1px solid var(--b)}.ayuda-contenido summary{cursor:pointer;font-weight:700}.ayuda-contenido details p{padding:8px 0 0;color:var(--m);font-size:13px}.legal-foot{text-align:center;margin:16px 0;color:var(--m);font-size:12px}.sust-propuesta p{margin:7px 0;color:var(--m)}.comprobante-box input{display:block;width:100%;margin:10px 0;color:var(--m)}
+.cuenta-segura,.factura-box,.comprobante-box,.sust-propuesta,.pedido-extra,.envio-est{margin:12px 0;padding:13px;border:1px solid color-mix(in srgb,var(--g) 30%,transparent);border-radius:14px;background:var(--g-soft)}
+.cuenta-segura{display:flex;flex-direction:column;gap:8px}.cuenta-segura small,.comprobante-box small{display:block;color:var(--muted);line-height:1.45}.auth-line,.factura-fields{display:grid;grid-template-columns:1fr auto;gap:8px}.factura-fields{grid-template-columns:1fr 1fr;margin-top:9px}.factura-fields input,.auth-line input{min-width:0;padding:10px;border-radius:9px;border:1px solid var(--line-2);background:var(--card);color:var(--ink)}.legal-check{display:block;margin:12px 2px;color:var(--muted);font-size:12px;line-height:1.5}.legal-check input{accent-color:var(--g);margin-right:6px}.legal-check a,.legal-foot a{color:var(--g)}.dir-guardadas{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:9px}.dir-guardadas small{width:100%;color:var(--muted)}.dir-chip{border:1px solid var(--line-2);border-radius:999px;background:var(--card-2);color:var(--ink);padding:7px 10px}.dir-chip.on{border-color:var(--g);color:var(--g);background:var(--g-soft)}.envio-est{font-size:13px;color:var(--g)}.envio-est small{display:block;margin-top:4px;color:var(--muted)}.promo-strip{margin:12px 0}.promo-card{display:flex;align-items:center;gap:8px;margin:8px 0;padding:12px 14px;border:1px solid color-mix(in srgb,var(--o) 35%,transparent);border-radius:14px;background:linear-gradient(145deg,var(--o-soft),var(--card));}.promo-card b{font-size:14px}.promo-card small{flex:1;color:var(--muted)}.home-extras{padding-bottom:30px}.ayuda{padding:0}.ayuda>summary{display:flex;align-items:center;justify-content:space-between;cursor:pointer;padding:14px 16px;margin:0;list-style:none}.ayuda>summary::-webkit-details-marker{display:none}.ayuda>summary::after{content:'＋';font-size:18px;color:var(--g)}.ayuda[open]>summary::after{content:'−'}.ayuda-contenido{padding:0 16px 12px}.ayuda-contenido details{padding:10px 0;border-top:1px solid var(--line-2)}.ayuda-contenido summary{cursor:pointer;font-weight:700}.ayuda-contenido details p{padding:8px 0 0;color:var(--muted);font-size:13px}.legal-foot{text-align:center;margin:16px 0;color:var(--muted);font-size:12px}.sust-propuesta p{margin:7px 0;color:var(--muted)}.comprobante-box input{display:block;width:100%;margin:10px 0;color:var(--muted)}
 .perfil-acceso{padding:16px 0 28px;text-align:center}.perfil-acceso>h2{margin-top:10px;font-family:var(--display);font-size:30px}.perfil-acceso>p{margin:6px auto 16px;max-width:34em;color:var(--muted);font-size:13.5px}.perfil-acceso .perfil-cuenta{text-align:left}.invitado-aviso{text-align:left;margin-top:14px}
 .sucursal-opcion .t b{font-size:18px}.sucursal-opcion .t small{font-size:12px}
 

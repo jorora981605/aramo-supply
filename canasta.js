@@ -1015,9 +1015,8 @@ function campana(){
 // ══════════════ Efectos ══════════════
 let _tt=0;
 function toast(m,acc){
-  const t=$('tlToast');t.textContent=m;
-  if(acc){const b=document.createElement('button');b.type='button';b.textContent=acc.txt;b.addEventListener('click',()=>{t.classList.remove('show');acc.fn();});t.append(b);}
-  t.classList.toggle('accion',!!acc);t.classList.add('show');clearTimeout(_tt);_tt=setTimeout(()=>t.classList.remove('show'),acc?5500:2600);
+  // Un solo sistema de avisos (aramo-ui.js). acc = {txt, fn} es el botón del aviso (Deshacer, Ver…).
+  AramoUI.aviso(m,{id:'tlToast',icono:false,deshacer:acc?acc.fn:null,textoDeshacer:acc&&acc.txt});
 }
 function volar(p,desde){
   const a=desde.getBoundingClientRect();
@@ -1276,7 +1275,7 @@ $('tlBitBtn').addEventListener('click',()=>abrirHoja({tipo:'perfil'}));
 
 // Tema: el del teléfono (claro u oscuro), o el que el cliente eligió
 function temaActual(){return document.documentElement.dataset.theme==='light'?'light':'dark';}
-function pintarTema(){const d=temaActual()==='dark';document.querySelector('meta[name="theme-color"]').content=d?'#0b120e':'#f8f5ee';}
+function pintarTema(){const d=temaActual()==='dark';document.querySelector('meta[name="theme-color"]').content=d?'#0b120e':'#f8f7f2';}
 pintarTema();
 DESK.addEventListener?.('change',()=>render());
 
