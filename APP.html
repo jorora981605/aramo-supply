@@ -3825,18 +3825,6 @@ document.getElementById('saveNewCatalogProduct').addEventListener('click',saveNe
 document.getElementById('modalNewCatalogProduct').addEventListener('click',e=>{if(e.target.id==='modalNewCatalogProduct')closeNewCatalogProductModal();});
 document.getElementById('modalPriceCompare').addEventListener('click',e=>{if(e.target.id==='modalPriceCompare')closePriceModal();});
 
-async function resetAll(){
-  if(!confirm('¿Reiniciar TODO? Se borrarán los pedidos del Mostrador, el Surtido, las canastas locales y los datos locales del POS. Se conservarán el catálogo, las sucursales y la cuenta de personal.'))return;
-  try{await window.AramoNube?.borrarTodo?.();}catch(e){console.warn('No se pudo reiniciar la nube de encargos',e);}
-  ['aramo4','aramo_hist','aramo_prices','aramo_lp','aramo_syncbase','aramo_order_scope','aramo_encargos_v1','aramo_encargos_pend','aramo_encargos_changes','aramo_reinicio_respaldo','aramo_borradores'].forEach(k=>localStorage.removeItem(k));
-  try{sessionStorage.removeItem('pos_suc');}catch{}
-  try{indexedDB.deleteDatabase('aramo-pos');}catch{}
-  try{await supa.from('pedidos').delete().neq('proveedor','');}catch(e){console.warn('No se pudo limpiar pedidos antiguos',e);}
-  try{await supa.from('app_config').delete().eq('id','main');}catch(e){console.warn('No se pudo limpiar configuración antigua',e);}
-  if(window.caches){try{for(const k of await caches.keys())if(k.startsWith('aramo-'))await caches.delete(k);}catch{}}
-  location.reload();
-}
-
 // ══════════════════════════════════════════
 // TOAST
 // ══════════════════════════════════════════

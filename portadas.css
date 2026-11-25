@@ -471,16 +471,6 @@ html[data-theme="dark"] .loc6-logo{color:var(--ar-v300)}
 .aj6 .ui-lista-fila > .ui-interruptor{flex:none;width:52px}
 .po6 kbd,.loc6 kbd{font-family:var(--ar-f-ui)}   /* las teclas 1·2·3·M con la letra de la app, no la de máquina */
 
-/* Reiniciar el pedido de las dos tiendas, desde el Inicio (2026-11-24): un renglón propio debajo de Surtido, solo si hay pedido */
-.po6-reini{display:flex;justify-content:flex-end;margin-top:calc(-1 * var(--ar-e2))}
-.po6-reini:empty{display:none}
-.po6-reini-btn{min-height:44px}
-@media (min-width:1024px){
-  /* con el botón, un renglón "auto" entre Surtido y La Feria: las tres tarjetas quedan del mismo alto */
-  .po6-puertas:has(.po6-reini-btn){grid-template-rows:1fr auto 1fr 1fr}
-  .po6-puertas:has(.po6-reini-btn) .po6-reini{margin-top:calc(-1 * var(--ar-e3));margin-bottom:calc(-1 * var(--ar-e3))}
-}
-
 /* 4 · Control (2026-11-24): cuarta puerta, azul. Con cuatro puertas, en la compu van más compactas para que quepan sin desplazarse */
 .po6{--ar-p-control:#1f5fae}
 html[data-theme="dark"] .po6{--ar-p-control:#3b7fd4}
@@ -488,7 +478,6 @@ html[data-theme="dark"] .po6{--ar-p-control:#3b7fd4}
 .po6 .ui-cuadro--control{background:var(--ar-p-control)}
 @media (min-width:1024px){
   .po6-puertas{grid-template-rows:repeat(4,1fr);gap:var(--ar-e3)}
-  .po6-puertas:has(.po6-reini-btn){grid-template-rows:1fr auto 1fr 1fr 1fr}
   .po6-door{padding:var(--ar-e3) var(--ar-e6)}
   .po6-door-nom b{font-size:26px}
   .po6-door .po6-collage{width:132px;height:104px}

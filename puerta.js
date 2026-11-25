@@ -1344,7 +1344,7 @@ const ACT={
     const sucursales=(t.sucursales||[]).map(s=>s.k===M.suc?{...s,precios:{...(s.precios||{}),...(on?{[k]:precios[k]}:{})}}:s);
     N.guardarTienda({prods,precios,sucursales});toast(on?'🤖 Precio automático: sigue al costo de Surtido':'Precio manual');repintar(pintarVitrina);
   },
-  vis(el){const k=el.dataset.k,t=T(),base=(t.sucursales||[]).find(s=>s.k===M.suc)||{},s=new Set(base.ocultos||t.ocultos||[]);s.has(k)?s.delete(k):s.add(k);const sucursales=(t.sucursales||[]).map(x=>x.k===M.suc?{...x,ocultos:[...s]}:x);N.guardarTienda({ocultos:[...s],sucursales});repintar(pintarVitrina);},
+  vis(el){const k=el.dataset.k,t=T();if(M.suc==='todas'){const ocultos=new Set(t.ocultos||[]);ocultos.has(k)?ocultos.delete(k):ocultos.add(k);N.guardarTienda({ocultos:[...ocultos]});}else{const branches=t.sucursales||[],base=branches.find(s=>s.k===M.suc)||{},global=new Set(t.ocultos||[]),ocultos=new Set(base.ocultos||[]),visibles=new Set(base.visibles||[]),estaOculto=(global.has(k)||ocultos.has(k))&&!visibles.has(k);if(estaOculto){if(global.has(k))visibles.add(k);else ocultos.delete(k);}else{if(global.has(k))visibles.delete(k);else ocultos.add(k);}const sucursales=branches.map(s=>s.k===M.suc?{...s,ocultos:[...ocultos],visibles:[...visibles]}:s);N.guardarTienda({sucursales});}repintar(pintarVitrina);},
   ago(el){const k=el.dataset.k,t=T(),base=(t.sucursales||[]).find(s=>s.k===M.suc)||{},s=new Set(base.agotados||t.agotados||[]);s.has(k)?s.delete(k):s.add(k);const sucursales=(t.sucursales||[]).map(x=>x.k===M.suc?{...x,agotados:[...s]}:x);N.guardarTienda({agotados:[...s],sucursales});toast(s.has(k)?'🚫 Agotado hoy':'De vuelta en la vitrina');repintar(pintarVitrina);},
   'vit-ok'(){cerrarHoja();},
   recetario(){M.vista='recetario';pintarRecetario();},

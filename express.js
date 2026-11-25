@@ -2107,6 +2107,19 @@ function xpLateHtml(prov,sides){
     return `<div class="pd-late ${side}"><b>Cambios después del envío · responsable: ${SIDE_NAME[side]}</b><small>${delta.map(esc).join('<br>')||'Revisá el complemento con el proveedor'}</small>${scopeSide()===side?`<div><button type="button" data-pd="copy-late" data-prov="${esc(prov)}" data-side="${side}">Copiar instrucciones</button><button type="button" data-pd="confirm-late" data-prov="${esc(prov)}" data-side="${side}">Ya lo envié al proveedor</button></div>`:`<small>Pendiente de confirmar el envío personal</small>`}</div>`;
   }).join('');
 }
+function xpOcultarProductoEnPOS(prod,side){
+  try{
+    const N=window.AramoNube;
+    if(!prod||!['moravia','angeles'].includes(side)||!N?.catalogo||!N?.tienda||!N?.guardarTienda)return false;
+    const key=normalizeText(prod.name),pos=N.catalogo(side).find(p=>normalizeText(p.n)===key);
+    if(!pos)return false;
+    const t=N.tienda(),branches=t.sucursales||[],base=branches.find(s=>s.k===side)||{},ocultos=new Set(base.ocultos||[]),visibles=new Set(base.visibles||[]);
+    ocultos.add(pos.k);visibles.delete(pos.k);
+    const next=branches.some(s=>s.k===side)?branches.map(s=>s.k===side?{...s,ocultos:[...ocultos],visibles:[...visibles]}:s):[...branches,{k:side,ocultos:[...ocultos],visibles:[...visibles]}];
+    N.guardarTienda({sucursales:next});
+    return true;
+  }catch(error){console.warn('[surtido] no se pudo ocultar el producto en POS',error);return false;}
+}
 function xpPedidoClick(e){
   const b=e.target.closest('[data-pd]');if(!b)return;
   const act=b.dataset.pd,prov=b.dataset.prov;
@@ -2122,7 +2135,7 @@ function xpPedidoClick(e){
   if(act==='remove-line'){
     const prod=sxProd(prov,b.dataset.pid),side=b.dataset.side;
     if(!prod||!activeOrderSides().includes(side))return;
-    syncQty(prov,prod,side,'',prod.unit);xpRefresh();toast(`${niceName(prod.name)} quitado de ${SIDE_NAME[side]}`,'ok');return;
+    syncQty(prov,prod,side,'',prod.unit);const oculto=xpOcultarProductoEnPOS(prod,side);xpRefresh();toast(oculto?`${niceName(prod.name)} quitado del pedido y ocultado del POS de ${SIDE_NAME[side]}`:`${niceName(prod.name)} quitado del pedido de ${SIDE_NAME[side]}; no coincidió por nombre en el POS`,'ok');return;
   }
   if(act==='copy-late'){
     const side=b.dataset.side,msg=[`Complemento del pedido enviado a ${prov} · ${SIDE_NAME[side]}`, ...xpLateChanges(prov,side).map(x=>'• '+x)].join('\n');

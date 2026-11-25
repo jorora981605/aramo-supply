@@ -296,6 +296,8 @@ function pasoDe(u){return u==='kg'?.5:1;}
 function catalogo(sucursal){
   const t=tienda(),base=window.ARAMO_CANASTA?.productos||[],bs=(t.sucursales||[]).find(s=>s.k===sucursal)||{};
   const ed={...(t.prods||{}),...(bs.prods||{})},precios={...(t.precios||{}),...(bs.precios||{})},ocultos=new Set([...(t.ocultos||[]),...(bs.ocultos||[])]),agot=new Set([...(t.agotados||[]),...(bs.agotados||[])]);
+  // Un producto oculto globalmente se puede volver a mostrar solo en una sucursal.
+  (bs.visibles||[]).forEach(k=>ocultos.delete(k));
   const vistos=new Set();
   const out=[...base,...(t.nuevos||[])].filter(p=>p&&p.k&&!vistos.has(p.k)&&vistos.add(p.k)).map(p=>{
     const e=ed[p.k]||{},u=e.u||p.u;
