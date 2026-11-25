@@ -37,5 +37,7 @@ jobs:
       - uses: actions/upload-pages-artifact@v5
         with:
           path: dist
+      - name: Esperar el registro del artefacto en Pages
+        run: sleep 10
       - id: publicado
         uses: actions/deploy-pages@v5
