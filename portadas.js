@@ -20,7 +20,7 @@ const LS={get(k,d){try{const v=JSON.parse(localStorage.getItem(k));return v??d;}
 
 const PUERTAS=[
   {k:'surtido',n:'Surtido',e:'🚚',d:'Lo que pedimos a proveedores',tecla:'1',c:'s',arte:['🍅','🥕','🥬','🧅'],dato:'s'},
-  {k:'canasta',n:'Taller',e:'🧺',d:'Lo que nos piden los clientes',tecla:'2',c:'t',arte:['🥑','🍋','🌿','🍌'],dato:'t'},
+  {k:'canasta',n:'La Feria',e:'🧺',d:'Lo que nos piden los clientes',tecla:'2',c:'t',arte:['🥑','🍋','🌿','🍌'],dato:'t'},
   {k:'pos',n:'ARAMO POS',e:'🧾',d:'Ventas y caja del mostrador',tecla:'3',c:'p',arte:['💵','💳','📲','🧾'],dato:'p'},
 ];
 const LISTA=[
@@ -30,7 +30,13 @@ const LISTA=[
   {n:4,t:'Pizarra de la verdu',d:'Como la pizarra de precios: madera, tiza y la lista del día con sus números.'},
   {n:5,t:'Consola de taller',d:'Escribí lo que buscás (tomate, A-7KQ3, caja…) o usá 1·2·3. Para ir volando.'},
 ];
+// Desde el rediseño hay una sola portada (la 6). Las otras siguen aquí hasta la limpieza final (Fase 8).
+const UNICA=6;
 function actual(){
+  try{if(+localStorage.getItem('aramo_portada')!==UNICA)localStorage.setItem('aramo_portada',String(UNICA));}catch{}
+  return UNICA;
+}
+function actualViejo(){
   // ?portada=N se usa una vez: se guarda y se quita de la dirección, así después manda lo que elijas.
   const q=location.search.match(/[?&]portada=([1-5])/);
   if(q){
@@ -44,7 +50,7 @@ function actual(){
 function elegir(n){LS.set('aramo_portada',Math.min(5,Math.max(1,+n||2)));}
 
 // ── Piezas comunes ──
-const herramientas=()=>`<div class="po-tools"><button type="button" class="po-chip po-local" data-pu="local" aria-label="Cambiar de local" title="Cambiar de local"><span data-d="local"></span></button><button type="button" class="po-chip po-nube" data-pu="compartir" data-nube title="Compartir el Taller"><i></i><span data-d="nube"></span></button><button type="button" class="po-chip po-avisar" data-pu="avisos-on" data-dn="avisosTxt" title="Activar avisos de pedidos nuevos"></button><button type="button" class="po-chip po-reini" data-pu="reiniciar-app" aria-label="Reiniciar la app desde cero" title="Reiniciar la app: baja todo de nuevo (no borra pedidos ni ajustes)"><b aria-hidden="true">↻</b><span>Reiniciar</span></button><span class="po-ics"><button type="button" class="po-chip" data-pu="portada" aria-label="Cambiar portada" title="Cambiar portada">🎨 <span>Portada</span></button><button type="button" class="po-chip" data-pu="ajustes-app" aria-label="Ajustes" title="Ajustes">⚙️ <span>Ajustes</span></button></span></div>`;
+const herramientas=()=>`<div class="po-tools"><button type="button" class="po-chip po-local" data-pu="local" aria-label="Cambiar de local" title="Cambiar de local"><span data-d="local"></span></button><button type="button" class="po-chip po-nube" data-pu="compartir" data-nube title="Compartir La Feria"><i></i><span data-d="nube"></span></button><button type="button" class="po-chip po-avisar" data-pu="avisos-on" data-dn="avisosTxt" title="Activar avisos de pedidos nuevos"></button><button type="button" class="po-chip po-reini" data-pu="reiniciar-app" aria-label="Reiniciar la app desde cero" title="Reiniciar la app: baja todo de nuevo (no borra pedidos ni ajustes)"><b aria-hidden="true">↻</b><span>Reiniciar</span></button><span class="po-ics"><button type="button" class="po-chip" data-pu="portada" aria-label="Cambiar portada" title="Cambiar portada">🎨 <span>Portada</span></button><button type="button" class="po-chip" data-pu="ajustes-app" aria-label="Ajustes" title="Ajustes">⚙️ <span>Ajustes</span></button></span></div>`;
 const ahora=cls=>`<button type="button" class="po-ahora ${cls||''}" data-ahora><span class="po-ahora-e" data-d="ahora.e"></span><span class="po-ahora-t"><small data-d="ahora.k"></small><strong data-d="ahora.t"></strong><em data-d="ahora.s"></em></span><span class="po-ahora-go" data-d="ahora.cta"></span></button>`;
 const badge=p=>`<span class="po-badge" data-dn="${p}"></span>`;
 
@@ -60,9 +66,9 @@ function v1(){
       <div class="pu-ventana"><div class="pu-barra"><i></i><i></i><i></i><span>1 · Surtido</span></div><div class="pu-vista" id="puMiniS"></div><div class="pu-glow"><span class="pu-abrir">Abrir Surtido</span></div></div>
       <div class="pu-info"><b>🚚 Surtido</b><small>Lo que ARAMO le pide a sus proveedores</small><span class="pu-stat" data-d="s.txt"></span></div>
     </button>
-    <button type="button" class="pu-cara" data-pu="canasta" style="--c:var(--po-t2)" aria-label="2 · Abrir Taller de pedidos">
-      <div class="pu-ventana"><div class="pu-barra"><i></i><i></i><i></i><span>2 · Taller de pedidos</span></div><div class="pu-vista" id="puMiniC"><iframe title="Vista del Taller" src="canasta.html?mini=1&tema=${tema}" loading="lazy" tabindex="-1" aria-hidden="true"></iframe></div><div class="pu-glow"><span class="pu-abrir">Abrir Taller</span></div></div>
-      <div class="pu-info"><b>🧺 Taller</b><small>Donde los clientes arman su pedido, de punta a punta</small><span class="pu-stat o" data-d="t.txt"></span></div>
+    <button type="button" class="pu-cara" data-pu="canasta" style="--c:var(--po-t2)" aria-label="2 · Abrir La Feria">
+      <div class="pu-ventana"><div class="pu-barra"><i></i><i></i><i></i><span>2 · La Feria</span></div><div class="pu-vista" id="puMiniC"><iframe title="Vista de La Feria" src="canasta.html?mini=1&tema=${tema}" loading="lazy" tabindex="-1" aria-hidden="true"></iframe></div><div class="pu-glow"><span class="pu-abrir">Abrir La Feria</span></div></div>
+      <div class="pu-info"><b>🧺 La Feria</b><small>Donde los clientes arman su pedido, de punta a punta</small><span class="pu-stat o" data-d="t.txt"></span></div>
     </button>
     <button type="button" class="pu-cara pu-cara-pos" data-pu="pos" style="--c:var(--po-p2)" aria-label="3 · Abrir ARAMO POS">
       <div class="pu-ventana"><div class="pu-barra"><i></i><i></i><i></i><span>3 · ARAMO POS</span></div><img class="pu-foto" src="pos-vista.jpg" alt="" loading="lazy"><div class="pu-glow"><span class="pu-abrir">Abrir ARAMO POS</span></div></div>
@@ -123,9 +129,47 @@ function v5(){
   <button type="button" class="po5-ahora" data-ahora><span class="po5-verd" data-d="ahora.k"></span><span><strong data-d="ahora.t"></strong><em data-d="ahora.s"></em></span><span class="po5-go" data-d="ahora.cta"></span></button>
   <div class="po5-tiles">${PUERTAS.map(p=>`<button type="button" class="po5-tile c-${p.c}" data-pu="${p.k}" aria-label="${p.tecla} · Abrir ${esc(p.n)}"><span class="po5-kick">0${p.tecla} · ${esc(p.n.toUpperCase())}</span><b>${p.e}</b><strong>${esc(p.n)}</strong><small>${esc(p.d)}</small><span class="po5-dato" data-d="${p.dato}.chip"></span>${badge(p.dato+'.alerta')}<kbd>${p.tecla}</kbd></button>`).join('')}</div>
   <section class="po5-bit"><p class="po5-kick">Bitácora de hoy</p><div data-dh="bit"></div></section>
-  <p class="po5-teclas"><kbd>1</kbd> Surtido <kbd>2</kbd> Taller <kbd>3</kbd> POS <kbd>M</kbd> Mostrador <kbd>/</kbd> buscar</p>`;
+  <p class="po5-teclas"><kbd>1</kbd> Surtido <kbd>2</kbd> La Feria <kbd>3</kbd> POS <kbd>M</kbd> Mostrador <kbd>/</kbd> buscar</p>`;
 }
-const V={1:v1,2:v2,3:v3,4:v4,5:v5};
+// ── 6 · Inicio del rediseño (2026-11-23): la portada definitiva, la única que se usa (decisión D2) ──
+// Tarjetas blancas; el color de cada puerta va en su cuadrito y en un lavado suave a la derecha.
+// El Mostrador en calma es blanco con borde naranja; con pedido nuevo se pone naranja y respira.
+// En la compu: Mostrador a la izquierda (con sus últimos pedidos) y las tres puertas a la derecha.
+const ic=(n,t)=>typeof window.icono==='function'?window.icono(n,{t:t||20}):'';
+const foto=k=>`<img src="fotos/${k}.webp" alt="" width="92" height="92" decoding="async">`;
+const PUERTAS6=[
+  {k:'surtido',n:'Surtido',c:'surtido',i:'camion',tecla:'1',sub:'s6.sub',ins:'s6.ins',fotos:['tomate','zanahoria','lechuga']},
+  {k:'canasta',n:'La Feria',c:'taller',i:'canasta',tecla:'2',sub:'t6.sub',ins:'t6.ins',fotos:['aguacate','banano','fresa']},
+  {k:'pos',n:'ARAMO POS',c:'pos',i:'caja',tecla:'3',sub:'p6.sub'},
+  // 4 · Control: la app "Control del negocio" del dueño, dentro de ARAMO (cierres, personal y gastos)
+  {k:'control',n:'Control',c:'control',i:'grafico',tecla:'4',sub:'c6.sub'},
+];
+function v6(){
+  return `<header class="po6-cab">
+    <div class="po6-logo" aria-label="ARAMO">ARAMO${ic('hoja',16)}</div>
+    <p class="po6-saludo"><span data-d="saludo"></span> · <span data-d="fecha"></span></p>
+    <div class="po6-der"><span class="po6-tienda" data-dh="tienda6"></span><button type="button" class="ui-nube po6-nube" data-pu="compartir" data-nube data-d="nube" title="Compartir La Feria"></button><button type="button" class="ui-btn-ico" data-pu="ajustes-app" aria-label="Ajustes" title="Ajustes">${ic('ajustes',22)}</button></div>
+  </header>
+  <div class="po6-avisos" data-dh="avisos6"></div>
+  <div class="po6-grid">
+    <section class="po6-mos" data-ahora-tono>
+      <button type="button" class="po6-mos-cab" data-pu="mostrador" aria-label="M · Entrar al Mostrador">
+        <span class="ui-cuadro ui-cuadro--l ui-cuadro--mostrador">${ic('aviso',24)}</span>
+        <span class="po6-mos-tx"><b data-d="mo6.tit"></b><small data-d="mo6.sub"></small></span>
+        <span class="po6-mos-ir" aria-hidden="true"><span class="po6-abrir">Abrir</span>${ic('siguiente',22)}</span>
+      </button>
+      <div class="po6-mos-lista" data-dh="mo6.lista"></div>
+      <div class="po6-mos-pie"><p data-d="mo6.caja"></p><button type="button" class="ui-btn ui-btn--l po6-mos-btn" data-pu="mostrador">Entrar al Mostrador<kbd>M</kbd></button></div>
+    </section>
+    <div class="po6-puertas">${PUERTAS6.map(p=>`<button type="button" class="po6-door po6-door--${p.c}" data-pu="${p.k}" aria-label="${p.tecla} · Abrir ${esc(p.n)}">
+      <span class="po6-door-tx"><span class="po6-door-nom"><span class="ui-cuadro ui-cuadro--l ui-cuadro--${p.c}">${ic(p.i,24)}</span><b>${esc(p.n)}</b><kbd>${p.tecla}</kbd></span>
+        <span class="po6-door-sub" data-d="${p.sub}"></span>${p.ins?`<span class="po6-door-ins" data-dh="${p.ins}"></span>`:''}</span>
+      ${p.fotos?`<span class="po6-collage" aria-hidden="true">${p.fotos.map(foto).join('')}</span>`:`<span class="po6-collage po6-collage--ico" aria-hidden="true">${ic(p.i,72)}</span>`}
+    </button>${p.c==='surtido'?'<div class="po6-reini" data-dh="s6.reini"></div>':''}`).join('')}</div>
+  </div>
+  <footer class="po6-pie">Caja web hoy <b data-d="caja.total"></b> · <b data-d="t.activos"></b> en curso · <b data-d="s.prods"></b> por pedir</footer>`;
+}
+const V={1:v1,2:v2,3:v3,4:v4,5:v5,6:v6};
 
 function llenar(root,D){
   root.querySelectorAll('[data-d]').forEach(el=>{const v=get(D,el.dataset.d);el.textContent=v==null?'':String(v);});
@@ -169,10 +213,10 @@ const mini={
 };
 function selectorHtml(){
   const v=actual();
-  return `<p class="mo-kick">Pantalla principal · elegí cómo la querés ver</p><div class="mo-h">🎨 Portada</div><div class="mo-s">Las 5 tienen el mismo orden: 1 Surtido · 2 Taller · 3 ARAMO POS, y la franja "Ahora". Cambia el estilo, nunca el lugar de las cosas.</div>
+  return `<p class="mo-kick">Pantalla principal · elegí cómo la querés ver</p><div class="mo-h">🎨 Portada</div><div class="mo-s">Las 5 tienen el mismo orden: 1 Surtido · 2 La Feria · 3 ARAMO POS, y la franja "Ahora". Cambia el estilo, nunca el lugar de las cosas.</div>
     <div class="po-sel">${LISTA.map(p=>`<button type="button" class="po-op${v===p.n?' on':''}" data-pu="portada-usar" data-v="${p.n}"><span class="po-mini po-mini${p.n}" aria-hidden="true">${mini[p.n]}</span><span class="po-op-t"><b>${p.n} · ${esc(p.t)}${p.rec?' <em>RECOMENDADA</em>':''}</b><small>${esc(p.d)}</small></span><span class="po-op-ok">${v===p.n?'✓':''}</span></button>`).join('')}</div>
     <div class="mo-s" style="margin-top:10px">Se guarda en este equipo. También podés abrir una directo: <code>APP.html?portada=3</code></div>`;
 }
 
-window.AramoPortadas={pintar,actual,elegir,selectorHtml,LISTA,PUERTAS};
+window.AramoPortadas={pintar,actual,actualViejo,elegir,selectorHtml,LISTA,PUERTAS};
 })();

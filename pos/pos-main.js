@@ -317,6 +317,7 @@ async function initDB() {
     ['hacienda_ambiente','stag'],
     ['mostrar_impuesto','0'],
     ['sinpe_numero',''],
+    ['sinpe_destinos',''],
   ];
   for (const [k, v] of configs) {
     db.run('INSERT OR IGNORE INTO configuracion (clave, valor) VALUES (?, ?)', [k, v]);
@@ -363,6 +364,9 @@ async function initDB() {
 
   // Migración — permisos individuales por cajero
   try { db.run("ALTER TABLE cajeros ADD COLUMN permisos TEXT DEFAULT '{}'"); } catch(e) {}
+
+  // Migración — a quién le hicieron el SINPE (texto "Nombre · teléfono", NULL si no hubo SINPE)
+  try { db.run('ALTER TABLE ventas ADD COLUMN sinpe_destino TEXT DEFAULT NULL'); } catch(e) {}
 
   // Admin por defecto si no existe ningún administrador
   const adminCnt = prepare(`SELECT COUNT(*) AS n FROM cajeros WHERE rol = 'administrador'`).get();
@@ -610,6 +614,22 @@ ipcMain.handle('promociones:eliminar', (_, id) => {
 });
 
 // ──────────────────────────────────────────────
+// SINPE por destinatario (ventas completadas). Mismo criterio de monto que el resto:
+// ventas con pago_* usan pago_sinpe; las viejas sin reparto usan el total si fueron 'sinpe'.
+// ──────────────────────────────────────────────
+const SQL_MONTO_SINPE = `CASE WHEN (pago_efectivo+pago_tarjeta+pago_sinpe)>0 THEN pago_sinpe
+               WHEN metodo_pago='sinpe' THEN total ELSE 0 END`;
+function sinpePorDestino(where, params) {
+  return prepare(`
+    SELECT COALESCE(NULLIF(TRIM(sinpe_destino),''),'Sin destinatario') AS destino,
+      COUNT(*) AS num_ventas, COALESCE(SUM(${SQL_MONTO_SINPE}),0) AS monto
+    FROM ventas
+    WHERE estado = 'completada' AND (${SQL_MONTO_SINPE}) > 0 AND ${where}
+    GROUP BY 1 ORDER BY monto DESC
+  `).all(params);
+}
+
+// ──────────────────────────────────────────────
 // IPC — CAJA
 // ──────────────────────────────────────────────
 ipcMain.handle('caja:actual', () =>
@@ -623,7 +643,8 @@ ipcMain.handle('caja:historial', () =>
       COALESCE(v.total_ventas, 0) AS total_ventas,
       COALESCE(v.efectivo,     0) AS efectivo,
       COALESCE(v.tarjeta,      0) AS tarjeta,
-      COALESCE(v.sinpe,        0) AS sinpe
+      COALESCE(v.sinpe,        0) AS sinpe,
+      COALESCE(v.descuentos,   0) AS descuentos
     FROM cajas c
     LEFT JOIN (
       SELECT caja_id,
@@ -640,7 +661,8 @@ ipcMain.handle('caja:historial', () =>
         COALESCE(SUM(
           CASE WHEN (pago_efectivo+pago_tarjeta+pago_sinpe)>0 THEN pago_sinpe
                WHEN metodo_pago='sinpe' THEN total ELSE 0 END
-        ),0) AS sinpe
+        ),0) AS sinpe,
+        COALESCE(SUM(descuento_total),0) AS descuentos
       FROM ventas WHERE estado = 'completada'
       GROUP BY caja_id
     ) v ON v.caja_id = c.id
@@ -723,9 +745,11 @@ ipcMain.handle('caja:resumen', (_, id) => {
       COALESCE(SUM(
         CASE WHEN (pago_efectivo+pago_tarjeta+pago_sinpe)>0 THEN pago_sinpe
              WHEN metodo_pago='sinpe' THEN total ELSE 0 END
-      ),0) AS sinpe
+      ),0) AS sinpe,
+      COALESCE(SUM(descuento_total),0) AS descuentos
     FROM ventas WHERE caja_id = ? AND estado = 'completada'
   `).get([id]);
+  ventas.sinpe_destinos = sinpePorDestino('caja_id = ?', [id]);
   const denominaciones = prepare(
     'SELECT * FROM arqueo_detalle WHERE caja_id = ? ORDER BY tipo, tipo_denominacion DESC, denominacion DESC'
   ).all([id]);
@@ -745,14 +769,15 @@ ipcMain.handle('ventas:crear', (_, data) => {
       INSERT INTO ventas
         (numero,subtotal,descuento_total,impuesto,total,metodo_pago,monto_recibido,cambio,
          caja_id,cliente_nombre,cliente_cedula,notas,pago_efectivo,pago_tarjeta,pago_sinpe,
-         desc_global_pct,desc_global_monto)
-      VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
+         desc_global_pct,desc_global_monto,sinpe_destino)
+      VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
     `).run([
       numero, data.subtotal, data.descuento_total||0, data.impuesto||0, data.total,
       data.metodo_pago||'efectivo', data.monto_recibido||0, data.cambio||0,
       cajaId, data.cliente_nombre||'', data.cliente_cedula||'', data.notas||'',
       data.pago_efectivo||0, data.pago_tarjeta||0, data.pago_sinpe||0,
       data.desc_global_pct||0, data.desc_global_monto||0,
+      ((data.pago_sinpe||0) > 0 && data.sinpe_destino) ? String(data.sinpe_destino).slice(0, 80) : null,
     ]);
 
     const ventaId = r.lastInsertRowid;
@@ -932,7 +957,9 @@ ipcMain.handle('reportes:resumen', (_, desde, hasta) => {
     GROUP BY metodo_pago
   `).all([desde, hasta]);
 
-  return { stats, porDia, porMetodo };
+  const sinpeDestinos = sinpePorDestino('DATE(fecha) >= ? AND DATE(fecha) <= ?', [desde, hasta]);
+
+  return { stats, porDia, porMetodo, sinpeDestinos };
 });
 
 ipcMain.handle('reportes:top_productos', (_, desde, hasta, limite = 15) =>

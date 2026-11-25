@@ -301,3 +301,199 @@ html[data-theme="dark"] .po3-hero[data-tono] .po3-cta{color:#1a1a1a}
 .po-tools.apretado .po-reini span{display:none!important}
 @media (max-width:520px){.po-tools{gap:6px}.po-tools>.po-chip{padding:0 11px}}
 .po-esperando{transform:scale(.97);opacity:.8;transition:transform .12s,opacity .12s}
+
+/* ══ 6 · Inicio del rediseño (2026-11-23, Fase 2) — la única portada (D2). Acomodo tomado del prototipo
+   aprobado (.rediseno/prototipo, p=puerta). Las piezas (ui-*) salen de aramo-ui.css. ══ */
+#puerta[data-portada="6"],#puFoto[data-portada="6"]{background:var(--ar-fondo)}
+.pu-in.po6{max-width:1200px;display:flex;flex-direction:column;gap:var(--ar-e3);min-height:100dvh;box-sizing:border-box;padding:calc(var(--ar-e4) + env(safe-area-inset-top,0px)) var(--ar-margen) calc(var(--ar-e4) + env(safe-area-inset-bottom,0px));font-family:var(--ar-f-ui);color:var(--ar-tinta)}
+.po6 p{margin:0}
+.po6-cab{display:grid;grid-template-columns:1fr auto;align-items:center;gap:2px var(--ar-e2)}
+.po6-logo{display:inline-flex;align-items:flex-start;gap:2px;font:700 26px/1 var(--ar-f-display);letter-spacing:.01em;color:var(--ar-v700)}
+.po6-logo .ic{color:var(--ar-o500);margin-top:-4px}
+html[data-theme="dark"] .po6-logo{color:var(--ar-v300)}
+.po6-saludo{grid-column:1/-1;font:var(--ar-t-meta);color:var(--ar-tinta-3)}
+.po6-der{grid-row:1;grid-column:2;display:flex;align-items:center;gap:var(--ar-e1)}
+.po6-tienda{display:contents}
+.po6-nube{display:none;border:0;background:none;cursor:pointer;font:var(--ar-t-meta)}
+.po6-nube.on::before{background:var(--ar-hecho)}
+.po6-avisos:empty{display:none}
+.po6-grid{display:flex;flex-direction:column;gap:var(--ar-e3);flex:1}
+/* Mostrador en calma: blanco con borde naranja */
+.po6-mos{position:relative;display:flex;flex-direction:column;gap:var(--ar-e3);padding:var(--ar-e3) var(--ar-e4);border-radius:var(--ar-r-lg);background:var(--ar-sup);box-shadow:var(--ar-s1);border-left:4px solid var(--ar-p-mostrador);color:var(--ar-tinta)}
+.po6-mos-cab{display:flex;align-items:center;gap:var(--ar-e3);width:100%;min-height:56px;padding:0;margin:0;border:0;background:none;color:inherit;font:inherit;text-align:left;cursor:pointer}
+.po6-mos-tx{flex:1;min-width:0;display:flex;flex-direction:column;gap:2px}
+.po6-mos-tx b{font:700 20px/1.2 var(--ar-f-display)}
+.po6-mos-tx small{font:var(--ar-t-meta);color:var(--ar-tinta-3)}
+.po6-mos-ir{display:flex;align-items:center;color:var(--ar-tinta-3)}
+.po6-abrir{display:none}
+.po6-mos-lista,.po6-mos-pie{display:none}
+/* Con pedido nuevo: naranja sólido y un halo que respira (la única animación que se repite) */
+.po6-mos[data-tono="urg"]{background:var(--ar-acento);color:var(--ar-sobre-acento);border-left-color:transparent}
+.po6-mos[data-tono="urg"] .po6-mos-tx b{font-size:21px;white-space:nowrap}
+.po6-mos[data-tono="urg"] small{color:rgba(255,255,255,.9)}
+.po6-mos[data-tono="urg"] .ui-cuadro{background:rgba(255,255,255,.2)}
+.po6-mos[data-tono="urg"] .po6-mos-ir{color:inherit}
+.po6-mos[data-tono="urg"] .po6-mos-ir .ic{display:none}
+.po6-mos[data-tono="urg"] .po6-abrir{display:inline-flex;align-items:center;min-height:40px;padding:0 16px;border-radius:var(--ar-r-full);background:#fff;color:var(--ar-v900);font:700 15px var(--ar-f-ui)}
+.po6-mos[data-tono="urg"]::after{content:"";position:absolute;inset:-5px;border-radius:inherit;border:3px solid var(--ar-o400);opacity:0;pointer-events:none;animation:uiHalo 2s var(--ar-ease) infinite}
+/* Puertas: el color va en el cuadrito y en un lavado suave a la derecha */
+.po6-puertas{display:flex;flex-direction:column;gap:var(--ar-e3)}
+.po6-door{--pc:var(--ar-p-surtido);position:relative;display:grid;grid-template-columns:1fr auto;align-items:center;gap:var(--ar-e2);width:100%;min-height:132px;margin:0;padding:var(--ar-e4);border:0;border-radius:var(--ar-r-lg);overflow:hidden;
+  background:linear-gradient(90deg,var(--ar-sup) 58%,color-mix(in srgb,var(--pc) 13%,var(--ar-sup)));box-shadow:var(--ar-s1);color:var(--ar-tinta);font:inherit;text-align:left;cursor:pointer;transition:transform var(--ar-m1) var(--ar-ease),box-shadow var(--ar-m1)}
+.po6-door:active{transform:scale(.985)}
+.po6-door--taller{--pc:var(--ar-p-taller)}
+.po6-door--pos{--pc:var(--ar-p-pos)}
+.po6-door-tx{display:flex;flex-direction:column;gap:6px;min-width:0}
+.po6-door-nom{display:flex;align-items:center;gap:var(--ar-e3)}
+.po6-door-nom b{font:700 22px/1.1 var(--ar-f-display);white-space:nowrap}
+.po6-door-nom kbd,.po6-mos-btn kbd{display:none}
+.po6-door-sub{font:var(--ar-t-cuerpo);color:var(--ar-tinta-2)}
+.po6-door-ins{display:flex;flex-wrap:wrap;gap:6px}
+.po6-door-ins:empty{display:none}
+.po6-collage{position:relative;width:104px;height:100px;flex:none}
+.po6-collage img{position:absolute;object-fit:contain;filter:drop-shadow(0 6px 8px rgba(20,26,22,.16))}
+.po6-collage img:nth-child(1){width:66px;height:66px;left:0;top:26px;transform:rotate(-8deg)}
+.po6-collage img:nth-child(2){width:62px;height:62px;right:0;top:0;transform:rotate(9deg)}
+.po6-collage img:nth-child(3){width:58px;height:58px;right:6px;bottom:-4px;transform:rotate(-3deg)}
+.po6-collage--ico{display:grid;place-items:center;color:color-mix(in srgb,var(--pc) 55%,var(--ar-tinta-3))}
+.po6-pie{font:var(--ar-t-meta);color:var(--ar-tinta-3);text-align:center;padding-top:var(--ar-e1)}
+.po6-pie b{font-weight:700;color:var(--ar-tinta-2)}
+@media (hover:hover) and (pointer:fine){.po6-door:hover{box-shadow:var(--ar-s2)}}
+/* Compu: cabe todo sin desplazarse. Mostrador a la izquierda (5/12) y las tres puertas a la derecha (7/12) */
+@media (min-width:1024px){
+  .pu-in.po6{height:100dvh;min-height:0;padding:0 var(--ar-e6) var(--ar-e3)}
+  .po6-cab{grid-template-columns:auto 1fr auto;min-height:72px;gap:var(--ar-e4)}
+  .po6-saludo{grid-column:2;grid-row:1;font-size:15px}
+  .po6-der{grid-column:3}
+  .po6-nube{display:inline-flex}
+  .po6-logo{font-size:30px}
+  .po6-grid{display:grid;grid-template-columns:5fr 7fr;gap:var(--ar-e4);min-height:0}
+  .po6-puertas{display:grid;grid-template-rows:repeat(3,1fr);gap:var(--ar-e4);min-height:0}
+  .po6-door{min-height:0;padding:var(--ar-e5) var(--ar-e6)}
+  .po6-door-nom b{font-size:30px}
+  .po6-door-nom kbd{display:inline-grid;place-items:center;min-width:26px;height:26px;border:1px solid var(--ar-borde-2);border-radius:6px;font:700 13px/1 var(--ar-f-ui);color:var(--ar-tinta-3);background:var(--ar-sup)}
+  .po6-door .po6-collage{width:170px;height:130px}
+  .po6-door .po6-collage img:nth-child(1){width:92px;height:92px;top:34px}
+  .po6-door .po6-collage img:nth-child(2){width:86px;height:86px}
+  .po6-door .po6-collage img:nth-child(3){width:78px;height:78px}
+  .po6-mos{padding:var(--ar-e5) var(--ar-e6);border-left-width:6px;gap:var(--ar-e4);min-height:0}
+  .po6-mos-tx b,.po6-mos[data-tono="urg"] .po6-mos-tx b{font-size:26px}
+  .po6-mos-ir{display:none}
+  .po6-mos-lista{display:flex;flex-direction:column;flex:1;min-height:0;overflow:hidden;border-top:1px solid var(--ar-borde);border-bottom:1px solid var(--ar-borde)}
+  .po6-ped{display:flex;align-items:center;gap:var(--ar-e3);min-height:56px;font:600 16px/1.3 var(--ar-f-ui)}
+  .po6-ped + .po6-ped{border-top:1px solid var(--ar-borde)}
+  .po6-ped b{font-weight:800}
+  .po6-ped span{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .po6-ped em{font:var(--ar-t-meta);font-style:normal;opacity:.85}
+  .po6 .po6-ped-vacio{margin:auto 0;font:var(--ar-t-cuerpo);color:var(--ar-tinta-3);text-align:center}
+  .po6-mos[data-tono="urg"] .po6-ped-vacio{color:rgba(255,255,255,.85)}
+  .po6-mos-pie{display:flex;flex-direction:column;gap:var(--ar-e3)}
+  .po6-mos-pie p{font:var(--ar-t-cuerpo);font-weight:600}
+  .po6-mos-btn{width:100%;background:var(--ar-acento);color:var(--ar-sobre-acento)}
+  .po6-mos-btn kbd{display:inline;margin-left:8px;padding:2px 7px;border-radius:6px;background:rgba(0,0,0,.14);font:700 13px/1.4 var(--ar-f-ui)}
+  .po6-mos[data-tono="urg"] .po6-mos-btn{background:#fff;color:var(--ar-v900)}
+  .po6-mos[data-tono="urg"] .po6-mos-lista{border-color:rgba(255,255,255,.25)}
+  .po6-mos[data-tono="urg"] .po6-ped + .po6-ped{border-color:rgba(255,255,255,.18)}
+}
+
+/* ══ Elegir tienda (#loc) y selector de Surtido (#scopePicker) · rediseño Fase 2 ══
+   Una lista con las tres opciones en filas de 72 px; la última usada (o la de ahora) lleva su pastilla. */
+#loc.loc{background:var(--ar-fondo);color:var(--ar-tinta);font-family:var(--ar-f-ui)}
+#loc .loc6{width:min(100%,480px);box-sizing:border-box;padding:calc(var(--ar-e6) + env(safe-area-inset-top,0px)) var(--ar-margen) calc(var(--ar-e6) + env(safe-area-inset-bottom,0px));text-align:left}
+.loc6-logo{display:flex;justify-content:center;align-items:flex-start;gap:2px;font:700 34px/1 var(--ar-f-display);letter-spacing:.01em;color:var(--ar-v700)}
+.loc6-logo .ic{color:var(--ar-o500);margin-top:-4px}
+html[data-theme="dark"] .loc6-logo{color:var(--ar-v300)}
+#loc .loc6 h1,.loc6 .scope-picker-title{margin:var(--ar-e5) 0 0;font:var(--ar-t-h1);letter-spacing:0;color:var(--ar-tinta);text-align:center}
+.loc6 .loc6-sub{margin:4px 0 0;font:var(--ar-t-cuerpo);color:var(--ar-tinta-2);text-align:center}
+.loc6 .loc6-ops{display:flex;flex-direction:column;gap:0;margin-top:var(--ar-e5);border-radius:var(--ar-r-lg);background:var(--ar-sup);box-shadow:var(--ar-s1);overflow:hidden}
+.loc6 .loc-op{position:relative;display:flex;align-items:center;gap:var(--ar-e3);width:100%;min-height:72px;margin:0;padding:var(--ar-e3) var(--ar-e4);border:0;border-radius:0;background:none;box-shadow:none;color:var(--ar-tinta);font:inherit;text-align:left;cursor:pointer;transition:background-color var(--ar-m1)}
+.loc6 .loc-op + .loc-op{border-top:1px solid var(--ar-borde)}
+.loc6 .loc-op:hover,.loc6 .loc-op.elegida{background:var(--ar-sup-2)}
+.loc6 .loc-op:active{transform:none;background:var(--ar-hundido)}
+.loc6 .loc-op:focus-visible{outline:3px solid var(--ar-foco-c);outline-offset:-3px}
+.loc6-ico{display:grid;place-items:center;flex:none;width:48px;height:48px;border-radius:var(--ar-r-md);background:var(--ar-moravia-suave);color:var(--ar-moravia-tinta)}
+.loc6-op.angeles .loc6-ico{background:var(--ar-angeles-suave);color:var(--ar-angeles-tinta)}
+.loc6-ico.dos{grid-auto-flow:column;gap:5px;place-content:center;background:var(--ar-hundido)}
+.loc6-ico.dos i{width:12px;height:12px;border-radius:50%;background:var(--ar-moravia)}
+.loc6-ico.dos i + i{background:var(--ar-angeles)}
+.loc6 .loc-t{flex:1;min-width:0}
+.loc6 .loc-t b{display:block;font:700 19px/1.25 var(--ar-f-ui);letter-spacing:0}
+.loc6 .loc-t small{display:flex;align-items:center;flex-wrap:wrap;gap:6px;margin-top:2px;font:var(--ar-t-meta);color:var(--ar-tinta-3)}
+.loc6-ult{padding:0 8px;border-radius:var(--ar-r-full);background:var(--ar-hundido);color:var(--ar-tinta-2);font:600 12.5px/1.7 var(--ar-f-ui)}
+.loc6 .loc-op > .ic{flex:none;color:var(--ar-tinta-3)}
+.loc6 .loc-op kbd{display:none}
+.loc6 .loc-op em{display:none}
+.loc6-pie{display:flex;align-items:center;justify-content:center;gap:6px;margin:var(--ar-e5) 0 0!important;font:var(--ar-t-meta)!important;color:var(--ar-tinta-3)}
+.loc6-cancelar{display:flex;margin:var(--ar-e3) auto 0;min-width:180px}
+/* Contraseña: cajitas y teclado grande */
+.loc6 .loc-clave{margin-top:var(--ar-e4);padding:var(--ar-e4);border:0;border-radius:var(--ar-r-lg);background:var(--ar-sup);box-shadow:var(--ar-s1);text-align:center}
+.loc6 .loc-clave > p{margin:0;font:var(--ar-t-cuerpo);color:var(--ar-tinta-2)}
+.loc6 .loc-dig span{width:44px;height:52px;border-radius:var(--ar-r-sm);border:2px solid var(--ar-borde-campo);font:700 24px var(--ar-f-ui);color:var(--ar-tinta)}
+.loc6 .loc-dig span.f{border-color:var(--ar-primario)}
+.loc6 .loc-clave.mal .loc-dig span{border-color:var(--ar-peligro)}
+.loc6 .loc6-error{display:flex;align-items:center;justify-content:center;gap:6px;margin:0 0 var(--ar-e3);font:600 15px var(--ar-f-ui);color:var(--ar-peligro-tinta)}
+.loc6 .loc-pad button{min-height:56px;border-radius:var(--ar-r-md);border:1px solid var(--ar-borde);background:var(--ar-sup-2);color:var(--ar-tinta);font:700 22px var(--ar-f-ui);cursor:pointer}
+.loc6 .loc-pad button:active{background:var(--ar-hundido)}
+/* Selector de Surtido: hoja que sube desde abajo en el teléfono, tarjeta al centro en la compu */
+#scopePicker.scope-picker{align-items:flex-end;padding:0;background:var(--ar-velo);backdrop-filter:none}
+#scopePicker .scope-picker-card.loc6{width:min(100%,520px);box-sizing:border-box;padding:var(--ar-e5) var(--ar-margen) calc(var(--ar-e4) + env(safe-area-inset-bottom,0px));border:0;border-radius:var(--ar-r-xl,24px) var(--ar-r-xl,24px) 0 0;background:var(--ar-fondo);box-shadow:var(--ar-s3,0 -10px 40px rgba(0,0,0,.25));text-align:left}
+#scopePicker .loc6 .scope-picker-title{margin-top:0;font-size:22px}
+@media (min-width:1024px){
+  .loc6 .loc-op kbd{display:inline-grid;place-items:center;min-width:26px;height:26px;border:1px solid var(--ar-borde-2);border-radius:6px;font:700 13px/1 var(--ar-f-ui);color:var(--ar-tinta-3);background:var(--ar-sup)}
+  #scopePicker.scope-picker{align-items:center}
+  #scopePicker .scope-picker-card.loc6{border-radius:var(--ar-r-xl,24px);padding-bottom:var(--ar-e5)}
+}
+
+/* ══ Ajustes únicos (rediseño, Fase 2): lista agrupada como los Ajustes del teléfono ══ */
+#moSheet:has(.aj6){background:var(--ar-fondo)}
+.aj6{display:flex;flex-direction:column;gap:var(--ar-e2);padding-bottom:var(--ar-e4);font-family:var(--ar-f-ui);color:var(--ar-tinta)}
+.aj6-tit{margin:0 48px var(--ar-e1) 0;font:var(--ar-t-h1);color:var(--ar-tinta)}
+.aj6 .ui-grupo-tit{margin:var(--ar-e4) var(--ar-e1) var(--ar-e1)}
+.aj6 .ui-lista-fila{min-height:60px;font:600 16px/1.3 var(--ar-f-ui);text-align:left;cursor:pointer}
+.aj6 .ui-lista-fila > em{max-width:42%;overflow:hidden;text-overflow:ellipsis}
+.aj6 button.ui-lista-fila:active{background:var(--ar-sup-2)}
+.aj6-fila-sw{cursor:pointer}
+.aj6-ver{margin:var(--ar-e5) 0 0;text-align:center;font:var(--ar-t-meta);color:var(--ar-tinta-3)}
+.aj6-volver{align-self:flex-start;display:inline-flex;align-items:center;gap:4px;min-height:44px;padding:0 var(--ar-e2) 0 0;margin:0;border:0;background:none;color:var(--ar-moravia-tinta);font:700 16px var(--ar-f-ui);cursor:pointer}
+.aj6-campos{display:flex;flex-direction:column;gap:var(--ar-e4);margin-top:var(--ar-e2)}
+.aj6-campos .ui-grupo-tit{margin:var(--ar-e3) var(--ar-e1) calc(-1 * var(--ar-e2))}
+.aj6-dos{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:var(--ar-e3)}
+.aj6 .ui-campo-in{box-sizing:border-box;background:var(--ar-sup);color:var(--ar-tinta);font:500 16px/1.3 var(--ar-f-ui)}
+.aj6-area{min-height:104px;padding-top:12px;padding-bottom:12px;resize:vertical}
+.aj6-sw{display:flex;align-items:center;gap:var(--ar-e3);min-height:60px;padding:var(--ar-e2) var(--ar-e4);border-radius:var(--ar-r-lg);background:var(--ar-sup);box-shadow:var(--ar-s1);cursor:pointer}
+.aj6-sw > span:first-child{flex:1;min-width:0;font:600 16px/1.3 var(--ar-f-ui)}
+.aj6-sw small{display:block;margin-top:2px;font:500 13.5px/1.35 var(--ar-f-ui);color:var(--ar-tinta-3)}
+.aj6-txt{margin:0;font:var(--ar-t-cuerpo);color:var(--ar-tinta-2)}
+.aj6-guardar{margin-top:var(--ar-e2)}
+.aj6 .ui-opcion{background:var(--ar-sup);color:var(--ar-tinta);font:600 16px/1.3 var(--ar-f-ui);text-align:left;cursor:pointer}
+.aj6 .ui-opcion.on{border-color:var(--ar-primario);box-shadow:inset 0 0 0 1px var(--ar-primario)}
+.aj6 .ui-opcion.on > .ic:last-child{color:var(--ar-primario)}
+.aj6 .ui-lista-fila > .ui-interruptor{flex:none;width:52px}
+.po6 kbd,.loc6 kbd{font-family:var(--ar-f-ui)}   /* las teclas 1·2·3·M con la letra de la app, no la de máquina */
+
+/* Reiniciar el pedido de las dos tiendas, desde el Inicio (2026-11-24): un renglón propio debajo de Surtido, solo si hay pedido */
+.po6-reini{display:flex;justify-content:flex-end;margin-top:calc(-1 * var(--ar-e2))}
+.po6-reini:empty{display:none}
+.po6-reini-btn{min-height:44px}
+@media (min-width:1024px){
+  /* con el botón, un renglón "auto" entre Surtido y La Feria: las tres tarjetas quedan del mismo alto */
+  .po6-puertas:has(.po6-reini-btn){grid-template-rows:1fr auto 1fr 1fr}
+  .po6-puertas:has(.po6-reini-btn) .po6-reini{margin-top:calc(-1 * var(--ar-e3));margin-bottom:calc(-1 * var(--ar-e3))}
+}
+
+/* 4 · Control (2026-11-24): cuarta puerta, azul. Con cuatro puertas, en la compu van más compactas para que quepan sin desplazarse */
+.po6{--ar-p-control:#1f5fae}
+html[data-theme="dark"] .po6{--ar-p-control:#3b7fd4}
+.po6-door--control{--pc:var(--ar-p-control)}
+.po6 .ui-cuadro--control{background:var(--ar-p-control)}
+@media (min-width:1024px){
+  .po6-puertas{grid-template-rows:repeat(4,1fr);gap:var(--ar-e3)}
+  .po6-puertas:has(.po6-reini-btn){grid-template-rows:1fr auto 1fr 1fr 1fr}
+  .po6-door{padding:var(--ar-e3) var(--ar-e6)}
+  .po6-door-nom b{font-size:26px}
+  .po6-door .po6-collage{width:132px;height:104px}
+  .po6-door .po6-collage img:nth-child(1){width:74px;height:74px;top:26px}
+  .po6-door .po6-collage img:nth-child(2){width:68px;height:68px}
+  .po6-door .po6-collage img:nth-child(3){width:62px;height:62px}
+  .po6-collage--ico .ic{width:56px;height:56px}
+}

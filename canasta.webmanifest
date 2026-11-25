@@ -1,6 +1,6 @@
 {
-  "name": "ARAMO Taller de pedidos",
-  "short_name": "ARAMO Taller",
+  "name": "La Feria · ARAMO",
+  "short_name": "La Feria",
   "description": "Armá tu canasta de frutas y verduras en ARAMO y recogela lista.",
   "start_url": "./canasta.html",
   "scope": "./",

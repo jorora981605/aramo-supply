@@ -1407,6 +1407,22 @@ function ciArchivar(st){
   const c=ciCalc(st),h=LS.get('aramo_cierres',[]);
   h.unshift({...c,id:ciId(),guardado:Date.now(),provs:c.provs.map(p=>({...p,items:p.items.map(({k,e,antes,fuera,...it})=>it)}))});
   LS.set('aramo_cierres',h.slice(0,30));
+  ciSubirNube();
+}
+// Copia en la nube de cada cierre TERMINADO (tabla aramo_cierres_compras), para que el Control lo vea
+// desde cualquier aparato. Decisión del dueño (2026-11-24): "que todo se conecte entre sí"; antes el
+// cierre vivía solo en el teléfono. Si la tabla todavía no existe, queda en el teléfono como siempre.
+let _ciSinNube=false;
+function ciSubirNube(){
+  if(_ciSinNube||typeof supa==='undefined')return;
+  const faltan=(LS.get('aramo_cierres',[])||[]).filter(x=>x&&x.id&&!x.nube).slice(0,10);
+  if(!faltan.length)return;
+  const filas=faltan.map(x=>({id:x.id,fecha:auDiaTxt(new Date(x.inicio)),firma:x.firma||null,total:+x.total||0,datos:x,updated_at:new Date().toISOString()}));
+  Promise.resolve().then(()=>supa.from('aramo_cierres_compras').upsert(filas,{onConflict:'id'})).then(({error})=>{
+    if(error){if(/aramo_cierres_compras|PGRST205|42P01/.test((error.code||'')+' '+(error.message||'')))_ciSinNube=true;console.warn('Cierre: sin copia en la nube todavía',error.message);return;}
+    const ids=new Set(faltan.map(x=>x.id)),h2=LS.get('aramo_cierres',[])||[];
+    h2.forEach(x=>{if(x&&ids.has(x.id))x.nube=true;});LS.set('aramo_cierres',h2);
+  }).catch(e=>console.warn('Cierre: sin copia en la nube',e?.message||e));
 }
 // ── Textos que cambian mientras se escribe ──
 const ciTxtSub=it=>it.q>0?(it.precio>0?'₡'+fmt(it.sub):'falta precio'):'no vino';
@@ -1580,6 +1596,7 @@ function ciPatch(){
 }
 function ciAbrir(){
   ciCargar();
+  ciSubirNube();   // sube los cierres viejos que todavía no tienen copia en la nube
   let h=$('sxCierre');
   if(!h){
     h=document.createElement('div');h.id='sxCierre';h.className='ci';document.body.appendChild(h);
@@ -2082,8 +2099,15 @@ function xpPedidoClick(e){
 // Reiniciar SOLO el pedido (cantidades, extras, notas y "enviado").
 // Proveedores, productos, precios, teléfonos e histórico no se tocan.
 async function xpResetEntireCombined(){
+  const ok=await AramoUI.confirmar({titulo:'¿Reiniciar el pedido de las dos tiendas?',texto:'Se borran las cantidades, notas y estados de Moravia y Los Ángeles, en todos los teléfonos. Proveedores, precios e historial no se tocan.',si:'Reiniciar',peligro:true});
+  if(!ok)return;
+  const r=await xpReiniciarTodo();
+  toast(r.remoteOk?'Pedido de las dos tiendas vacío':'Pedido vacío en este teléfono; revisá la conexión',r.remoteOk?'ok':'err');
+}
+// Reinicia de una vez el pedido de las dos tiendas (sin preguntar: pregunta quien la llama).
+// La usan Surtido en "Las dos" y el botón del Inicio. Deja XP.undo para Deshacer (xpUndoReset).
+async function xpReiniciarTodo(){
   const old=JSON.parse(JSON.stringify(S.pedidos||{})),providers=Object.keys(old);
-  if(!confirm('Borrar todo el pedido combinado?\n\nSe eliminaran las cantidades, extras, notas y estados de Moravia y Los Angeles.\nLos proveedores del catalogo no se borran.'))return;
   XP.undo={at:Date.now(),data:old,sides:['moravia','angeles']};
   S.pedidos={};
   S.createSelection={};
@@ -2097,13 +2121,16 @@ async function xpResetEntireCombined(){
     if(res.error)throw new Error(res.error.message);
   }catch(e){remoteOk=false;console.warn('No se pudo borrar el pedido combinado en la nube:',e?.message||e);}
   xpRefresh();
-  toast(remoteOk?'Pedido combinado vacio':'Pedido vacio en este telefono; revisa la conexion',remoteOk?'ok':'err');
+  return{remoteOk,n:providers.length};
 }
-function xpResetPedido(){
+window.xpReiniciarTodo=xpReiniciarTodo;
+window.xpDeshacerReinicio=()=>xpUndoReset();
+async function xpResetPedido(){
   if(activeOrderSides().length>1){xpResetEntireCombined();return;}
   const sides=activeOrderSides();
   const label=sides.length>1?'Moravia y Los Ángeles':SIDE_NAME[sides[0]];
-  if(!confirm(`¿Reiniciar el pedido de ${label}?\n\nSe borran las cantidades de todos los proveedores en TODOS los teléfonos.\nProveedores, precios e historial no se tocan.`))return;
+  const ok=await AramoUI.confirmar({titulo:`¿Reiniciar el pedido de ${label}?`,texto:'Se borran las cantidades de todos los proveedores de esta tienda, en todos los teléfonos. Proveedores, precios e historial no se tocan.',si:'Reiniciar',peligro:true});
+  if(!ok)return;
   XP.undo={at:Date.now(),data:JSON.parse(JSON.stringify(S.pedidos)),sides};
   Object.keys(S.pedidos).forEach(prov=>{
     const p=getPedido(prov);

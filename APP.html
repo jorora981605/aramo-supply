@@ -26,7 +26,7 @@
     try{d.fonts.load('600 16px "Plus Jakarta Sans"').then(ok,function(){});}catch(e){ok();}},60);});
 })(document);
 </script>
-<link rel="stylesheet" href="aramo-ui.css?v=20261122-fase1">
+<link rel="stylesheet" href="aramo-ui.css?v=20261123-fase2">
 <link rel="apple-touch-icon" href="./icon.png">
 <link rel="icon" href="./icon.png">
 <title>ARAMO</title>
@@ -698,7 +698,7 @@ html[data-theme="dark"] .today-money-card{background:linear-gradient(145deg,#125
 </style>
 <link rel="stylesheet" href="express.css?v=20261020-premium-2">
 <link rel="stylesheet" href="puerta.css?v=20261013-perfil-1">
-<link rel="stylesheet" href="portadas.css?v=20261122-fase1">
+<link rel="stylesheet" href="portadas.css?v=20261124-control">
 <link rel="stylesheet" href="pedido.css?v=20261122-fase1">
 <link rel="stylesheet" href="surtido.css?v=20261123-auto1">
 </head>
@@ -709,7 +709,8 @@ html[data-theme="dark"] .today-money-card{background:linear-gradient(145deg,#125
 // termina de cargar; así no se ve pasar la pantalla de Surtido mientras tanto.
 (function(){try{
   if(location.hash||/[?&](pos|portada)=/.test(location.search)||!sessionStorage.getItem('aramo_local_sesion'))return;
-  var f=JSON.parse(localStorage.getItem('aramo_portada_foto')||'null');if(!f||!f.html||f.v!==+(localStorage.getItem('aramo_portada')||2))return;
+  // Solo la foto del Inicio nuevo (portada 6, Fase 2 del rediseño): una foto de una portada vieja no se pinta.
+  var f=JSON.parse(localStorage.getItem('aramo_portada_foto')||'null');if(!f||!f.html||f.v!==6)return;
   var t=localStorage.getItem('aramo_theme')||'light';if(t==='auto')t=matchMedia('(prefers-color-scheme: dark)').matches?'dark':'light';
   document.documentElement.dataset.theme=t;
   document.body.insertAdjacentHTML('afterbegin','<div class="pu open" id="puFoto" data-portada="'+f.v+'" aria-hidden="true"><div class="'+f.cls+'">'+f.html+'</div></div>');
@@ -1002,7 +1003,7 @@ html[data-theme="dark"] .today-money-card{background:linear-gradient(145deg,#125
         </div>
       </div>
 
-      <div class="app-version">ARAMO · versión <b>2026-11-23 · automático 1</b> · se actualiza sola</div>
+      <div class="app-version">ARAMO · versión <b>2026-11-24 · Control</b> · se actualiza sola</div>
 
       <div class="cfg-acc" data-acc="datos">
         <button class="cfg-acc-hdr">⚠️ Borrar TODA la aplicación <span class="cfg-acc-arrow">▾</span></button>
@@ -1256,8 +1257,17 @@ function applyOrderScope(){
   document.body.dataset.orderScope=scope;
   updateScopeLabels();
 }
+// Selector de tienda de Surtido (rediseño, Fase 2): el mismo diseño que "Elegir tienda", en una hoja
+// con Cancelar. Se dibuja al abrir (así usa los íconos de iconos.js). Los botones siguen con data-order-scope.
 function openScopePicker(){
   applyOrderScope();
+  const box=document.querySelector('#scopePicker .scope-picker-card'),cur=getOrderScope();
+  const I=(n,t)=>typeof window.icono==='function'?window.icono(n,{t:t||22}):'';
+  if(box)box.innerHTML=`<h2 class="scope-picker-title" id="scopePickerTitle">¿Qué tienda querés ver?</h2>
+    <p class="loc6-sub">Lo que pedís en Surtido queda en la tienda que elijás.</p>
+    <div class="scope-picker-options loc6-ops">${[['moravia','moravia','Moravia','ARAMO'],['lasr','angeles','Los Ángeles','LASR'],['both','','Las dos','Moravia y Los Ángeles a la vez']].map(([k,ico,n,s])=>`<button class="scope-option loc-op loc6-op ${ico||'todas'}${cur===k?' ult':''}" type="button" data-order-scope="${k}"><span class="loc6-ico${ico?'':' dos'}" aria-hidden="true">${ico?I(ico,24):'<i></i><i></i>'}</span><span class="loc-t"><b>${n}</b><small>${s}${cur===k?'<span class="loc6-ult">Ahora</span>':''}</small></span>${I('siguiente',22)}</button>`).join('')}</div>
+    <button type="button" class="ui-btn ui-btn--fantasma ui-btn--l loc6-cancelar" data-scope-cancelar>Cancelar</button>`;
+  box?.classList.add('loc6');
   document.getElementById('scopePicker')?.classList.add('open');
   document.body.classList.add('scope-picker-open');
 }
@@ -2320,7 +2330,13 @@ function scheduleConfigRender(){
 document.querySelectorAll('.nav-btn').forEach(b=>{
   if(b.dataset.view)b.addEventListener('click',()=>switchView(b.dataset.view));
 });
-document.querySelectorAll('[data-order-scope]').forEach(btn=>btn.addEventListener('click',()=>chooseOrderScope(btn.dataset.orderScope)));
+// Un solo oyente para el selector (sus botones se vuelven a dibujar cada vez que se abre).
+document.getElementById('scopePicker')?.addEventListener('click',e=>{
+  const b=e.target.closest('[data-order-scope]');
+  if(b){chooseOrderScope(b.dataset.orderScope);return;}
+  if(e.target.closest('[data-scope-cancelar]')||e.target.id==='scopePicker')closeScopePicker();
+});
+document.addEventListener('keydown',e=>{if(e.key==='Escape'&&document.getElementById('scopePicker')?.classList.contains('open')&&document.getElementById('scopePicker').querySelector('[data-scope-cancelar]'))closeScopePicker();});
 document.getElementById('scopeSwitch')?.addEventListener('click',openScopePicker);
 
 // La navegación queda siempre visible para evitar acciones escondidas.
@@ -4102,13 +4118,13 @@ if(isIOS && !isInStandalone && !dismissed){
 </script>
 <!-- Íconos y ventanitas del sistema de diseño: antes de express.js, que ya los usa -->
 <script src="iconos.js?v=20261122-fase1"></script>
-<script src="aramo-ui.js?v=20261122-fase1"></script>
-<script src="express.js?v=20261123-auto1"></script>
+<script src="aramo-ui.js?v=20261123-fase2"></script>
+<script src="express.js?v=20261124-control"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcode-generator/1.4.4/qrcode.min.js"></script>
 <script src="canasta-config.js?v=20261018-seguridad-1"></script>
 <script src="aramo-nube.js?v=20261020-circuito-6"></script>
-<script src="portadas.js?v=20261023-rapida-1"></script>
-<script src="puerta.js?v=20261122-fase1"></script>
+<script src="portadas.js?v=20261124-control"></script>
+<script src="puerta.js?v=20261124-control"></script>
 <script>
   // El menú, Mostrador y Surtido se desplazan verticalmente; no usar gestos
   // horizontales como Atrás/Adelante del navegador en el teléfono.

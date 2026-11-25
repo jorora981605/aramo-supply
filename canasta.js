@@ -375,6 +375,8 @@ window.addEventListener('popstate',e=>{
 // Un paso a la vez y un solo botón abajo. Siempre hay cómo volver: "‹" arriba,
 // la línea de pasos, "Seguir comprando" y la marca ARAMO (lleva al inicio).
 const CHIP={recetas:'📖',frutas:'🍎',verduras:'🥬',hierbas:'🌿',despensa:'🥚',raices:'🥔'};
+// La Feria (2026-11-24): cada categoría con la foto de un producto suyo (si no hay foto, su emoji)
+const CAT_FOTO={frutas:'manzana',verduras:'lechuga',hierbas:'culantro',despensa:'huevos',raices:'papa'};
 // Orden de la barra de categorías (lo pidió el dueño): Recetas, Frutas, Verduras, Hierbas, Despensa y Raíces.
 const ORDEN_CATS=['recetas','frutas','verduras','hierbas','despensa','raices'];
 const PASO_N={canasta:0,entrega:1,datos:2,pago:3};
@@ -408,7 +410,7 @@ const ADORNO=['🍓','🥑','🍍','🥭','🍋'];
 function mesaArmar(){
   const n=cestaN(),u=ultimoPedido(),a=activo(),pedidos=pedidosVisibles();
   const tarjetas=pedidos.map((o,i)=>{const ea=estadoDe(o),s=suc(o.sucursal),envio=N.estadoEnvio?.(o.id)==='pendiente';return `<button type="button" class="vivo-card est-${o.estado}${envio?' pendiente':''}" data-act="ver" data-id="${o.id}" style="--t:${i*.08}s"><span class="vc-e"><i>${ea.e}</i></span><span class="vc-t"><small>Pedido ${esc(o.ref)} · ${esc(s?.n||'ARAMO')}</small><b>${esc(ea.t)}</b><span class="vc-bar"><i style="width:${ea.p}%"></i></span></span><span class="go" aria-hidden="true">›</span></button>`;}).join('');
-  return `<section class="hola"><i class="aura" aria-hidden="true"></i><span class="flota" aria-hidden="true">${ADORNO.map((e,i)=>`<i style="--k:${i}">${e}</i>`).join('')}</span><p>${saludo()} 👋</p><h2>¿Qué llevamos hoy?</h2></section>
+  return `<section class="hola"><i class="aura" aria-hidden="true"></i><span class="flota" aria-hidden="true">${ADORNO.map((e,i)=>`<i style="--k:${i}">${e}</i>`).join('')}</span><p>${saludo()} · Como en la feria, sin salir de casa</p><h2>¿Qué llevamos hoy?</h2></section>
   ${tarjetas?`<div class="vivo-list" aria-label="Mis pedidos">${tarjetas}</div>`:''}
   ${u&&!n&&!a?`<button type="button" class="repetir" data-act="repetir" data-id="${u.id}" data-express="1"><span class="rp-e">${emojis(u.items,3)}</span><span class="t"><b>Repetir mi último pedido</b><small>${u.items.length} ${u.items.length===1?'producto':'productos'} · ${$c(N.totalDe(u))}</small></span><span class="go" aria-hidden="true">›</span></button>`:''}
   <div class="buscar" id="tlBuscar">
@@ -417,6 +419,7 @@ function mesaArmar(){
   </div>
   <nav class="cats" id="tlPasillos" aria-label="Categorías"></nav>
   <div id="tlParse">${parseHtml()}</div>
+  <div class="grid-tit" id="tlGridTit"></div>
   <div class="prods" id="tlGrid"></div>`;
 }
 function parseHtml(){
@@ -446,20 +449,23 @@ function pintarGrid(){
   const cats=ORDEN_CATS.map(k=>({k,n:k==='recetas'?'Recetas':(CFG.pasillos||[]).find(p=>p.k===k)?.n||k}));
   if(!C.pasillo||!cats.some(f=>f.k===C.pasillo))C.pasillo='frutas';
   const tabs=$('tlPasillos'),mini=$('tlMini');
-  if(tabs){tabs.hidden=!!q||modoLista;tabs.innerHTML=cats.map(f=>{const on=C.pasillo===f.k;return `<button type="button" class="tab c-${f.k}${on?' on'+(C.animGrid?' salta':''):''}" data-act="pasillo" data-k="${f.k}"><span class="cat-e">${CHIP[f.k]||'🧺'}</span><span class="cat-n">${esc(f.n)}</span></button>`;}).join('');}
+  if(tabs){tabs.hidden=!!q||modoLista;tabs.innerHTML=cats.map(f=>{const on=C.pasillo===f.k;return `<button type="button" class="tab c-${f.k}${on?' on'+(C.animGrid?' salta':''):''}" data-act="pasillo" data-k="${f.k}"><span class="cat-e">${CAT_FOTO[f.k]&&(FOTOS[CAT_FOTO[f.k]]||FOTOS_EXTRA[CAT_FOTO[f.k]])?foto(CAT_FOTO[f.k],CHIP[f.k],'cat-f'):(CHIP[f.k]||'🧺')}</span><span class="cat-n">${esc(f.n)}</span></button>`;}).join('');}
   if(mini)mini.innerHTML=cats.map(f=>`<button type="button" class="mc c-${f.k}${C.pasillo===f.k?' on':''}" data-act="cat" data-c="${f.k}" aria-label="${esc(f.n)}" title="${esc(f.n)}"><span>${CHIP[f.k]||'🧺'}</span><small>${esc(f.n)}</small></button>`).join('');
   const recetas=!q&&!modoLista&&C.pasillo==='recetas';
   g.classList.toggle('entra',!!C.animGrid);C.animGrid=false;
   g.classList.toggle('con-recetas',recetas);
   g.dataset.cat=q?'res':C.pasillo;
+  let lista=null;
   if(modoLista)g.innerHTML='';
-  else if(recetas)g.innerHTML=RECETAS().map((r,i)=>receta(r,i)).join('');
+  else if(recetas){lista=RECETAS();g.innerHTML=lista.map((r,i)=>receta(r,i)).join('');}
   else{
-    let lista;
     if(q){const w=q.split(/\s+/).filter(t=>!VACIAS.has(t));lista=cat().filter(p=>{const n=norm(p.n);return w.every(t=>n.includes(t.replace(/(es|s)$/,'')));});}
     else lista=cat().filter(p=>p.c===C.pasillo);
     g.innerHTML=lista.length?lista.map((p,i)=>tile(p,i)).join(''):`<div class="vacio"><b>🔍</b>No encontramos “${esc(C.q)}”.<button type="button" class="link" data-act="limpiar-q">Ver todo</button></div>`;
   }
+  // Título de la lista: la categoría y cuántos hay (La Feria, 2026-11-24)
+  const tt=$('tlGridTit');
+  if(tt){const n=lista?lista.length:0,nom=q?'Resultados':(cats.find(f=>f.k===C.pasillo)?.n||'');tt.hidden=modoLista||!lista;tt.innerHTML=lista?`<h3>${esc(nom)}</h3><small>${n} ${recetas?(n===1?'receta':'recetas'):(n===1?'producto':'productos')}</small>`:'';}
   pegar();
 }
 
@@ -971,7 +977,7 @@ function msgTienda(o){
   const s=suc(o.sucursal),M=N.PAGOS[o.pago.metodo];
   const enlaceTienda=N.modo()==='nube'?N.enlace('APP.html','encargo',{id:o.id,ref:o.ref,pin:o.pin}):N.enlace('APP.html','encargo',o);
   return [
-    `🧺 *Pedido ARAMO Taller · ${o.ref}*`,
+    `🧺 *Pedido de La Feria · ${o.ref}*`,
     `👤 ${o.cliente.nombre} · ${fmtTel(o.cliente.tel)}`,
     `📍 ${s?.n||''} (${s?.zona||''}) · ${cuando(o.retiro.at)} · ${entregaTxt(o.retiro)}`,
     o.retiro.envio?`🗺️ Entregar en: ${mapaUrl(o.retiro.envio)}${o.retiro.envio.senas?' · '+o.retiro.envio.senas:''}`:'',

@@ -101,26 +101,35 @@ function usarLocal(k){
   try{if(typeof chooseOrderScope==='function')chooseOrderScope(k==='todas'?'both':k==='moravia'?'moravia':'lasr');}catch{}
   document.getElementById('scopePicker')?.classList.remove('open');document.body.classList.remove('scope-picker-open');
 }
-let _trasLocal=null;
-function pedirLocal(despues){
-  _trasLocal=despues||null;
+let _trasLocal=null,_locCancelar=null;
+// Elegir tienda (rediseño, Fase 2): una lista con las tres opciones; la última usada lleva "Último".
+// Al arrancar elegir es obligatorio; desde el Inicio (o al salir de "Las dos") se puede cancelar.
+// Teclas en la compu: 1 Moravia · 2 Los Ángeles · 3 Las dos · Esc cancelar.
+function pedirLocal(despues,cancelar){
+  _trasLocal=despues||null;_locCancelar=cancelar||null;M.locPend=null;M.clave='';
   const ultimo=LS.get('aramo_local',null),activo=acceso().activo;
   const el=$('loc');
   const opciones=[
-    {k:'moravia',e:'🏠',n:suc('moravia')?.n||'ARAMO',zona:suc('moravia')?.zona||'Moravia'},
-    {k:'angeles',e:'📍',n:suc('angeles')?.n||'LASR',zona:suc('angeles')?.zona||'Los Ángeles'},
-    {k:'todas',e:'🧺',n:'Ambos',zona:'Moravia y Los Ángeles · solo Surtido'}
+    {k:'moravia',t:'1',ico:'moravia',n:suc('moravia')?.zona||'Moravia',sub:suc('moravia')?.n||'ARAMO'},
+    {k:'angeles',t:'2',ico:'angeles',n:suc('angeles')?.zona||'Los Ángeles',sub:suc('angeles')?.n||'LASR'},
+    {k:'todas',t:'3',n:'Las dos',sub:'Solo para Surtido'}
   ];
-  el.innerHTML=`<div class="loc-in">
-    <div class="loc-marca">ARAMO</div>
-    <h1>¿En qué local estás?</h1>
-    <p>Elegí un local para ver sus pedidos, o <b>Ambos</b> para trabajar el Surtido de las dos tiendas.</p>
-    <div class="loc-ops">${opciones.map(x=>`<button type="button" class="loc-op${ultimo===x.k?' ult':''}" data-loc="${x.k}"><span class="loc-e">${x.e}</span><span class="loc-t"><b>${esc(x.n)}</b><small>${esc(x.zona)}</small></span>${ultimo===x.k?'<em>Último</em>':''}<span class="loc-ir">→</span></button>`).join('')}</div>
+  el.innerHTML=`<div class="loc-in loc6">
+    <div class="loc6-logo" aria-hidden="true">ARAMO${ICO('hoja',18)}</div>
+    <h1 id="locTit">¿Dónde estás trabajando hoy?</h1>
+    <p class="loc6-sub">Lo podés cambiar cuando querás.</p>
+    <div class="loc-ops loc6-ops" role="group" aria-labelledby="locTit">${opciones.map(x=>`<button type="button" class="loc-op loc6-op ${x.k}${ultimo===x.k?' ult':''}" data-loc="${x.k}">
+      <span class="loc6-ico${x.ico?'':' dos'}" aria-hidden="true">${x.ico?ICO(x.ico,24):'<i></i><i></i>'}</span>
+      <span class="loc-t"><b>${esc(x.n)}</b><small>${esc(x.sub)}${ultimo===x.k?'<span class="loc6-ult">Último</span>':''}</small></span>
+      <kbd aria-hidden="true">${x.t}</kbd>${ICO('siguiente',22)}</button>`).join('')}</div>
     <div id="locClave"></div>
-    <p class="loc-pie">${activo?'🔒 Cada local pide su contraseña':'🔓 Entrada directa · la contraseña se activa en ⚙️ Ajustes'}</p>
+    <p class="loc6-pie">${ICO('candado',16)}${activo?'Cada tienda pide su contraseña':'Entrada sin contraseña · se activa en Ajustes'}</p>
+    ${_locCancelar?'<button type="button" class="ui-btn ui-btn--fantasma ui-btn--l loc6-cancelar" data-loc-cancelar>Cancelar</button>':''}
   </div>`;
   el.classList.add('open');document.body.classList.add('pu-lock');
+  requestAnimationFrame(()=>el.querySelector('.loc-op.ult,.loc-op')?.focus({preventScroll:true}));
 }
+function cancelarLocal(){const f=_locCancelar;if(!f)return;_locCancelar=null;_trasLocal=null;M.locPend=null;M.clave='';cerrarLocal();f();}
 function cerrarLocal(){$('loc').classList.remove('open');}
 function entrarLocal(k){
   usarLocal(k);cerrarLocal();buzz(10);
@@ -130,10 +139,20 @@ function entrarLocal(k){
 }
 function pintarClave(k,mal){
   const d=(M.clave||'').padEnd(5,' ').split('');
+  document.querySelectorAll('#loc .loc-op').forEach(b=>b.classList.toggle('elegida',b.dataset.loc===k));
   $('locClave').innerHTML=`<div class="loc-clave${mal?' mal':''}"><p>Contraseña de <b>${esc(localNom(k))}</b></p><div class="loc-dig">${d.map(c=>`<span class="${c!==' '?'f':''}">${c!==' '?'•':''}</span>`).join('')}</div>
-    <div class="loc-pad">${[1,2,3,4,5,6,7,8,9,'⌫',0,'✓'].map(x=>`<button type="button" data-clave="${x}">${x}</button>`).join('')}</div></div>`;
+    ${mal?`<p class="loc6-error" role="alert">${ICO('alerta',16)}Esa contraseña no es. Probá otra vez.</p>`:''}
+    <div class="loc-pad">${[1,2,3,4,5,6,7,8,9,'⌫',0,'✓'].map(x=>`<button type="button" data-clave="${x}"${x==='⌫'?' aria-label="Borrar"':x==='✓'?' aria-label="Entrar"':''}>${x}</button>`).join('')}</div></div>`;
 }
+document.addEventListener('keydown',e=>{
+  if(!$('loc')?.classList.contains('open')||e.ctrlKey||e.metaKey||e.altKey)return;
+  if(e.key==='Escape'&&_locCancelar){e.preventDefault();cancelarLocal();return;}
+  if(M.locPend||e.target.matches?.('input,textarea'))return;
+  const k={'1':'moravia','2':'angeles','3':'todas'}[e.key];
+  if(k){e.preventDefault();$('loc').querySelector(`[data-loc="${k}"]`)?.click();}
+});
 document.addEventListener('click',async e=>{
+  if(e.target.closest('[data-loc-cancelar]')){cancelarLocal();return;}
   const op=e.target.closest('[data-loc]');
   if(op){
     const k=op.dataset.loc;
@@ -147,7 +166,7 @@ document.addEventListener('click',async e=>{
     else if(x!=='✓'&&M.clave.length<5)M.clave+=x;
     if(M.clave.length===5||x==='✓'){
       if(await claveOk(M.locPend,M.clave)){const k=M.locPend;M.locPend=null;M.clave='';entrarLocal(k);return;}
-      M.clave='';pintarClave(M.locPend,true);buzz([60,40,60]);toast('Esa contraseña no es');return;
+      M.clave='';pintarClave(M.locPend,true);buzz([60,40,60]);return;
     }
     pintarClave(M.locPend);
   }
@@ -241,7 +260,7 @@ function montar(){
         <button type="button" data-mo="deshacer-reinicio" id="moDeshacer" hidden><b>↩️</b>Deshacer reinicio</button>
         <button type="button" data-mo="recetario"><b>📖</b>Recetario</button>
         <button type="button" data-mo="ajustes"><b>💳</b>Pagos y horarios</button>
-        <button type="button" data-mo="compartir"><b>📣</b>Compartir Taller</button>
+        <button type="button" data-mo="compartir"><b>📣</b>Compartir La Feria</button>
         <button type="button" data-mo="prueba"><b>🧪</b>Pedido de prueba</button>
       </div></div>
       <aside class="mo-caja" id="moCaja" aria-label="Caja"></aside></div></div>`;
@@ -295,7 +314,7 @@ function datosPuerta(){
   const a=activos().filter(paraMi),nuevos=a.filter(o=>o.estado==='nuevo').length,alist=a.filter(o=>o.estado==='alistando').length,listos=a.filter(o=>o.estado==='listo').length;
   const cob=N.lista().filter(o=>o.cobro&&esHoy(o.cobro.fecha)&&paraMi(o)),total=cob.reduce((t,o)=>t+(+o.cobro.total||0),0);
   const fd=new Date().toLocaleDateString('es-CR',{weekday:'long',day:'numeric',month:'long'});
-  const pasos=[['🏪','Proveedores',sr.provs||'—'],['🚚','Surtido',sr.prods?sr.prods+' prod.':'—'],['🏷️','Vitrina',N.catalogo().filter(p=>!p.oculto).length+' prod.'],['🧺','Taller',a.length+' en curso'],['🛎️','Mostrador',listos+' listos'],['🧾','Caja',cob.length?$c(total):'₡0 hoy']];
+  const pasos=[['🏪','Proveedores',sr.provs||'—'],['🚚','Surtido',sr.prods?sr.prods+' prod.':'—'],['🏷️','Vitrina',N.catalogo().filter(p=>!p.oculto).length+' prod.'],['🧺','La Feria',a.length+' en curso'],['🛎️','Mostrador',listos+' listos'],['🧾','Caja',cob.length?$c(total):'₡0 hoy']];
   return{
     saludo:h<12?'Buenos días':h<18?'Buenas tardes':'Buenas noches',
     fecha:fd.charAt(0).toUpperCase()+fd.slice(1),hora:fh(new Date()),
@@ -313,6 +332,36 @@ function datosPuerta(){
     caja:{total:$c(total),n:cob.length},
     cadena:pasos.map((p,i)=>`${i?'<span class="pu-flecha">›</span>':''}<div class="pu-eslabon"><b>${p[0]}</b>${p[1]}<em>${esc(p[2])}</em></div>`).join(''),
     bit:bitacoraHoy(),
+    ...datosInicio(sr,a,{nuevos,alist,listos,total}),
+  };
+}
+// ── Datos del Inicio nuevo (portada 6, rediseño 2026-11-23) ──
+const ICO=(n,t)=>typeof window.icono==='function'?window.icono(n,{t:t||20}):'';
+const hoyTxt=()=>{const d=new Date();return d.getFullYear()+'-'+(d.getMonth()+1)+'-'+d.getDate();};
+function datosInicio(sr,a,c){
+  const k=LOCAL&&LOCAL!=='todas'?LOCAL:'moravia',zona=suc(k)?.zona||(k==='moravia'?'Moravia':'Los Ángeles');
+  const pl=(n,s,p)=>n+' '+(n===1?s:p);
+  // La franja de avisos sale solo si están apagados y no la cerraron hoy.
+  const pedirAvisos=N.avisos.soportado()&&N.avisos.permiso()!=='granted'&&LS.get('aramo_avisos_franja','')!==hoyTxt();
+  // Los últimos 3 pedidos (los nuevos primero), para la compu.
+  const est={nuevo:o=>`hace ${Math.max(1,-minsA(o.created||o.updated))} min`,alistando:()=>'alistando',listo:()=>'listo',entregado:o=>'entregado '+fh(o.updated),cancelado:()=>'cancelado'};
+  const ultimos=[...a.slice().sort((x,y)=>(y.estado==='nuevo')-(x.estado==='nuevo')||Date.parse(y.created||0)-Date.parse(x.created||0)),...cerradosHoy().filter(paraMi).sort((x,y)=>Date.parse(y.updated||0)-Date.parse(x.updated||0))].slice(0,3);
+  return{
+    tienda6:`<button type="button" class="ui-tienda ui-tienda--filtro ui-tienda--${k}" data-pu="local" aria-label="Tienda: ${esc(zona)}. Tocá para cambiar">${esc(zona)}${ICO('bajar',16)}</button>`,
+    avisos6:pedirAvisos?`<div class="ui-franja">${ICO('aviso',18)}<span>Activá los avisos para oír los pedidos nuevos</span><button type="button" class="ui-btn ui-btn--s ui-btn--secundario" data-pu="avisos-on">Activar</button><button type="button" class="ui-btn-ico" data-pu="avisos-cerrar" aria-label="Ahora no" title="Ahora no">${ICO('cerrar',18)}</button></div>`:'',
+    mo6:{
+      tit:c.nuevos?pl(c.nuevos,'pedido nuevo','pedidos nuevos'):'Mostrador',
+      sub:c.nuevos?`Mostrador · ${c.alist} alistando`:`${c.nuevos} nuevos · ${c.alist} alistando · Caja ${$c(c.total)}`,
+      caja:`Caja de hoy ${$c(c.total)}`,
+      lista:ultimos.length?ultimos.map(o=>`<div class="po6-ped"><b>${esc(o.ref)}</b><span>${esc(o.cliente?.nombre||'')}</span><em>${esc((est[o.estado]||(()=>''))(o))}</em></div>`).join(''):'<p class="po6-ped-vacio">Todavía no hay pedidos hoy.</p>',
+    },
+    s6:{sub:'Pedido a proveedores',
+       // Reiniciar el pedido de las dos tiendas de una vez, sin entrar a Surtido (solo si hay algo pedido)
+       reini:sr.prods?`<button type="button" class="ui-btn ui-btn--peligro-fantasma ui-btn--s po6-reini-btn" data-pu="reiniciar-pedido">${ICO('reiniciar',18)}Reiniciar el pedido de las dos tiendas</button>`:'',
+       ins:(sr.sinEnviar?`<span class="ui-estado ui-estado--pendiente">${ICO('reloj',16)}${sr.sinEnviar} por enviar</span>`:'')+`<span class="ui-estado">${sr.prods?pl(sr.prods,'producto','productos'):'Pedido vacío'}</span>`},
+    t6:{sub:'Tienda en línea de los clientes',ins:a.length?`<span class="ui-estado ui-estado--pendiente">${ICO('reloj',16)}${a.length} en curso</span>`:''},
+    p6:{sub:'Caja de '+zona},
+    c6:{sub:'Cierres, personal y gastos'},
   };
 }
 let _portadaMontada=0,_fotoT=0;
@@ -346,16 +395,16 @@ function sugerencias(q){
   const L=[];
   const P=[
     {r:/^(1|surt|pedir|provee|compra)/,e:'🚚',t:'Abrir Surtido',s:'Pedidos a proveedores',act:'surtido'},
-    {r:/^(2|taller|client|canasta|tienda online)/,e:'🧺',t:'Abrir Taller',s:'Lo que ven los clientes',act:'canasta'},
+    {r:/^(2|taller|client|canasta|tienda online)/,e:'🧺',t:'Abrir La Feria',s:'Lo que ven los clientes',act:'canasta'},
     {r:/^(3|pos|caja|vend|cobr|factur)/,e:'🧾',t:'Abrir ARAMO POS',s:'Ventas y caja del mostrador',act:'pos'},
     {r:/^(m$|mostr|pedidos|encarg|recib)/,e:'🛎️',t:'Abrir Mostrador y Caja',s:'Recibir, alistar, cobrar y entregar',act:'mostrador'},
     {r:/^(prec|vitrin|product)/,e:'🏷️',t:'Precios y productos',s:'Cambiar precio, unidad o nombre',act:'vitrina'},
-    {r:/^(recet)/,e:'📖',t:'Recetario',s:'Recetas del Taller',act:'recetario'},
+    {r:/^(recet)/,e:'📖',t:'Recetario',s:'Recetas de La Feria',act:'recetario'},
     {r:/^(ajust|sinpe|horari|whats)/,e:'⚙️',t:'Pagos y horarios',s:'SINPE, WhatsApp de cada tienda, horarios',act:'ajustes'},
     {r:/^(pega|link)/,e:'📥',t:'Pedido de WhatsApp',s:'Pegar un pedido que llegó por WhatsApp',act:'whatsapp'},
     {r:/^(cierre|hoy|cobrad)/,e:'🧾',t:'Caja de hoy',s:'Cobros del día por método',act:'caja'},
   ];
-  if(!q)return[{e:'🚚',t:'1 · Surtido',s:'Pedidos a proveedores',act:'surtido'},{e:'🧺',t:'2 · Taller',s:'Lo que ven los clientes',act:'canasta'},{e:'🧾',t:'3 · ARAMO POS',s:'Ventas y caja',act:'pos'},{e:'🛎️',t:'M · Mostrador',s:'Pedidos de clientes',act:'mostrador'}];
+  if(!q)return[{e:'🚚',t:'1 · Surtido',s:'Pedidos a proveedores',act:'surtido'},{e:'🧺',t:'2 · La Feria',s:'Lo que ven los clientes',act:'canasta'},{e:'🧾',t:'3 · ARAMO POS',s:'Ventas y caja',act:'pos'},{e:'🛎️',t:'M · Mostrador',s:'Pedidos de clientes',act:'mostrador'}];
   P.forEach(x=>{if(x.r.test(q))L.push(x);});
   // pedidos por código o por nombre del cliente
   N.lista().filter(o=>!o.archivado&&(nrm(o.ref).replace('-','').includes(q.replace('-',''))||nrm(o.cliente?.nombre).includes(q))).slice(0,4)
@@ -427,7 +476,7 @@ function volverAlMenu(){
     cerrarHoja();
     $('mostrador')?.classList.remove('open');
     cerrarPuerta();
-    pedirLocal();
+    pedirLocal(null,()=>document.body.classList.remove('pu-lock'));   // Cancelar = seguir en el Surtido de las dos
     return;
   }
   abrirPuerta();
@@ -868,7 +917,7 @@ function pintarVitrina(){
   const t=T(),cat=N.catalogo(M.suc==='todas'?null:M.suc),q=nrm(M.vq);
   const L=cat.filter(p=>(M.vcat==='todos'||p.c===M.vcat)&&(!q||nrm(p.n+' '+(p.d||'')).includes(q)));
   const margen=t.margen??35;
-  abrirHoja(`<p class="mo-kick">Vitrina · lo que ven los clientes en el Taller</p><div class="mo-h">🏷️ Precios y productos</div><div class="mo-s">Todo se guarda solo y se ve al instante en el Taller y las recetas. Los pedidos ya sellados conservan su precio.</div>
+  abrirHoja(`<p class="mo-kick">Vitrina · lo que ven los clientes en La Feria</p><div class="mo-h">🏷️ Precios y productos</div><div class="mo-s">Todo se guarda solo y se ve al instante en La Feria y las recetas. Los pedidos ya sellados conservan su precio.</div>
     <div class="mo-dos" style="margin-top:10px"><label class="mo-field">Buscar<input type="search" id="moVitQ" value="${esc(M.vq)}" placeholder="Ej.: aguacate" autocomplete="off"></label><label class="mo-field">🤖 Margen automático<input type="number" id="moMargen" min="0" max="300" step="1" value="${margen}"></label></div>
     <div class="mo-chips" style="flex-wrap:nowrap;overflow-x:auto">${[{k:'todos',n:'Todos',e:'🧺'},...CFG.pasillos.filter(p=>p.k!=='top')].map(p=>`<button type="button" class="mo-chip${M.vcat===p.k?' on':''}" data-mo="vcat" data-k="${p.k}">${p.e} ${esc(p.n)}</button>`).join('')}</div>
     <button type="button" class="mo-btn p w" style="margin-top:10px" data-mo="prod-nuevo">＋ Producto nuevo</button>
@@ -886,7 +935,7 @@ function pintarVitrina(){
     const k=i.dataset.moPr,v=Math.max(0,Math.round(+i.value||0));
     const precios={...(T().precios||{})};if(v>0)precios[k]=v;else delete precios[k];
     const t2=T(),kk=M.suc==='todas'?localK():M.suc,sucursales=(t2.sucursales||[]).map(s=>s.k===kk?{...s,precios:{...(s.precios||{}),...(v>0?{[k]:v}:{})}}:s);
-    N.guardarTienda({precios,sucursales});toast('🏷️ Precio guardado · ya se ve en el Taller');
+    N.guardarTienda({precios,sucursales});toast('🏷️ Precio guardado · ya se ve en La Feria');
   }));
 }
 function editarProd(k){
@@ -906,7 +955,7 @@ function pintarProd(){
      <label class="mo-field">URL de foto existente<input id="peFotoUrl" type="url" value="${esc(e.foto||'')}" placeholder="https://…"></label>
     <label class="mo-sw">🤖 Precio automático (costo de Surtido + ${t.margen??35}%)<input type="checkbox" id="peA" ${e.auto?'checked':''}></label>
     <div class="mo-s">${c?`Costo de hoy en Surtido: <b>${$c(c.pr)}</b> (${esc(c.prov)}) → precio automático <b>${$c(precioAuto(c.pr,t.margen??35))}</b>`:'No encontramos este producto en Surtido con ese nombre; el automático necesita un costo.'}</div>
-    <button type="button" class="mo-btn p w big" style="margin-top:12px" data-mo="prod-ok">Guardar · se ve al instante en el Taller</button>
+    <button type="button" class="mo-btn p w big" style="margin-top:12px" data-mo="prod-ok">Guardar · se ve al instante en La Feria</button>
     ${e.nuevo?'':'<button type="button" class="mo-btn w" style="margin-top:8px" data-mo="vitrina">‹ Volver a la vitrina</button>'}`);
   const u=$('peU');u.addEventListener('change',()=>{M.edit={...leerProd(),u:u.value,s:u.value==='kg'?.5:1};repintar(pintarProd);});
   $('peFoto')?.addEventListener('change',async ev=>{const file=ev.target.files?.[0];if(!file)return;if(!e.k){toast('Guardá el producto primero y luego subí la foto');return;}try{toast('Subiendo foto…');const url=await N.subirFoto(file,e.k);M.edit={...M.edit,foto:url};const input=$('peFotoUrl');if(input)input.value=url;toast('📷 Foto guardada');}catch(err){toast(err.message||'No se pudo subir la foto');}});
@@ -930,14 +979,14 @@ function guardarProd(){
   if(e.auto){const c=costoHoy(e.n);if(c)precios[k]=precioAuto(c.pr,t.margen??35);}
   else if(e.p>0)precios[k]=e.p;
   N.guardarTienda({prods,precios,nuevos});
-  toast(`🏷️ ${e.n} guardado · ya se ve en el Taller`);
+  toast(`🏷️ ${e.n} guardado · ya se ve en La Feria`);
   M.vista='vitrina';pintarVitrina();
 }
 
 // ── Recetario editable ──
 function pintarRecetario(){
   const t=T(),fuera=new Set(t.recetasOcultas||[]),todas=[...(CFG.recetas||[]),...(t.recetas||[])];
-  abrirHoja(`<p class="mo-kick">Recetario del Taller · ${todas.length} recetas</p><div class="mo-h">📖 Recetario</div><div class="mo-s">El cliente elige una receta y las cantidades se escalan solas por personas. Creá las tuyas con lo que más vendés.</div>
+  abrirHoja(`<p class="mo-kick">Recetario de La Feria · ${todas.length} recetas</p><div class="mo-h">📖 Recetario</div><div class="mo-s">El cliente elige una receta y las cantidades se escalan solas por personas. Creá las tuyas con lo que más vendés.</div>
     <button type="button" class="mo-btn p w" style="margin-top:10px" data-mo="rec-nueva">＋ Receta nueva</button>
     <div class="mo-blk" style="padding:4px 12px">${todas.map(r=>{const propia=(t.recetas||[]).some(x=>x.k===r.k);return `<div class="mo-vi${fuera.has(r.k)?' oculto':''}"><span class="e">${r.e}</span><span class="t"><strong>${esc(r.n)}${propia?' <span class="mo-pill">tuya</span>':''}</strong><small>${esc((CFG.categoriasRecetas||[]).find(c=>c.k===r.c)?.n||'')} · ${r.items.map(([k])=>N.catalogo().find(p=>p.k===k)?.n||k).join(', ')}</small></span>${propia?`<button type="button" class="tg" data-mo="rec-edit" data-k="${r.k}" aria-label="Editar">✏️</button>`:''}<button type="button" class="tg${fuera.has(r.k)?'':' on'}" data-mo="rec-vis" data-k="${r.k}" aria-label="Mostrar">${fuera.has(r.k)?'🙈':'👁'}</button></div>`;}).join('')}</div>`);
 }
@@ -956,7 +1005,7 @@ function pintarReceta(){
     <div class="mo-blk" style="padding:4px 12px">${r.items.map(([k,q4],i)=>{const p=cat.find(x=>x.k===k);return `<div class="mo-vi"><span class="e">${p?.e||'🧺'}</span><span class="t"><strong>${esc(p?.n||k)}</strong><small>por ${esc(UNI[p?.u]||p?.u||'')}</small></span><input type="number" step="${p?.u==='kg'?'0.25':'1'}" min="0" value="${q4}" data-re-q="${i}" aria-label="Cantidad"><button type="button" class="tg" data-mo="re-quitar" data-i="${i}" aria-label="Quitar">✕</button></div>`;}).join('')||'<div class="mo-s">Buscá abajo y tocá para agregar.</div>'}</div>
     <label class="mo-field">Agregar ingrediente<input type="search" id="reQ" value="${esc(M.rq||'')}" placeholder="Buscá: tomate, culantro…" autocomplete="off"></label>
     <div class="mo-chips" style="flex-wrap:wrap">${sug.map(p=>`<button type="button" class="mo-chip" data-mo="re-add" data-k="${p.k}">${p.e} ${esc(p.n)}</button>`).join('')}</div>
-    <button type="button" class="mo-btn p w big" style="margin-top:12px" data-mo="rec-ok">Guardar receta · aparece en el Taller</button>
+    <button type="button" class="mo-btn p w big" style="margin-top:12px" data-mo="rec-ok">Guardar receta · aparece en La Feria</button>
     <button type="button" class="mo-btn w" style="margin-top:8px" data-mo="recetario">‹ Volver al recetario</button>`);
   const leer=()=>{const v=id=>$(id)?.value??'';Object.assign(r,{n:v('reN').trim(),e:v('reE').trim()||'🍲',c:v('reC'),desc:v('reD').trim()});};
   ['reN','reE','reC','reD'].forEach(id=>$(id).addEventListener('change',leer));
@@ -1017,7 +1066,7 @@ function pintarCliente(){
 }
 function pintarPrograma(){
   const L=M.prog||(M.prog=JSON.parse(JSON.stringify(N.lealtad())));
-  abrirHoja(`<p class="mo-kick">Clientes y lealtad · los dos locales</p><div class="mo-h">🍃 Programa de lealtad</div><div class="mo-s">Tus clientes ganan hojas con cada pedido entregado y las canjean por descuentos al pedir en el Taller.</div>
+  abrirHoja(`<p class="mo-kick">Clientes y lealtad · los dos locales</p><div class="mo-h">🍃 Programa de lealtad</div><div class="mo-s">Tus clientes ganan hojas con cada pedido entregado y las canjean por descuentos al pedir en La Feria.</div>
     <div class="mo-blk"><label class="mo-sw">Programa activo<input type="checkbox" id="lgAct" ${L.activa?'checked':''}></label>
       <label class="mo-field">1 hoja 🍃 por cada ₡<input type="number" id="lgPor" min="100" step="100" inputmode="numeric" value="${+L.porHoja}"></label>
       <label class="mo-sw">🔥 Hojas dobles (promo: los pedidos nuevos valen el doble)<input type="checkbox" id="lgDob" ${L.dobles?'checked':''}></label></div>
@@ -1078,30 +1127,88 @@ function pintarPersonal(){
   $('stEmail')?.addEventListener('input',e=>{M.staffEmail=e.target.value;});$('stPass')?.addEventListener('input',e=>{M.staffPass=e.target.value;});
 }
 async function pintarAnalitica(){
-  abrirHoja('<p class="mo-kick">Métricas del Taller</p><div class="mo-h">📊 Qué está pasando</div><div class="mo-s">Busquedas sin resultado, productos vistos, canastas abandonadas y errores registrados.</div><div class="mo-s">Cargando…</div>');
+  abrirHoja('<p class="mo-kick">Métricas de La Feria</p><div class="mo-h">📊 Qué está pasando</div><div class="mo-s">Busquedas sin resultado, productos vistos, canastas abandonadas y errores registrados.</div><div class="mo-s">Cargando…</div>');
   const ev=await N.metricas();
   const count=(tipo)=>ev.filter(x=>x.tipo===tipo).length;
   const noEncontrado=ev.filter(x=>x.tipo==='search_empty').slice(0,12),errores=ev.filter(x=>x.tipo==='client_error').slice(0,12),vistas=ev.filter(x=>x.tipo==='product_view').slice(0,12);
-  abrirHoja(`<p class="mo-kick">Métricas del Taller · últimos eventos</p><div class="mo-h">📊 Qué está pasando</div><div class="mo-cuadre"><div><span>Busquedas sin resultado</span><b>${count('search_empty')}</b></div><div><span>Canastas abandonadas</span><b>${count('cart_abandon')}</b></div><div><span>Productos vistos</span><b>${count('product_view')}</b></div><div><span>Errores</span><b>${count('client_error')}</b></div></div><div class="mo-blk"><h4>🔎 No encontraron</h4>${noEncontrado.length?noEncontrado.map(x=>`<div class="mo-s">${esc(x.data?.q||'—')} · ${esc(fdia(x.created_at))}</div>`).join(''):'<div class="mo-s">Todavía no hay datos.</div>'}</div><div class="mo-blk"><h4>👀 Más vistos recientemente</h4>${vistas.length?vistas.map(x=>`<div class="mo-s">${esc(x.data?.nombre||x.data?.k||'Producto')} · ${esc(fdia(x.created_at))}</div>`).join(''):'<div class="mo-s">Todavía no hay datos.</div>'}</div><div class="mo-blk"><h4>🧯 Errores recientes</h4>${errores.length?errores.map(x=>`<div class="mo-s">${esc(x.data?.message||'Error')} · ${esc(fdia(x.created_at))}</div>`).join(''):'<div class="mo-s">No hay errores registrados.</div>'}</div>`);
+  abrirHoja(`<p class="mo-kick">Métricas de La Feria · últimos eventos</p><div class="mo-h">📊 Qué está pasando</div><div class="mo-cuadre"><div><span>Busquedas sin resultado</span><b>${count('search_empty')}</b></div><div><span>Canastas abandonadas</span><b>${count('cart_abandon')}</b></div><div><span>Productos vistos</span><b>${count('product_view')}</b></div><div><span>Errores</span><b>${count('client_error')}</b></div></div><div class="mo-blk"><h4>🔎 No encontraron</h4>${noEncontrado.length?noEncontrado.map(x=>`<div class="mo-s">${esc(x.data?.q||'—')} · ${esc(fdia(x.created_at))}</div>`).join(''):'<div class="mo-s">Todavía no hay datos.</div>'}</div><div class="mo-blk"><h4>👀 Más vistos recientemente</h4>${vistas.length?vistas.map(x=>`<div class="mo-s">${esc(x.data?.nombre||x.data?.k||'Producto')} · ${esc(fdia(x.created_at))}</div>`).join(''):'<div class="mo-s">Todavía no hay datos.</div>'}</div><div class="mo-blk"><h4>🧯 Errores recientes</h4>${errores.length?errores.map(x=>`<div class="mo-s">${esc(x.data?.message||'Error')} · ${esc(fdia(x.created_at))}</div>`).join(''):'<div class="mo-s">No hay errores registrados.</div>'}</div>`);
 }
 
-// ── Ajustes de la app (botón ⚙️ de la pantalla principal) ──
+// ── Ajustes (rediseño, Fase 2): uno solo, para el ⚙ del Inicio y para "Pagos y horarios" del Mostrador ──
+// Lista agrupada: ESTE EQUIPO y LA TIENDA. Cada fila dice cómo está y abre su formulario con Guardar.
+// OJO: 'aj-ok' guarda SOLO los campos que están en pantalla (un campo ausente nunca se guarda vacío).
+const ajZona=k=>suc(k)?.zona||(k==='angeles'?'Los Ángeles':'Moravia');
+const ajCampo=(id,et,val,o={})=>`<label class="ui-campo"><span class="ui-campo-et">${et}</span>${o.area?`<textarea class="ui-campo-in aj6-area" id="${id}" rows="${o.area}"${o.ph?` placeholder="${esc(o.ph)}"`:''}>${esc(val??'')}</textarea>`:`<input class="ui-campo-in" id="${id}" type="${o.tipo||'text'}"${o.modo?` inputmode="${o.modo}"`:''}${o.min!=null?` min="${o.min}"`:''}${o.paso?` step="${o.paso}"`:''} value="${esc(val??'')}"${o.ph?` placeholder="${esc(o.ph)}"`:''} autocomplete="off">`}${o.ayuda?`<span class="ui-campo-ayuda">${o.ayuda}</span>`:''}</label>`;
+const ajSw=(id,et,on,sub,extra='')=>`<label class="aj6-sw"><span>${et}${sub?`<small>${sub}</small>`:''}</span><span class="ui-interruptor"><input type="checkbox" id="${id}"${on?' checked':''}${extra}><span></span></span></label>`;
+const ajTema=()=>{const v=LS.get('aramo_theme',null)||localStorage.getItem('aramo_theme')||'light';return['light','dark','auto'].includes(v)?v:'light';};
 function pintarAjustesApp(){
-  const a=acceso(),perm=N.avisos.permiso();
-  abrirHoja(`<p class="mo-kick">Pantalla principal · este equipo</p><div class="mo-h">⚙️ Ajustes</div>
-    <div class="mo-blk"><h4>🔒 Contraseña de ${esc(localNom(LOCAL||'moravia'))}</h4>
-      <label class="mo-sw">Pedir contraseña al abrir la app<input type="checkbox" ${a.activo?'checked':''} data-mo="acceso-sw"></label>
-      <div class="mo-s">${a.activo?'Está activa: al abrir la app se pide la contraseña del local.':'Apagada por ahora: se entra directo. La contraseña de fábrica es 12345.'}</div>
-      <label class="mo-field" style="margin-top:8px">Contraseña actual<input id="acActual" type="password" inputmode="numeric" autocomplete="off" placeholder="12345"></label>
-      <div class="mo-dos"><label class="mo-field">Nueva (4 a 8 números)<input id="acNueva" type="password" inputmode="numeric" autocomplete="new-password"></label><label class="mo-field">Repetila<input id="acRepite" type="password" inputmode="numeric" autocomplete="new-password"></label></div>
-      <button type="button" class="mo-btn w" style="margin-top:10px" data-mo="clave-ok">Cambiar contraseña</button></div>
-    <div class="mo-blk"><h4>🔔 Avisos de pedidos nuevos</h4>
-      <div class="mo-row"><span style="flex:1"><small style="color:var(--m)">${!N.avisos.soportado()?'Este navegador no permite notificaciones; queda el sonido y WhatsApp.':perm==='granted'?'Activados ✓ · te llegan estés en Surtido, Taller o el POS.':perm==='denied'?'Bloqueados: permitilos en la configuración del sitio.':'Activalos para que te avise en cualquier pantalla.'}</small></span>${perm==='granted'?'<button type="button" class="mo-btn" data-mo="probar-aviso">Probar</button>':'<button type="button" class="mo-btn p" data-mo="avisos-on">Activar</button>'}</div>
-      <label class="mo-sw">🔊 Sonido que se repite hasta abrir el pedido<input type="checkbox" id="rSon" ${R.sonido?'checked':''}></label>
-      <label class="mo-sw">💡 Mantener la pantalla encendida<input type="checkbox" id="rPan" ${R.pantalla?'checked':''}></label></div>
-    <div class="mo-btns"><button type="button" class="mo-btn" data-mo="ajustes">💳 Pagos y horarios de ${esc(localNom(LOCAL||'moravia'))}</button></div>`);
-  $('rSon').addEventListener('change',e=>{R.sonido=e.target.checked;guardarR();});
-  $('rPan').addEventListener('change',e=>{R.pantalla=e.target.checked;guardarR();pantallaEncendida();});
+  M.vista='ajustes-app';
+  const a=acceso(),perm=N.avisos.permiso(),t=T(),k=localK(),s=(t.sucursales||[]).find(x=>x.k===k)||{k},sp=N.sinpeDe(k);
+  const fila=(sec,ico,tit,res,sub)=>`<button type="button" class="ui-lista-fila" data-mo="aj-sec" data-sec="${sec}">${ICO(ico,22)}<span>${tit}${sub?`<small>${sub}</small>`:''}</span>${res?`<em>${esc(res)}</em>`:''}${ICO('siguiente',20)}</button>`;
+  const avisos=!N.avisos.soportado()?'Solo sonido':perm==='granted'?(R.sonido?'Activos':'Sin sonido'):perm==='denied'?'Bloqueados':'Apagados';
+  const ver=document.querySelector('.app-version b')?.textContent||'';
+  abrirHoja(`<div class="aj6"><h2 class="aj6-tit">Ajustes</h2>
+    <h3 class="ui-grupo-tit">Este equipo</h3>
+    <div class="ui-lista">
+      ${fila('tienda','tienda','Tienda de este equipo',ajZona(k))}
+      ${fila('tema','sol','Tema',{light:'Claro',dark:'Oscuro',auto:'Automático'}[ajTema()])}
+      ${fila('avisos','aviso','Avisos de pedidos',avisos)}
+      <label class="ui-lista-fila aj6-fila-sw">${ICO('pantalla',22)}<span>Pantalla siempre encendida<small>Para la tablet del mostrador</small></span><span class="ui-interruptor"><input type="checkbox" id="rPan"${R.pantalla?' checked':''}><span></span></span></label>
+      ${fila('clave','candado','Contraseña de entrada',a.activo?'Activa':'Apagada')}
+      ${fila('actualizar','actualizar','Actualizar la app','','No borra pedidos ni ajustes')}
+    </div>
+    <h3 class="ui-grupo-tit">La tienda · ${esc(ajZona(k))}</h3>
+    <div class="ui-lista">
+      ${fila('contacto','mensaje','Contacto y WhatsApp',s.whatsapp?fmtTel(s.whatsapp):'Sin número')}
+      ${fila('horario','reloj','Horario y feriados',s.abre&&s.cierra?`${s.abre}–${s.cierra}`:'Sin horario')}
+      ${fila('pagos','sinpe','Pagos y SINPE',sp.numero?fmtTel(sp.numero):'Sin SINPE')}
+      ${fila('envio','camion','Envío a domicilio',t.envio===false?'Apagado':t.envioConfig?.tarifaBase?$c(t.envioConfig.tarifaBase):'Activo')}
+      ${fila('programa','hoja','Programa de hojas',N.lealtad().activa?'Activo':'Apagado')}
+      ${fila('compartir','qr','Compartir La Feria')}
+      ${fila('legales','libro','Textos legales')}
+      ${fila('avanzado','ajustes','Avanzado')}
+    </div>
+    ${ver?`<p class="aj6-ver">ARAMO · versión ${esc(ver)} · se actualiza sola</p>`:''}</div>`);
+  $('rPan')?.addEventListener('change',e=>{R.pantalla=e.target.checked;guardarR();pantallaEncendida();AramoUI.aviso(R.pantalla?'La pantalla se queda encendida':'Pantalla normal',{icono:false});});
+}
+// Cada sección de Ajustes en su propia hoja, con "‹ Ajustes" arriba.
+function pintarAjSec(sec){
+  const t=T(),k=localK(),s=(t.sucursales||[]).find(x=>x.k===k)||{k},sp=N.sinpeDe(k),a=acceso(),perm=N.avisos.permiso(),ec=t.envioConfig||{};
+  const guardar='<button type="button" class="ui-btn ui-btn--primario ui-btn--l aj6-guardar" data-mo="aj-ok">Guardar</button>';
+  const S={
+    tema:['Tema',`<div class="ui-opciones">${[['light','sol','Claro','Fondo claro, como el papel'],['dark','luna','Oscuro','Fondo oscuro, cansa menos de noche'],['auto','pantalla','Automático','Sigue al teléfono o la compu']].map(([v,i,n,d])=>`<button type="button" class="ui-opcion${ajTema()===v?' on':''}" data-mo="aj-tema-usar" data-v="${v}" aria-pressed="${ajTema()===v}">${ICO(i,22)}<span>${n}<small>${d}</small></span>${ajTema()===v?ICO('ok',20):''}</button>`).join('')}</div>`],
+    avisos:['Avisos de pedidos',`<p class="aj6-txt">${!N.avisos.soportado()?'Este navegador no permite notificaciones: queda el sonido y el WhatsApp de la tienda.':perm==='granted'?'Activados: te llegan estés en Surtido, La Feria o el POS.':perm==='denied'?'Están bloqueados: permitilos en la configuración del sitio del navegador.':'Activalos para que te avise en cualquier pantalla.'}</p>
+      ${N.avisos.soportado()&&perm!=='denied'?(perm==='granted'?`<button type="button" class="ui-btn ui-btn--secundario ui-btn--l" data-mo="probar-aviso">${ICO('probar',20)}Probar cómo suena</button>`:`<button type="button" class="ui-btn ui-btn--primario ui-btn--l" data-mo="avisos-on">${ICO('aviso',20)}Activar los avisos</button>`):''}
+      ${ajSw('rSon','Sonido que se repite hasta abrir el pedido',R.sonido,'Solo suenan los pedidos nuevos')}`],
+    clave:['Contraseña de entrada',`${ajSw('acSw','Pedir contraseña al abrir la app',a.activo,a.activo?'Activa: al abrir se pide la contraseña de la tienda.':'Apagada: se entra directo. La de fábrica es 12345.',' data-mo="acceso-sw"')}
+      <h3 class="ui-grupo-tit">Cambiar la contraseña de ${esc(ajZona(k))}</h3>
+      ${ajCampo('acActual','Contraseña actual','',{tipo:'password',modo:'numeric',ph:'12345'})}
+      <div class="aj6-dos">${ajCampo('acNueva','Nueva (4 a 8 números)','',{tipo:'password',modo:'numeric'})}${ajCampo('acRepite','Repetila','',{tipo:'password',modo:'numeric'})}</div>
+      <button type="button" class="ui-btn ui-btn--secundario ui-btn--l" data-mo="clave-ok">Cambiar contraseña</button>`],
+    contacto:['Contacto y WhatsApp',`${ajSw('ajAct','Recibe pedidos',s.activa!==false,'Si lo apagás, los clientes no pueden pedirle a esta tienda.')}
+      ${ajCampo('ajWaSuc','WhatsApp que recibe los pedidos',fmtTel(s.whatsapp),{tipo:'tel',modo:'tel',ph:'8888-8888'})}
+      <button type="button" class="ui-btn ui-btn--secundario ui-btn--l" data-mo="tienda-gps" data-k="${k}">${ICO('tienda',20)}${s.lat?'Ubicación guardada · actualizar':'Guardar la ubicación de la tienda (estando aquí)'}</button>${guardar}`],
+    horario:['Horario y feriados',`<div class="aj6-dos">${ajCampo('ajAbre','Abre',s.abre,{tipo:'time'})}${ajCampo('ajCierra','Cierra',s.cierra,{tipo:'time'})}</div>
+      <div class="aj6-dos">${ajCampo('ajMin','Minutos para alistar un pedido',+t.alistadoMin||40,{tipo:'number',modo:'numeric',min:10})}${ajCampo('ajCapacidad','Pedidos por hora (máximo)',+t.capacidadPorHora||20,{tipo:'number',modo:'numeric',min:0})}</div>
+      ${ajCampo('ajFeriados','Feriados',(t.feriados||[]).join(', '),{ph:'2026-12-25, 2027-01-01',ayuda:'Fechas así: año-mes-día, separadas por coma.'})}
+      ${ajCampo('ajEspecial','Horario especial',Object.entries(t.horariosEspeciales||{}).map(([d,x])=>`${d} | ${x.cerrada?'cerrado':`${x.abre||''}-${x.cierra||''}`}`).join('\n'),{area:3,ph:'2026-12-24 | 07:00-15:00\n2026-12-25 | cerrado',ayuda:'Un día por renglón: fecha | hora-hora, o fecha | cerrado.'})}${guardar}`],
+    pagos:['Pagos y SINPE',`<div class="aj6-dos">${ajCampo('ajSinpe','SINPE Móvil · número',fmtTel(sp.numero),{tipo:'tel',modo:'tel',ph:'8888-8888'})}${ajCampo('ajSinpeN','A nombre de',sp.nombre,{ph:'Ej.: ARAMO S.A.'})}</div>
+      ${ajCampo('ajLink','Link de pago con tarjeta (opcional)',t.linkTarjeta,{tipo:'url',ph:'https://…',ayuda:'Sin link, la tarjeta se cobra con datáfono al recoger. Vale para las dos tiendas.'})}${guardar}`],
+    envio:['Envío a domicilio',`${ajSw('ajEnvio','Ofrecer envío a domicilio',t.envio!==false,'Vale para las dos tiendas.')}
+      ${ajCampo('ajZona','Zona que cubrís',ec.zona,{ph:'Moravia y alrededores'})}
+      <div class="aj6-dos">${ajCampo('ajRadio','Distancia máxima (km)',+ec.radioKm||8,{tipo:'number',modo:'decimal',min:0,paso:'0.5'})}${ajCampo('ajTarifa','Tarifa base ₡',+ec.tarifaBase||0,{tipo:'number',modo:'numeric',min:0,paso:100})}</div>
+      <div class="aj6-dos">${ajCampo('ajKm','Por cada km ₡',+ec.tarifaKm||0,{tipo:'number',modo:'numeric',min:0,paso:50})}${ajCampo('ajMinimo','Pedido mínimo ₡',+ec.minimo||0,{tipo:'number',modo:'numeric',min:0,paso:100})}</div>${guardar}`],
+    legales:['Textos legales',`${ajCampo('ajPriv','Privacidad',t.privacidad,{area:4})}${ajCampo('ajCond','Condiciones',t.condiciones,{area:4})}
+      ${ajCampo('ajFaq','Preguntas frecuentes',(t.faq||[]).map(x=>`${x.q} | ${x.a}`).join('\n'),{area:4,ayuda:'Una por renglón: pregunta | respuesta.'})}${guardar}`],
+    avanzado:['Avanzado',`${ajCampo('ajNombre','Nombre de la tienda',t.nombre)}
+      <div class="aj6-dos">${ajCampo('ajShareTitle','Título al compartir',t.shareTitle,{ph:'Pedí en ARAMO'})}${ajCampo('ajShareDesc','Descripción al compartir',t.shareDescription)}</div>
+      ${ajCampo('ajShareImage','Imagen para compartir (dirección)',t.shareImage,{tipo:'url',ph:'https://…'})}
+      ${ajCampo('ajPushKey','Clave pública VAPID (avisos con la app cerrada)',t.pushPublicKey,{ph:'BEl…',ayuda:'Solo la clave pública. El servidor de avisos usa la privada.'})}${guardar}`],
+  };
+  const x=S[sec];if(!x)return pintarAjustesApp();
+  M.vista='aj-'+sec;
+  abrirHoja(`<div class="aj6"><button type="button" class="aj6-volver" data-mo="ajustes-app">${ICO('atras',20)}Ajustes</button><h2 class="aj6-tit">${x[0]}</h2><div class="aj6-campos">${x[1]}</div></div>`);
+  $('rSon')?.addEventListener('change',e=>{R.sonido=e.target.checked;guardarR();pintarPuerta();});
 }
 
 // ── Receptor ──
@@ -1128,7 +1235,7 @@ function pintarCompartir(){
   const url=linkTaller(),on=N.modo()==='nube';
   let qr='';
   if(window.qrcode){const q=window.qrcode(0,'M');q.addData(url);q.make();qr=q.createSvgTag({cellSize:4,margin:0,scalable:true});}
-  abrirHoja(`<div class="mo-h">📣 Compartir el Taller</div><div class="mo-s">Pegá este QR en caja o mandá el link: tus clientes arman su pedido en el Taller y lo recogen listo o les llega a casa.</div>
+  abrirHoja(`<div class="mo-h">📣 Compartir La Feria</div><div class="mo-s">Pegá este QR en caja o mandá el link: tus clientes arman su pedido en La Feria y lo recogen listo o les llega a casa.</div>
     ${qr?`<div class="mo-qr">${qr}</div>`:''}<code class="mo-code">${esc(url)}</code>
     <div class="mo-btns"><button type="button" class="mo-btn" data-mo="copiar" data-v="${esc(url)}">📋 Copiar link</button><button type="button" class="mo-btn p" data-mo="wa-share">💬 Mandar por WhatsApp</button></div>
     <a class="mo-btn w" style="margin-top:8px" href="canasta.html">👀 Verlo como cliente</a>
@@ -1158,19 +1265,35 @@ function pedidoPrueba(){
 const ACT={
   surtido(el){entrar('surtido',el);},canasta(el){entrar('canasta',el);},mostrador(el){entrar('mostrador',el);},pos(el){entrar('pos',el);},
   puerta(){volverAlMenu();},
+  // Control: la app de cierres del dueño, por tienda (control.html)
+  control(){buzz(12);location.href='control.html?suc='+encodeURIComponent(LOCAL&&LOCAL!=='todas'?LOCAL:'moravia');},
   portada(){M.vista='portada';abrirHoja(window.AramoPortadas.selectorHtml());},
   'portada-usar'(el){window.AramoPortadas.elegir(+el.dataset.v);cerrarHoja();_portadaMontada=0;const r=$('puIn');if(r)r.dataset.v='';pintarPuerta();$('puerta').scrollTop=0;toast('🎨 Portada '+el.dataset.v+' · '+(window.AramoPortadas.LISTA.find(x=>x.n===+el.dataset.v)?.t||''));},
   compartir(){M.vista='compartir';pintarCompartir();},
-  local(){pedirLocal(()=>LOCAL==='todas'?abrirSurtidoAmbos():abrirPuerta());},
+  local(){pedirLocal(()=>LOCAL==='todas'?abrirSurtidoAmbos():abrirPuerta(),()=>abrirPuerta());},
   'reiniciar-app'(el){reiniciarApp(el);},
+  'avisos-cerrar'(){LS.set('aramo_avisos_franja',hoyTxt());pintarPuerta();},
+  // Reiniciar el pedido de proveedores de las DOS tiendas de una vez, desde el Inicio (con Deshacer).
+  'reiniciar-pedido'(){
+    if(typeof window.xpReiniciarTodo!=='function'){toast('Abrí Surtido una vez y probá de nuevo');return;}
+    const sr=surtidoResumen();
+    AramoUI.confirmar({titulo:'¿Reiniciar el pedido?',texto:`Se borra el pedido de Moravia y de Los Ángeles (${sr.prods} producto${sr.prods===1?'':'s'} de ${sr.provs} proveedor${sr.provs===1?'':'es'}), en todos los teléfonos. Proveedores, precios e historial no se tocan.`,si:'Reiniciar',peligro:true}).then(async ok=>{
+      if(!ok)return;
+      const r=await window.xpReiniciarTodo();
+      pintarPuerta();
+      AramoUI.aviso(r.remoteOk?'Pedido reiniciado en las dos tiendas':'Pedido reiniciado en este teléfono; revisá la conexión',{tipo:r.remoteOk?'ok':'error',ms:10000,deshacer:()=>{window.xpDeshacerReinicio?.();setTimeout(pintarPuerta,50);}});
+    });
+  },
   'ajustes-app'(){M.vista='ajustes-app';pintarAjustesApp();},
   mas(el){const m=$('moMas');m.hidden=!m.hidden;el.setAttribute('aria-expanded',String(!m.hidden));el.querySelector('b').textContent=m.hidden?'⋯':'✕';},
   'acceso-sw'(){
-    const a=acceso();
+    const a=acceso(),otra=()=>repintar(()=>pintarAjSec('clave'));
     if(a.activo){
-      const c=prompt('Para apagar la contraseña, escribí la de '+localNom(localK()));if(c===null)return;
-      claveOk(localK(),c).then(ok=>{if(!ok){toast('Esa contraseña no es');repintar(pintarAjustesApp);return;}N.guardarTienda({acceso:{...a,activo:false}});toast('🔓 Entrada directa, sin contraseña');repintar(pintarAjustesApp);});
-    }else{N.guardarTienda({acceso:{...a,activo:true}});toast('🔒 Cada local pide su contraseña al abrir');repintar(pintarAjustesApp);}
+      AramoUI.pedir({titulo:'Apagar la contraseña',texto:'Para apagarla, escribí la contraseña de '+localNom(localK())+'.',etiqueta:'Contraseña',tipo:'decimal',si:'Apagar'}).then(c=>{
+        if(c===null){otra();return;}
+        claveOk(localK(),c).then(ok=>{if(!ok){toast('Esa contraseña no es');otra();return;}N.guardarTienda({acceso:{...a,activo:false}});toast('🔓 Entrada directa, sin contraseña');otra();});
+      });
+    }else{N.guardarTienda({acceso:{...a,activo:true}});toast('🔒 Cada local pide su contraseña al abrir');otra();}
   },
   'clave-ok'(){
     const k=localK(),act=$('acActual').value,n1=$('acNueva').value,n2=$('acRepite').value;
@@ -1179,7 +1302,7 @@ const ACT={
     claveOk(k,act).then(async ok=>{
       if(!ok){toast('La contraseña actual no es');return;}
       const a=acceso();N.guardarTienda({acceso:{...a,claves:{...(a.claves||{}),[k]:await huella(n1)}}});
-      toast('🔒 Contraseña de '+localNom(k)+' cambiada');repintar(pintarAjustesApp);
+      toast('🔒 Contraseña de '+localNom(k)+' cambiada');repintar(()=>pintarAjSec('clave'));
     });
   },
   pesar(){M.vista='pesar';M.pk=pkInicial(N.get(M.abierto));pintarEncargo();},
@@ -1251,7 +1374,7 @@ const ACT={
     r.items=r.items.filter(([,q])=>q>0);
     if(!r.k)r.k='mi_'+nrm(r.n).replace(/[^a-z0-9]+/g,'_').slice(0,24)+'_'+Date.now().toString(36).slice(-3);
     const lista=[...(T().recetas||[])].filter(x=>x.k!==r.k);lista.push(r);
-    N.guardarTienda({recetas:lista});toast('📖 '+r.n+' ya está en el Taller');M.vista='recetario';pintarRecetario();
+    N.guardarTienda({recetas:lista});toast('📖 '+r.n+' ya está en La Feria');M.vista='recetario';pintarRecetario();
   },
   whatsapp(){M.vista='whatsapp';pintarWhatsapp();},
   'pega-ok'(){
@@ -1260,10 +1383,23 @@ const ACT={
     if(!o?.id){toast('No encontramos un pedido en ese texto; pegá el mensaje completo');return;}
     N.importar(o);sinAbrir.delete(o.id);guardarSinAbrir();toast('🛎️ Pedido '+o.ref+' recibido · tocalo para abrirlo');mostrarEnLista(o.id);
   },
-  ajustes(){M.vista='ajustes';pintarAjustes();},
+  ajustes(){pintarAjustesApp();},   // "Pagos y horarios" del Mostrador abre los Ajustes únicos (rediseño, Fase 2)
+  'aj-sec'(el){
+    const sec=el.dataset.sec;
+    if(sec==='tienda'){cerrarHoja();ACT.local();return;}
+    if(sec==='programa'){ACT.programa();return;}
+    if(sec==='compartir'){ACT.compartir();return;}
+    if(sec==='actualizar'){AramoUI.confirmar({titulo:'¿Actualizar la app?',texto:'Baja otra vez lo último que se publicó. No borra pedidos, el Surtido ni los ajustes.',si:'Actualizar'}).then(ok=>{if(ok)reiniciarApp();});return;}
+    pintarAjSec(sec);
+  },
+  'aj-tema-usar'(el){
+    const v=el.dataset.v;
+    if(typeof window.applyTheme==='function')window.applyTheme(v);else{try{localStorage.setItem('aramo_theme',v);}catch{}}
+    repintar(()=>pintarAjSec('tema'));
+  },
   receptor(){M.vista='receptor';pintarReceptor();},
   'r-suc'(el){R.suc=el.dataset.k;M.suc=R.suc;guardarR();repintar(pintarReceptor);pintarMostrador();pintarPuerta();toast('📡 Este equipo recibe: '+receptorNom());},
-  'avisos-on'(){N.avisos.pedir().then(r=>{toast(r==='granted'?'🔔 Avisos activados en este equipo':'El navegador no permitió los avisos');if(M.vista==='receptor')repintar(pintarReceptor);if(M.vista==='ajustes-app')repintar(pintarAjustesApp);pintarMostrador();pintarPuerta();if(r==='granted')N.avisos.mostrar('🔔 Avisos de ARAMO activados','Aquí te va a llegar cada pedido nuevo de '+receptorNom()+'.',{tag:'aramo-prueba'});});},
+  'avisos-on'(){N.avisos.pedir().then(r=>{toast(r==='granted'?'🔔 Avisos activados en este equipo':'El navegador no permitió los avisos');if(M.vista==='receptor')repintar(pintarReceptor);if(M.vista==='ajustes-app')repintar(pintarAjustesApp);if(M.vista==='aj-avisos')repintar(()=>pintarAjSec('avisos'));pintarMostrador();pintarPuerta();if(r==='granted')N.avisos.mostrar('🔔 Avisos de ARAMO activados','Aquí te va a llegar cada pedido nuevo de '+receptorNom()+'.',{tag:'aramo-prueba'});});},
   'avisos-toggle'(){R.sonido=!R.sonido;guardarR();toast(R.sonido?'🔔 Avisos activados':'🔕 Avisos silenciados · podés activarlos de nuevo aquí');pintarMostrador();pintarPuerta();},
   'probar-aviso'(){campana(true);N.avisos.mostrar('🛎️ Así suena un pedido nuevo','A-PRUEBA · Ana · 6 productos · '+receptorNom(),{tag:'aramo-prueba'});},
   surtir(el){
@@ -1354,7 +1490,7 @@ const ACT={
     navigator.geolocation.getCurrentPosition(p=>{
       const t=T(),k=el.dataset.k;
       N.guardarTienda({sucursales:(t.sucursales||[]).map(s=>s.k===k?{...s,lat:+p.coords.latitude.toFixed(6),lng:+p.coords.longitude.toFixed(6)}:s)});
-      toast('📍 Ubicación de la tienda guardada');pintarAjustes();
+      toast('📍 Ubicación de la tienda guardada');if(M.vista==='aj-contacto')repintar(()=>pintarAjSec('contacto'));else pintarAjustes();
     },()=>toast('No se pudo tomar la ubicación'),{enableHighAccuracy:true,timeout:15000});
   },
   clientes(){M.vista='clientes';M.prog=null;pintarClientes();},
@@ -1369,20 +1505,58 @@ const ACT={
     const premios=L.premios.map(p=>({k:p.k||'p'+Math.random().toString(36).slice(2,7),n:String(p.n||'').trim()||`${$c(p.valor)} de descuento`,hojas:Math.round(+p.hojas||0),valor:Math.round(+p.valor||0)}));
     if(premios.some(p=>p.hojas<1||p.valor<1)){toast('Cada premio necesita hojas y un descuento mayor que cero');return;}
     N.guardarTienda({lealtad:{activa:!!L.activa,porHoja:Math.round(+L.porHoja),dobles:!!L.dobles,premios}});
-    M.prog=null;toast('🍃 Programa guardado · ya se ve en el Taller');M.vista='clientes';pintarClientes();
+    M.prog=null;toast('🍃 Programa guardado · ya se ve en La Feria');M.vista='clientes';pintarClientes();
   },
   'quitar-premio'(){const o=N.get(M.abierto);if(!o?.premio)return;if(!confirm(`¿Quitar el premio de ${$c(o.premio.valor)} del pedido ${o.ref}?`))return;N.cambiar(o.id,x=>{delete x.premio;},'tienda','Premio quitado: no le alcanzaban las hojas').then(()=>{repintar(pintarEncargo);pintarMostrador();toast('Premio quitado');});},
+  // Guarda SOLO lo que está en pantalla: Ajustes ahora va por secciones y un campo que no se ve nunca
+  // se guarda vacío (así cambiar el horario no toca el SINPE ni lo demás en la nube).
   'aj-ok'(){
-    const t=T(),v=id=>$(id)?.value.trim()||'',k=localK();
-    const sucs=(t.sucursales||[]).map(s=>s.k!==k?s:{...s,activa:!!$('ajAct')?.checked,whatsapp:telDig(v('ajWaSuc')),abre:v('ajAbre')||s.abre,cierra:v('ajCierra')||s.cierra,sinpe:{numero:telDig(v('ajSinpe')),nombre:v('ajSinpeN')}});
-    const faq=v('ajFaq').split(/\n+/).map(x=>x.split('|')).filter(x=>x[0]?.trim()).map(x=>({q:x[0].trim(),a:(x.slice(1).join('|')||'').trim()}));
-    const horarios={};v('ajEspecial').split(/\n+/).forEach(line=>{const [f,raw]=line.split('|').map(x=>x.trim());if(!/^\d{4}-\d{2}-\d{2}$/.test(f)||!raw)return;if(raw.toLowerCase()==='cerrado')horarios[f]={cerrada:true};else{const [abre,cierra]=raw.split('-').map(x=>x.trim());if(abre&&cierra)horarios[f]={abre,cierra};}});
-    const feriados=v('ajFeriados').split(',').map(x=>x.trim()).filter(x=>/^\d{4}-\d{2}-\d{2}$/.test(x));
-     const remoto=N.modo()==='nube';
-     Promise.resolve(N.guardarTienda({nombre:v('ajNombre')||'ARAMO',alistadoMin:Math.max(10,+v('ajMin')||40),envio:$('ajEnvio').checked,linkTarjeta:v('ajLink'),sucursales:sucs,feriados,horariosEspeciales:horarios,envioConfig:{...(t.envioConfig||{}),zona:v('ajZona'),radioKm:Math.max(0,+v('ajRadio')||0),tarifaBase:Math.max(0,+v('ajTarifa')||0),tarifaKm:Math.max(0,+v('ajKm')||0),minimo:Math.max(0,+v('ajMinimo')||0)},capacidadPorHora:Math.max(0,+v('ajCapacidad')||0),privacidad:v('ajPriv'),condiciones:v('ajCond'),faq,shareTitle:v('ajShareTitle'),shareDescription:v('ajShareDesc'),shareImage:v('ajShareImage'),pushPublicKey:v('ajPushKey')})).then(ok=>{if(remoto&&ok===false){toast('No se guardó en la nube: iniciá sesión de personal');return;}cerrarHoja();toast('⚙️ Guardado · '+sucNom(k));});
+    const t=T(),k=localK(),hay=id=>!!$(id),v=id=>$(id)?.value.trim()||'',c={};
+    if(['ajAct','ajWaSuc','ajAbre','ajCierra','ajSinpe','ajSinpeN'].some(hay)){
+      c.sucursales=(t.sucursales||[]).map(s=>{
+        if(s.k!==k)return s;
+        const n={...s};
+        if(hay('ajAct'))n.activa=!!$('ajAct').checked;
+        if(hay('ajWaSuc'))n.whatsapp=telDig(v('ajWaSuc'));
+        if(hay('ajAbre'))n.abre=v('ajAbre')||s.abre;
+        if(hay('ajCierra'))n.cierra=v('ajCierra')||s.cierra;
+        if(hay('ajSinpe')||hay('ajSinpeN'))n.sinpe={...(s.sinpe||{}),...(hay('ajSinpe')?{numero:telDig(v('ajSinpe'))}:{}),...(hay('ajSinpeN')?{nombre:v('ajSinpeN')}:{})};
+        return n;
+      });
+    }
+    if(hay('ajNombre'))c.nombre=v('ajNombre')||'ARAMO';
+    if(hay('ajMin'))c.alistadoMin=Math.max(10,+v('ajMin')||40);
+    if(hay('ajCapacidad'))c.capacidadPorHora=Math.max(0,+v('ajCapacidad')||0);
+    if(hay('ajEnvio'))c.envio=$('ajEnvio').checked;
+    if(hay('ajLink'))c.linkTarjeta=v('ajLink');
+    if(hay('ajFeriados'))c.feriados=v('ajFeriados').split(',').map(x=>x.trim()).filter(x=>/^\d{4}-\d{2}-\d{2}$/.test(x));
+    if(hay('ajEspecial')){const horarios={};v('ajEspecial').split(/\n+/).forEach(line=>{const [f,raw]=line.split('|').map(x=>x.trim());if(!/^\d{4}-\d{2}-\d{2}$/.test(f)||!raw)return;if(raw.toLowerCase()==='cerrado')horarios[f]={cerrada:true};else{const [abre,cierra]=raw.split('-').map(x=>x.trim());if(abre&&cierra)horarios[f]={abre,cierra};}});c.horariosEspeciales=horarios;}
+    if(['ajZona','ajRadio','ajTarifa','ajKm','ajMinimo'].some(hay)){
+      const e={...(t.envioConfig||{})};
+      if(hay('ajZona'))e.zona=v('ajZona');
+      if(hay('ajRadio'))e.radioKm=Math.max(0,+v('ajRadio')||0);
+      if(hay('ajTarifa'))e.tarifaBase=Math.max(0,+v('ajTarifa')||0);
+      if(hay('ajKm'))e.tarifaKm=Math.max(0,+v('ajKm')||0);
+      if(hay('ajMinimo'))e.minimo=Math.max(0,+v('ajMinimo')||0);
+      c.envioConfig=e;
+    }
+    if(hay('ajPriv'))c.privacidad=v('ajPriv');
+    if(hay('ajCond'))c.condiciones=v('ajCond');
+    if(hay('ajFaq'))c.faq=v('ajFaq').split(/\n+/).map(x=>x.split('|')).filter(x=>x[0]?.trim()).map(x=>({q:x[0].trim(),a:(x.slice(1).join('|')||'').trim()}));
+    if(hay('ajShareTitle'))c.shareTitle=v('ajShareTitle');
+    if(hay('ajShareDesc'))c.shareDescription=v('ajShareDesc');
+    if(hay('ajShareImage'))c.shareImage=v('ajShareImage');
+    if(hay('ajPushKey'))c.pushPublicKey=v('ajPushKey');
+    if(!Object.keys(c).length){pintarAjustesApp();return;}
+    const remoto=N.modo()==='nube',enSeccion=String(M.vista||'').startsWith('aj-');
+    Promise.resolve(N.guardarTienda(c)).then(ok=>{
+      if(remoto&&ok===false){toast('No se guardó en la nube: iniciá sesión de personal');return;}
+      if(enSeccion)pintarAjustesApp();else cerrarHoja();
+      toast('⚙️ Guardado · '+sucNom(k));
+    });
   },
   copiar(el){navigator.clipboard?.writeText(el.dataset.v).then(()=>toast('📋 Copiado'),()=>toast(el.dataset.v));},
-  'wa-share'(){abrir(N.wa('',`🧺 ¡Ya podés pedir en ${T().nombre||'ARAMO'} desde el celular! Entrá al Taller, armá tu canasta de frutas y verduras y la recogés lista o te llega a casa 👉 ${linkTaller()}`));},
+  'wa-share'(){abrir(N.wa('',`🧺 ¡Ya podés pedir en ${T().nombre||'ARAMO'} desde el celular! Entrá a La Feria, armá tu canasta de frutas y verduras y la recogés lista o te llega a casa 👉 ${linkTaller()}`));},
 };
 function codigoOk(o,como){
   pararCamara();
@@ -1424,7 +1598,7 @@ document.addEventListener('keydown',e=>{
   // Teclas rápidas en la pantalla principal: 1 Surtido · 2 Taller · 3 POS · M Mostrador · / buscar
   if(!$('puerta')?.classList.contains('open')||$('moSheet')?.classList.contains('open'))return;
   if(e.ctrlKey||e.metaKey||e.altKey||e.target.matches?.('input,textarea,select'))return;
-  const mapa={'1':'surtido','2':'canasta','3':'pos',m:'mostrador',M:'mostrador'};
+  const mapa={'1':'surtido','2':'canasta','3':'pos','4':'control',m:'mostrador',M:'mostrador'};
   if(mapa[e.key]){e.preventDefault();const el=document.querySelector(`#puIn [data-pu="${mapa[e.key]}"]`);ACT[mapa[e.key]](el);}
   else if(e.key==='/'&&$('poCmdQ')){e.preventDefault();$('poCmdQ').focus();}
 });

@@ -1,8 +1,8 @@
-const CACHE_NAME = 'aramo-shell-v72-automatico1';
+const CACHE_NAME = 'aramo-shell-v78-control';
 const CDN_CACHE = 'aramo-cdn-v1';
 // Las páginas: al instalar se guardan junto con TODOS los archivos que cargan,
 // tal cual los piden (con su ?v=…). Así cada pantalla abre sin esperar a internet.
-const PAGINAS = ['./APP.html', './canasta.html', './pos/index.html', './index.html'];
+const PAGINAS = ['./APP.html', './canasta.html', './control.html', './pos/index.html', './index.html'];
 const EXTRAS = ['./manifest.json', './canasta.webmanifest', './icon.png', './pos-vista.jpg', './canasta-fotos.js', './catalogo-productos.js', './supplier-base.js', './privacidad.html', './condiciones.html',
   // Letras de la app, guardadas aquí mismo (ya no se bajan de Google): funcionan sin internet
   './fuentes/jakarta-latin.woff2', './fuentes/jakarta-latin-ext.woff2', './fuentes/fraunces-latin.woff2', './fuentes/fraunces-latin-ext.woff2'];

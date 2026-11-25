@@ -205,7 +205,7 @@
       const d = el('button', 'ui-aviso-deshacer', op.textoDeshacer || 'Deshacer'); d.type = 'button';
       d.addEventListener('click', () => { yo.cerrar(); try { op.deshacer(); } catch (e) { console.error(e); } });
       a.appendChild(d);
-    }
+    } else a.classList.add('ui-aviso--pasa');   // sin botón: los toques pasan a lo de abajo (no tapa la barra de arriba)
     const ms = op.ms || (op.deshacer ? 7000 : 5000);
     const armar = () => { clearTimeout(t); t = setTimeout(() => yo.cerrar(), ms); };
     a.addEventListener('pointerenter', () => clearTimeout(t)); a.addEventListener('pointerleave', armar);

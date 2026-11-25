@@ -426,6 +426,7 @@ html.ui-hoja-abierta{overflow:hidden}
 .ui-aviso.sale{animation:uiAvisoSale var(--ar-m2) var(--ar-ease) both}
 .ui-aviso-txt{flex:1;min-width:0;display:-webkit-box;-webkit-box-orient:vertical;-webkit-line-clamp:2;line-clamp:2;overflow:hidden}
 .ui-aviso > .ic{color:var(--ar-v300)}
+.ui-aviso--pasa{pointer-events:none}   /* sin botón: no tapa lo que está debajo */
 .ui-aviso--error > .ic{color:#ff9a8a}
 .ui-aviso--info > .ic{color:#a9c3ff}
 .ui-aviso-deshacer{flex:none;min-height:44px;padding:0 var(--ar-e2);margin:-4px -8px -4px 0;border:0;border-radius:var(--ar-r-xs);background:transparent;color:var(--ar-o300);font:var(--ar-t-boton-ch);cursor:pointer}

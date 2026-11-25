@@ -1,0 +1,83 @@
+/* ══════════════════════════════════════════════════════════════════════
+   La Feria (antes "Taller") · la misma interfaz clara y sencilla del resto de ARAMO.
+   Pedido del dueño, 2026-11-24. Va DESPUÉS de canasta.css y solo cambia el aspecto:
+   el flujo por pasos, abrir cada producto y la canasta funcionan igual.
+   Fondo limpio (sin aurora), marca "La Feria", categorías con foto, título con cuántos hay,
+   2 productos por fila en el teléfono (decisión 2B) y tarjetas blancas.
+   ══════════════════════════════════════════════════════════════════════ */
+html[data-app="taller"]{background:var(--ar-fondo)}
+html[data-app="taller"] body{background:var(--ar-fondo);color:var(--ar-tinta);font-family:var(--ar-f-ui)}
+.fondo{display:none}
+
+/* ── Encabezado ── */
+.tl-top{padding:10px 0 0}
+.m-t{font-family:var(--ar-f-display);font-size:28px;letter-spacing:.01em;color:var(--ar-v700)}
+html[data-theme="dark"] .m-t{color:var(--ar-v300)}
+.m-t svg{fill:var(--ar-o500)}
+.marca small{font:600 12.5px var(--ar-f-ui);color:var(--ar-tinta-3)}
+.tl-back,.ib{background:var(--ar-sup);border-color:var(--ar-borde);box-shadow:var(--ar-s1);color:var(--ar-tinta)}
+.av{background:var(--ar-acento);color:var(--ar-sobre-acento)}
+
+/* ── Saludo: sin frutas flotando, letra grande y clara ── */
+.hola{padding:12px 2px 2px}
+.hola .aura,.hola .flota{display:none}
+.hola p{max-width:none;font:500 15px/1.4 var(--ar-f-ui);color:var(--ar-tinta-3)}
+.hola h2{margin-top:6px;font-family:var(--ar-f-display);font-size:clamp(27px,7.6vw,36px);letter-spacing:-.01em;color:var(--ar-tinta)}
+
+/* ── Buscador ── */
+.buscar{margin-top:8px}
+.ask{height:52px;border-radius:var(--ar-r-md);background:var(--ar-sup);border:1px solid var(--ar-borde-campo);box-shadow:none}
+.ask:focus-within{border-color:var(--ar-v600);box-shadow:var(--ar-foco)}
+.ask input{font:500 16px var(--ar-f-ui);color:var(--ar-tinta)}
+.buscar.pegado,.mini-cats{background:color-mix(in srgb,var(--ar-fondo) 94%,transparent)}
+.mc{background:var(--ar-sup)}
+.mc small{font-size:9.5px}
+.mc.on{background:var(--ar-primario);box-shadow:none}
+.mc.on small{color:#fff}
+
+/* ── Categorías: cuadros de color suave con la foto de un producto ── */
+.cats{grid-template-columns:repeat(3,minmax(0,1fr));gap:8px;margin-top:12px}
+@media (min-width:560px){.cats{grid-template-columns:repeat(6,minmax(0,1fr))}}
+.cats .tab{justify-content:center;gap:4px;min-height:96px;padding:10px 6px 8px;border-radius:var(--ar-r-lg);border:1.5px solid transparent;background:color-mix(in srgb,var(--pc) 13%,var(--ar-sup))}
+.cats .tab .cat-e,.cats .tab.on .cat-e,.cats .tab:hover .cat-e{width:54px;height:54px;border-radius:0;background:none;box-shadow:none;transform:none;font-size:36px}
+.cats .tab .cat-e .ft{width:54px;height:54px;object-fit:contain;filter:drop-shadow(0 5px 6px rgba(20,26,22,.18))}
+.cats .tab .cat-n{font:700 14.5px var(--ar-f-ui);color:var(--ar-tinta)}
+.cats .tab.on{border-color:var(--ar-primario);background:color-mix(in srgb,var(--pc) 22%,var(--ar-sup))}
+.cats .tab.on .cat-n{font-weight:800}
+html[data-theme="dark"] .cats .tab{background:color-mix(in srgb,var(--pc) 16%,var(--ar-sup))}
+
+/* ── Título de la lista ── */
+.grid-tit{display:flex;align-items:baseline;justify-content:space-between;gap:10px;margin:20px 2px 0}
+.grid-tit[hidden]{display:none}
+.grid-tit h3{margin:0;font:700 22px/1.2 var(--ar-f-display);color:var(--ar-tinta)}
+.grid-tit small{font:600 14px var(--ar-f-ui);color:var(--ar-tinta-3);white-space:nowrap}
+
+/* ── Productos: 2 por fila en el teléfono, tarjeta blanca, foto en su plato y + verde ── */
+.prods{grid-template-columns:repeat(2,minmax(0,1fr));gap:12px;margin-top:10px}
+@media (max-width:340px){.prods{grid-template-columns:repeat(2,minmax(0,1fr))}}
+@media (min-width:560px){.prods{grid-template-columns:repeat(3,minmax(0,1fr));gap:14px}}
+@media (min-width:860px){.prods{grid-template-columns:repeat(5,minmax(0,1fr))}}
+.pt{padding:10px 10px 12px;border-radius:var(--ar-r-lg);background:var(--ar-sup);box-shadow:var(--ar-s1)}
+.pt-plato,.pt.f-foto .pt-plato{border-radius:var(--ar-r-md);background:radial-gradient(circle at 50% 45%,var(--ar-sup) 0,var(--ar-sup-2) 78%);box-shadow:none}
+.pt:hover .pt-plato{transform:translateY(-2px);box-shadow:none}
+.pt.off .pt-plato{background:var(--ar-hundido)}
+.pt-n{margin-top:8px;padding:0;font:700 16px/1.25 var(--ar-f-ui);color:var(--ar-tinta)}
+.pt-p{padding:0;font:600 14px var(--ar-f-ui);color:var(--ar-tinta-2)}
+.pt-add,.pt.con-foto .pt-add{right:6px;bottom:6px;width:44px;height:44px;background:var(--ar-primario);color:#fff;font-size:27px;box-shadow:0 6px 12px -6px rgba(14,74,48,.6)}
+.pt:hover .pt-add{background:var(--ar-v800,var(--ar-primario));color:#fff}
+@media (max-width:360px){.pt-add,.pt.con-foto .pt-add{width:40px;height:40px;font-size:24px}}
+.pt .step-q{height:44px;background:var(--ar-primario);color:#fff;box-shadow:0 6px 14px -6px rgba(14,74,48,.6)}
+.pt .step-q button{width:40px;height:40px;font-size:22px}
+.pt .step-q em{font:800 14px var(--ar-f-ui)}
+.pt.con-foto.in .pt-plato{box-shadow:none}
+.pt.con-foto.in .pt-plato::before{box-shadow:inset 0 0 0 3px var(--ar-primario)}
+.pt.f-foto .pt-plato::after{display:none}
+
+/* ── Barra de la canasta: verde, como el resto de la app ── */
+.bar{--inv:var(--ar-primario);--inv-ink:#fff;--inv-mut:rgba(255,255,255,.84);background:var(--ar-primario);color:#fff;border-radius:var(--ar-r-lg)}
+.bar .btn{background:#fff;color:var(--ar-v900)}
+.tk-ico em{background:var(--ar-acento)}
+
+/* ── Ventana del producto y renglones de la canasta: el mismo plato neutro de las tarjetas ── */
+.ficha-e,.ficha.c-frutas .ficha-e,.ficha.c-verduras .ficha-e,.ficha.c-raices .ficha-e,.ficha.c-hierbas .ficha-e,.ficha.c-despensa .ficha-e{background:radial-gradient(circle at 50% 45%,var(--ar-sup) 0,var(--ar-sup-2) 78%);box-shadow:none}
+.li-e,.linea.c-frutas .li-e,.linea.c-verduras .li-e,.linea.c-raices .li-e,.linea.c-hierbas .li-e,.linea.c-despensa .li-e{background:var(--ar-sup-2);box-shadow:none}

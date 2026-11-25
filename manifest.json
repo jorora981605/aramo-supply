@@ -1,7 +1,7 @@
 {
   "name": "ARAMO",
   "short_name": "ARAMO",
-  "description": "ARAMO: Surtido, Taller de pedidos y ARAMO POS en una sola pantalla",
+  "description": "ARAMO: Surtido, La Feria y ARAMO POS en una sola pantalla",
   "start_url": "./APP.html",
   "scope": "./",
   "display": "standalone",
