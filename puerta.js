@@ -355,10 +355,7 @@ function datosInicio(sr,a,c){
       caja:`Caja de hoy ${$c(c.total)}`,
       lista:ultimos.length?ultimos.map(o=>`<div class="po6-ped"><b>${esc(o.ref)}</b><span>${esc(o.cliente?.nombre||'')}</span><em>${esc((est[o.estado]||(()=>''))(o))}</em></div>`).join(''):'<p class="po6-ped-vacio">Todavía no hay pedidos hoy.</p>',
     },
-    s6:{sub:'Pedido a proveedores',
-       // Reiniciar el pedido de las dos tiendas de una vez, sin entrar a Surtido (solo si hay algo pedido)
-       reini:sr.prods?`<button type="button" class="ui-btn ui-btn--peligro-fantasma ui-btn--s po6-reini-btn" data-pu="reiniciar-pedido">${ICO('reiniciar',18)}Reiniciar el pedido de las dos tiendas</button>`:'',
-       ins:(sr.sinEnviar?`<span class="ui-estado ui-estado--pendiente">${ICO('reloj',16)}${sr.sinEnviar} por enviar</span>`:'')+`<span class="ui-estado">${sr.prods?pl(sr.prods,'producto','productos'):'Pedido vacío'}</span>`},
+     s6:{sub:'Pedido a proveedores',ins:(sr.sinEnviar?`<span class="ui-estado ui-estado--pendiente">${ICO('reloj',16)}${sr.sinEnviar} por enviar</span>`:'')+`<span class="ui-estado">${sr.prods?pl(sr.prods,'producto','productos'):'Pedido vacío'}</span>`},
     t6:{sub:'Tienda en línea de los clientes',ins:a.length?`<span class="ui-estado ui-estado--pendiente">${ICO('reloj',16)}${a.length} en curso</span>`:''},
     p6:{sub:'Caja de '+zona},
     c6:{sub:'Cierres, personal y gastos'},
@@ -1273,17 +1270,6 @@ const ACT={
   local(){pedirLocal(()=>LOCAL==='todas'?abrirSurtidoAmbos():abrirPuerta(),()=>abrirPuerta());},
   'reiniciar-app'(el){reiniciarApp(el);},
   'avisos-cerrar'(){LS.set('aramo_avisos_franja',hoyTxt());pintarPuerta();},
-  // Reiniciar el pedido de proveedores de las DOS tiendas de una vez, desde el Inicio (con Deshacer).
-  'reiniciar-pedido'(){
-    if(typeof window.xpReiniciarTodo!=='function'){toast('Abrí Surtido una vez y probá de nuevo');return;}
-    const sr=surtidoResumen();
-    AramoUI.confirmar({titulo:'¿Reiniciar el pedido?',texto:`Se borra el pedido de Moravia y de Los Ángeles (${sr.prods} producto${sr.prods===1?'':'s'} de ${sr.provs} proveedor${sr.provs===1?'':'es'}), en todos los teléfonos. Proveedores, precios e historial no se tocan.`,si:'Reiniciar',peligro:true}).then(async ok=>{
-      if(!ok)return;
-      const r=await window.xpReiniciarTodo();
-      pintarPuerta();
-      AramoUI.aviso(r.remoteOk?'Pedido reiniciado en las dos tiendas':'Pedido reiniciado en este teléfono; revisá la conexión',{tipo:r.remoteOk?'ok':'error',ms:10000,deshacer:()=>{window.xpDeshacerReinicio?.();setTimeout(pintarPuerta,50);}});
-    });
-  },
   'ajustes-app'(){M.vista='ajustes-app';pintarAjustesApp();},
   mas(el){const m=$('moMas');m.hidden=!m.hidden;el.setAttribute('aria-expanded',String(!m.hidden));el.querySelector('b').textContent=m.hidden?'⋯':'✕';},
   'acceso-sw'(){

@@ -466,37 +466,16 @@ function xpQtyLabel(q,unit){
 function xpRenderProveedores(){
   const list=$('providersNavList');
   if(!list)return;
-  const t=xpTotals();
-  const sum=$('pvSum');
-  if(sum){
-    sum.className='pv-sum sx-mini'+(t.items?' has':'');
-    sum.setAttribute('aria-label',t.items?`${t.items} productos, ₡${fmt(t.total)}. Ver el pedido y enviarlo`:'Pedido vacío');
-    sum.innerHTML=t.items
-      ?`<span class="sx-mini-e">🧺</span><span class="sx-mini-t"><b>${plural(t.items,'producto','productos')}</b><small>₡${fmt(t.total)}${t.pending?` · ${t.pending} por enviar`:' · enviado ✓'}</small></span><span class="sx-mini-f">${ico('enviar')}</span>`
-      :`<span class="sx-mini-e">🧺</span><span class="sx-mini-t"><b>Pedido vacío</b><small>Buscá o abrí un proveedor</small></span>`;
-  }
   const q=normalizeText($('pvSearch')?.value||'');
   const searching=!!q&&!XP.parsed.length;
   const names=getProvNames().filter(n=>!searching||normalizeText(n).includes(q));
   list.hidden=searching&&!names.length;
   list.innerHTML=(searching&&names.length?'<div class="pv-label">Proveedores</div>':'')+names.map(name=>{
-    const n=hasData(name)?xpCount(name):0,sent=n&&isSent(name),tot=n?sideTotal(name):0;
-    return `<div class="pv-item"><button type="button" class="pv-card${n?(sent?' sent':' pending'):''}" data-prov="${esc(name)}">
+    return `<div class="pv-item"><button type="button" class="pv-card" data-prov="${esc(name)}">
       <span class="pv-av">${esc(name.charAt(0).toUpperCase())}</span>
       <span class="pv-name">${esc(name)}</span>
-      <span class="pv-meta">${n?`${n} prod.${tot?' · ₡'+fmt(tot):''}`:'—'}</span>
-      ${n?`<span class="pv-state">${sent?'✅ Enviado':'⚠️ Por enviar'}</span>`:''}
     </button><button type="button" class="pv-edit" data-edit="${esc(name)}" aria-label="Editar ${esc(name)}" title="Editar nombre, WhatsApp y productos">✎</button></div>`;
   }).join('');
-  const top=$('pvTop');
-  if(top){
-    const sides=activeOrderSides();
-    top.innerHTML=XP.undo&&Date.now()-XP.undo.at<120000
-      ?`<div class="pv-undo sx-mini"><span class="sx-mini-t"><b>Reiniciado</b></span><button type="button" data-pv="undo">↩️ Deshacer</button></div>`
-      :t.items?`<button type="button" class="pv-reset sx-mini" data-pv="reset" aria-label="Reiniciar pedido${sides.length===1?' de '+SIDE_NAME[sides[0]]:''}: borra las cantidades y empieza de cero" title="Borra las cantidades y empieza de cero"><span class="sx-mini-e">${ico('reiniciar')}</span><span class="sx-mini-t"><b>Reiniciar</b></span></button>`:'';
-  }
-  sxRenderTablero();
-  $('pvTop')?.closest('.pv-wrap')?.classList.toggle('sx-sin-reset',!$('pvTop')?.childElementCount);
   sxMarcarBusqueda(); // también cuando el buscador se limpia solo
 }
 window.renderProveedoresNav=xpRenderProveedores;
@@ -867,13 +846,14 @@ function sxTarjeta(d,i,sides,modo){
     <header class="sx-card-h">
       <button type="button" class="sx-card-id" data-pd="open" data-prov="${esc(d.prov)}" title="Abrir ${esc(d.prov)}"><span class="sx-av">${esc(d.prov.charAt(0).toUpperCase())}</span><span class="sx-card-t"><b>${esc(d.prov)}</b><small><i></i>${d.sent?'Enviado':'Por enviar'} · ${plural(d.n,'producto','productos')}</small></span></button>
       ${d.tot?`<span class="sx-card-tot">₡${fmt(d.tot)}</span>`:''}
-      ${modo==='pedido'?`<button type="button" class="sx-env${d.sent?' hecho':''}" data-pd="send" data-prov="${esc(d.prov)}" aria-label="${d.sent?'Reenviar':'Enviar'} el pedido a ${esc(d.prov)}" title="${d.sent?'Reenviar':'Enviar'} por WhatsApp">${ico(d.sent?'listo':'enviar')}<span class="sx-env-label">${d.sent?'Reenviar':'Enviar'}</span></button>`:''}
+      ${modo==='pedido'&&scopeSide()==='both'?`<button type="button" class="sx-env${d.sent?' hecho':''}" data-pd="send" data-prov="${esc(d.prov)}" aria-label="${d.sent?'Reenviar':'Enviar'} el pedido a ${esc(d.prov)}" title="${d.sent?'Reenviar':'Enviar'} por WhatsApp">${ico(d.sent?'listo':'enviar')}<span class="sx-env-label">${d.sent?'Reenviar':'Enviar'}</span></button>`:''}
     </header>
     <div class="sx-chips">
-      ${d.lines.map(l=>`<button type="button" class="sx-chip" data-pd="line" data-prov="${esc(d.prov)}" data-pid="${esc(l.prod.id)}" aria-label="${esc(niceName(l.prod.name))}: ${sides.map(s=>SIDE_NAME[s]+' '+(l.q[s]||0)).join(', ')} ${esc(l.unit)}. Mantené apretado para pasarlo a otro proveedor."><span class="sx-e">${smartEmoji(l.prod)}</span><span class="sx-n">${esc(niceName(l.prod.name))}</span><span class="sx-q">${sides.map(s=>cant(l.q[s],s)).join('')}<small>${esc(uniCorta(l.unit))}</small></span></button>`).join('')}
+      ${d.lines.map(l=>{const barato=Object.entries(sxPreciosDe(d.prov,l.prod).por).find(([,x])=>x.barato);return `<div class="sx-order-line"><button type="button" class="sx-chip" data-pd="line" data-prov="${esc(d.prov)}" data-pid="${esc(l.prod.id)}" aria-label="${esc(niceName(l.prod.name))}: ${sides.map(s=>SIDE_NAME[s]+' '+(l.q[s]||0)).join(', ')} ${esc(l.unit)}. Tocá para editar."><span class="sx-e">${smartEmoji(l.prod)}</span><span class="sx-n">${esc(niceName(l.prod.name))}</span><span class="sx-q">${sides.map(s=>cant(l.q[s],s)).join('')}<small>${esc(uniCorta(l.unit))}</small></span></button>${sides.filter(s=>l.q[s]>0).map(s=>`<button type="button" class="sx-line-del ${s}" data-pd="remove-line" data-prov="${esc(d.prov)}" data-pid="${esc(l.prod.id)}" data-side="${s}" aria-label="Quitar ${esc(niceName(l.prod.name))} del pedido de ${SIDE_NAME[s]}" title="Quitar de ${SIDE_NAME[s]}">×</button>`).join('')}${barato?`<small class="sx-best-price">Más barato en <b>${esc(barato[0])}</b> · ₡${fmt(barato[1].precio)}/${esc(barato[1].u)}</small>`:''}</div>`;}).join('')}
       ${d.extras.map(x=>`<span class="sx-chip extra"><span class="sx-e">➕</span><span class="sx-n">${esc(x.name||'Extra')}</span><span class="sx-q">${sides.map(s=>cant(s===x.side?+x.qty:0,s)).join('')}<small>${esc(uniCorta(x.unit||'kg'))}</small></span></span>`).join('')}
     </div>
     ${notasProductoHTML}
+    ${modo==='pedido'?xpLateHtml(d.prov,sides):''}
     ${horas?`<div class="sx-horas">${horas}</div>`:''}
     ${notas}
   </article>`;
@@ -1763,11 +1743,12 @@ function xpRenderPedido(){
   const datos=provs.map(prov=>{const {lines,extras}=xpProvLines(prov);return{prov,lines,extras,sent:isSent(prov),tot:sideTotal(prov),n:lines.length+extras.length};});
   const enviados=datos.filter(d=>d.sent).length,porEnviar=datos.length-enviados;
   const nSide=s=>datos.reduce((k,d)=>k+d.lines.filter(l=>l.q[s]>0).length+d.extras.filter(x=>x.side===s).length,0);
+  const lastSent=xpLatestSent(sides);
   if((_pdFiltro==='pend'&&!porEnviar)||(_pdFiltro==='env'&&!enviados))_pdFiltro='todos';
   let html=`<section class="pdx-hero${t.items?'':' vacio'}">
-    <div class="pdx-arte" aria-hidden="true"><i>🥬</i><i>🍅</i><i>🥕</i></div>
     <p class="pdx-kick">${ico('canasta')}Pedido de mañana</p>
-    <h2 class="pdx-fecha">${esc(fecha)}</h2>`;
+    <h2 class="pdx-fecha">${esc(fecha)}</h2>
+    <div class="pd-sent-time"><span>Último envío del pedido</span><strong>${lastSent?esc(new Date(lastSent.at).toLocaleTimeString('es-CR',{hour:'numeric',minute:'2-digit'})):'Aún no enviado'}</strong><small>${lastSent?`${esc(SIDE_NAME[lastSent.side])} · ${esc(new Date(lastSent.at).toLocaleDateString('es-CR',{day:'numeric',month:'short'}))}`:'La hora queda guardada y se comparte entre tiendas'}</small></div>`;
   if(!t.items){
     html+=`<div class="pdx-vacio"><b>Todavía no hay nada pedido</b><small>Entrá a un proveedor y tocá sus productos.</small><button type="button" class="pdx-cta" data-pd="go"><span class="pdx-cta-i">${ico('canasta')}</span><span class="pdx-cta-t"><b>Ir a proveedores</b></span><span class="pdx-cta-f">${ico('flecha')}</span></button></div></section>`;
   }else{
@@ -1786,19 +1767,22 @@ function xpRenderPedido(){
           <span class="pdx-dots">${datos.map(d=>`<i class="${d.sent?'on':''}" title="${esc(d.prov)}"></i>`).join('')}</span>
           <small><b>${enviados}</b> de ${datos.length} enviados</small>
         </div>
-        ${porEnviar?`<button type="button" class="pdx-cta" data-pd="chain"><span class="pdx-cta-i">${ico('enviar')}</span><span class="pdx-cta-t"><b>Enviar uno por uno</b><small>${plural(porEnviar,'proveedor','proveedores')} · te guío paso a paso</small></span><span class="pdx-cta-f">${ico('flecha')}</span></button>
+        ${scopeSide()==='both'?(porEnviar?`<button type="button" class="pdx-cta" data-pd="chain"><span class="pdx-cta-i">${ico('enviar')}</span><span class="pdx-cta-t"><b>Enviar uno por uno</b><small>${plural(porEnviar,'proveedor','proveedores')} · te guío paso a paso</small></span><span class="pdx-cta-f">${ico('flecha')}</span></button>
           <div class="pdx-acc2"><button type="button" data-pd="allone">${ico('mensaje')}Todo en 1 mensaje</button><button type="button" data-pd="lista">${ico('lista')}Lista a contactos</button></div>`
-          :`<div class="pdx-listo"><span>${ico('listo')}¡Todo enviado!</span><button type="button" data-pd="lista">${ico('lista')}Lista a contactos</button></div>`}
+          :`<div class="pdx-listo"><span>${ico('listo')}¡Todo enviado!</span><button type="button" data-pd="lista">${ico('lista')}Lista a contactos</button></div>`):`<div class="pd-solo-pedido">Podés revisar y completar esta tienda aquí. El envío oficial se hace desde <b>Ambos</b>.</div>`}
       </div>
     </div>
   </section>`;
   }
+  if(dos)html+=ciBarra();
+  html+=auBoton(!t.items);
+  if(t.items)html+=`<button type="button" class="sx-pdf-btn" data-sx-pdf><span class="sx-pdf-i">${ico('hoja')}</span><span class="sx-pdf-t"><b>PDF del pedido</b><small>Lista completa para revisar o compartir</small></span><span class="sx-pdf-f" aria-hidden="true">›</span></button>`;
   if(XP.undo&&Date.now()-XP.undo.at<120000)html+=`<div class="pd-undo">Pedido reiniciado. <button type="button" data-pd="undo">↩️ Deshacer</button></div>`;
   if(t.items){
     html+=`<div class="pdx-barra-f"><h3>Proveedores</h3><div class="pdx-filtros" role="group" aria-label="Qué proveedores ver">${[['todos','Todos',datos.length],['pend','Por enviar',porEnviar],['env','Enviados',enviados]].map(([k,n,c])=>`<button type="button" class="${_pdFiltro===k?'on':''}" data-pdx-f="${k}"${c||k==='todos'?'':' disabled'} aria-pressed="${_pdFiltro===k}">${n} <b>${c}</b></button>`).join('')}</div></div>`;
     html+=`<div class="sx-grid">${datos.filter(d=>_pdFiltro==='todos'||(_pdFiltro==='pend'?!d.sent:d.sent)).map((d,i)=>sxTarjeta(d,i,sides,'pedido')).join('')}</div>`;
-    html+=`<button type="button" class="pd-reset pdx-reset" data-pd="reset">🗑️ Reiniciar pedido${sides.length===1?' de '+SIDE_NAME[sides[0]]:''}</button>`;
   }
+  html+=`<section class="pd-reinicios"><h3>Reiniciar pedido</h3><p>Se guarda una copia para revisar la mercadería recibida.</p>${sides.map(side=>`<button type="button" data-pd="reset" data-side="${side}">Reiniciar ${SIDE_NAME[side]}</button>`).join('')}</section>`;
   html+='<div id="resSemana" class="au-sem-w"></div>';   // esta semana contra la pasada (renderSemana, APP.html)
   html+=xpHistoryHtml();
   // La entrada animada solo al abrir la pestaña (si no, cada cambio en vivo la repetiría).
@@ -1806,6 +1790,14 @@ function xpRenderPedido(){
   body.innerHTML=html;
   if(typeof renderSemana==='function')renderSemana();
   xpContarPedido(body);
+}
+function xpLatestSent(sides=activeOrderSides()){
+  let best=null;
+  Object.entries(S.pedidos||{}).forEach(([prov,p])=>sides.forEach(side=>{const at=+p?.notes?.['__sentAt_'+side]||0;if(at>0&&(!best||at>best.at))best={at,side,prov};}));
+  Object.values(historicoCache||{}).forEach(row=>{const times=row?.detalle?.sentAt||{};sides.forEach(side=>{const at=+times[side]||0;if(at>0&&(!best||at>best.at))best={at,side,prov:row.proveedor};});});
+  (LS.get('aramo_surtido_hist_v1',[])||[]).forEach(row=>{const at=+row?.sentAt||0;if(at>0&&sides.includes(row.side)&&(!best||at>best.at))best={at,side:row.side,prov:row.proveedor};});
+  Object.entries(S.pedidos||{}).forEach(([prov,p])=>sides.forEach(side=>(p.notes?.['__archive_'+side]||[]).forEach(row=>{const at=+row.sentAt||0;if(at>0&&(!best||at>best.at))best={at,side,prov};})));
+  return best;
 }
 // Los números suben solos hasta su valor cuando cambian (o al abrir la pestaña).
 function xpContarPedido(body){
@@ -2071,16 +2063,49 @@ $('sxTablero')?.addEventListener('click',e=>{
   const chip=b.closest('.sx-chip');if(chip)sxEditar(chip.dataset.prov,chip.dataset.pid,chip.dataset.lado);
 });
 function xpHistoryHtml(){
-  const today=new Date().toISOString().slice(0,10);
-  const byDate={};
-  Object.values(typeof historicoCache==='object'&&historicoCache?historicoCache:{}).forEach(row=>{
-    if(!row?.fecha||row.fecha===today)return;
-    const d=byDate[row.fecha]||(byDate[row.fecha]={fecha:row.fecha,moravia:0,angeles:0,total:0});
-    d.moravia+=+row.total_moravia||0;d.angeles+=+row.total_angeles||0;d.total+=+row.total||0;
-  });
-  const days=Object.values(byDate).sort((a,b)=>b.fecha.localeCompare(a.fecha)).slice(0,14);
-  if(!days.length)return'';
-  return `<details class="pd-hist"><summary>📅 Días anteriores</summary>${days.map(d=>`<div class="pd-hist-row"><span>${new Date(d.fecha+'T00:00:00').toLocaleDateString('es-CR',{weekday:'short',day:'numeric',month:'short'})}</span><small>M ₡${fmt(d.moravia)} · LA ₡${fmt(d.angeles)}</small><b>₡${fmt(d.total)}</b></div>`).join('')}</details>`;
+  const local=LS.get('aramo_surtido_hist_v1',[])||[];
+  const shared=Object.entries(S.pedidos||{}).flatMap(([prov,p])=>['moravia','angeles'].flatMap(side=>(p.notes?.['__archive_'+side]||[]).map(row=>({...row,proveedor:prov,side}))));
+  const archivedProviders=new Set([...local,...shared].map(row=>`${row.fecha}|${row.proveedor}`));
+  const remote=Object.values(historicoCache||{}).filter(row=>!archivedProviders.has(`${row.fecha}|${row.proveedor}`));
+  const byId=new Map();[...local,...shared,...remote].forEach((row,i)=>byId.set(row.id||`${row.fecha}_${row.proveedor}_${row.side||i}`,row));
+  const rows=[...byId.values()].filter(row=>scopeSide()==='both'||!row.side||row.side===scopeSide());
+  const days={};
+  rows.forEach(row=>{if(!row?.fecha)return;(days[row.fecha]||(days[row.fecha]=[])).push(row);});
+  const fechas=Object.keys(days).sort((a,b)=>b.localeCompare(a)).slice(0,30);
+  if(!fechas.length)return'';
+  const fechaLabel=f=>new Date(f+'T12:00:00').toLocaleDateString('es-CR',{weekday:'short',day:'numeric',month:'short'});
+  const detalle=row=>{
+    if(row.side&&Array.isArray(row.items))return row.items.length?row.items.map(x=>`${esc(x.name)}: ${fmtQ(x.qty)} ${esc(x.unit||'')}`).join('<br>'):'Pedido vacío en ese reinicio';
+    const d=row.detalle||{},sideRows=['moravia','angeles'].filter(s=>activeOrderSides().includes(s)).map(side=>{
+      const vals=Object.entries(d.q?.[side]||{}).map(([pid,v])=>{const prod=(getAllProviders()[row.proveedor]?.products||[]).find(x=>String(x.id)===String(pid));return `${esc(niceName(prod?.name||pid))}: ${fmtQ(+v?.[0]||0)} ${esc(v?.[1]||'')}`;});
+      (d.x?.[side]||[]).forEach(x=>vals.push(`${esc(x[0])}: ${fmtQ(+x[1]||0)} ${esc(x[2]||'')}`));
+      return vals.length?`<b>${SIDE_NAME[side]}</b><br>${vals.join('<br>')}`:'';
+    }).filter(Boolean);
+    return sideRows.join('<br>')||'Sin detalle de productos guardado';
+  };
+  return `<details class="pd-hist"><summary>📅 Pedidos guardados · ${fechas.length} días</summary>${fechas.map(f=>{
+    return `<details class="pd-hist-day"><summary>${esc(fechaLabel(f))} · ${items.length} registro${items.length===1?'':'s'}</summary>${items.map(row=>{const times=row.detalle?.sentAt||(row.side?{[row.side]:row.sentAt}:{});const sent=Object.entries(times).filter(([,v])=>+v>0).map(([s,v])=>`${SIDE_NAME[s]}: ${new Date(+v).toLocaleTimeString('es-CR',{hour:'numeric',minute:'2-digit'})}`).join(' · ');return `<div class="pd-hist-row"><b>${esc(row.proveedor||'Pedido')}</b>${row.side?`<small>${esc(SIDE_NAME[row.side])} · ₡${fmt(row.total||0)}</small>`:''}<small>${detalle(row)}</small>${sent?`<small>Enviado: ${esc(sent)}</small>`:''}</div>`;}).join('')}</details>`;
+  }).join('')}</details>`;
+}
+function xpLateChanges(prov,side){
+  const p=S.pedidos[prov],snap=p?.notes?.['__sentSnapshot_'+side];if(!snap)return[];
+  const prodMap=new Map((getAllProviders()[prov]?.products||[]).map(x=>[String(x.id),x]));
+  const before=snap.qtys||{},now=p.qtys?.[side]||{},ids=new Set([...Object.keys(before),...Object.keys(now)]),out=[];
+  ids.forEach(id=>{const a=+before[id]?.qty||0,b=+now[id]?.qty||0;if(a===b&&String(before[id]?.unit||'')===String(now[id]?.unit||''))return;const name=niceName(prodMap.get(String(id))?.name||id),u=now[id]?.unit||before[id]?.unit||'';out.push(b>a?`${name}: agregar ${fmtQ(b-a)} ${u}`:b<a?`${name}: quitar ${fmtQ(a-b)} ${u}`:`${name}: cambiar a ${fmtQ(b)} ${u}`);});
+  const key=x=>`${normalizeText(x?.name)}|${normUnit(x?.unit)}`,old=new Map((snap.extras||[]).map(x=>[key(x),+x.qty||0]));
+  (p.extras?.[side]||[]).forEach(x=>{const k=key(x),a=old.get(k)||0,b=+x.qty||0;if(a!==b)out.push(b>a?`${x.name}: agregar ${fmtQ(b-a)} ${x.unit||''}`:`${x.name}: quitar ${fmtQ(a-b)} ${x.unit||''}`);old.delete(k);});
+  old.forEach((q,k)=>{const name=k.split('|')[0];if(q)out.push(`${name}: quitar ${fmtQ(q)}`);});
+  const note=getBranchNote(p,side);if(note&&p.notes?.['__late_'+side])out.push(`Instrucción de ${SIDE_NAME[side]}: ${note}`);
+  return out;
+}
+function xpLateHtml(prov,sides){
+  const p=S.pedidos[prov]||{};
+  return sides.map(side=>{
+    const at=+p.notes?.['__late_'+side]||0;if(!at)return'';
+    const confirmed=+p.notes?.['__lateConfirmed_'+side]||0,delta=xpLateChanges(prov,side);
+    if(confirmed)return `<div class="pd-late ${side} confirmed"><b>Complemento confirmado por ${SIDE_NAME[side]}</b><small>${esc(sxCuando(confirmed))}</small></div>`;
+    return `<div class="pd-late ${side}"><b>Cambios después del envío · responsable: ${SIDE_NAME[side]}</b><small>${delta.map(esc).join('<br>')||'Revisá el complemento con el proveedor'}</small>${scopeSide()===side?`<div><button type="button" data-pd="copy-late" data-prov="${esc(prov)}" data-side="${side}">Copiar instrucciones</button><button type="button" data-pd="confirm-late" data-prov="${esc(prov)}" data-side="${side}">Ya lo envié al proveedor</button></div>`:`<small>Pendiente de confirmar el envío personal</small>`}</div>`;
+  }).join('');
 }
 function xpPedidoClick(e){
   const b=e.target.closest('[data-pd]');if(!b)return;
@@ -2088,69 +2113,96 @@ function xpPedidoClick(e){
   if(act==='go')return switchView('proveedores');
   if(act==='line')return xpOpenSheet(prov,b.dataset.pid);
   if(act==='open')return openProv(prov);
-  if(act==='send'){if(!buildMsg(prov,'both')){toast('El pedido está vacío','err');return;}S.currentProv=prov;sendWA('both');setTimeout(xpRefresh,250);return;}
+  if(act==='send'){if(scopeSide()!=='both'){toast('El envío está disponible en la vista Ambos','err');return;}if(!buildMsg(prov,'both')){toast('El pedido está vacío','err');return;}S.currentProv=prov;sendWA('both');setTimeout(xpRefresh,250);return;}
   if(act==='chain')return xpStartChain();
   if(act==='allone'){sendAllPendingWA();setTimeout(xpRefresh,250);return;}
   if(act==='lista')return sendListaWA();
-  if(act==='reset')return xpResetPedido();
+  if(act==='reset')return xpResetPedido(b.dataset.side);
   if(act==='undo')return xpUndoReset();
+  if(act==='remove-line'){
+    const prod=sxProd(prov,b.dataset.pid),side=b.dataset.side;
+    if(!prod||!activeOrderSides().includes(side))return;
+    syncQty(prov,prod,side,'',prod.unit);xpRefresh();toast(`${niceName(prod.name)} quitado de ${SIDE_NAME[side]}`,'ok');return;
+  }
+  if(act==='copy-late'){
+    const side=b.dataset.side,msg=[`Complemento del pedido enviado a ${prov} · ${SIDE_NAME[side]}`, ...xpLateChanges(prov,side).map(x=>'• '+x)].join('\n');
+    (navigator.clipboard?.writeText(msg)||Promise.reject()).then(()=>toast('Instrucciones copiadas para enviar personalmente','ok')).catch(()=>{const ta=document.createElement('textarea');ta.value=msg;document.body.appendChild(ta);ta.select();document.execCommand('copy');ta.remove();toast('Instrucciones copiadas para enviar personalmente','ok');});return;
+  }
+  if(act==='confirm-late'){
+    const side=b.dataset.side;if(scopeSide()!==side)return;
+    const p=getPedido(prov);if(!p.notes)p.notes={};p.notes['__lateConfirmed_'+side]=Date.now();markProvDirty(prov);persist();xpRefresh();toast('Confirmación compartida con Ambos','ok');return;
+  }
 }
 
-// Reiniciar SOLO el pedido (cantidades, extras, notas y "enviado").
-// Proveedores, productos, precios, teléfonos e histórico no se tocan.
-async function xpResetEntireCombined(){
-  const ok=await AramoUI.confirmar({titulo:'¿Reiniciar el pedido de las dos tiendas?',texto:'Se borran las cantidades, notas y estados de Moravia y Los Ángeles, en todos los teléfonos. Proveedores, precios e historial no se tocan.',si:'Reiniciar',peligro:true});
-  if(!ok)return;
-  const r=await xpReiniciarTodo();
-  toast(r.remoteOk?'Pedido de las dos tiendas vacío':'Pedido vacío en este teléfono; revisá la conexión',r.remoteOk?'ok':'err');
-}
-// Reinicia de una vez el pedido de las dos tiendas (sin preguntar: pregunta quien la llama).
-// La usan Surtido en "Las dos" y el botón del Inicio. Deja XP.undo para Deshacer (xpUndoReset).
-async function xpReiniciarTodo(){
-  const old=JSON.parse(JSON.stringify(S.pedidos||{})),providers=Object.keys(old);
-  XP.undo={at:Date.now(),data:old,sides:['moravia','angeles']};
-  S.pedidos={};
-  S.createSelection={};
-  _dirtyProvs.clear();
-  providers.forEach(prov=>delete _syncBase[prov]);
-  saveSyncBase();
-  saveLocalState();
-  let remoteOk=true;
-  try{
-    const res=await supa.from('pedidos').delete().neq('proveedor','');
-    if(res.error)throw new Error(res.error.message);
-  }catch(e){remoteOk=false;console.warn('No se pudo borrar el pedido combinado en la nube:',e?.message||e);}
-  xpRefresh();
-  return{remoteOk,n:providers.length};
-}
-window.xpReiniciarTodo=xpReiniciarTodo;
-window.xpDeshacerReinicio=()=>xpUndoReset();
-async function xpResetPedido(){
-  if(activeOrderSides().length>1){xpResetEntireCombined();return;}
-  const sides=activeOrderSides();
-  const label=sides.length>1?'Moravia y Los Ángeles':SIDE_NAME[sides[0]];
-  const ok=await AramoUI.confirmar({titulo:`¿Reiniciar el pedido de ${label}?`,texto:'Se borran las cantidades de todos los proveedores de esta tienda, en todos los teléfonos. Proveedores, precios e historial no se tocan.',si:'Reiniciar',peligro:true});
-  if(!ok)return;
-  XP.undo={at:Date.now(),data:JSON.parse(JSON.stringify(S.pedidos)),sides};
-  Object.keys(S.pedidos).forEach(prov=>{
-    const p=getPedido(prov);
-    sides.forEach(side=>{
-      const tenia=pedidoTieneLado(p,side);
-      p.qtys[side]={};p.extras[side]=[];
-      Object.keys(p.notes).forEach(k=>{
-        if(k.endsWith('__'+side)||k==='__note_'+side)delete p.notes[k];
-        else if(side==='moravia'&&!k.startsWith('__')&&!k.includes('__'))delete p.notes[k];
-      });
-      if(side==='moravia')p.note='';
-      markUnsent(prov,side);
-      if(!tenia)delete p.notes['__upd_'+side]; // ya estaba vacío: no se modificó
-    });
+function xpArchiveSide(side,fecha=aramoLocalDate(),unique=false){
+  const old=LS.get('aramo_surtido_hist_v1',[])||[],added=[];
+  Object.entries(S.pedidos||{}).forEach(([prov,p])=>{
+    const items=(getAllProviders()[prov]?.products||[]).flatMap(prod=>{const v=p.qtys?.[side]?.[prod.id];return +v?.qty>0?[{name:niceName(prod.name),qty:+v.qty,unit:v.unit||prod.unit||''}]:[];});
+    (p.extras?.[side]||[]).forEach(x=>{if(+x.qty>0)items.push({name:String(x.name||'Extra'),qty:+x.qty,unit:x.unit||''});});
+    const sentAt=+p.notes?.['__sentAt_'+side]||0;
+    if(!items.length&&!sentAt)return;
+    const id=unique?`${fecha}_${side}_${Date.now()}_${Math.random().toString(36).slice(2,5)}`:`${fecha}_${side}_${prov}`;
+    const row={id,fecha,proveedor:prov,side,total:calcSide(side,prov),items,sentAt};
+    const key='__archive_'+side,archives=p.notes[key]||[];
+    p.notes[key]=unique?[row,...archives].slice(0,60):[row,...archives.filter(x=>x.id!==id)].slice(0,60);
+    markProvDirty(prov);
+    added.push(row);
+    pushHistoricoToSupabase(prov,'archive',calcSide('moravia',prov),calcSide('angeles',prov),fecha);
   });
-  S.createSelection={};
-  persist();
-  toast('🗑️ Pedido reiniciado','ok');
-  xpRefresh();
+  if(added.length){
+    const ids=new Set(added.map(x=>x.id));
+    const keep=unique?old:old.filter(x=>!ids.has(x.id));
+    LS.set('aramo_surtido_hist_v1',[...added,...keep].slice(0,600));
+  }
+  return added.length;
 }
+function xpClearSide(side){
+  Object.keys(S.pedidos||{}).forEach(prov=>{
+    const p=getPedido(prov);
+    p.qtys[side]={};p.extras[side]=[];
+    Object.keys(p.notes||{}).forEach(k=>{
+      if(!k.startsWith('__archive_')&&(k.endsWith('__'+side)||k==='__note_'+side))delete p.notes[k];
+      else if(side==='moravia'&&!k.startsWith('__')&&!k.includes('__'))delete p.notes[k];
+    });
+    delete p.notes['__sentSnapshot_'+side];delete p.notes['__late_'+side];delete p.notes['__lateConfirmed_'+side];delete p.notes['__upd_'+side];
+    if(side==='moravia')p.note='';
+    if(!p.sentByBranch)p.sentByBranch={...sentFlags(p)};
+    p.sentByBranch[side]=false;p.sent=!!p.sentByBranch.moravia&&!!p.sentByBranch.angeles;p.notes.__sentByBranch={...p.sentByBranch};
+    markProvDirty(prov);
+  });
+}
+async function xpResetPedido(side=scopeSide()){
+  if(side==='both'){toast('Reiniciá una tienda a la vez','err');return;}
+  if(!['moravia','angeles'].includes(side)||!activeOrderSides().includes(side)){toast('Elegí una tienda activa para reiniciar','err');return;}
+  const ok=await AramoUI.confirmar({titulo:`¿Reiniciar el pedido de ${SIDE_NAME[side]}?`,texto:'Se guarda una copia del pedido para revisar la mercadería recibida. La otra tienda queda igual.',si:'Guardar y reiniciar',peligro:true});
+  if(!ok)return;
+  XP.undo={at:Date.now(),data:JSON.parse(JSON.stringify(S.pedidos)),sides:[side]};
+  const n=xpArchiveSide(side,aramoLocalDate(),true);
+  xpClearSide(side);S.createSelection={};persist();
+  toast(n?`Pedido de ${SIDE_NAME[side]} guardado y reiniciado`:`Pedido de ${SIDE_NAME[side]} reiniciado`,'ok');xpRefresh();
+}
+window.xpDeshacerReinicio=()=>xpUndoReset();
+function xpDailyRollover(){
+  const today=aramoLocalDate(),last=LS.get('aramo_pedido_ultimo_dia','');
+  if(!window._aramoPedidoListo)return false;
+  if(!last){
+    const stale=['moravia','angeles'].filter(side=>{
+      const touched=Object.values(S.pedidos||{}).reduce((mx,p)=>Math.max(mx,+p?.notes?.['__upd_'+side]||0),0);
+      return touched>0&&aramoLocalDate(new Date(touched))<today;
+    });
+    if(stale.length){stale.forEach(side=>{const touched=Math.max(0,...Object.values(S.pedidos||{}).map(p=>+p?.notes?.['__upd_'+side]||0));xpArchiveSide(side,aramoLocalDate(new Date(touched)),false);xpClearSide(side);});XP.undo=null;S.createSelection={};persist();xpRefresh();}
+    LS.set('aramo_pedido_ultimo_dia',today);return !!stale.length;
+  }
+  if(last===today)return false;
+  ['moravia','angeles'].forEach(side=>xpArchiveSide(side,last,false));
+  ['moravia','angeles'].forEach(xpClearSide);
+  XP.undo=null;S.createSelection={};LS.set('aramo_pedido_ultimo_dia',today);persist();xpRefresh();
+  toast('Pedido nuevo para hoy. El anterior quedó guardado.','ok');return true;
+}
+window.xpDailyRollover=xpDailyRollover;
+window.xpDailyReady=()=>{window._aramoPedidoListo=true;xpDailyRollover();};
+setInterval(()=>xpDailyRollover(),30000);
+document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='visible')xpDailyRollover();});
 function xpUndoReset(){
   const u=XP.undo;if(!u)return;
   Object.entries(u.data).forEach(([prov,old])=>{
@@ -2171,6 +2223,7 @@ function xpUndoReset(){
 
 // ── Enviar uno por uno ──
 function xpStartChain(){
+  if(scopeSide()!=='both'){toast('El envío está disponible en la vista Ambos','err');return;}
   const queue=getProvNames().filter(p=>hasData(p)&&!isSent(p));
   if(!queue.length){toast('No hay pedidos pendientes','err');return;}
   xpBuildOverlays();
@@ -2268,15 +2321,9 @@ wrap('chooseOrderScope',()=>xpRefresh());
 wrap('openProv',()=>xpRenderProvSuggest());
 
 // ── Enlaces de eventos ──
-$('pvSum')?.addEventListener('click',()=>{if(xpTotals().items)switchView('pedido');});
 $('providersNavList')?.addEventListener('click',e=>{
   const ed=e.target.closest('[data-edit]');if(ed){abrirEditorProv(ed.dataset.edit);return;}
   const c=e.target.closest('[data-prov]');if(c)openProv(c.dataset.prov);
-});
-$('pvTop')?.addEventListener('click',e=>{
-  const b=e.target.closest('[data-pv]');if(!b)return;
-  if(b.dataset.pv==='reset')xpResetPedido();
-  if(b.dataset.pv==='undo')xpUndoReset();
 });
 // La altura del menú de abajo: las fichas se abren encima de él, así siempre se puede tocar.
 function xpNavAltura(){const n=document.querySelector('.nav-bottom');if(n)document.documentElement.style.setProperty('--navh',n.offsetHeight+'px');}
@@ -2291,6 +2338,7 @@ $('pvParse')?.addEventListener('input',xpParseChange);
 $('pvParse')?.addEventListener('change',xpParseChange);
 $('provSuggest')?.addEventListener('click',xpSugClick);
 $('pedidoBody')?.addEventListener('click',xpPedidoClick);
+$('pedidoBody')?.addEventListener('click',e=>{if(e.target.closest('[data-sx-pdf]'))hojaPdfAbrir();else if(e.target.closest('[data-sx-cierre]'))ciAbrir();else if(e.target.closest('[data-sx-siempre]'))auAbrir();});
 $('sxTablero')?.addEventListener('click',xpPedidoClick);
 $('sxProvBar')?.addEventListener('click',()=>{const b=$('sxProvBar'),w=b.closest('.pv-wrap'),ab=!w.classList.contains('sx-abierto');w.classList.toggle('sx-abierto',ab);b.setAttribute('aria-expanded',String(ab));if(ab)setTimeout(()=>b.scrollIntoView({behavior:'smooth',block:'start'}),60);});
 $('pedidoBody')?.addEventListener('click',e=>{const f=e.target.closest('[data-pdx-f]');if(!f||f.disabled)return;_pdFiltro=f.dataset.pdxF;xpRenderPedido();});

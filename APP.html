@@ -699,8 +699,8 @@ html[data-theme="dark"] .today-money-card{background:linear-gradient(145deg,#125
 <link rel="stylesheet" href="express.css?v=20261020-premium-2">
 <link rel="stylesheet" href="puerta.css?v=20261013-perfil-1">
 <link rel="stylesheet" href="portadas.css?v=20261124-control">
-<link rel="stylesheet" href="pedido.css?v=20261122-fase1">
-<link rel="stylesheet" href="surtido.css?v=20261123-auto1">
+<link rel="stylesheet" href="pedido.css?v=20261125-diario1">
+<link rel="stylesheet" href="surtido.css?v=20261125-diario1">
 </head>
 <body>
 <script>
@@ -774,7 +774,7 @@ html[data-theme="dark"] .today-money-card{background:linear-gradient(145deg,#125
       </form>
       <div class="hx-actions">
         <button class="hx-act primary" id="homeCreateOrder" type="button"><span class="ico">⚡</span><span><strong id="homeCtaTitle">Pedido rápido</strong><small id="homeCtaSub">Tocá productos y listo</small></span></button>
-        <button class="hx-act" id="homeSendOrders" type="button"><span class="ico">📤</span><span><strong>Enviar</strong><small id="homeSendSub">Nada pendiente</small></span></button>
+        <button class="hx-act scope-both-only" id="homeSendOrders" type="button"><span class="ico">📤</span><span><strong>Enviar</strong><small id="homeSendSub">Nada pendiente</small></span></button>
       </div>
       <div id="homeOrderCard"></div>
     </div>
@@ -799,16 +799,12 @@ html[data-theme="dark"] .today-money-card{background:linear-gradient(145deg,#125
 <div class="view" id="view-proveedores">
   <div class="scroll">
     <div class="pv-wrap">
-      <div id="pvTop"></div>
-      <button type="button" class="pv-sum" id="pvSum"></button>
       <div class="pv-search">
         <span class="pv-search-ico">🔍</span>
         <input id="pvSearch" type="search" placeholder="Buscar" aria-label="Buscar producto o proveedor" autocomplete="off" enterkeyhint="search">
       </div>
       <div id="pvParse" class="pv-parse" hidden></div>
       <div id="pvResults"></div>
-      <section class="both-summary" id="bothSummary" hidden aria-label="Resumen combinado de Surtido"></section>
-      <section class="sx-tablero" id="sxTablero" aria-label="Tu pedido de hoy"></section>
       <button type="button" class="sx-provbar" id="sxProvBar" aria-expanded="false" aria-controls="providersNavList"><span class="sx-pb-e">🏪</span><span class="sx-pb-t"><b>Proveedores</b><small>Tocá para ver todos y agregar productos</small></span><span class="sx-pb-n" id="sxProvBarN"></span><span class="sx-pb-f" aria-hidden="true">▾</span></button>
       <div id="providersNavList" class="pv-grid"></div>
     </div>
@@ -881,14 +877,20 @@ html[data-theme="dark"] .today-money-card{background:linear-gradient(145deg,#125
   </div>
   <div class="wa-bar">
     <div class="pp-total"><small>Total</small><strong class="prov-total-quick" id="provTotalQuick">₡0</strong></div>
-    <button class="wa-btn" id="btnWA" type="button"><span style="font-size:20px">💬</span> Enviar por WhatsApp</button>
+<button class="wa-btn scope-both-only" id="btnWA" type="button"><span style="font-size:20px">💬</span> Enviar por WhatsApp</button>
     <button class="listo-prov" id="btnListoProv" type="button">✓ Listo · volver a proveedores</button>
   </div>
 </div>
 
 <!-- ═══ PEDIDO DEL DÍA: revisar, enviar, reiniciar e historial ═══ -->
 <div class="view" id="view-pedido">
-  <div class="scroll"><div class="pd-wrap" id="pedidoBody"></div></div>
+  <div class="scroll">
+    <div class="pd-wrap" id="pedidoBody"></div>
+    <details class="cfg-acc pd-contactos scope-both-only">
+      <summary class="cfg-acc-hdr">📋 Lista a contactos <span class="cfg-acc-count" id="accCountPdfWa"></span></summary>
+      <div class="cfg-acc-body"><div class="cfg-acc-sub">Solo disponible en Ambos · reciben la lista completa del día</div><div id="cfgPdfWa"></div></div>
+    </details>
+  </div>
 </div>
 
 <!-- ═══ RESUMEN ═══ -->
@@ -947,30 +949,6 @@ html[data-theme="dark"] .today-money-card{background:linear-gradient(145deg,#125
   <div class="scroll" style="padding-bottom:120px">
     <div class="sec">
 
-      <div class="cfg-acc" data-acc="pdfwa">
-        <button class="cfg-acc-hdr">📋 Lista WA — contactos <span class="cfg-acc-count" id="accCountPdfWa"></span><span class="cfg-acc-arrow">▾</span></button>
-        <div class="cfg-acc-body">
-          <div class="cfg-acc-sub">Reciben la lista completa del día (hasta 5 contactos)</div>
-          <div id="cfgPdfWa"></div>
-        </div>
-      </div>
-
-      <div class="cfg-acc" data-acc="provs">
-        <button class="cfg-acc-hdr">🏪 Proveedores y productos <span class="cfg-acc-count" id="accCountProvs"></span><span class="cfg-acc-arrow">▾</span></button>
-        <div class="cfg-acc-body">
-          <div class="new-provider-box">
-            <div class="new-provider-title">Añadir proveedor</div>
-            <div class="new-provider-help">Escribí el nombre. Aparecerá automáticamente en orden alfabético.</div>
-            <div class="new-prov-row">
-              <input class="new-prov-inp" id="newProvName" placeholder="Nombre del proveedor">
-              <button class="btn btn-g btn-sm" onclick="addProveedor()">+ Añadir</button>
-            </div>
-          </div>
-          <div class="provider-list-title">Proveedores actuales</div>
-          <div id="cfgProveedores"></div>
-        </div>
-      </div>
-
       <div class="cfg-acc" data-acc="catalogo">
         <button class="cfg-acc-hdr">🥬 Productos <span class="cfg-acc-count" id="accCountCatalogo"></span><span class="cfg-acc-arrow">▾</span></button>
         <div class="cfg-acc-body">
@@ -992,24 +970,6 @@ html[data-theme="dark"] .today-money-card{background:linear-gradient(145deg,#125
             <input id="catalogImportInput" type="file" accept=".xlsx,.xls,.csv,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,application/vnd.ms-excel,text/csv" hidden>
           </label>
           <div id="catalogImportStatus" class="excel-import-status" aria-live="polite"></div>
-        </div>
-      </div>
-
-      <div class="cfg-acc" data-acc="precios">
-        <button class="cfg-acc-hdr">💰 Precios <span class="cfg-acc-arrow">→</span></button>
-        <div class="cfg-acc-body">
-          <div class="cfg-acc-sub">Buscá un producto, compará quién lo vende y editá sus precios en una sola ventana.</div>
-          <button class="btn btn-g btn-full" onclick="switchView('precios')">Abrir buscador de precios</button>
-        </div>
-      </div>
-
-      <div class="app-version">ARAMO · versión <b>2026-11-24 · Control</b> · se actualiza sola</div>
-
-      <div class="cfg-acc" data-acc="datos">
-        <button class="cfg-acc-hdr">⚠️ Borrar TODA la aplicación <span class="cfg-acc-arrow">▾</span></button>
-        <div class="cfg-acc-body">
-          <div class="cfg-acc-sub">Borra pedidos <b>y también</b> proveedores, teléfonos y configuración en todos los dispositivos. Para empezar un pedido nuevo usá <b>Pedido → Reiniciar pedido</b>.</div>
-          <button class="btn btn-r btn-full btn-sm" onclick="resetAll()">Reiniciar todo</button>
         </div>
       </div>
 
@@ -2028,10 +1988,14 @@ function histPush(e){const h=histGet();h.unshift(e);LS.set('aramo_hist',h.slice(
 // ── HISTÓRICO DIARIO SINCRONIZADO (por sucursal, para comparar días) ──
 let historicoCache={};
 
+function aramoLocalDate(date=new Date()){
+  const y=date.getFullYear(),m=String(date.getMonth()+1).padStart(2,'0'),d=String(date.getDate()).padStart(2,'0');
+  return `${y}-${m}-${d}`;
+}
 async function loadHistoricoFromSupabase(){
   try{
     // Sin el detalle de productos (pesa): ese solo se pide cuando se usa "Lo de siempre".
-    const{data,error}=await supa.from('historico_diario').select('id,fecha,proveedor,total_moravia,total_angeles,total,enviado_moravia,enviado_angeles,updated_at').order('fecha',{ascending:false}).limit(200);
+    const{data,error}=await supa.from('historico_diario').select('*').order('fecha',{ascending:false}).limit(500);
     if(error){console.warn('Error cargando histórico:',error.message);return;}
     historicoCache={};
     (data||[]).forEach(row=>{historicoCache[row.id]=row;});
@@ -2055,8 +2019,7 @@ function initRealtimeHistorico(){
 // día (sendWA ya calcula tM/tA sobre el pedido completo, no solo el lado
 // enviado), así que se reemplaza en cada envío. Los flags de "enviado" se
 // mergean contra lo que ya había para no revertir un lado ya enviado a false.
-function pushHistoricoToSupabase(prov,side,tM,tA){
-  const fecha=new Date().toISOString().slice(0,10);
+function pushHistoricoToSupabase(prov,side,tM,tA,fecha=aramoLocalDate()){
   const id=fecha+'_'+prov;
   const prev=historicoCache[id]||{};
   const row={
@@ -2070,6 +2033,7 @@ function pushHistoricoToSupabase(prov,side,tM,tA){
   // Lo que se pidió de cada producto (para "Lo de siempre"): {v,t,q:{tienda:{producto:[cantidad,unidad]}},x:{tienda:[[nombre,cantidad,unidad]]}}.
   // Necesita la columna historico_diario.detalle (supabase-historico-detalle.sql). Si todavía no existe, se guarda como antes.
   const conDetalle=_histDetalle!==false?{...row,detalle:detalleDelPedido(prov)}:row;
+  historicoCache[id]=conDetalle;
   supa.from('historico_diario').upsert(conDetalle,{onConflict:'id'}).then(({error})=>{
     if(!error){if(conDetalle!==row)_histDetalle=true;return;}
     if(conDetalle!==row&&/detalle|PGRST204|42703/.test((error.code||'')+' '+(error.message||''))){
@@ -2089,7 +2053,7 @@ function detalleDelPedido(prov){
     const a=(p.extras?.[s]||[]).filter(e=>+e?.qty>0).map(e=>[String(e.name||''),+e.qty,e.unit||'']);
     if(a.length)x[s]=a;
   });
-  return{v:1,t:Date.now(),q,x};
+  return{v:2,t:Date.now(),q,x,sentAt:{moravia:+p.notes?.__sentAt_moravia||0,angeles:+p.notes?.__sentAt_angeles||0}};
 }
 
 const fmt=n=>Number(n||0).toLocaleString('es-CR');
@@ -2151,8 +2115,13 @@ function markUnsent(prov,side='both'){
   const p=S.pedidos[prov];if(!p)return;
   markProvDirty(prov);
   if(!p.sentByBranch)p.sentByBranch={moravia:!!p.sent,angeles:!!p.sent};
-  if(side==='both'){p.sentByBranch.moravia=false;p.sentByBranch.angeles=false;p.sent=false;}
-  else{p.sentByBranch[side]=false;p.sent=!!p.sentByBranch.moravia&&!!p.sentByBranch.angeles;}
+  if(!p.notes)p.notes={};
+  const changedSides=side==='both'?['moravia','angeles']:[side];
+  changedSides.forEach(s=>{
+    if(p.sentByBranch[s]||p.notes['__lateConfirmed_'+s]){p.notes['__late_'+s]=Date.now();delete p.notes['__lateConfirmed_'+s];}
+    p.sentByBranch[s]=false;
+  });
+  p.sent=!!p.sentByBranch.moravia&&!!p.sentByBranch.angeles;
   if(!p.notes)p.notes={};p.notes.__sentByBranch={...p.sentByBranch};
   // Hora en que se modificó por última vez el pedido de cada tienda a este proveedor. Viaja a la
   // nube dentro de notes (n|__upd_moravia), así todos los teléfonos la ven igual. Solo se llama
@@ -2999,21 +2968,25 @@ function buildAllPendingOrdersMsg(providers){
 }
 
 function sendAllPendingWA(){
-  const side=scopeSide()==='both'?'both':scopeSide();
+  if(scopeSide()!=='both'){toast('El envío está disponible en la vista Ambos','err');return;}
+  const side='both';
   const pending=getProvNames().filter(prov=>hasData(prov)&&!isSent(prov));
   const msg=buildAllPendingOrdersMsg(pending);
   if(!msg){toast('No hay pedidos pendientes por enviar','err');return;}
+  const sentAtAll=Date.now();
   const sentProviders=pending.filter(prov=>buildMsg(prov,side));
   sentProviders.forEach(prov=>{
     const p=getPedido(prov),tM=calcSide('moravia',prov),tA=calcSide('angeles',prov);
     markProvDirty(prov);
     histPush({id:Date.now()+Math.random(),date:new Date().toISOString(),provider:prov,totalM:tM,totalA:tA,total:tM+tA,qtys:JSON.parse(JSON.stringify(p.qtys)),extras:JSON.parse(JSON.stringify(p.extras)),note:p.note||''});
     snapLastPrices(prov);
-    pushHistoricoToSupabase(prov,side,tM,tA);
     if(!p.sentByBranch)p.sentByBranch={moravia:!!p.sent,angeles:!!p.sent};
     if(side==='both'){p.sentByBranch.moravia=true;p.sentByBranch.angeles=true;p.sent=true;}
     else{p.sentByBranch[side]=true;p.sent=!!p.sentByBranch.moravia&&!!p.sentByBranch.angeles;}
-    if(!p.notes)p.notes={};p.notes.__sentByBranch={...p.sentByBranch};
+    if(!p.notes)p.notes={};
+    ['moravia','angeles'].forEach(s=>{p.notes['__sentAt_'+s]=sentAtAll;p.notes['__sentSnapshot_'+s]={qtys:JSON.parse(JSON.stringify(p.qtys?.[s]||{})),extras:JSON.parse(JSON.stringify(p.extras?.[s]||[])),at:sentAtAll};delete p.notes['__late_'+s];delete p.notes['__lateConfirmed_'+s];});
+    p.notes.__sentByBranch={...p.sentByBranch};
+    pushHistoricoToSupabase(prov,side,tM,tA);
   });
   renderHome();
   closeProvListModal();
@@ -3026,7 +2999,8 @@ function sendAllPendingWA(){
 // ── SEND ──
 function sendWA(side='both'){
   const prov=S.currentProv;
-  if(side==='both'&&scopeSide()!=='both')side=scopeSide();
+  if(scopeSide()!=='both'){toast('El envío está disponible en la vista Ambos','err');return;}
+  side=['moravia','angeles'].includes(side)?side:'both';
   const msg=buildMsg(prov,side);
   if(!msg){toast('El pedido está vacío','err');return;}
   const contacts=(S.waContacts[prov]||[]).map(normalizeCostaRicaPhone).filter(Boolean);
@@ -3034,13 +3008,16 @@ function sendWA(side='both'){
   const tM=calcSide('moravia'),tA=calcSide('angeles');
   const entry={id:Date.now(),date:new Date().toISOString(),provider:prov,totalM:tM,totalA:tA,total:tM+tA,qtys:JSON.parse(JSON.stringify(p.qtys)),extras:JSON.parse(JSON.stringify(p.extras)),note:p.note||''};
   histPush(entry);snapLastPrices(prov);
-  pushHistoricoToSupabase(prov,side,tM,tA);
   const sentPedido=getPedido(prov);
   markProvDirty(prov);
   if(!sentPedido.sentByBranch)sentPedido.sentByBranch={moravia:!!sentPedido.sent,angeles:!!sentPedido.sent};
   if(side==='both'){sentPedido.sentByBranch.moravia=true;sentPedido.sentByBranch.angeles=true;sentPedido.sent=true;}
   else{sentPedido.sentByBranch[side]=true;sentPedido.sent=!!sentPedido.sentByBranch.moravia&&!!sentPedido.sentByBranch.angeles;}
-  if(!sentPedido.notes)sentPedido.notes={};sentPedido.notes.__sentByBranch={...sentPedido.sentByBranch};
+  if(!sentPedido.notes)sentPedido.notes={};
+  const sentAt=Date.now();
+  (side==='both'?['moravia','angeles']:[side]).forEach(s=>{sentPedido.notes['__sentAt_'+s]=sentAt;sentPedido.notes['__sentSnapshot_'+s]={qtys:JSON.parse(JSON.stringify(sentPedido.qtys?.[s]||{})),extras:JSON.parse(JSON.stringify(sentPedido.extras?.[s]||[])),at:sentAt};delete sentPedido.notes['__late_'+s];delete sentPedido.notes['__lateConfirmed_'+s];});
+  sentPedido.notes.__sentByBranch={...sentPedido.sentByBranch};
+  pushHistoricoToSupabase(prov,side,tM,tA);
   renderProvStatus();renderHome();
   const urls=contacts.length
     ?contacts.map(raw=>`https://wa.me/${raw}?text=${encodeURIComponent(msg)}`)
@@ -3111,6 +3088,7 @@ function buildListaMsg(){
 
 // Enviar lista completa por WhatsApp (sin imprimir)
 function sendListaWA(){
+  if(scopeSide()!=='both'){toast('La lista a contactos está disponible en la vista Ambos','err');return;}
   const msg=buildListaMsg();
   if(!msg){toast('Sin pedidos para enviar','err');return;}
   const contacts=(S.pdfWa||[]).filter(c=>c.tel?.trim());
@@ -3185,7 +3163,7 @@ function renderResumen(){
 function renderHistorico(){
   const el=document.getElementById('resHistorico');
   if(!el)return;
-  const today=new Date().toISOString().slice(0,10);
+  const today=aramoLocalDate();
   const byDate={};
   Object.values(historicoCache).forEach(row=>{
     if(row.fecha===today)return;
@@ -3271,10 +3249,9 @@ document.getElementById('catalogImportInput')?.addEventListener('change',e=>{
 });
 
 function renderConfig({catalog=true}={}){
-  // Contadores en los títulos — se ve el estado sin abrir nada
+  // Los contactos de la lista completa viven dentro de Pedido y solo en Ambos.
   const waSet=(S.pdfWa||[]).filter(c=>(c.tel||'').trim()).length;
   const elW=document.getElementById('accCountPdfWa');if(elW)elW.textContent=waSet+'/5';
-  const elPr=document.getElementById('accCountProvs');if(elPr)elPr.textContent=getProvNames().length;
 
   // PDF WhatsApp
   document.getElementById('cfgPdfWa').innerHTML=S.pdfWa.map((c,i)=>`
@@ -3285,8 +3262,6 @@ function renderConfig({catalog=true}={}){
     </div>
   `).join('');
 
-  // Proveedores y productos
-  renderCfgProveedores();
   if(catalog)renderCatalogo();
 }
 
@@ -3990,6 +3965,7 @@ document.getElementById('themeToggle').addEventListener('click',()=>{
     initRealtimePedidos();
     initRealtimeHistorico();
     markSyncLive();
+    window._aramoPedidoListo=true;window.xpDailyReady?.();
     renderHome();
     if(S.currentProv){renderProdTable();updateProvTotals();updatePreview();renderProvStatus();}
   });
@@ -4025,6 +4001,7 @@ function openProviderProfilesModal(){
   document.getElementById('modalProvList').classList.add('open');
 }
 function openSendOrdersModal(){
+  if(scopeSide()!=='both'){toast('El envío de pedidos está disponible en la vista Ambos','err');return;}
   const body=document.getElementById('provListModalBody'),provs=getProvNames().filter(p=>hasData(p)&&!isSent(p));
   document.getElementById('provListModalTitle').textContent='Enviar pedidos';
   body.style.display='block';body.style.maxHeight='60vh';body.style.overflowY='auto';body.style.gridTemplateColumns='';body.style.gap='';
@@ -4119,7 +4096,7 @@ if(isIOS && !isInStandalone && !dismissed){
 <!-- Íconos y ventanitas del sistema de diseño: antes de express.js, que ya los usa -->
 <script src="iconos.js?v=20261122-fase1"></script>
 <script src="aramo-ui.js?v=20261123-fase2"></script>
-<script src="express.js?v=20261124-control"></script>
+<script src="express.js?v=20261125-diario1"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcode-generator/1.4.4/qrcode.min.js"></script>
 <script src="canasta-config.js?v=20261018-seguridad-1"></script>
 <script src="aramo-nube.js?v=20261020-circuito-6"></script>
