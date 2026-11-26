@@ -8,7 +8,7 @@
    Letra grande (nada se toca por debajo de 48 px), botones de 64 a 72 px, rojo SOLO para lo que falta.
    ══════════════════════════════════════════════════════════════════════ */
 :root{
-  --q-frutas:#e07a2e;--q-verduras:#2f8f5b;--q-hierbas:#1d9a8a;--q-raices:#9a6b45;--q-despensa:#c79a3e;--q-canasta:#1d2a22;--q-recetas:#1f6b40;
+  --q-frutas:#c9621a;--q-verduras:#2f8f5b;--q-hierbas:#178276;--q-raices:#9a6b45;--q-despensa:#a37721;--q-canasta:#1d2a22;--q-recetas:#1f6b40;
   --verde-hondo:#1f6b40;--verde-boton:#1f7a45;
   --fraunces:var(--ar-f-display);
 }
@@ -122,16 +122,18 @@ html[data-theme="dark"] .qd-canasta{box-shadow:inset 0 0 0 1.5px rgba(255,255,25
 /* ── Barra de abajo: oscura, "Canasta · 5 · ₡6.800 →" ── */
 .bar{--inv:var(--q-canasta);--inv-ink:#fff;--inv-mut:rgba(255,255,255,.84);left:12px;right:12px;bottom:calc(14px + var(--bot));max-width:696px;padding:0;border-radius:26px;background:var(--q-canasta);color:#fff;box-shadow:0 14px 34px rgba(0,0,0,.28)}
 html[data-theme="dark"] .bar{box-shadow:0 14px 34px rgba(0,0,0,.6),inset 0 0 0 1.5px rgba(255,255,255,.16)}
-.bar .tk{width:100%;min-height:72px;padding:8px 20px 8px 14px;display:flex;align-items:center;gap:14px;color:#fff;text-align:left}
-.tk-ico{height:48px}
+.bar .tk{width:100%;min-height:72px;padding:8px 18px 8px 14px;display:flex;align-items:center;gap:12px;color:#fff;text-align:left}
+.tk-ico{height:48px;padding-right:0}
+.tk-ico i{margin-left:0}
 .tk-ico i{width:44px;height:44px;box-shadow:0 0 0 3px var(--q-canasta)}
 .tk-t{flex:1;min-width:0}
-.tk-t strong{display:block;font:800 22px/1.2 var(--ar-f-ui);letter-spacing:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.tk-t strong{display:block;font:800 clamp(18px,5.4vw,22px)/1.2 var(--ar-f-ui);letter-spacing:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .tk-go{flex:none;font-size:32px;line-height:1}
+.pt,.qd,.bq,.bq-hondo,.preg,.renglon{min-width:0}
 
 /* ── Tu canasta: bloques ── */
-.bloques{display:grid;gap:14px}
-.bq{display:flex;align-items:center;gap:16px;width:100%;min-height:96px;padding:20px;border-radius:26px;background:var(--ar-sup);border:1px solid var(--ar-borde);box-shadow:var(--ar-s1);text-align:left;color:var(--ar-tinta);transition:transform .16s var(--suave)}
+.bloques{display:grid;grid-template-columns:minmax(0,1fr);gap:14px}
+.bq{min-width:0;display:flex;align-items:center;gap:16px;width:100%;min-height:96px;padding:20px;border-radius:26px;background:var(--ar-sup);border:1px solid var(--ar-borde);box-shadow:var(--ar-s1);text-align:left;color:var(--ar-tinta);transition:transform .16s var(--suave)}
 .bq:active{transform:scale(.99)}
 .bq-i{flex:none;display:grid;place-items:center;width:54px;height:54px;border-radius:17px;background:var(--bc);color:#fff}
 .bq-i svg{width:28px;height:28px}
@@ -220,13 +222,13 @@ html[data-theme="dark"] .legal-check a{color:var(--ar-v300)}
 .cuenta-segura small{font-size:15px}
 
 /* ══════════════ Mi pedido ══════════════ */
-body[data-est="enviado"]{--mc:#e07a2e;--mt:#fff}
-body[data-est="recibido"]{--mc:#1d9a8a;--mt:#fff}
+body[data-est="enviado"]{--mc:#c9621a;--mt:#fff}
+body[data-est="recibido"]{--mc:#178276;--mt:#fff}
 body[data-est="alistando"]{--mc:#f2b33d;--mt:#3d2c05}
 body[data-est="listo"]{--mc:#2f8f5b;--mt:#fff}
 body[data-est="entregado"]{--mc:#1f6b40;--mt:#fff}
 body[data-est="cancelado"]{--mc:#8a978e;--mt:#fff}
-.f-enviado{--mc:#e07a2e;--mt:#fff}.f-recibido{--mc:#1d9a8a;--mt:#fff}.franja.f-alistando{--mc:#d99a1c;--mt:#fff}.mp-estado.f-alistando{--mc:#f2b33d;--mt:#3d2c05}
+.f-enviado{--mc:#c9621a;--mt:#fff}.f-recibido{--mc:#178276;--mt:#fff}.franja.f-alistando{--mc:#d99a1c;--mt:#fff}.mp-estado.f-alistando{--mc:#f2b33d;--mt:#3d2c05}
 .f-listo{--mc:#2f8f5b;--mt:#fff}.f-entregado{--mc:#1f6b40;--mt:#fff}.f-cancelado{--mc:#8a978e;--mt:#fff}
 /* encima del color: ⌂ y la tienda en la barra transparente */
 body[data-pantalla="pedido"] .tl{position:relative}
@@ -330,6 +332,11 @@ html[data-theme="dark"] .det-dir a{color:var(--ar-v300)}
 .cot-b{min-height:68px;border-radius:20px}
 .cot-b.ok{background:var(--verde-boton)}
 
+@media (max-width:380px){
+  .bq{gap:12px;padding:16px}
+  .bq-i{width:48px;height:48px}
+  .bq-m{font-size:26px}
+}
 @media (max-width:360px){
   .qd{min-height:150px;padding:16px}
   .qd b{font-size:22px}
