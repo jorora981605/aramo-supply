@@ -43,9 +43,19 @@ create table if not exists public.pos_respaldo (
   creado   timestamptz not null default now(),
   primary key (sucursal, version)
 );
+-- Resumen diario legible por el Control. La base completa del POS sigue
+-- cifrada en pos_parte; aquí solo se guarda el cierre auditado del día.
+create table if not exists public.pos_cierre_diario (
+  sucursal   text not null,
+  fecha      date not null,
+  resumen    jsonb not null default '{}'::jsonb,
+  actualizado timestamptz not null default now(),
+  primary key (sucursal, fecha)
+);
 alter table public.pos_sucursal enable row level security;
 alter table public.pos_parte    enable row level security;
 alter table public.pos_respaldo enable row level security;
+alter table public.pos_cierre_diario enable row level security;
 -- (sin políticas: la llave pública no puede leer ni escribir estas tablas)
 
 -- ── Contraseña del local (con bloqueo por intentos) ──
@@ -66,6 +76,37 @@ begin
          bloqueado = case when s.fallos + 1 >= 10 then now() + interval '15 minutes' else null end
    where sucursal = p_suc;
   return false;
+end $$;
+
+-- Publicar y leer solo con la misma clave del local. Así el Control puede
+-- conciliar ventas entre dispositivos sin exponer el POS ni sus clientes.
+create or replace function public.pos_publicar_cierre(p_suc text, p_clave text, p_fecha date, p_resumen jsonb)
+returns json language plpgsql security definer set search_path = public, extensions as $$
+declare d jsonb := coalesce(p_resumen,'{}'::jsonb);
+begin
+  if not public.pos_ok(p_suc,p_clave) then return json_build_object('ok',false,'motivo','clave'); end if;
+  if p_fecha is null or p_fecha < current_date - 90 or p_fecha > current_date + 1 then
+    return json_build_object('ok',false,'motivo','fecha');
+  end if;
+  if jsonb_typeof(d->'ventas') <> 'array' then return json_build_object('ok',false,'motivo','resumen_invalido'); end if;
+  if jsonb_array_length(d->'ventas') > 1000 then return json_build_object('ok',false,'motivo','resumen_grande'); end if;
+  if length(d::text) > 1000000 then return json_build_object('ok',false,'motivo','resumen_grande'); end if;
+  d := jsonb_set(d,'{sucursal}',to_jsonb(p_suc),true);
+  d := jsonb_set(d,'{fecha}',to_jsonb(p_fecha::text),true);
+  d := jsonb_set(d,'{publicadoEn}',to_jsonb(now()),true);
+  insert into public.pos_cierre_diario(sucursal,fecha,resumen,actualizado)
+    values(p_suc,p_fecha,d,now())
+    on conflict(sucursal,fecha) do update set resumen=excluded.resumen,actualizado=now();
+  return json_build_object('ok',true,'fecha',p_fecha,'actualizado',now());
+end $$;
+
+create or replace function public.pos_leer_cierres(p_suc text, p_clave text, p_desde date, p_hasta date)
+returns json language plpgsql security definer set search_path = public as $$
+begin
+  if not public.pos_ok(p_suc,p_clave) then return json_build_object('ok',false,'motivo','clave'); end if;
+  return coalesce((select json_agg(json_build_object('fecha',fecha,'resumen',resumen,'actualizado',actualizado) order by fecha desc)
+                   from public.pos_cierre_diario
+                   where sucursal=p_suc and fecha between coalesce(p_desde,current_date-70) and coalesce(p_hasta,current_date)), '[]'::json);
 end $$;
 
 create or replace function public.pos_info(p_suc text)
@@ -195,6 +236,8 @@ end $$;
 revoke all on function public.pos_ok(text, text) from public, anon, authenticated;
 revoke all on function public.pos_info(text) from public, anon, authenticated;
 revoke all on function public.pos_poner_clave(text, text) from public, anon, authenticated;
+revoke all on function public.pos_publicar_cierre(text, text, date, jsonb) from public, anon, authenticated;
+revoke all on function public.pos_leer_cierres(text, text, date, date) from public, anon, authenticated;
 grant execute on function public.pos_entrar(text, text) to anon, authenticated;
 grant execute on function public.pos_bajar(text, text, bigint, int) to anon, authenticated;
 grant execute on function public.pos_tomar(text, text, text, text) to anon, authenticated;
@@ -203,6 +246,8 @@ grant execute on function public.pos_soltar(text, text, text) to anon, authentic
 grant execute on function public.pos_subir(text, text, text, bigint, int, text) to anon, authenticated;
 grant execute on function public.pos_confirmar(text, text, text, bigint, int, bigint) to anon, authenticated;
 grant execute on function public.pos_respaldar(text, text, text) to anon, authenticated;
+grant execute on function public.pos_publicar_cierre(text, text, date, jsonb) to anon, authenticated;
+grant execute on function public.pos_leer_cierres(text, text, date, date) to anon, authenticated;
 
 -- ▼▼▼ CAMBIÁ ESTAS DOS CONTRASEÑAS (mínimo 6 caracteres) ▼▼▼
 select public.pos_poner_clave('moravia', 'CLAVE-MORAVIA');

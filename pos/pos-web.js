@@ -35,6 +35,7 @@ let version=0,sucio=false,dueno=false,soloLectura=true,info=null,cambios=0,subie
 let tLocal=0,tSubir=0,tMax=0;
 let listoRes;const listo=new Promise(r=>{listoRes=r;});
 const HANDLERS={},ESCUCHAS={};
+const POS_CIERRE_KEY='aramo_pos_cierre_v1_';
 const ESCRIBE=new Set(['productos:crear','productos:actualizar','productos:eliminar','productos:ajustar_stock','productos:crear_lote',
   'promociones:crear','promociones:actualizar','promociones:eliminar','caja:abrir','caja:cerrar','ventas:crear','ventas:anular','ventas:devolver_item',
   'config:guardar','facturas:crear','facturas:actualizar_estado','cajeros:crear','cajeros:actualizar','cajeros:eliminar','cajeros:guardarPermisos',
@@ -51,7 +52,12 @@ window.POSWEB={
     }
     const fn=HANDLERS[c];
     if(!fn)throw new Error('Esta función no está disponible en la web: '+c);
-    return fn({sender:null},...a);
+    const result=await fn({sender:null},...a);
+    if(c==='ventas:crear'||c==='ventas:anular'||c==='ventas:devolver_item'){
+      const fecha=result?.fecha?String(result.fecha).slice(0,10):posFechaISO();
+      setTimeout(()=>{posPublicarResumen(fecha);},0);
+    }
+    return result;
   },
   send(c){if(c==='app:force-close')salirYa();},
   on(c,cb){(ESCUCHAS[c]=ESCUCHAS[c]||[]).push(cb);},
@@ -163,6 +169,35 @@ function marcarCambio(){
   cambios++;sucio=true;
   clearTimeout(tLocal);tLocal=setTimeout(guardarLocal,400);
   programarSubida();pintarEstado();
+}
+function posFechaISO(value){
+  const d=value?new Date(value):new Date();
+  const p=n=>String(n).padStart(2,'0');
+  return `${d.getFullYear()}-${p(d.getMonth()+1)}-${p(d.getDate())}`;
+}
+function posResumenDia(fecha){
+  if(!POS||!SUC)return null;
+  let rows=[];
+  try{
+    rows=POS.prepare(`SELECT v.id,v.numero,v.fecha,v.total,v.metodo_pago,v.estado,v.anulado_por,v.anulado_fecha,v.anulado_motivo,c.usuario AS cajero,v.pago_efectivo,v.pago_tarjeta,v.pago_sinpe
+      FROM ventas v LEFT JOIN cajas c ON c.id=v.caja_id WHERE DATE(v.fecha)=? ORDER BY v.fecha,v.id`).all([fecha]);
+  }catch(e){return null;}
+  const ventas=rows.map(v=>{
+    const split=(Number(v.pago_efectivo)||0)+(Number(v.pago_tarjeta)||0)+(Number(v.pago_sinpe)||0)>0;
+    return {id:+v.id||0,numero:String(v.numero||''),fecha:v.fecha,total:+v.total||0,estado:String(v.estado||''),metodo:String(v.metodo_pago||''),efectivo:split?(+v.pago_efectivo||0):v.metodo_pago==='efectivo'?(+v.total||0):0,tarjeta:split?(+v.pago_tarjeta||0):v.metodo_pago==='tarjeta'?(+v.total||0):0,sinpe:split?(+v.pago_sinpe||0):v.metodo_pago==='sinpe'?(+v.total||0):0,cajero:String(v.cajero||''),anuladoPor:String(v.anulado_por||''),anuladoFecha:String(v.anulado_fecha||''),anuladoMotivo:String(v.anulado_motivo||'')};
+  });
+  const completadas=ventas.filter(v=>v.estado==='completada');
+  const resumen={v:1,sucursal:SUC,fecha,efectivo:completadas.reduce((t,v)=>t+v.efectivo,0),tarjeta:completadas.reduce((t,v)=>t+v.tarjeta,0),sinpe:completadas.reduce((t,v)=>t+v.sinpe,0),total:completadas.reduce((t,v)=>t+(+v.total||0),0),n:completadas.length,ventas,generadoEn:new Date().toISOString()};
+  resumen.huella=sha256hex(JSON.stringify({fecha,ventas}));
+  return resumen;
+}
+async function posPublicarResumen(fecha){
+  const resumen=posResumenDia(fecha);if(!resumen)return null;
+  try{localStorage.setItem(POS_CIERRE_KEY+SUC,JSON.stringify(resumen));}catch(e){}
+  if(!supa||!CLAVE)return resumen;
+  try{await rpc('pos_publicar_cierre',{p_suc:SUC,p_clave:CLAVE,p_fecha:fecha,p_resumen:resumen});}
+  catch(e){if(!faltaNube(e))console.warn('[pos] no se publicó el resumen diario',e);}
+  return resumen;
 }
 async function guardarLocal(){
   clearTimeout(tLocal);
@@ -380,6 +415,7 @@ async function abrir(r,local){
   await guardarLocal();
   pintarCapa(null);
   listoRes();
+  posPublicarResumen(posFechaISO());
   montarPedidoWeb();
   pintarEstado();
   if(sucio&&dueno)programarSubida();

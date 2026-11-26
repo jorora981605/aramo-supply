@@ -909,7 +909,7 @@
     <nav id="nav">
       <button data-page="staff">♙ Personal</button>
       <button data-page="schedule">◷ Horarios</button>
-      <button data-page="closure" class="active">✓ Cierre semanal</button>
+      <button data-page="closure" class="active">✓ Cierre diario</button>
       <button data-page="settings">⚙ Configuración y respaldo</button>
     </nav>
 
@@ -937,7 +937,7 @@
       </div>
     </header>
     <div class="top">
-      <h1 id="pageTitle">Cierre semanal</h1>
+      <h1 id="pageTitle">Cierre diario</h1>
     </div>
 
     <section id="dashboard" class="section">
@@ -1180,6 +1180,9 @@
 
     <section id="closure" class="section active">
       <div id="ctlPuente" class="ctl-puente" role="status" hidden></div>
+      <div id="clDailyOverview" class="cl-daily-overview" aria-live="polite"></div>
+      <details class="cl-weekly-toggle">
+        <summary>Ver hoja semanal y editar datos</summary>
       <div class="weekly-sheet-shell">
         <div class="weekly-sheet-toolbar">
           <div class="weekly-sheet-controls">
@@ -1200,6 +1203,7 @@
         <button id="clResetDayBtn" class="cl-reset-day" type="button" hidden onclick="clResetOpenDay()">Reiniciar día abierto</button>
         <div id="clSpreadsheet" class="weekly-sheet-scroll"></div>
       </div>
+      </details>
 
       <div id="clReceivablesPanel" class="payables-manager"></div>
 
@@ -1381,7 +1385,7 @@
 <script src="canasta-config.js?v=20261018-seguridad-1"></script>
 <script src="aramo-nube.js?v=20261020-circuito-6"></script>
 <script defer src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.117.0"></script>
-<script src="control-puente.js?v=20261125-control3"></script>
+<script src="control-puente.js?v=20261126-control4"></script>
 <script>
 // ARAMO: un Control por tienda. La tienda sale de ?suc=, o de la que se eligió al entrar a ARAMO.
 const TIENDA=(()=>{let l=new URLSearchParams(location.search).get('suc');try{l=l||sessionStorage.getItem('aramo_local_sesion')||JSON.parse(localStorage.getItem('aramo_local')||'null');}catch(e){}return l==='moravia'?'moravia':'angeles';})();
@@ -1941,8 +1945,8 @@ function page(id){
       'Cubra '+scheduleWeeklyHours()+' horas semanales sin quemar al equipo.'
     ],
     closure:[
-      'Cierre semanal',
-      'Ventas, compras, gastos y planilla: el resultado real de la semana.'
+      'Cierre diario',
+      'Todo lo que entró y salió hoy, con el origen de cada movimiento.'
     ],
     settings:[
       'Configuración y respaldo',
@@ -4110,6 +4114,7 @@ let clSheetCollapsed=new Set(clSheetGroupKeys.filter(key=>key!=='caja'));
 
 function clSetSheetDayFilter(value){
   clSheetDayFilter=value;
+  clRenderDailyOverview();
   clRenderSpreadsheet();
 }
 
@@ -4155,6 +4160,98 @@ function clLoad(){
   clRender();
 }
 
+function clOverviewDay(){
+  const selected=clSheetDayFilter&&clSheetDayFilter!=='all'&&clSheetDayFilter!=='none'?clSheetDayFilter:'';
+  return selected&&clInRange(selected,clState.start,clState.end)?selected:clState.start;
+}
+
+function clOverviewDateLabel(date){
+  const s=new Date(date+'T12:00:00').toLocaleDateString('es-CR',{weekday:'long',day:'numeric',month:'long',year:'numeric'});
+  return s.charAt(0).toUpperCase()+s.slice(1);
+}
+
+function clOverviewSource(field,d,sources){
+  const p=sources?.pos||{},m=sources?.mostrador||{};
+  const map={cash:'efectivo',sinpe:'sinpe',card:'tarjeta'};
+  const key=map[field];
+  if(!d.manual?.__auto?.[field]&&num(d.manual?.[field])>0)return '<span class="cl-source manual">Digitado en cierre</span>';
+  if(key){
+    const tags=[];
+    if(num(p[key])>0)tags.push(`POS${num(p.n)?` · ${num(p.n)} ventas`:''}`);
+    if(num(m[key])>0)tags.push(`Mostrador${num(m.n)?` · ${num(m.n)} cobros`:''}`);
+    if(tags.length)return `<span class="cl-source">${esc(tags.join(' + '))}</span>`;
+  }
+  if(d.manual?.__auto?.[field])return '<span class="cl-source">Llegó automático</span>';
+  if(num(d.manual?.[field])>0)return '<span class="cl-source manual">Digitado en cierre</span>';
+  return '<span class="cl-source none">Sin movimiento</span>';
+}
+
+function clOverviewRow(label,value,note='',tag=''){
+  const tagHtml=/^Autom/.test(String(tag))?`<span class="cl-source">${esc(tag)}</span>`:tag;
+  return `<div class="cl-flow-row"><div class="cl-flow-row-main"><span class="cl-flow-row-label">${esc(label)}${tagHtml}</span>${note?`<span class="cl-flow-row-note">${esc(note)}</span>`:''}</div><strong class="cl-flow-row-value">${fmt(value)}</strong></div>`;
+}
+
+function clOverviewFlow(title,mark,total,rows,kind){
+  return `<article class="cl-flow-card ${kind}-card"><div class="cl-flow-head"><h2 class="cl-flow-title"><span class="mark">${mark}</span>${title}</h2><strong class="cl-flow-total">${fmt(total)}</strong></div><div class="cl-flow-rows">${rows.join('')}</div></article>`;
+}
+
+function clOverviewDateTime(value){
+  if(!value)return '';
+  const d=new Date(value);if(isNaN(d))return '';
+  return d.toLocaleString('es-CR',{day:'2-digit',month:'2-digit',hour:'2-digit',minute:'2-digit'});
+}
+function clOverviewPosMethod(v){
+  const method=String(v?.metodo||'').toLowerCase();
+  return method==='efectivo'?'Efectivo':method==='sinpe'?'SINPE':method==='tarjeta'?'Tarjeta':method||'Mixto';
+}
+
+function clRenderDailyOverview(){
+  const el=document.getElementById('clDailyOverview');if(!el||!clState.start)return;
+  const {perDay}=clComputeWeek(clState.start);
+  const date=clOverviewDay(),d=perDay.find(x=>x.date===date)||perDay[0];if(!d)return;
+  const sources=window.AramoPuente?.fuentesDia?.(d.date,TIENDA)||{};
+  const pos=sources.pos||{},mostrador=sources.mostrador||{},comprasSrc=sources.compras||{};
+  const salio=d.compras+d.grupoInversion+num(d.manual.desechos)+d.fixedTotal+d.salarioTotal+d.rebajoTotal+d.cuentaXpagarTotal+d.cajaRetirosTotal;
+  const posN=num(pos.n||pos.ventas||pos.transacciones), mostradorN=num(mostrador.n||mostrador.cobros), cierreN=num(comprasSrc.n||sources.cierres);
+  const automatico=posN||mostradorN||cierreN;
+  const posMovimientos=Array.isArray(pos.ventas)?pos.ventas:[];
+  const posDetalle=posMovimientos.length?`<details class="cl-audit-detail"><summary>Ver movimientos del POS (${posMovimientos.length})</summary><div class="cl-pos-movements">${posMovimientos.slice(-12).reverse().map(v=>`<div class="cl-pos-movement"><span><b>${esc(v.numero||'Venta')}</b><small>${esc(clOverviewDateTime(v.fecha))} · ${esc(clOverviewPosMethod(v))}${v.cajero?' · '+esc(v.cajero):''}</small></span><strong class="${v.estado==='anulada'?'is-cancelled':''}">${fmt(v.total)}${v.estado==='anulada'?' · anulada':''}</strong></div>`).join('')}</div>${posMovimientos.length>12?'<small class="cl-audit-meta">Se muestran las últimas 12; el total y la huella incluyen todas.</small>':''}</details>`:'';
+  const resultadoClass=d.ganancia<0?' is-loss':'';
+  const ventasTag=clOverviewSource('cash',d,sources);
+  const cardNote=`Bruto ${fmt(d.manual.card)} · comisión ${clPct(d.cardFeePct)}`;
+  const ingresoRows=[
+    clOverviewRow('Ventas en efectivo',d.manual.cash,`POS + Mostrador cuando están conectados`,ventasTag),
+    clOverviewRow('Ventas por SINPE',d.manual.sinpe,'Cobros confirmados del día',clOverviewSource('sinpe',d,sources)),
+    clOverviewRow('Ventas con tarjeta (neto)',d.datafonoNeto,cardNote,clOverviewSource('card',d,sources)),
+    clOverviewRow('Bodega',d.manual.bodega,'Ingreso adicional registrado en el cierre',d.manual.__auto?.bodega?'<span class="cl-source">Automático</span>':''),
+    clOverviewRow('Cuentas por cobrar',d.cuentasPorCobrarTotal,'Venta fiada: cuenta como venta, no como efectivo',d.cuentasPorCobrarTotal?'<span class="cl-source manual">Registrado en Control</span>':''),
+    clOverviewRow('Sobrante de caja',d.cajaSobrante,'Se suma porque quedó dinero sin explicar',d.cajaSobrante?'<span class="cl-source">Arqueo de caja</span>':'')
+  ];
+  const salidaRows=[
+    clOverviewRow('Compras',d.compras,'Compras generales y abonos confirmados',cierreN?`<span class="cl-source">${cierreN} cierre${cierreN===1?'':'s'}</span>`:''),
+    clOverviewRow('Grupo Inversión',d.grupoInversion,'Efectivo, SINPE, tarjeta y Uber destinados a inversión',''),
+    clOverviewRow('Desechos / merma',d.manual.desechos,'Pérdida de producto registrada en el día',''),
+    clOverviewRow('Gastos fijos',d.fixedTotal,'Alquiler, luz, datáfono, impuestos, seguro, wifi y ahorro','Automático'),
+    clOverviewRow('Salarios',d.salarioTotal,'Horas del calendario y tarifas del personal','Automático'),
+    clOverviewRow('Rebajos',d.rebajoTotal,'Rebajos de responsables registrados',''),
+    clOverviewRow('Cuentas por pagar',d.cuentaXpagarTotal,'Abonos y facturas confirmadas',''),
+    clOverviewRow('Retiros de caja',d.cajaRetirosTotal,'Salida física con motivo, separada de Compras','')
+  ];
+  const auditLines=[
+    `<div class="cl-audit-line"><div><b>POS</b><div>${posN?`<span class="cl-audit-ok">${posN} venta${posN===1?'':'s'} conciliada${posN===1?'':'s'}</span>`:'Sin ventas del POS para este día'}</div></div><div class="cl-audit-meta">${pos.actualizado?`${pos.origen==='nube'?'Nube':'Este dispositivo'} · ${esc(clOverviewDateTime(pos.actualizado))}`:(posN?'Resumen local':'Pendiente de conectar')}</div></div>`,
+    `<div class="cl-audit-line"><div><b>Mostrador</b><div>${mostradorN?`<span class="cl-audit-ok">${mostradorN} cobro${mostradorN===1?'':'s'} confirmado${mostradorN===1?'':'s'}</span>`:'Sin cobros para este día'}</div></div><div class="cl-audit-meta">${mostrador.actualizado?esc(clOverviewDateTime(mostrador.actualizado)):'Pedidos cobrados'}</div></div>`,
+    `<div class="cl-audit-line"><div><b>Compras</b><div>${cierreN?`<span class="cl-audit-ok">${cierreN} cierre${cierreN===1?'':'s'} terminado${cierreN===1?'':'s'}`:'No hay cierres automáticos'}</span></div></div><div class="cl-audit-meta">${sources.sinTabla?'Revisar conexión':'Cierres de proveedores'}</div></div>`,
+    `<div class="cl-audit-line"><div><b>Caja</b><div>${d.cajaPendingConfirm?'<span class="cl-audit-warn">Falta confirmar un turno</span>':d.cajaFaltante?`<span class="cl-audit-warn">Faltante ${fmt(d.cajaFaltante)} · se cobra al responsable</span>`:'<span class="cl-audit-ok">Sin faltantes pendientes</span>'}</div></div><div class="cl-audit-meta">${d.cajaSobrante?`Sobrante ${fmt(d.cajaSobrante)}`:'Arqueo revisado'}</div></div>`
+  ];
+  const selectedValue=esc(d.date);
+  el.innerHTML=`
+    <div class="cl-overview-head"><div><p class="cl-overview-kicker">Cierre diario · ${esc(TIENDA_NOMBRE)}</p><h1 class="cl-overview-title">${esc(clOverviewDateLabel(d.date))}</h1><p class="cl-overview-sub">Todo lo que entró, todo lo que salió y el origen de cada número.</p></div><label class="cl-overview-date">Ver día <input type="date" value="${selectedValue}" min="${esc(clState.start)}" max="${esc(clState.end)}" onchange="clSetSheetDayFilter(this.value)"></label></div>
+    <div class="cl-overview-summary"><article class="cl-overview-hero${resultadoClass}"><span class="cl-overview-hero-label">Ganancia del día</span><strong class="cl-overview-hero-value">${fmt(d.ganancia)}</strong><span class="cl-overview-hero-note">Entró ${fmt(d.ingresoReal)} · salió ${fmt(salio)}</span></article><article class="cl-overview-stat"><span class="cl-overview-stat-label">Ventas registradas</span><strong class="cl-overview-stat-value">${fmt(d.ventas)}</strong><small>${posN+mostradorN} movimientos conectados</small></article><article class="cl-overview-stat"><span class="cl-overview-stat-label">Total que entró</span><strong class="cl-overview-stat-value plus">${fmt(d.ingresoReal)}</strong><small>Ventas, bodega y sobrante</small></article><article class="cl-overview-stat"><span class="cl-overview-stat-label">Total que salió</span><strong class="cl-overview-stat-value minus">${fmt(salio)}</strong><small>Compras, gastos y retiros</small></article></div>
+    <div class="cl-overview-columns">${clOverviewFlow('Entró','+',d.ingresoReal,ingresoRows,'plus')}${clOverviewFlow('Salió','−',salio,salidaRows,'minus')}</div>
+    <div class="cl-audit"><article class="cl-audit-card"><h2 class="cl-section-title">Origen y seguridad del cierre<small>${automatico?'Los datos automáticos se comparan con el Control; el detalle manual nunca se sobreescribe.':'Todavía no hay movimientos automáticos para este día.'}</small></h2><div class="cl-audit-list">${auditLines.join('')}</div>${posDetalle}${pos.huella?`<div class="cl-audit-meta cl-audit-fingerprint">Huella del resumen POS: <b>${esc(String(pos.huella).slice(0,24))}…</b></div>`:''}</article><article class="cl-explain-card"><h2 class="cl-section-title">Qué suma y qué resta<small>La fórmula que produce la ganancia grande de arriba.</small></h2><ul class="cl-explain-list"><li><span class="dot plus">+</span><span><b>Suma:</b> efectivo, SINPE, tarjeta neta, Bodega, cuentas por cobrar y sobrante de caja.</span></li><li><span class="dot minus">−</span><span><b>Resta:</b> Compras, Grupo Inversión, desechos, gastos fijos, salarios, rebajos, cuentas por pagar y retiros.</span></li><li><span class="dot minus">!</span><span><b>Faltante de caja:</b> no se mezcla con la ganancia; queda asignado al responsable del turno para cobrarlo.</span></li></ul></article></div>
+    <div class="cl-overview-foot"><span><b>¿Necesitás corregir un monto?</b> Abrí la hoja semanal; el cambio queda guardado en este local y vuelve a calcularse aquí.</span><button class="btn secondary" type="button" onclick="document.querySelector('.cl-weekly-toggle')?.setAttribute('open','')">Abrir hoja semanal</button></div>`;
+}
+
 function clRender(){
   if(!clState.start)return;
   const q=clState;
@@ -4162,6 +4259,7 @@ function clRender(){
   const weekNumEl=document.getElementById('clWeekNumber');
   if(weekNumEl)weekNumEl.textContent='Semana '+clWeekNumber(q.start);
 
+  clRenderDailyOverview();
   clRenderSpreadsheet();
   clRenderReceivables();
 }
