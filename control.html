@@ -1474,6 +1474,12 @@ const defaults={
   // original y una lista de abonos con la semana (lunes ISO) en que se
   // hicieron; el saldo es monto - suma de abonos.
   closurePending:[],
+  // Libro obligatorio de aportes, pagos, retiros y declaraciones de no
+  // aporte de cada socio. Un cero también se registra con motivo: nunca
+  // queda escondido quién puso dinero y quién no.
+  closurePartnerLedger:{},
+  // Cierre blindado por día. Se puede reabrir solo dejando motivo y actor.
+  closureLocks:{},
   // Cuentas por pagar (facturas) de un día exacto, cada una independiente:
   // {id,concept,amount}. Su suma es lo que antes era el campo único
   // "cuentaXpagar" — se mantiene ese campo también por compatibilidad con
@@ -4333,6 +4339,7 @@ function clRenderDailyOverview(){
     ${calendarMarkup}<div class="cl-overview-head"><div><p class="cl-overview-kicker">Cierre diario · ${esc(TIENDA_NOMBRE)}</p><h1 class="cl-overview-title">${esc(clOverviewDateLabel(d.date))}</h1><p class="cl-overview-sub">Todo lo que entró, todo lo que salió y el origen de cada número.</p></div><label class="cl-overview-date">Ver fecha <input type="date" value="${selectedValue}" min="${esc(clState.start)}" max="${esc(clState.end)}" onchange="clSetSheetDayFilter(this.value)"></label></div>
     <div class="cl-overview-summary"><article class="cl-overview-hero${resultadoClass}"><span class="cl-overview-hero-label">Ganancia del día</span><strong class="cl-overview-hero-value">${fmt(d.ganancia)}</strong><span class="cl-overview-hero-note">Entró ${fmt(d.ingresoReal)} · salió ${fmt(salio)}</span></article><article class="cl-overview-stat"><span class="cl-overview-stat-label">Ventas registradas</span><strong class="cl-overview-stat-value">${fmt(d.ventas)}</strong><small>${posN+mostradorN} movimientos conectados</small></article><article class="cl-overview-stat"><span class="cl-overview-stat-label">Total que entró</span><strong class="cl-overview-stat-value plus">${fmt(d.ingresoReal)}</strong><small>Ventas, bodega y sobrante</small></article><article class="cl-overview-stat"><span class="cl-overview-stat-label">Total que salió</span><strong class="cl-overview-stat-value minus">${fmt(salio)}</strong><small>Compras, gastos y retiros</small></article></div>
     <div class="cl-overview-columns">${clOverviewFlow('Entró','+',d.ingresoReal,detailedIngresoRows,'plus')}${clOverviewFlow('Salió','−',salio,detailedSalidaRows,'minus')}</div>
+    ${clClosureLockCard(d.date,d,perDay)}
     <div class="cl-audit"><article class="cl-audit-card"><h2 class="cl-section-title">Origen y seguridad del cierre<small>${automatico?'Los datos automáticos se comparan con el Control; el detalle manual nunca se sobreescribe.':'Todavía no hay movimientos automáticos para este día.'}</small></h2><div class="cl-audit-list">${auditLines.join('')}</div><details class="cl-audit-detail"><summary>Ver detalle de caja y responsable por turno</summary>${clOverviewCajaDetail(d)}</details>${posDetalle}${pos.huella?`<div class="cl-audit-meta cl-audit-fingerprint">Huella del resumen POS: <b>${esc(String(pos.huella).slice(0,24))}…</b></div>`:''}</article><article class="cl-explain-card"><h2 class="cl-section-title">Qué suma y qué resta<small>La fórmula que produce la ganancia grande de arriba.</small></h2><ul class="cl-explain-list"><li><span class="dot plus">+</span><span><b>Suma:</b> efectivo, SINPE, tarjeta neta, Bodega, cuentas por cobrar y sobrante de caja.</span></li><li><span class="dot minus">−</span><span><b>Resta:</b> Compras, Grupo Inversión, desechos, gastos fijos, salarios, rebajos, cuentas por pagar y retiros.</span></li><li><span class="dot minus">!</span><span><b>Faltante de caja:</b> no se mezcla con la ganancia; queda asignado al responsable del turno para cobrarlo.</span></li></ul></article></div>
     <div class="cl-overview-foot"><span><b>Cada colón queda explicado.</b> Abrí una tarjeta para ver su origen, responsable y detalle. Los datos editables se guardan en el cierre diario de este local.</span><button class="btn secondary" type="button" onclick="clOpenReceivablesPanel()">Ver cuentas por cobrar</button></div>`;
 }
@@ -4878,6 +4885,8 @@ function clFindClosure(){
 
 function clSave(){
   const {perDay}=clComputeWeek(clState.start);
+  const selected=clOverviewDay(),selectedDay=perDay.find(d=>d.date===selected),check=selectedDay&&clClosureChecklist(selected,selectedDay);
+  if(!check?.ready){alert(`No se guarda como cierre definitivo todavía:\n\n${(check?.issues||['Revisá el día seleccionado.']).map(x=>'• '+x).join('\n')}`);return;}
   const ventas=perDay.reduce((t,d)=>t+d.ventas,0);
   const ganancia=perDay.reduce((t,d)=>t+d.ganancia,0);
 
@@ -4891,6 +4900,7 @@ function clSave(){
   const i=all.findIndex(x=>x.start===clState.start);
   if(i>=0)all[i]=record;else all.push(record);
   localStorage.setItem(CLOSURES_KEY,JSON.stringify(all));
+  clCloseDay(selected);
   alert('Cierre guardado correctamente.');
 }
 
@@ -4932,6 +4942,9 @@ function clExportCSV(){
     ['Jefes 20% neto',sum('ganancia')*0.2],
     ['Roger 40% neto',sum('ganancia')*0.4],
     ['Joseph 40% neto',sum('ganancia')*0.4-sumManual('rebajoJoseph')],
+    [],
+    ['APORTES/PAGOS/RETIROS DE SOCIOS','MONTO'],
+    ...perDay.flatMap(d=>clPartnerLedgerFor(d.date).map(x=>[d.dayName+' · '+(x.partner==='joseph'?'Joseph':'Roger')+' · '+clPartnerTypeLabel(x.type)+' · '+x.concept,x.amount])),
     [],
     ['REBAJOS Y DESCUENTOS AUDITABLES','MONTO'],
     ...perDay.flatMap(d=>clRebajosFor(d.date).map(x=>[d.dayName+' · '+x.person+' · '+x.reason,x.amount])),
@@ -4997,6 +5010,7 @@ function clDailyRaw(date){
 }
 
 function clSetDailyField(date,field,value){
+  if(!clEditAllowed(date))return;
   data.closureDaily=data.closureDaily||{};
   const entry={...clDailyRaw(date),[field]:num(value)};
   data.closureDaily[date]=entry;
@@ -5076,6 +5090,7 @@ function clCajaEncargado(date,start,end){
   return (clDailyEntry(date).cajaEncargados||{})[start+'|'+end];
 }
 function clCajaSetEncargado(date,start,end,personId){
+  if(!clEditAllowed(date))return;
   const entry=clDailyRaw(date);
   const all={...(entry.cajaEncargados||{})};
   if(personId)all[start+'|'+end]=personId;else delete all[start+'|'+end];
@@ -5095,6 +5110,7 @@ function clCajaTurno(date,segKey){
   return (clDailyEntry(date).cajaCounts||{})[segKey]||{};
 }
 function clCajaSetTurno(date,segKey,field,value){
+  if(!clEditAllowed(date))return;
   const entry=clDailyRaw(date);
   const all={...(entry.cajaCounts||{})};
   const current={...(all[segKey]||{})};
@@ -5112,6 +5128,7 @@ function clCajaSetTurno(date,segKey,field,value){
 // deja constancia de que hubo dos personas presentes en el cambio de
 // turno, sin tener que volver a contar y escribir el mismo número.
 function clCajaConfirmTurno(date,segKey){
+  if(!clEditAllowed(date))return;
   const entry=clDailyRaw(date);
   const all={...(entry.cajaCounts||{})};
   const current={...(all[segKey]||{}),confirmedAt:new Date().toLocaleTimeString('es-CR',{hour:'2-digit',minute:'2-digit'})};
@@ -5132,6 +5149,7 @@ function clCajaShowReport(segKey){
 // que su propio cálculo salga bien) y el hueco del traspaso se le carga
 // al turno anterior — no a quien está reportando el problema.
 function clCajaReportApertura(date,segKey,value){
+  if(!clEditAllowed(date))return;
   const entry=clDailyRaw(date);
   const all={...(entry.cajaCounts||{})};
   const current={...(all[segKey]||{}),reportedApertura:num(value),confirmedAt:new Date().toLocaleTimeString('es-CR',{hour:'2-digit',minute:'2-digit'})};
@@ -5154,6 +5172,7 @@ function clCajaRetirosTotal(date){
   return clCajaRetiros(date).reduce((s,r)=>s+num(r.amount),0);
 }
 function clCajaAddRetiro(date,amount,concept){
+  if(!clEditAllowed(date))return;
   const amt=num(amount);
   const motivo=(concept||'').trim();
   if(!amt||!motivo)return;
@@ -5164,6 +5183,7 @@ function clCajaAddRetiro(date,amount,concept){
   save();
 }
 function clCajaRemoveRetiro(date,id){
+  if(!clEditAllowed(date))return;
   const entry=clDailyRaw(date);
   const list=(entry.cajaRetiros||[]).filter(r=>r.id!==id);
   data.closureDaily=data.closureDaily||{};
@@ -5188,6 +5208,7 @@ function clCajaTransactionsFor(date){
   return clDailyEntry(date).cajaTransactions||[];
 }
 function clCajaImportTransactions(date,list){
+  if(!clEditAllowed(date))return;
   data.closureDaily=data.closureDaily||{};
   const entry=clDailyRaw(date);
   data.closureDaily[date]={...entry,cajaTransactions:(list||[]).map(t=>({id:uid(),time:t.time,amount:num(t.amount),note:t.note||''}))};
@@ -5356,17 +5377,20 @@ function clInvoicesFor(date){
   return (data.closureInvoices||{})[date]||[];
 }
 function clInvoiceAdd(date){
+  if(!clEditAllowed(date))return;
   data.closureInvoices=data.closureInvoices||{};
   data.closureInvoices[date]=[...clInvoicesFor(date),{id:uid(),concept:'Factura nueva',amount:0}];
   save();
 }
 function clInvoiceSetField(date,id,field,value){
+  if(!clEditAllowed(date))return;
   data.closureInvoices=data.closureInvoices||{};
   const list=clInvoicesFor(date).map(inv=>inv.id===id?{...inv,[field]:field==='concept'?value:num(value)}:inv);
   data.closureInvoices[date]=list;
   save();
 }
 function clInvoiceRemove(date,id){
+  if(!clEditAllowed(date))return;
   data.closureInvoices=data.closureInvoices||{};
   data.closureInvoices[date]=clInvoicesFor(date).filter(inv=>inv.id!==id);
   save();
@@ -5387,6 +5411,7 @@ function clReceivablesFor(date){
   return (data.closureReceivables||{})[date]||[];
 }
 function clReceivableAdd(date){
+  if(!clEditAllowed(date))return null;
   data.closureReceivables=data.closureReceivables||{};
   const item={id:uid(),concept:'Cliente nuevo',amount:0,dueDate:'',collected:false,responsable:''};
   data.closureReceivables[date]=[...clReceivablesFor(date),item];
@@ -5394,6 +5419,7 @@ function clReceivableAdd(date){
   return item;
 }
 function clReceivableSetField(date,id,field,value){
+  if(!clEditAllowed(date))return;
   data.closureReceivables=data.closureReceivables||{};
   const list=clReceivablesFor(date).map(r=>r.id===id?{...r,[field]:field==='amount'?num(value):value}:r);
   data.closureReceivables[date]=list;
@@ -5406,6 +5432,7 @@ function clReceivableToggleCollected(date,id){
 // Cambia el día de venta al que pertenece (y por lo tanto, qué día suma
 // el ingreso), conservando el resto de sus datos.
 function clReceivableSetDate(oldDate,id,newDate){
+  if(!clEditAllowed(oldDate)||!clEditAllowed(newDate))return;
   if(!newDate||newDate===oldDate)return;
   data.closureReceivables=data.closureReceivables||{};
   const item=clReceivablesFor(oldDate).find(r=>r.id===id);
@@ -5415,6 +5442,7 @@ function clReceivableSetDate(oldDate,id,newDate){
   save();
 }
 function clReceivableRemove(date,id){
+  if(!clEditAllowed(date))return;
   data.closureReceivables=data.closureReceivables||{};
   data.closureReceivables[date]=clReceivablesFor(date).filter(r=>r.id!==id);
   save();
@@ -5437,6 +5465,7 @@ function clRebajoPeople(){
   return staff;
 }
 function clRebajoAdd(date,person,amount,reason){
+  if(!clEditAllowed(date))return;
   const amt=num(amount),who=String(person||'').trim(),why=String(reason||'').trim();
   if(!who||!why||amt<=0){alert('Anotá la persona, el motivo y un monto mayor que ₡0.');return;}
   data.closureRebajos=data.closureRebajos||{};
@@ -5452,11 +5481,13 @@ function clRebajoAddFromForm(date){
   clRebajoAdd(date,p?.value,a?.value,r?.value);
 }
 function clRebajoSetField(date,id,field,value){
+  if(!clEditAllowed(date))return;
   data.closureRebajos=data.closureRebajos||{};
   data.closureRebajos[date]=clRebajosFor(date).map(x=>x.id===id?{...x,[field]:field==='amount'?num(value):String(value||'')}:x);
   save();clRenderDailyOverview();
 }
 function clRebajoRemove(date,id){
+  if(!clEditAllowed(date))return;
   data.closureRebajos=data.closureRebajos||{};
   data.closureRebajos[date]=clRebajosFor(date).filter(x=>x.id!==id);
   save();clRenderDailyOverview();
@@ -5472,6 +5503,101 @@ function clRebajosDetail(date,perDay){
   const rows=items.map(x=>`<div class="cl-ledger-item"><div><b>${esc(x.person)}</b><small>${esc(x.reason)} · ${esc(clOverviewDateTime(x.createdAt)||'registrado')} · por ${esc(x.enteredBy||'Usuario')}</small></div><strong>${fmt(x.amount)}</strong><button type="button" class="cl-ledger-remove" title="Eliminar rebajo" onclick="clRebajoRemove('${date}','${x.id}')">×</button></div>`).join('');
   const comparativo=summary.length?`<div class="cl-ledger-compare"><b>Comparativo de la semana</b>${summary.map(([p,v])=>`<span><em>${esc(p)}</em><strong>${fmt(v)}</strong></span>`).join('')}</div>`:'<p class="cl-detail-empty">Todavía no hay rebajos registrados con responsable.</p>';
   return `<div class="cl-ledger"><div class="cl-ledger-list">${rows||'<p class="cl-detail-empty">No hay rebajos para este día.</p>'}</div><div class="cl-ledger-form"><b>Agregar rebajo o descuento</b><div class="cl-ledger-form-grid"><select id="clRebajoPerson-${date}">${people.map(p=>`<option value="${esc(p.name)}">${esc(p.name)}</option>`).join('')}</select><input id="clRebajoAmount-${date}" type="number" min="1" step="1" placeholder="Monto en ₡"><input id="clRebajoReason-${date}" placeholder="Motivo obligatorio"><button type="button" class="btn secondary" onclick="clRebajoAddFromForm('${date}')">Guardar</button></div></div>${comparativo}</div>`;
+}
+
+// ---------- Aportes, pagos y retiros de socios ----------
+// La regla es deliberadamente simétrica: Roger y Joseph deben dejar una
+// constancia diaria. Puede ser un aporte/pago, un retiro o "sin aporte";
+// incluso el cero exige un motivo. Así la comparación se basa en evidencia,
+// no en una discusión personal.
+function clPartnerLedgerFor(date){return (data.closurePartnerLedger||{})[date]||[];}
+function clPartnerNames(){return [{id:'roger',name:'Roger'},{id:'joseph',name:'Joseph'}];}
+function clActorLabel(){
+  if(typeof role==='undefined')return 'Usuario';
+  return role==='owner'?'Roger · Propietario':role==='partner'?'Joseph · Socio':String(role);
+}
+function clPartnerLast(date,partner){
+  const list=clPartnerLedgerFor(date).filter(x=>x.partner===partner);
+  return list[list.length-1]||null;
+}
+function clPartnerAdd(date,partner,type,amount,concept){
+  if(!clEditAllowed(date))return;
+  const amt=num(amount),why=String(concept||'').trim();
+  if(!partner||!type||!why||(type!=='sin-aporte'&&amt<=0)){alert('Cada socio debe registrar el movimiento y un motivo. Un “sin aporte” también necesita explicación.');return;}
+  data.closurePartnerLedger=data.closurePartnerLedger||{};
+  const item={id:uid(),partner,type,amount:type==='sin-aporte'?0:amt,concept:why,enteredBy:clActorLabel(),createdAt:new Date().toISOString()};
+  data.closurePartnerLedger[date]=[...clPartnerLedgerFor(date),item];
+  save();
+}
+function clPartnerAddFromForm(date,partner){
+  const type=document.getElementById('clPartnerType-'+date+'-'+partner)?.value;
+  const amount=document.getElementById('clPartnerAmount-'+date+'-'+partner)?.value;
+  const concept=document.getElementById('clPartnerConcept-'+date+'-'+partner)?.value;
+  clPartnerAdd(date,partner,type,amount,concept);
+}
+function clPartnerRemove(date,id){
+  if(!clEditAllowed(date))return;
+  data.closurePartnerLedger=data.closurePartnerLedger||{};
+  data.closurePartnerLedger[date]=clPartnerLedgerFor(date).filter(x=>x.id!==id);
+  save();
+}
+function clPartnerTypeLabel(type){return ({aporte:'Aporte al negocio',pago:'Pago de compra/proveedor',retiro:'Retiro personal','sin-aporte':'Sin aporte'}[type]||type);}
+function clPartnerTotal(date,partner,types){
+  const allowed=types||['aporte','pago'];
+  return clPartnerLedgerFor(date).filter(x=>x.partner===partner&&allowed.includes(x.type)).reduce((t,x)=>t+num(x.amount),0);
+}
+function clPartnerWeekSummary(perDay){
+  return clPartnerNames().map(p=>({
+    ...p,
+    aportes:(perDay||[]).reduce((t,d)=>t+clPartnerTotal(d.date,p.id,['aporte','pago']),0),
+    retiros:(perDay||[]).reduce((t,d)=>t+clPartnerTotal(d.date,p.id,['retiro']),0),
+    dias:(perDay||[]).filter(d=>clPartnerLedgerFor(d.date).some(x=>x.partner===p.id)).length
+  }));
+}
+function clPartnerLedgerDetail(date,perDay){
+  const items=clPartnerLedgerFor(date),summary=clPartnerWeekSummary(perDay);
+  const rows=items.map(x=>`<div class="cl-partner-ledger-item"><div><b>${esc(x.partner==='joseph'?'Joseph':'Roger')} · ${esc(clPartnerTypeLabel(x.type))}</b><small>${esc(x.concept)} · ${esc(clOverviewDateTime(x.createdAt)||'registrado')} · ${esc(x.enteredBy||'Usuario')}</small></div><strong class="${x.type==='retiro'?'is-debt':''}">${x.type==='sin-aporte'?'₡0':fmt(x.amount)}</strong><button type="button" class="cl-ledger-remove" onclick="clPartnerRemove('${date}','${x.id}')" title="Eliminar movimiento">×</button></div>`).join('');
+  const forms=clPartnerNames().map(p=>{const last=clPartnerLast(date,p.id);return `<div class="cl-partner-form"><div class="cl-partner-form-head"><b>${p.name}</b><span>${last?`${clPartnerTypeLabel(last.type)} · ${last.type==='sin-aporte'?'₡0':fmt(last.amount)}`:'Falta declaración'}</span></div><div class="cl-partner-form-grid"><select id="clPartnerType-${date}-${p.id}"><option value="aporte">Aporte al negocio</option><option value="pago">Pago de compra/proveedor</option><option value="retiro">Retiro personal</option><option value="sin-aporte">Sin aporte</option></select><input id="clPartnerAmount-${date}-${p.id}" type="number" min="0" step="1" placeholder="Monto ₡"><input id="clPartnerConcept-${date}-${p.id}" placeholder="Motivo / comprobante"><button type="button" class="btn secondary" onclick="clPartnerAddFromForm('${date}','${p.id}')">Registrar</button></div></div>`;}).join('');
+  const compare=summary.map(p=>`<span><em>${p.name}</em><b>Aportó ${fmt(p.aportes)}</b><b>Retiró ${fmt(p.retiros)}</b><small>${p.dias} día${p.dias===1?'':'s'} con registro</small></span>`).join('');
+  return `<div class="cl-partner-ledger"><p class="cl-detail-note"><b>Regla de cierre:</b> Roger y Joseph deben dejar una declaración diaria. “Sin aporte” no se oculta: queda con ₡0 y motivo.</p><div class="cl-partner-forms">${forms}</div><div class="cl-partner-ledger-list">${rows||'<p class="cl-detail-empty">Todavía no hay movimientos de socios para este día.</p>'}</div><div class="cl-partner-compare"><b>Comparativo de la semana</b>${compare}</div></div>`;
+}
+function clClosureChecklist(date,d){
+  const partnerOk=clPartnerNames().every(p=>clPartnerLedgerFor(date).some(x=>x.partner===p.id&&['aporte','pago','sin-aporte'].includes(x.type)));
+  const cajaOk=!d.cajaPendingConfirm&&(d.cajaSegments||[]).every(s=>s.turno?.apertura!==undefined&&s.turno?.cierre!==undefined);
+  const faltantesOk=(d.cajaFaltantes||[]).every(x=>x.personId&&x.personName);
+  const issues=[];
+  if(!partnerOk)issues.push('Falta la declaración diaria de Roger o Joseph.');
+  if(!cajaOk)issues.push('Falta confirmar apertura/cierre de uno o más turnos de caja.');
+  if(!faltantesOk)issues.push('Hay un faltante sin responsable identificable.');
+  return {ready:issues.length===0,issues,partnerOk,cajaOk,faltantesOk};
+}
+function clClosureLockFor(date){return (data.closureLocks||{})[date]||null;}
+function clEditAllowed(date){
+  const lock=clClosureLockFor(date);
+  if(lock?.lockedAt){alert(`El cierre de ${date} está blindado. Reabrilo con un motivo antes de modificarlo.`);return false;}
+  return true;
+}
+function clClosureDigest(date,d){return JSON.stringify({date,ingreso:d.ingresoReal,salio:d.ganancia,daily:d.manual,partners:clPartnerLedgerFor(date)});}
+function clCloseDay(date){
+  const d=clComputeWeek(clState.start).perDay.find(x=>x.date===date),check=d&&clClosureChecklist(date,d);
+  if(!d||!check?.ready){alert(`No se puede blindar este cierre todavía:\n\n${(check?.issues||['No se encontró el día.']).map(x=>'• '+x).join('\n')}`);return;}
+  data.closureLocks=data.closureLocks||{};
+  data.closureLocks[date]={lockedAt:new Date().toISOString(),lockedBy:clActorLabel(),digest:clClosureDigest(date,d),history:[...(clClosureLockFor(date)?.history||[])]};
+  save();
+}
+function clReopenDay(date){
+  const lock=clClosureLockFor(date);if(!lock)return;
+  const reason=prompt('Motivo obligatorio para reabrir el cierre:','Corrección documentada');
+  if(!reason||!reason.trim())return;
+  data.closureLocks=data.closureLocks||{};
+  data.closureLocks[date]={...lock,reopenedAt:new Date().toISOString(),reopenedBy:clActorLabel(),reopenReason:reason.trim(),history:[...(lock.history||[]),{at:new Date().toISOString(),by:clActorLabel(),reason:reason.trim()}],lockedAt:null};
+  save();
+}
+function clClosureLockCard(date,d,perDay){
+  const lock=clClosureLockFor(date),check=clClosureChecklist(date,d);
+  const status=lock?.lockedAt?`Blindado ${clOverviewDateTime(lock.lockedAt)} · ${esc(lock.lockedBy||'Usuario')}`:check.ready?'Listo para blindar':'No está listo';
+  const rows=[['Socios',check.partnerOk],['Caja',check.cajaOk],['Faltantes',check.faltantesOk]].map(([label,ok])=>`<span class="cl-close-check ${ok?'ok':'bad'}"><b>${ok?'✓':'!'}</b>${label}</span>`).join('');
+  return `<article class="cl-closure-lock-card ${lock?.lockedAt?'locked':''}"><div class="cl-closure-lock-head"><div><h2>🔒 Cierre blindado</h2><p>${lock?.lockedAt?'Este día quedó congelado. Para corregirlo se exige motivo y queda historial.':'Ningún día se considera cerrado hasta que cada colón tenga responsable y ambos socios dejen constancia.'}</p></div><strong>${status}</strong></div><div class="cl-close-checks">${rows}</div>${!check.ready&&!lock?.lockedAt?`<ul class="cl-close-issues">${check.issues.map(x=>`<li>${esc(x)}</li>`).join('')}</ul>`:''}<details class="cl-partner-card-detail"><summary>Aportes, pagos y retiros de Roger/Joseph</summary>${clPartnerLedgerDetail(date,perDay)}</details><div class="cl-closure-actions">${lock?.lockedAt?`<button type="button" class="btn secondary" onclick="clReopenDay('${date}')">Reabrir con motivo</button>`:`<button type="button" class="btn" ${check.ready?'':'disabled'} onclick="clCloseDay('${date}')">Confirmar y blindar este día</button>`}</div></article>`;
 }
 // Todas las cuentas por cobrar de la semana abierta, juntas en una sola
 // lista (cada una con su fecha de venta), para revisarlas de un vistazo
@@ -5505,6 +5631,7 @@ function clOpenReceivablesPanel(){
 // revisar lo que ya se registró.
 function clReceivableAddFor(date){
   const item=clReceivableAdd(date);
+  if(!item)return;
   clOpenReceivableId=item.id;
   clOpenReceivablesPanel();
 }
