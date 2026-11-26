@@ -1,0 +1,149 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#156334">
+<meta name="robots" content="noindex,nofollow">
+<title>Pedido de ARAMO</title>
+<meta name="description" content="Tu pedido de ARAMO, claro y ordenado.">
+<meta property="og:type" content="website">
+<meta property="og:title" content="Pedido de ARAMO">
+<meta property="og:description" content="Tocá para ver el pedido, claro y ordenado.">
+<meta property="og:image" content="https://jorora981605.github.io/aramo-supply/icon.png">
+<link rel="icon" href="./icon.png">
+<link rel="apple-touch-icon" href="./icon.png">
+<style>
+@font-face{font-family:"Plus Jakarta Sans";font-style:normal;font-weight:500 800;font-display:swap;src:url(fuentes/jakarta-latin.woff2) format("woff2");unicode-range:U+0000-00FF,U+0131,U+0152-0153,U+02BB-02BC,U+02C6,U+02DA,U+02DC,U+0304,U+0308,U+0329,U+2000-206F,U+20AC,U+2122,U+2191,U+2193,U+2212,U+2215,U+FEFF,U+FFFD}
+@font-face{font-family:"Fraunces";font-style:normal;font-weight:600 700;font-display:swap;src:url(fuentes/fraunces-latin.woff2) format("woff2");unicode-range:U+0000-00FF,U+0131,U+0152-0153,U+02BB-02BC,U+02C6,U+02DA,U+02DC,U+0304,U+0308,U+0329,U+2000-206F,U+20AC,U+2122,U+2191,U+2193,U+2212,U+2215,U+FEFF,U+FFFD}
+:root{color-scheme:light;--v:#156334;--v8:#124e2b;--v50:#eef7f0;--v100:#d6eedb;--o:#a3420e;--o50:#fff4ec;--o100:#ffe4cf;--tinta:#141a16;--sub:#4b4c43;--linea:#e1e0d6;--papel:#fff;--fondo:#ece9df;
+  --ui:"Plus Jakarta Sans",system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;--ser:"Fraunces",Georgia,"Times New Roman",serif}
+*{box-sizing:border-box}
+html{-webkit-text-size-adjust:100%}
+body{margin:0;background:var(--fondo);background-image:radial-gradient(1200px 500px at 50% -120px,#dcebd9,transparent);color:var(--tinta);font:500 17px/1.5 var(--ui);padding:0 16px max(28px,env(safe-area-inset-bottom))}
+.hoja{max-width:640px;margin:18px auto 0;background:var(--papel);border-radius:22px;box-shadow:0 1px 2px rgba(20,26,22,.06),0 24px 48px -28px rgba(20,60,35,.45);overflow:hidden}
+.cab{display:flex;align-items:center;gap:12px;padding:18px 20px;background:linear-gradient(140deg,#0d3d28,#156640);color:#fff}
+.cab img{width:46px;height:46px;border-radius:13px;background:#fff;flex:none}
+.cab b{display:block;font:700 20px/1.1 var(--ser);letter-spacing:.02em}
+.cab small{display:block;margin-top:3px;font:600 13px var(--ui);opacity:.85}
+.cuerpo{padding:22px 20px 8px}
+.para{margin:0;font:600 14px var(--ui);color:var(--sub);letter-spacing:.04em;text-transform:uppercase}
+h1{margin:4px 0 4px;font:700 34px/1.1 var(--ser);color:var(--v8);overflow-wrap:anywhere}
+.cuando{margin:0 0 20px;font:600 15px var(--ui);color:var(--sub)}
+.tienda{margin:0 0 16px;border:1px solid var(--linea);border-radius:18px;overflow:hidden}
+.tienda h2{display:flex;align-items:center;gap:10px;margin:0;padding:13px 16px;font:700 18px/1.2 var(--ui)}
+.tienda h2 span{margin-left:auto;font:700 14px var(--ui);opacity:.8;white-space:nowrap}
+.tienda.moravia h2{background:var(--v50);color:var(--v8)}
+.tienda.angeles h2{background:var(--o50);color:var(--o)}
+.tienda h2 i{flex:none;width:12px;height:12px;border-radius:50%;background:currentColor}
+.lin{display:flex;align-items:baseline;gap:12px;padding:12px 16px;border-top:1px solid var(--linea)}
+.lin:first-of-type{border-top:0}
+.lin .n{flex:1;min-width:0;font:700 18px/1.3 var(--ui);overflow-wrap:anywhere}
+.lin .n small{display:block;margin-top:2px;font:500 15px/1.35 var(--ui);color:var(--sub);font-style:italic}
+.lin .q{flex:none;text-align:right;font:800 22px/1.2 var(--ui);font-variant-numeric:tabular-nums}
+.lin .q small{margin-left:4px;font:700 15px var(--ui);color:var(--sub)}
+.nota{margin:0;padding:12px 16px;border-top:1px solid var(--linea);background:#fbfaf5;font:500 16px/1.4 var(--ui);color:var(--sub)}
+.nota b{color:var(--tinta)}
+.gracias{margin:6px 0 22px;font:600 18px var(--ser);color:var(--v8)}
+.acciones{display:flex;margin:0 0 22px}
+.btn{flex:1;min-height:52px;padding:0 18px;border:0;border-radius:14px;background:var(--v);color:#fff;font:700 17px var(--ui);cursor:pointer}
+.btn:active{transform:scale(.98)}
+.btn.suave{background:var(--v50);color:var(--v8);box-shadow:inset 0 0 0 1.5px var(--v100)}
+.invita{margin:0;padding:20px;background:linear-gradient(180deg,var(--v50),#f6faf4);border-top:1px solid var(--v100)}
+.invita h3{margin:0 0 6px;font:700 21px/1.2 var(--ser);color:var(--v8)}
+.invita p{margin:0 0 12px;font:500 16.5px/1.5 var(--ui);color:#2c3a31}
+.invita ul{margin:0;padding:0;list-style:none;display:grid;gap:8px}
+.invita li{display:flex;gap:10px;font:600 16px/1.4 var(--ui);color:#2c3a31}
+.invita li::before{content:"\2713";flex:none;display:grid;place-items:center;width:24px;height:24px;border-radius:50%;background:var(--v);color:#fff;font-size:14px;margin-top:1px}
+.pie{max-width:640px;margin:14px auto 0;text-align:center;font:600 13px var(--ui);color:#6b6c60}
+.estado{padding:44px 24px 40px;text-align:center}
+.estado .ico{font-size:46px;line-height:1}
+.estado h1{font-size:26px;margin:12px 0 8px}
+.estado p{margin:0 0 18px;color:var(--sub);font-size:17px}
+.estado .btn{max-width:320px;margin:0 auto}
+.carga{padding:30px 20px}
+.carga i{display:block;height:20px;margin:0 0 14px;border-radius:8px;background:linear-gradient(90deg,#efede4,#f8f7f2,#efede4);background-size:200% 100%;animation:br 1.2s linear infinite}
+.carga i:nth-child(1){width:42%;height:32px}.carga i:nth-child(2){width:70%}.carga i:nth-child(3){height:120px}
+@keyframes br{to{background-position:-200% 0}}
+@media (prefers-reduced-motion:reduce){.carga i{animation:none}}
+@media (max-width:380px){h1{font-size:30px}.lin .q{font-size:20px}}
+@media print{body{background:#fff;padding:0}.hoja{margin:0;box-shadow:none;border-radius:0}.acciones,.invita,.pie{display:none}.cab{-webkit-print-color-adjust:exact;print-color-adjust:exact}.tienda h2{-webkit-print-color-adjust:exact;print-color-adjust:exact}.tienda{break-inside:avoid}}
+</style>
+</head>
+<body>
+<main class="hoja" id="hoja" aria-live="polite">
+  <div class="cab"><img src="icon.png" alt="" width="46" height="46"><div><b>ARAMO</b><small>Frutas y verduras</small></div></div>
+  <div id="cont"><div class="carga" aria-label="Abriendo el pedido"><i></i><i></i><i></i></div></div>
+</main>
+<p class="pie">ARAMO · Moravia y Los Ángeles</p>
+<script>
+(function(){
+'use strict';
+var URL_NUBE='https://gtzkrdefkcbrjzwoehth.supabase.co';
+var LLAVE='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imd0emtyZGVma2Nicmp6d29laHRoIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzk5OTUxMzMsImV4cCI6MjA5NTU3MTEzM30.S32-f2m32VR-oAQaeOLi0XjZZqlBlotJFMQxsOuQh48';
+var cont=document.getElementById('cont');
+var TZ='America/Costa_Rica';
+function el(tag,cls,txt){var e=document.createElement(tag);if(cls)e.className=cls;if(txt!=null)e.textContent=txt;return e;}
+function num(q){var n=+q;return isFinite(n)?n.toLocaleString('es-CR',{maximumFractionDigits:2}):String(q);}
+function cap(s){return s.charAt(0).toUpperCase()+s.slice(1);}
+function mensaje(ico,titulo,texto,reintento){
+  cont.textContent='';
+  var d=el('div','estado');
+  d.appendChild(el('div','ico',ico));d.appendChild(el('h1','',titulo));d.appendChild(el('p','',texto));
+  if(reintento){var b=el('button','btn','Intentar de nuevo');b.type='button';b.onclick=abrir;d.appendChild(b);}
+  cont.appendChild(d);
+}
+function pintar(r){
+  var datos=r.datos||{},tiendas=datos.tiendas||[],f=new Date(+r.enviado||datos.at||Date.now());
+  var dia=cap(f.toLocaleDateString('es-CR',{weekday:'long',day:'numeric',month:'long',timeZone:TZ}).replace(',',''));
+  var hora=f.toLocaleTimeString('es-CR',{hour:'numeric',minute:'2-digit',timeZone:TZ});
+  document.title='Pedido para '+r.proveedor+' · ARAMO';
+  cont.textContent='';
+  var c=el('div','cuerpo');
+  c.appendChild(el('p','para','Pedido para'));
+  c.appendChild(el('h1','',r.proveedor));
+  c.appendChild(el('p','cuando',dia+' · enviado a las '+hora));
+  var hay=false;
+  tiendas.forEach(function(t){
+    var ls=(t.lineas||[]);if(!ls.length&&!t.nota)return;hay=true;
+    var s=el('section','tienda '+(t.k==='angeles'?'angeles':'moravia'));
+    var h=el('h2');h.appendChild(el('i'));h.appendChild(document.createTextNode((t.n||'ARAMO')+(t.num?' (#'+t.num+')':'')));
+    h.appendChild(el('span','',ls.length+(ls.length===1?' producto':' productos')));s.appendChild(h);
+    ls.forEach(function(l){
+      var row=el('div','lin');var n=el('div','n',l.n||'');
+      if(l.nota)n.appendChild(el('small','',l.nota));
+      var q=el('div','q',num(l.q));if(l.u)q.appendChild(el('small','',l.u));
+      row.appendChild(n);row.appendChild(q);s.appendChild(row);
+    });
+    if(t.nota){var p=el('p','nota');p.appendChild(el('b','','Nota: '));p.appendChild(document.createTextNode(t.nota));s.appendChild(p);}
+    c.appendChild(s);
+  });
+  if(!hay)c.appendChild(el('p','cuando','Este pedido no trae productos.'));
+  c.appendChild(el('p','gracias','¡Muchas gracias!'));
+  var a=el('div','acciones');var b=el('button','btn suave','Guardar o imprimir (PDF)');b.type='button';b.onclick=function(){window.print();};a.appendChild(b);c.appendChild(a);
+  cont.appendChild(c);
+  var inv=el('aside','invita');
+  inv.appendChild(el('h3','','Así de claro puede ser cada pedido'));
+  inv.appendChild(el('p','','ARAMO es la aplicación con la que hacemos nuestros pedidos a proveedores como vos. Si te gusta cómo se ve este, contanos y te mostramos cómo funciona.'));
+  var ul=el('ul');['Cada pedido llega ordenado, por tienda y con sus notas.','Sin mensajes largos que se pierden en el chat.','Sabés al instante qué se necesita para mañana.'].forEach(function(x){ul.appendChild(el('li','',x));});
+  inv.appendChild(ul);
+  document.getElementById('hoja').appendChild(inv);
+}
+function abrir(){
+  var t=(new URLSearchParams(location.search).get('t')||'').trim();
+  if(!/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(t)){mensaje('🔎','No encontramos este pedido','El enlace parece incompleto. Pedile a ARAMO que te lo mande de nuevo.');return;}
+  var inv=document.querySelector('.invita');if(inv)inv.remove();
+  cont.innerHTML='<div class="carga" aria-label="Abriendo el pedido"><i></i><i></i><i></i></div>';
+  fetch(URL_NUBE+'/rest/v1/rpc/pedido_enlace_ver',{method:'POST',headers:{'apikey':LLAVE,'Authorization':'Bearer '+LLAVE,'Content-Type':'application/json'},body:JSON.stringify({p_codigo:t})})
+    .then(function(r){if(!r.ok)throw new Error('http '+r.status);return r.json();})
+    .then(function(r){
+      if(r&&r.ok&&r.datos)pintar(r);
+      else mensaje('🔎','No encontramos este pedido','Puede que el enlace esté vencido o mal copiado. Pedile a ARAMO que te lo mande de nuevo.');
+    })
+    .catch(function(){mensaje('📶','No se pudo abrir el pedido','Revisá tu internet e intentá de nuevo.',true);});
+}
+abrir();
+})();
+</script>
+</body>
+</html>
