@@ -2,7 +2,7 @@
    ARAMO · Portadas — 5 formas de la pantalla principal (la Puerta).
 
    Reglas que comparten las 5:
-   · Mismo orden siempre: 1 Surtido · 2 Taller · 3 ARAMO POS. Cambia el
+   · Mismo orden siempre: 1 Inventario · 2 Taller · 3 ARAMO POS. Cambia el
      estilo, nunca el lugar: la mano aprende dónde tocar.
    · Una franja "Ahora" con lo más urgente (pedido nuevo, atrasos, SINPE,
      pedido a proveedores sin enviar…). Un toque y estás ahí.
@@ -19,7 +19,7 @@ const get=(o,p)=>p.split('.').reduce((a,k)=>a==null?a:a[k],o);
 const LS={get(k,d){try{const v=JSON.parse(localStorage.getItem(k));return v??d;}catch{return d;}},set(k,v){try{localStorage.setItem(k,JSON.stringify(v));}catch{}}};
 
 const PUERTAS=[
-  {k:'surtido',n:'Surtido',e:'🚚',d:'Lo que pedimos a proveedores',tecla:'1',c:'s',arte:['🍅','🥕','🥬','🧅'],dato:'s'},
+  {k:'surtido',n:'Inventario',e:'🚚',d:'Lo que pedimos a proveedores',tecla:'1',c:'s',arte:['🍅','🥕','🥬','🧅'],dato:'s'},
   {k:'canasta',n:'La Feria',e:'🧺',d:'Lo que nos piden los clientes',tecla:'2',c:'t',arte:['🥑','🍋','🌿','🍌'],dato:'t'},
   {k:'pos',n:'ARAMO POS',e:'🧾',d:'Ventas y caja del mostrador',tecla:'3',c:'p',arte:['💵','💳','📲','🧾'],dato:'p'},
 ];
@@ -62,9 +62,9 @@ function v1(){
   <h1 class="pu-h1"><span data-d="saludo"></span>, ¿qué abrimos?</h1>
   ${ahora('po-ahora-v1')}
   <div class="pu-caras">
-    <button type="button" class="pu-cara" data-pu="surtido" style="--c:var(--g)" aria-label="1 · Abrir Surtido">
-      <div class="pu-ventana"><div class="pu-barra"><i></i><i></i><i></i><span>1 · Surtido</span></div><div class="pu-vista" id="puMiniS"></div><div class="pu-glow"><span class="pu-abrir">Abrir Surtido</span></div></div>
-      <div class="pu-info"><b>🚚 Surtido</b><small>Lo que ARAMO le pide a sus proveedores</small><span class="pu-stat" data-d="s.txt"></span></div>
+    <button type="button" class="pu-cara" data-pu="surtido" style="--c:var(--g)" aria-label="1 · Abrir Inventario">
+      <div class="pu-ventana"><div class="pu-barra"><i></i><i></i><i></i><span>1 · Inventario</span></div><div class="pu-vista" id="puMiniS"></div><div class="pu-glow"><span class="pu-abrir">Abrir Inventario</span></div></div>
+      <div class="pu-info"><b>🚚 Inventario</b><small>Lo que ARAMO le pide a sus proveedores</small><span class="pu-stat" data-d="s.txt"></span></div>
     </button>
     <button type="button" class="pu-cara" data-pu="canasta" style="--c:var(--po-t2)" aria-label="2 · Abrir La Feria">
       <div class="pu-ventana"><div class="pu-barra"><i></i><i></i><i></i><span>2 · La Feria</span></div><div class="pu-vista" id="puMiniC"><iframe title="Vista de La Feria" src="canasta.html?mini=1&tema=${tema}" loading="lazy" tabindex="-1" aria-hidden="true"></iframe></div><div class="pu-glow"><span class="pu-abrir">Abrir La Feria</span></div></div>
@@ -129,7 +129,7 @@ function v5(){
   <button type="button" class="po5-ahora" data-ahora><span class="po5-verd" data-d="ahora.k"></span><span><strong data-d="ahora.t"></strong><em data-d="ahora.s"></em></span><span class="po5-go" data-d="ahora.cta"></span></button>
   <div class="po5-tiles">${PUERTAS.map(p=>`<button type="button" class="po5-tile c-${p.c}" data-pu="${p.k}" aria-label="${p.tecla} · Abrir ${esc(p.n)}"><span class="po5-kick">0${p.tecla} · ${esc(p.n.toUpperCase())}</span><b>${p.e}</b><strong>${esc(p.n)}</strong><small>${esc(p.d)}</small><span class="po5-dato" data-d="${p.dato}.chip"></span>${badge(p.dato+'.alerta')}<kbd>${p.tecla}</kbd></button>`).join('')}</div>
   <section class="po5-bit"><p class="po5-kick">Bitácora de hoy</p><div data-dh="bit"></div></section>
-  <p class="po5-teclas"><kbd>1</kbd> Surtido <kbd>2</kbd> La Feria <kbd>3</kbd> POS <kbd>M</kbd> Mostrador <kbd>/</kbd> buscar</p>`;
+  <p class="po5-teclas"><kbd>1</kbd> Inventario <kbd>2</kbd> La Feria <kbd>3</kbd> POS <kbd>M</kbd> Mostrador <kbd>/</kbd> buscar</p>`;
 }
 // ── 6 · Inicio del rediseño (2026-11-23): la portada definitiva, la única que se usa (decisión D2) ──
 // Tarjetas blancas; el color de cada puerta va en su cuadrito y en un lavado suave a la derecha.
@@ -138,7 +138,7 @@ function v5(){
 const ic=(n,t)=>typeof window.icono==='function'?window.icono(n,{t:t||20}):'';
 const foto=k=>`<img src="fotos/${k}.webp" alt="" width="92" height="92" decoding="async">`;
 const PUERTAS6=[
-  {k:'surtido',n:'Surtido',c:'surtido',i:'camion',tecla:'1',sub:'s6.sub',ins:'s6.ins',fotos:['tomate','zanahoria','lechuga']},
+  {k:'surtido',n:'Inventario',c:'surtido',i:'camion',tecla:'1',sub:'s6.sub',ins:'s6.ins',fotos:['tomate','zanahoria','lechuga']},
   {k:'canasta',n:'La Feria',c:'taller',i:'canasta',tecla:'2',sub:'t6.sub',ins:'t6.ins',fotos:['aguacate','banano','fresa']},
   {k:'pos',n:'ARAMO POS',c:'pos',i:'caja',tecla:'3',sub:'p6.sub'},
   // 4 · Control: la app "Control del negocio" del dueño, dentro de ARAMO (cierres, personal y gastos)
@@ -213,7 +213,7 @@ const mini={
 };
 function selectorHtml(){
   const v=actual();
-  return `<p class="mo-kick">Pantalla principal · elegí cómo la querés ver</p><div class="mo-h">🎨 Portada</div><div class="mo-s">Las 5 tienen el mismo orden: 1 Surtido · 2 La Feria · 3 ARAMO POS, y la franja "Ahora". Cambia el estilo, nunca el lugar de las cosas.</div>
+  return `<p class="mo-kick">Pantalla principal · elegí cómo la querés ver</p><div class="mo-h">🎨 Portada</div><div class="mo-s">Las 5 tienen el mismo orden: 1 Inventario · 2 La Feria · 3 ARAMO POS, y la franja "Ahora". Cambia el estilo, nunca el lugar de las cosas.</div>
     <div class="po-sel">${LISTA.map(p=>`<button type="button" class="po-op${v===p.n?' on':''}" data-pu="portada-usar" data-v="${p.n}"><span class="po-mini po-mini${p.n}" aria-hidden="true">${mini[p.n]}</span><span class="po-op-t"><b>${p.n} · ${esc(p.t)}${p.rec?' <em>RECOMENDADA</em>':''}</b><small>${esc(p.d)}</small></span><span class="po-op-ok">${v===p.n?'✓':''}</span></button>`).join('')}</div>
     <div class="mo-s" style="margin-top:10px">Se guarda en este equipo. También podés abrir una directo: <code>APP.html?portada=3</code></div>`;
 }

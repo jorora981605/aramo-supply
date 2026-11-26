@@ -466,6 +466,10 @@ function xpQtyLabel(q,unit){
 function xpRenderProveedores(){
   const list=$('providersNavList');
   if(!list)return;
+  const tools=$('inventoryTools');if(tools)tools.hidden=false;
+  const history=$('surtidoHistory');if(history)history.innerHTML=xpHistoryHtml();
+  const notice=$('inventoryResetNotice');
+  if(notice)notice.innerHTML=XP.undo&&Date.now()-XP.undo.at<120000?`<div class="pd-undo">Pedido reiniciado. <button type="button" data-inventory-undo>Deshacer</button></div>`:'';
   const q=normalizeText($('pvSearch')?.value||'');
   const searching=!!q&&!XP.parsed.length;
   const names=getProvNames().filter(n=>!searching||normalizeText(n).includes(q));
@@ -1777,14 +1781,11 @@ function xpRenderPedido(){
   if(dos)html+=ciBarra();
   html+=auBoton(!t.items);
   if(t.items)html+=`<button type="button" class="sx-pdf-btn" data-sx-pdf><span class="sx-pdf-i">${ico('hoja')}</span><span class="sx-pdf-t"><b>PDF del pedido</b><small>Lista completa para revisar o compartir</small></span><span class="sx-pdf-f" aria-hidden="true">›</span></button>`;
-  if(XP.undo&&Date.now()-XP.undo.at<120000)html+=`<div class="pd-undo">Pedido reiniciado. <button type="button" data-pd="undo">↩️ Deshacer</button></div>`;
   if(t.items){
     html+=`<div class="pdx-barra-f"><h3>Proveedores</h3><div class="pdx-filtros" role="group" aria-label="Qué proveedores ver">${[['todos','Todos',datos.length],['pend','Por enviar',porEnviar],['env','Enviados',enviados]].map(([k,n,c])=>`<button type="button" class="${_pdFiltro===k?'on':''}" data-pdx-f="${k}"${c||k==='todos'?'':' disabled'} aria-pressed="${_pdFiltro===k}">${n} <b>${c}</b></button>`).join('')}</div></div>`;
     html+=`<div class="sx-grid">${datos.filter(d=>_pdFiltro==='todos'||(_pdFiltro==='pend'?!d.sent:d.sent)).map((d,i)=>sxTarjeta(d,i,sides,'pedido')).join('')}</div>`;
   }
-  html+=`<section class="pd-reinicios"><h3>Reiniciar pedido</h3><p>Se guarda una copia para revisar la mercadería recibida.</p>${sides.map(side=>`<button type="button" data-pd="reset" data-side="${side}">Reiniciar ${SIDE_NAME[side]}</button>`).join('')}</section>`;
   html+='<div id="resSemana" class="au-sem-w"></div>';   // esta semana contra la pasada (renderSemana, APP.html)
-  html+=xpHistoryHtml();
   // La entrada animada solo al abrir la pestaña (si no, cada cambio en vivo la repetiría).
   if(_pdEntrar){body.classList.add('pdx-entra');clearTimeout(_pdT);_pdT=setTimeout(()=>body.classList.remove('pdx-entra'),1600);_pdEntrar=false;}
   body.innerHTML=html;
@@ -2072,7 +2073,7 @@ function xpHistoryHtml(){
   const days={};
   rows.forEach(row=>{if(!row?.fecha)return;(days[row.fecha]||(days[row.fecha]=[])).push(row);});
   const fechas=Object.keys(days).sort((a,b)=>b.localeCompare(a)).slice(0,30);
-  if(!fechas.length)return'';
+  if(!fechas.length)return'<details class="pd-hist"><summary>Historial de pedidos: 0 dias</summary><p class="pd-hist-empty">Los pedidos reiniciados aparecen aqui.</p></details>';
   const fechaLabel=f=>new Date(f+'T12:00:00').toLocaleDateString('es-CR',{weekday:'short',day:'numeric',month:'short'});
   const detalle=row=>{
     if(row.side&&Array.isArray(row.items))return row.items.length?row.items.map(x=>`${esc(x.name)}: ${fmtQ(x.qty)} ${esc(x.unit||'')}`).join('<br>'):'Pedido vacío en ese reinicio';
@@ -2084,7 +2085,7 @@ function xpHistoryHtml(){
     return sideRows.join('<br>')||'Sin detalle de productos guardado';
   };
   return `<details class="pd-hist"><summary>📅 Pedidos guardados · ${fechas.length} días</summary>${fechas.map(f=>{
-    const items=days[f];
+    const items=days[f]||[];
     return `<details class="pd-hist-day"><summary>${esc(fechaLabel(f))} · ${items.length} registro${items.length===1?'':'s'}</summary>${items.map(row=>{const times=row.detalle?.sentAt||(row.side?{[row.side]:row.sentAt}:{});const sent=Object.entries(times).filter(([,v])=>+v>0).map(([s,v])=>`${SIDE_NAME[s]}: ${new Date(+v).toLocaleTimeString('es-CR',{hour:'numeric',minute:'2-digit'})}`).join(' · ');return `<div class="pd-hist-row"><b>${esc(row.proveedor||'Pedido')}</b>${row.side?`<small>${esc(SIDE_NAME[row.side])} · ₡${fmt(row.total||0)}</small>`:''}<small>${detalle(row)}</small>${sent?`<small>Enviado: ${esc(sent)}</small>`:''}</div>`;}).join('')}</details>`;
   }).join('')}</details>`;
 }
@@ -2325,6 +2326,8 @@ window.switchView=function(name){
   if(typeof cerrarEditorProv==='function')cerrarEditorProv();
   $('modalProvList')?.classList.remove('open');
   _switchView(name);
+  const tools=$('inventoryTools');if(tools)tools.hidden=name!=='proveedores';
+  const resetMenu=$('inventoryResetMenu'),resetBtn=$('inventoryResetBtn');if(resetMenu)resetMenu.hidden=true;if(resetBtn)resetBtn.setAttribute('aria-expanded','false');
   window.scrollTo(0,0);
   if(name==='pedido'){_pdEntrar=true;xpRenderPedido();}
   if(name==='proveedores')xpRenderProveedores();
@@ -2339,6 +2342,17 @@ $('providersNavList')?.addEventListener('click',e=>{
   const ed=e.target.closest('[data-edit]');if(ed){abrirEditorProv(ed.dataset.edit);return;}
   const c=e.target.closest('[data-prov]');if(c)openProv(c.dataset.prov);
 });
+$('inventoryTools')?.addEventListener('click',e=>{
+  const side=e.target.closest('[data-inventory-reset-side]');
+  if(side){$('inventoryResetMenu').hidden=true;$('inventoryResetBtn').setAttribute('aria-expanded','false');xpResetPedido(side.dataset.inventoryResetSide);return;}
+  if(e.target.closest('#inventoryResetBtn')){
+    if(scopeSide()!=='both'){xpResetPedido(scopeSide());return;}
+    const menu=$('inventoryResetMenu'),open=menu.hidden;menu.hidden=!open;$('inventoryResetBtn').setAttribute('aria-expanded',String(open));
+  }
+});
+$('inventoryResetNotice')?.addEventListener('click',e=>{if(e.target.closest('[data-inventory-undo]'))xpUndoReset();});
+document.addEventListener('click',e=>{if(e.target.closest('#inventoryTools'))return;const menu=$('inventoryResetMenu');if(menu&&!menu.hidden){menu.hidden=true;$('inventoryResetBtn')?.setAttribute('aria-expanded','false');}});
+document.addEventListener('keydown',e=>{if(e.key!=='Escape')return;const menu=$('inventoryResetMenu');if(menu&&!menu.hidden){menu.hidden=true;$('inventoryResetBtn')?.setAttribute('aria-expanded','false');$('inventoryResetBtn')?.focus();}});
 // La altura del menú de abajo: las fichas se abren encima de él, así siempre se puede tocar.
 function xpNavAltura(){const n=document.querySelector('.nav-bottom');if(n)document.documentElement.style.setProperty('--navh',n.offsetHeight+'px');}
 xpNavAltura();addEventListener('resize',xpNavAltura);

@@ -724,13 +724,13 @@ html[data-theme="dark"] .today-money-card{background:linear-gradient(145deg,#125
 
 <div class="scope-picker open" id="scopePicker" role="dialog" aria-modal="true" aria-labelledby="scopePickerTitle">
   <div class="scope-picker-card">
-    <div class="scope-picker-kicker">🚚 ARAMO Surtido</div>
+    <div class="scope-picker-kicker">🚚 ARAMO Inventario</div>
     <div class="scope-picker-title" id="scopePickerTitle">¿Dónde vas a pedir hoy?</div>
-    <div class="scope-picker-help">Elegí una sucursal para trabajar solo ese pedido. “Ambos” abre el Surtido combinado de las dos tiendas.</div>
+    <div class="scope-picker-help">Elegí una sucursal para trabajar solo ese pedido. “Ambos” abre el Inventario combinado de las dos tiendas.</div>
     <div class="scope-picker-options">
       <button class="scope-option" type="button" data-order-scope="moravia"><span class="scope-option-ico">🏠</span><span class="scope-option-copy"><strong>ARAMO</strong><small>Pedido de Moravia</small></span><span class="scope-option-arrow">›</span></button>
       <button class="scope-option" type="button" data-order-scope="lasr"><span class="scope-option-ico">📍</span><span class="scope-option-copy"><strong>LASR</strong><small>Pedido de Los Ángeles</small></span><span class="scope-option-arrow">›</span></button>
-      <button class="scope-option" type="button" data-order-scope="both"><span class="scope-option-ico">🧺</span><span class="scope-option-copy"><strong>Ambos</strong><small>Surtido combinado · Moravia y Los Ángeles</small></span><span class="scope-option-arrow">›</span></button>
+      <button class="scope-option" type="button" data-order-scope="both"><span class="scope-option-ico">🧺</span><span class="scope-option-copy"><strong>Ambos</strong><small>Inventario combinado · Moravia y Los Ángeles</small></span><span class="scope-option-arrow">›</span></button>
     </div>
   </div>
 </div>
@@ -739,7 +739,14 @@ html[data-theme="dark"] .today-money-card{background:linear-gradient(145deg,#125
 
 <div class="desktop-main">
 <div class="topbar">
-  <div class="logo">ARAMO <span>Surtido</span></div>
+  <div class="logo">ARAMO <span>Inventario</span></div>
+  <div class="inventory-tools" id="inventoryTools" hidden>
+    <button type="button" class="inventory-reset-btn" id="inventoryResetBtn" aria-label="Reiniciar pedido" aria-expanded="false" aria-controls="inventoryResetMenu">↻ <span>Reiniciar</span></button>
+    <div class="inventory-reset-menu" id="inventoryResetMenu" role="menu" hidden>
+      <button type="button" role="menuitem" data-inventory-reset-side="moravia">Reiniciar Moravia</button>
+      <button type="button" role="menuitem" data-inventory-reset-side="angeles">Reiniciar Los Ángeles</button>
+    </div>
+  </div>
   <div style="display:flex;align-items:center;gap:8px;margin-left:auto">
     <span id="syncDot" style="width:7px;height:7px;border-radius:50%;background:var(--g);opacity:0;transition:opacity .3s" title="Sincronizado"></span>
     <span class="saved-txt" id="savedMob">✓</span>
@@ -805,6 +812,8 @@ html[data-theme="dark"] .today-money-card{background:linear-gradient(145deg,#125
       </div>
       <div id="pvParse" class="pv-parse" hidden></div>
       <div id="pvResults"></div>
+      <div id="inventoryResetNotice"></div>
+      <div id="surtidoHistory"></div>
       <button type="button" class="sx-provbar" id="sxProvBar" aria-expanded="false" aria-controls="providersNavList"><span class="sx-pb-e">🏪</span><span class="sx-pb-t"><b>Proveedores</b><small>Tocá para ver todos y agregar productos</small></span><span class="sx-pb-n" id="sxProvBarN"></span><span class="sx-pb-f" aria-hidden="true">▾</span></button>
       <div id="providersNavList" class="pv-grid"></div>
     </div>
@@ -1224,7 +1233,7 @@ function openScopePicker(){
   const box=document.querySelector('#scopePicker .scope-picker-card'),cur=getOrderScope();
   const I=(n,t)=>typeof window.icono==='function'?window.icono(n,{t:t||22}):'';
   if(box)box.innerHTML=`<h2 class="scope-picker-title" id="scopePickerTitle">¿Qué tienda querés ver?</h2>
-    <p class="loc6-sub">Lo que pedís en Surtido queda en la tienda que elijás.</p>
+    <p class="loc6-sub">Lo que pedís en Inventario queda en la tienda que elijás.</p>
     <div class="scope-picker-options loc6-ops">${[['moravia','moravia','Moravia','ARAMO'],['lasr','angeles','Los Ángeles','LASR'],['both','','Las dos','Moravia y Los Ángeles a la vez']].map(([k,ico,n,s])=>`<button class="scope-option loc-op loc6-op ${ico||'todas'}${cur===k?' ult':''}" type="button" data-order-scope="${k}"><span class="loc6-ico${ico?'':' dos'}" aria-hidden="true">${ico?I(ico,24):'<i></i><i></i>'}</span><span class="loc-t"><b>${n}</b><small>${s}${cur===k?'<span class="loc6-ult">Ahora</span>':''}</small></span>${I('siguiente',22)}</button>`).join('')}</div>
     <button type="button" class="ui-btn ui-btn--fantasma ui-btn--l loc6-cancelar" data-scope-cancelar>Cancelar</button>`;
   box?.classList.add('loc6');
@@ -2184,7 +2193,7 @@ function combinedSurtidoData(){
   return{groups,rows,total:calcAllProvs()};
 }
 function combinedSurtidoText(){
-  const data=combinedSurtidoData(),lines=['📋 SURTIDO COMBINADO ARAMO','Moravia + Los Ángeles',`Total estimado: ₡${fmt(data.total.total)}`,''];
+  const data=combinedSurtidoData(),lines=['📋 INVENTARIO COMBINADO ARAMO','Moravia + Los Ángeles',`Total estimado: ₡${fmt(data.total.total)}`,''];
   if(!data.groups.length)return lines.concat(['No hay cantidades seleccionadas.']).join('\n');
   data.groups.forEach(group=>{
     const flags=sentFlags(group.p);
@@ -2212,7 +2221,7 @@ function renderCombinedSurtidoSummary(){
   box.hidden=false;
   box.innerHTML=`
     <div class="both-summary-head">
-      <div><div class="both-summary-title">🧺 Surtido de ambas tiendas</div><div class="both-summary-sub">Moravia + Los Ángeles · cantidades separadas.</div></div>
+      <div><div class="both-summary-title">🧺 Inventario de ambas tiendas</div><div class="both-summary-sub">Moravia + Los Ángeles · cantidades separadas.</div></div>
       <div class="both-summary-actions"><button type="button" class="both-summary-action primary" data-summary-send-all>📤 Enviar pendientes</button></div>
     </div>
     <div class="both-summary-totals"><div class="both-summary-total m"><small>Moravia</small><strong>₡${fmt(t.moravia)}</strong></div><div class="both-summary-total a"><small>Los Ángeles</small><strong>₡${fmt(t.angeles)}</strong></div><div class="both-summary-total"><small>Total combinado</small><strong>₡${fmt(t.total)}</strong></div></div>

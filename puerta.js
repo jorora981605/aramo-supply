@@ -112,7 +112,7 @@ function pedirLocal(despues,cancelar){
   const opciones=[
     {k:'moravia',t:'1',ico:'moravia',n:suc('moravia')?.zona||'Moravia',sub:suc('moravia')?.n||'ARAMO'},
     {k:'angeles',t:'2',ico:'angeles',n:suc('angeles')?.zona||'Los Ángeles',sub:suc('angeles')?.n||'LASR'},
-    {k:'todas',t:'3',n:'Las dos',sub:'Solo para Surtido'}
+    {k:'todas',t:'3',n:'Las dos',sub:'Solo para Inventario'}
   ];
   el.innerHTML=`<div class="loc-in loc6">
     <div class="loc6-logo" aria-hidden="true">ARAMO${ICO('hoja',18)}</div>
@@ -186,7 +186,7 @@ function surtidoResumen(){
   return{prods,provs:provs.size,sinEnviar:sinEnviar.size};
 }
 function costoHoy(nombre){
-  // Precio más bajo que ARAMO paga hoy por ese producto en Surtido.
+  // Precio más bajo que ARAMO paga hoy por ese producto en Inventario.
   try{
     const exacto=nrm(nombre),key=exacto.split(' ')[0];let best=null;
     Object.entries(getAllProviders()).forEach(([prov,d])=>{
@@ -200,7 +200,7 @@ function costoHoy(nombre){
   }catch{return null;}
 }
 const precioAuto=(costo,margen)=>Math.ceil(costo*(1+(+margen||0)/100)/25)*25;
-// Precio automático: si un producto está en 🤖, su precio sigue al costo de Surtido + margen.
+// Precio automático: si un producto está en 🤖, su precio sigue al costo de Inventario + margen.
 let _autoT=0;
 function autoPrecios(){
   clearTimeout(_autoT);
@@ -314,7 +314,7 @@ function datosPuerta(){
   const a=activos().filter(paraMi),nuevos=a.filter(o=>o.estado==='nuevo').length,alist=a.filter(o=>o.estado==='alistando').length,listos=a.filter(o=>o.estado==='listo').length;
   const cob=N.lista().filter(o=>o.cobro&&esHoy(o.cobro.fecha)&&paraMi(o)),total=cob.reduce((t,o)=>t+(+o.cobro.total||0),0);
   const fd=new Date().toLocaleDateString('es-CR',{weekday:'long',day:'numeric',month:'long'});
-  const pasos=[['🏪','Proveedores',sr.provs||'—'],['🚚','Surtido',sr.prods?sr.prods+' prod.':'—'],['🏷️','Vitrina',N.catalogo().filter(p=>!p.oculto).length+' prod.'],['🧺','La Feria',a.length+' en curso'],['🛎️','Mostrador',listos+' listos'],['🧾','Caja',cob.length?$c(total):'₡0 hoy']];
+  const pasos=[['🏪','Proveedores',sr.provs||'—'],['🚚','Inventario',sr.prods?sr.prods+' prod.':'—'],['🏷️','Vitrina',N.catalogo().filter(p=>!p.oculto).length+' prod.'],['🧺','La Feria',a.length+' en curso'],['🛎️','Mostrador',listos+' listos'],['🧾','Caja',cob.length?$c(total):'₡0 hoy']];
   return{
     saludo:h<12?'Buenos días':h<18?'Buenas tardes':'Buenas noches',
     fecha:fd.charAt(0).toUpperCase()+fd.slice(1),hora:fh(new Date()),
@@ -391,7 +391,7 @@ function sugerencias(q){
   q=nrm(q);
   const L=[];
   const P=[
-    {r:/^(1|surt|pedir|provee|compra)/,e:'🚚',t:'Abrir Surtido',s:'Pedidos a proveedores',act:'surtido'},
+    {r:/^(1|surt|pedir|provee|compra)/,e:'🚚',t:'Abrir Inventario',s:'Pedidos a proveedores',act:'surtido'},
     {r:/^(2|taller|client|canasta|tienda online)/,e:'🧺',t:'Abrir La Feria',s:'Lo que ven los clientes',act:'canasta'},
     {r:/^(3|pos|caja|vend|cobr|factur)/,e:'🧾',t:'Abrir ARAMO POS',s:'Ventas y caja del mostrador',act:'pos'},
     {r:/^(m$|mostr|pedidos|encarg|recib)/,e:'🛎️',t:'Abrir Mostrador y Caja',s:'Recibir, alistar, cobrar y entregar',act:'mostrador'},
@@ -401,16 +401,16 @@ function sugerencias(q){
     {r:/^(pega|link)/,e:'📥',t:'Pedido de WhatsApp',s:'Pegar un pedido que llegó por WhatsApp',act:'whatsapp'},
     {r:/^(cierre|hoy|cobrad)/,e:'🧾',t:'Caja de hoy',s:'Cobros del día por método',act:'caja'},
   ];
-  if(!q)return[{e:'🚚',t:'1 · Surtido',s:'Pedidos a proveedores',act:'surtido'},{e:'🧺',t:'2 · La Feria',s:'Lo que ven los clientes',act:'canasta'},{e:'🧾',t:'3 · ARAMO POS',s:'Ventas y caja',act:'pos'},{e:'🛎️',t:'M · Mostrador',s:'Pedidos de clientes',act:'mostrador'}];
+  if(!q)return[{e:'🚚',t:'1 · Inventario',s:'Pedidos a proveedores',act:'surtido'},{e:'🧺',t:'2 · La Feria',s:'Lo que ven los clientes',act:'canasta'},{e:'🧾',t:'3 · ARAMO POS',s:'Ventas y caja',act:'pos'},{e:'🛎️',t:'M · Mostrador',s:'Pedidos de clientes',act:'mostrador'}];
   P.forEach(x=>{if(x.r.test(q))L.push(x);});
   // pedidos por código o por nombre del cliente
   N.lista().filter(o=>!o.archivado&&(nrm(o.ref).replace('-','').includes(q.replace('-',''))||nrm(o.cliente?.nombre).includes(q))).slice(0,4)
     .forEach(o=>L.push({e:'🛎️',t:`${o.ref} · ${o.cliente.nombre}`,s:`${{nuevo:'Nuevo',alistando:'Alistando',listo:'Listo',entregado:'Entregado',cancelado:'Cancelado'}[o.estado]||''} · ${$c(N.totalDe(o))}`,act:'abrir',id:o.id}));
-  // productos: buscarlos en Surtido
+  // productos: buscarlos en Inventario
   if(q.length>=3){
     const prod=N.catalogo().find(p=>nrm(p.n).startsWith(q))||N.catalogo().find(p=>nrm(p.n).includes(q));
-    if(prod)L.push({e:prod.e,t:`Buscar «${prod.n}» en Surtido`,s:'Ver quién lo vende y pedirlo',act:'surtir',n:prod.n});
-    else L.push({e:'🔍',t:`Buscar «${q}» en Surtido`,s:'Entre todos los proveedores',act:'surtir',n:q});
+    if(prod)L.push({e:prod.e,t:`Buscar «${prod.n}» en Inventario`,s:'Ver quién lo vende y pedirlo',act:'surtir',n:prod.n});
+    else L.push({e:'🔍',t:`Buscar «${q}» en Inventario`,s:'Entre todos los proveedores',act:'surtir',n:q});
   }
   return L.slice(0,6);
 }
@@ -445,7 +445,7 @@ function abrirPuerta(){
   pintarPuerta();clonarSurtido();autoPrecios();
   requestAnimationFrame(escalarMinis);
 }
-// “Ambos” es un acceso directo al Surtido combinado. No muestra la portada,
+// “Ambos” es un acceso directo al Inventario combinado. No muestra la portada,
 // Mostrador ni POS porque esos módulos necesitan una sucursal específica.
 function abrirSurtidoAmbos(){
   cerrarHoja();
@@ -454,8 +454,8 @@ function abrirSurtidoAmbos(){
   $('puIn')?.replaceChildren();
   _portadaMontada=0;
   document.body.classList.remove('pu-lock');
-  try{switchView('proveedores');}catch(e){console.warn('No se pudo abrir Surtido combinado',e);}
-  toast('🧺 Surtido combinado · Moravia + Los Ángeles');
+  try{switchView('proveedores');}catch(e){console.warn('No se pudo abrir Inventario combinado',e);}
+  toast('🧺 Inventario combinado · Moravia + Los Ángeles');
 }
 // ARAMO POS en la nube: el POS del local elegido al entrar (Moravia o LASR), en cualquier dispositivo.
 // En la compu se abre en otra pestaña (así el Mostrador sigue avisando); en el celular, aquí mismo.
@@ -564,7 +564,7 @@ function pintarMostrador(){
   if(dh)dh.hidden=!(resp?.pedidos?.length&&Date.now()-resp.t<12*36e5);
   $('moLista').innerHTML=L.length?L.map(tarjeta).join(''):`<div class="mo-vacio"><b>${{nuevo:'📭',alistando:'🧺',listo:'✅',hecho:'🌙'}[M.tab]}</b>${{nuevo:'Sin pedidos nuevos.',alistando:'Nada alistándose ahora.',listo:'Nada esperando entrega.',hecho:'Todavía no se ha entregado nada hoy.'}[M.tab]}${M.tab==='nuevo'?'<br><br><button type="button" class="mo-btn" data-mo="prueba">🧪 Probar con un pedido de prueba</button>':''}</div>`;
   const falt=[...new Map(A.concat(H).flatMap(o=>(o.items||[]).filter(i=>i.estado==='nohay').map(i=>[i.k,i]))).values()];
-  $('moFaltan').innerHTML=falt.length?`<div class="mo-faltan"><h4>🚚 No hubo hoy: pedirlo en Surtido</h4><div>${falt.map(i=>`<button type="button" class="mo-chip" data-mo="surtir" data-n="${esc(i.n)}">${i.e} ${esc(i.n)}</button>`).join('')}</div></div>`:'';
+  $('moFaltan').innerHTML=falt.length?`<div class="mo-faltan"><h4>🚚 No hubo hoy: pedirlo en Inventario</h4><div>${falt.map(i=>`<button type="button" class="mo-chip" data-mo="surtir" data-n="${esc(i.n)}">${i.e} ${esc(i.n)}</button>`).join('')}</div></div>`:'';
   pintarCaja();
 }
 function tarjeta(o){
@@ -921,9 +921,9 @@ function pintarVitrina(){
     <div class="mo-blk" style="padding:4px 12px">${L.map(p=>{
       const auto=!!(t.prods||{})[p.k]?.auto,c=auto||M.vq?costoHoy(p.n):null;
       return `<div class="mo-vi${p.oculto?' oculto':''}"><button type="button" class="e" data-mo="prod-edit" data-k="${p.k}" aria-label="Editar ${esc(p.n)}">${p.e}</button>
-        <button type="button" class="t" data-mo="prod-edit" data-k="${p.k}"><strong>${esc(p.n)}${p.propio?' <span class="mo-pill">nuevo</span>':''}</strong><small>${esc(p.d||'')}${p.d?' · ':''}por ${esc(UNI[p.u]||p.u)}${auto?` · 🤖 ${c?'costo '+$c(c.pr)+' + '+margen+'%':'sin costo en Surtido'}`:''}</small></button>
+        <button type="button" class="t" data-mo="prod-edit" data-k="${p.k}"><strong>${esc(p.n)}${p.propio?' <span class="mo-pill">nuevo</span>':''}</strong><small>${esc(p.d||'')}${p.d?' · ':''}por ${esc(UNI[p.u]||p.u)}${auto?` · 🤖 ${c?'costo '+$c(c.pr)+' + '+margen+'%':'sin costo en Inventario'}`:''}</small></button>
         <input type="number" inputmode="numeric" min="0" step="5" value="${p.p}" data-mo-pr="${p.k}" aria-label="Precio de ${esc(p.n)}" ${auto?'disabled':''}>
-        <button type="button" class="tg${auto?' on':''}" data-mo="auto" data-k="${p.k}" aria-label="Precio automático" title="Precio automático con el costo de Surtido">🤖</button>
+        <button type="button" class="tg${auto?' on':''}" data-mo="auto" data-k="${p.k}" aria-label="Precio automático" title="Precio automático con el costo de Inventario">🤖</button>
         <button type="button" class="tg${p.oculto?'':' on'}" data-mo="vis" data-k="${p.k}" aria-label="Mostrar">${p.oculto?'🙈':'👁'}</button>
         <button type="button" class="tg ag${p.agotado?' on':''}" data-mo="ago" data-k="${p.k}" aria-label="Agotado">🚫</button></div>`;}).join('')||'<div class="mo-vacio">Nada con ese nombre.</div>'}</div>`);
   const qi=$('moVitQ');qi.addEventListener('input',()=>{M.vq=qi.value;const pos=qi.selectionStart;repintar(pintarVitrina);const n=$('moVitQ');n.focus();n.setSelectionRange(pos,pos);});
@@ -950,8 +950,8 @@ function pintarProd(){
      <div class="mo-dos"><label class="mo-field">Pasillo<select id="peC">${CFG.pasillos.filter(p=>p.k!=='top').map(p=>`<option value="${p.k}"${e.c===p.k?' selected':''}>${p.e} ${esc(p.n)}</option>`).join('')}</select></label><label class="mo-field">Precio ₡ por ${esc(UNI[e.u]||e.u)}<input id="peP" type="number" inputmode="numeric" min="0" step="5" value="${+e.p||''}" ${e.auto?'disabled':''}></label></div>
      <label class="mo-field">Foto del producto<input id="peFoto" type="file" accept="image/jpeg,image/png,image/webp,image/heic"><small>JPG, PNG o WebP · máximo 5 MB. La foto se publica en el catálogo.</small></label>
      <label class="mo-field">URL de foto existente<input id="peFotoUrl" type="url" value="${esc(e.foto||'')}" placeholder="https://…"></label>
-    <label class="mo-sw">🤖 Precio automático (costo de Surtido + ${t.margen??35}%)<input type="checkbox" id="peA" ${e.auto?'checked':''}></label>
-    <div class="mo-s">${c?`Costo de hoy en Surtido: <b>${$c(c.pr)}</b> (${esc(c.prov)}) → precio automático <b>${$c(precioAuto(c.pr,t.margen??35))}</b>`:'No encontramos este producto en Surtido con ese nombre; el automático necesita un costo.'}</div>
+    <label class="mo-sw">🤖 Precio automático (costo de Inventario + ${t.margen??35}%)<input type="checkbox" id="peA" ${e.auto?'checked':''}></label>
+    <div class="mo-s">${c?`Costo de hoy en Inventario: <b>${$c(c.pr)}</b> (${esc(c.prov)}) → precio automático <b>${$c(precioAuto(c.pr,t.margen??35))}</b>`:'No encontramos este producto en Inventario con ese nombre; el automático necesita un costo.'}</div>
     <button type="button" class="mo-btn p w big" style="margin-top:12px" data-mo="prod-ok">Guardar · se ve al instante en La Feria</button>
     ${e.nuevo?'':'<button type="button" class="mo-btn w" style="margin-top:8px" data-mo="vitrina">‹ Volver a la vitrina</button>'}`);
   const u=$('peU');u.addEventListener('change',()=>{M.edit={...leerProd(),u:u.value,s:u.value==='kg'?.5:1};repintar(pintarProd);});
@@ -1174,7 +1174,7 @@ function pintarAjSec(sec){
   const guardar='<button type="button" class="ui-btn ui-btn--primario ui-btn--l aj6-guardar" data-mo="aj-ok">Guardar</button>';
   const S={
     tema:['Tema',`<div class="ui-opciones">${[['light','sol','Claro','Fondo claro, como el papel'],['dark','luna','Oscuro','Fondo oscuro, cansa menos de noche'],['auto','pantalla','Automático','Sigue al teléfono o la compu']].map(([v,i,n,d])=>`<button type="button" class="ui-opcion${ajTema()===v?' on':''}" data-mo="aj-tema-usar" data-v="${v}" aria-pressed="${ajTema()===v}">${ICO(i,22)}<span>${n}<small>${d}</small></span>${ajTema()===v?ICO('ok',20):''}</button>`).join('')}</div>`],
-    avisos:['Avisos de pedidos',`<p class="aj6-txt">${!N.avisos.soportado()?'Este navegador no permite notificaciones: queda el sonido y el WhatsApp de la tienda.':perm==='granted'?'Activados: te llegan estés en Surtido, La Feria o el POS.':perm==='denied'?'Están bloqueados: permitilos en la configuración del sitio del navegador.':'Activalos para que te avise en cualquier pantalla.'}</p>
+    avisos:['Avisos de pedidos',`<p class="aj6-txt">${!N.avisos.soportado()?'Este navegador no permite notificaciones: queda el sonido y el WhatsApp de la tienda.':perm==='granted'?'Activados: te llegan estés en Inventario, La Feria o el POS.':perm==='denied'?'Están bloqueados: permitilos en la configuración del sitio del navegador.':'Activalos para que te avise en cualquier pantalla.'}</p>
       ${N.avisos.soportado()&&perm!=='denied'?(perm==='granted'?`<button type="button" class="ui-btn ui-btn--secundario ui-btn--l" data-mo="probar-aviso">${ICO('probar',20)}Probar cómo suena</button>`:`<button type="button" class="ui-btn ui-btn--primario ui-btn--l" data-mo="avisos-on">${ICO('aviso',20)}Activar los avisos</button>`):''}
       ${ajSw('rSon','Sonido que se repite hasta abrir el pedido',R.sonido,'Solo suenan los pedidos nuevos')}`],
     clave:['Contraseña de entrada',`${ajSw('acSw','Pedir contraseña al abrir la app',a.activo,a.activo?'Activa: al abrir se pide la contraseña de la tienda.':'Apagada: se entra directo. La de fábrica es 12345.',' data-mo="acceso-sw"')}
@@ -1340,9 +1340,9 @@ const ACT={
     const k=el.dataset.k,t=T(),prods={...(t.prods||{})},on=!prods[k]?.auto;
     prods[k]={...(prods[k]||{}),auto:on};
     const precios={...(t.precios||{})};
-    if(on){const p=N.catalogo(M.suc==='todas'?null:M.suc).find(x=>x.k===k),c=p&&costoHoy(p.n);if(!c){toast('No hay costo de '+(p?.n||k)+' en Surtido; queda el precio manual');return;}precios[k]=precioAuto(c.pr,t.margen??35);}
+    if(on){const p=N.catalogo(M.suc==='todas'?null:M.suc).find(x=>x.k===k),c=p&&costoHoy(p.n);if(!c){toast('No hay costo de '+(p?.n||k)+' en Inventario; queda el precio manual');return;}precios[k]=precioAuto(c.pr,t.margen??35);}
     const sucursales=(t.sucursales||[]).map(s=>s.k===M.suc?{...s,precios:{...(s.precios||{}),...(on?{[k]:precios[k]}:{})}}:s);
-    N.guardarTienda({prods,precios,sucursales});toast(on?'🤖 Precio automático: sigue al costo de Surtido':'Precio manual');repintar(pintarVitrina);
+    N.guardarTienda({prods,precios,sucursales});toast(on?'🤖 Precio automático: sigue al costo de Inventario':'Precio manual');repintar(pintarVitrina);
   },
   vis(el){const k=el.dataset.k,t=T();if(M.suc==='todas'){const ocultos=new Set(t.ocultos||[]);ocultos.has(k)?ocultos.delete(k):ocultos.add(k);N.guardarTienda({ocultos:[...ocultos]});}else{const branches=t.sucursales||[],base=branches.find(s=>s.k===M.suc)||{},global=new Set(t.ocultos||[]),ocultos=new Set(base.ocultos||[]),visibles=new Set(base.visibles||[]),estaOculto=(global.has(k)||ocultos.has(k))&&!visibles.has(k);if(estaOculto){if(global.has(k))visibles.add(k);else ocultos.delete(k);}else{if(global.has(k))visibles.delete(k);else ocultos.add(k);}const sucursales=branches.map(s=>s.k===M.suc?{...s,ocultos:[...ocultos],visibles:[...visibles]}:s);N.guardarTienda({sucursales});}repintar(pintarVitrina);},
   ago(el){const k=el.dataset.k,t=T(),base=(t.sucursales||[]).find(s=>s.k===M.suc)||{},s=new Set(base.agotados||t.agotados||[]);s.has(k)?s.delete(k):s.add(k);const sucursales=(t.sucursales||[]).map(x=>x.k===M.suc?{...x,agotados:[...s]}:x);N.guardarTienda({agotados:[...s],sucursales});toast(s.has(k)?'🚫 Agotado hoy':'De vuelta en la vitrina');repintar(pintarVitrina);},
@@ -1375,7 +1375,7 @@ const ACT={
     if(sec==='tienda'){cerrarHoja();ACT.local();return;}
     if(sec==='programa'){ACT.programa();return;}
     if(sec==='compartir'){ACT.compartir();return;}
-    if(sec==='actualizar'){AramoUI.confirmar({titulo:'¿Actualizar la app?',texto:'Baja otra vez lo último que se publicó. No borra pedidos, el Surtido ni los ajustes.',si:'Actualizar'}).then(ok=>{if(ok)reiniciarApp();});return;}
+    if(sec==='actualizar'){AramoUI.confirmar({titulo:'¿Actualizar la app?',texto:'Baja otra vez lo último que se publicó. No borra pedidos, el Inventario ni los ajustes.',si:'Actualizar'}).then(ok=>{if(ok)reiniciarApp();});return;}
     pintarAjSec(sec);
   },
   'aj-tema-usar'(el){
@@ -1392,7 +1392,7 @@ const ACT={
     primeraVez=false;document.getElementById('scopePicker')?.classList.remove('open');document.body.classList.remove('scope-picker-open');
     cerrarHoja();$('mostrador').classList.remove('open');cerrarPuerta();
     try{switchView('proveedores');const i=$('pvSearch');if(i){i.value=el.dataset.n;i.dispatchEvent(new Event('input',{bubbles:true}));i.dispatchEvent(new KeyboardEvent('keydown',{key:'Enter',bubbles:true}));}}catch{}
-    toast('🚚 Buscando '+el.dataset.n+' en Surtido');
+    toast('🚚 Buscando '+el.dataset.n+' en Inventario');
   },
   'pos-pedido'(){
     const o=N.get(M.abierto);if(!o)return;
