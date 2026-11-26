@@ -543,7 +543,9 @@ function mostrarEnLista(id){
   if(o)requestAnimationFrame(()=>{const c=document.querySelector(`#moLista .mo-card[data-id="${CSS.escape(o.id)}"]`);if(c)c.scrollIntoView({block:'center',behavior:'smooth'});});
 }
 const filtrar=L=>L.filter(o=>M.suc==='todas'||o.sucursal===M.suc);
-function pintarMostrador(){
+// Un pedido cancelado o entregado ya no queda montado como tiquete pendiente en el POS de esta tienda.
+function limpiarTiquetesPOS(){try{['moravia','angeles'].forEach(k=>{const L=LS.get('aramo_pos_feria_'+k,null);if(!Array.isArray(L)||!L.length)return;const R=L.filter(p=>{const o=N.get(p.id);return !o||!(o.estado==='cancelado'||o.estado==='entregado'||(o.cobro&&!o.cobro.porPOS));});if(R.length!==L.length)LS.set('aramo_pos_feria_'+k,R);});}catch(e){}}
+function pintarMostrador(){limpiarTiquetesPOS();
   if(!$('mostrador')?.classList.contains('open'))return;
   pintarNube();
   const alarma=alarmaHtml();$('moAlarma').innerHTML=alarma;
@@ -700,7 +702,7 @@ async function revisarPOS(){
       try{
         if(o.posVenta?.numero!==d.numero){
           const met=({efectivo:'Efectivo',tarjeta:'Tarjeta',sinpe:'SINPE'}[d.metodo])||d.metodo||'';
-          await N.cambiar(o.id,x=>{x.posVenta={numero:d.numero,total:+d.total||0,metodo:d.metodo||'',at:d.at||new Date().toISOString()};x._ev={tipo:'pos-venta',monto:+d.total||0,metodo:met,numero:d.numero};},'tienda',`Venta #${d.numero} registrada en el POS (${met} ${$c(+d.total||0)})`);
+          await N.cambiar(o.id,x=>{x.posVenta={numero:d.numero,total:+d.total||0,metodo:d.metodo||'',at:d.at||new Date().toISOString()};if(!x.cobro){const mx=d.metodo==='mixto'?((+d.sinpe>=+d.efectivo&&+d.sinpe>=+d.tarjeta)?'sinpe':(+d.tarjeta>+d.efectivo?'tarjeta':'efectivo')):(d.metodo||'efectivo');x.cobro={metodo:mx,total:+d.total||0,recibido:+d.total||0,vuelto:0,fecha:d.at||new Date().toISOString(),venta:'POS '+(d.numero||''),sucursal:x.sucursal,porPOS:1};}x._ev={tipo:'pos-venta',monto:+d.total||0,metodo:met,numero:d.numero};},'tienda',`Venta #${d.numero} registrada en el POS (${met} ${$c(+d.total||0)})`);
         }
         try{localStorage.removeItem(key);}catch{}
       }finally{_posOcupado.delete(key);}
@@ -765,7 +767,7 @@ function pintarEncargo(){
   const holo=o.items.map(i=>`<div class="mo-hit ${i.estado==='listo'?'ok':i.estado==='nohay'?'no':o.estado==='alistando'?'wait':''}" title="${esc(i.n)}"><b>${i.e}</b><em>${esc(i.n)}</em><small>${esc(i.u==='kg'&&i.qr!=null&&i.qr!==''?kg(qReal(i))+' kg':qtxt(qReal(i),i.u))}</small></div>`).join('');
   let acc='';
   const posDraft=LS.get('aramo_pos_cotizacion_'+o.id,null);
-  const posBox=`<div class="mo-pos-link"><button type="button" class="mo-btn p w" data-mo="pos-pedido">🧾 Abrir este pedido en POS</button><small>Se abre con los productos y cantidades del pedido. Al guardar la nueva cotización, regresá aquí para enviarla al cliente.</small></div>`;
+  const posBox=`<div class="mo-pos-link"><button type="button" class="mo-btn p w" data-mo="pos-pedido">🧾 Abrir este pedido en POS</button><small>Entra al POS como un tiquete con el nombre del cliente. Revisá pesos y precios y tocá «Guardar y volver»: la cotización le llega sola al cliente y el tiquete queda listo para cobrar con F12.</small></div>`;
   const draftBox=posDraft?.items?.length?`<div class="mo-pos-link"><b>🧾 Hay una cotización devuelta desde POS</b><small>Revisá los cambios antes de enviarlos al cliente.</small><button type="button" class="mo-btn o w" data-mo="aplicar-pos">Aplicar cotización del POS</button></div>`:'';
   const recBox=o.recibidoCliente?(o.recibidoCliente.ok?`<div class="mo-acc-nota ok"><b>✅ El cliente dice que ya lo recibió</b><br>${esc(fh(o.recibidoCliente.at))} · cerralo con el botón de abajo.</div>`:`<div class="mo-acc-nota mal"><b>⚠️ El cliente dice que NO lo recibió</b><br>${esc(fh(o.recibidoCliente.at))} · escribile o llamalo ya.</div>`):'';
   const sinpeBox=o.pago?.metodo==='sinpe'&&!cobrado(o)&&(o.estado==='listo'||(o.estado==='alistando'&&N.definitivo(o)))&&fase!=='confirmacion'
