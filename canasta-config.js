@@ -139,10 +139,16 @@ window.ARAMO_CANASTA={
   tienda:{
     nombre:'ARAMO',
     whatsapp:'',            // WhatsApp general (si una tienda no tiene el suyo)
-    sinpe:{numero:'',nombre:''},
+    sinpe:{numero:'85848428',nombre:''},   // SINPE Móvil 8584-8428 para las dos tiendas (Mostrador → Ajustes lo cambia)
     linkTarjeta:'',         // opcional: link de pago con tarjeta (Tilopay, ONVO, etc.)
     // Operación y comunicación pública. Se pueden ajustar desde Mostrador.
-    envioConfig:{activa:true,zona:'Moravia y alrededores',radioKm:8,tarifaBase:1500,tarifaKm:250,minimo:0},
+    // Envío con Uber. El estimado se calcula en el aparato (sin servicios externos):
+    //   km por calle = km en línea recta × factorCalle
+    //   Uber aprox. = máx(uberMinimo, tarifaBase + km por calle × tarifaKm)   (tarifaKm se afina con el historial real)
+    //   pedido < repartoMin → el cliente paga todo el envío; desde repartoMin → el cliente paga repartoPct %
+    //   minimo = pedido mínimo (₡ de productos) para pedir envío; radioKm = distancia máxima en línea recta.
+    envioConfig:{activa:true,zona:'Moravia y alrededores',radioKm:8,tarifaBase:800,tarifaKm:380,uberMinimo:1800,factorCalle:1.35,minimo:0,repartoMin:10000,repartoPct:50,historial:[]},
+    pagoTarjeta:false,      // preparado pero oculto: por ahora La Feria cobra solo por SINPE Móvil
     feriados:[],            // fechas YYYY-MM-DD sin servicio
     horariosEspeciales:{},  // fecha -> {cerrada,abre,cierra}
     capacidadPorHora:20,
@@ -150,7 +156,7 @@ window.ARAMO_CANASTA={
     condiciones:'Los precios son aproximados hasta pesar la canasta. Si algo falta, aplicamos la opción que elegiste. Podés cancelar antes de que empiece el alistado.',
     faq:[
       {q:'¿Cuánto tarda?',a:'La hora disponible aparece al elegir tienda. También podés programar el retiro.'},
-      {q:'¿Cómo pago?',a:'SINPE, efectivo, tarjeta o link de pago cuando la tienda lo tenga habilitado.'},
+      {q:'¿Cómo pago?',a:'Por SINPE Móvil. Te mostramos el número y el monto al hacer el pedido.'},
       {q:'¿Dónde entregan?',a:'La app valida la zona y muestra la tarifa estimada antes de confirmar.'}
     ],
     promos:[],
@@ -163,8 +169,9 @@ window.ARAMO_CANASTA={
     envio:true,             // ofrecer envío a domicilio con Uber
     margen:35,              // % sobre el costo de Surtido para el precio automático
     sucursales:[
-      {k:'moravia',n:'ARAMO',zona:'Moravia',mapa:'ARAMO verdulería Moravia',abre:'07:00',cierra:'19:00',activa:true,whatsapp:''},
-      {k:'angeles',n:'LASR',zona:'Los Ángeles',mapa:'LASR verdulería Los Ángeles',abre:'07:00',cierra:'19:00',activa:true,whatsapp:''},
+      // lat/lng aprox.: sirven para el estimado del envío. Mostrador → Ajustes → Envío → "Guardar ubicación (estando aquí)" las afina.
+      {k:'moravia',n:'ARAMO',zona:'Moravia',mapa:'ARAMO verdulería Moravia',abre:'07:00',cierra:'19:00',activa:true,whatsapp:'',lat:9.964,lng:-84.048,aprox:true},
+      {k:'angeles',n:'LASR',zona:'Los Ángeles',mapa:'LASR verdulería Los Ángeles',abre:'07:00',cierra:'19:00',activa:true,whatsapp:'',lat:10.001,lng:-84.115,aprox:true},
     ],
     precios:{},   // k → precio que pisa la referencia
     prods:{},     // k → cambios de nombre, descripción, unidad, paso, ícono, pasillo, auto

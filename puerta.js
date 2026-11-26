@@ -51,11 +51,14 @@ function falta(iso){
 }
 const mapaUrl=u=>'https://www.google.com/maps/search/?api=1&query='+u.lat+','+u.lng;
 function uberLink(o){
-  // Abre la app de Uber con el destino del cliente ya puesto (universal link de Uber).
-  const s=suc(o.sucursal),e=o.retiro.envio,q=['action=setPickup'];
-  if(s?.lat&&s?.lng)q.push('pickup[latitude]='+s.lat,'pickup[longitude]='+s.lng,'pickup[nickname]='+encodeURIComponent(s.n+' '+s.zona));
+  // Abre la app de Uber con la recogida (la tienda) y el destino (la ubicación del cliente) ya puestos.
+  // Si la tienda todavía no guardó su ubicación exacta, Uber toma como salida donde está este aparato (la tienda).
+  const s=suc(o.sucursal),e=o.retiro.envio,ub=N.ubiSuc(s),q=['action=setPickup'];
+  if(ub.exacta)q.push('pickup[latitude]='+ub.lat,'pickup[longitude]='+ub.lng,'pickup[nickname]='+encodeURIComponent(s.n+' '+s.zona),'pickup[formatted_address]='+encodeURIComponent(s.mapa||s.n));
   else q.push('pickup=my_location');
-  q.push('dropoff[latitude]='+e.lat,'dropoff[longitude]='+e.lng,'dropoff[nickname]='+encodeURIComponent(o.cliente.nombre+' · '+o.ref));
+  const nick=encodeURIComponent(o.cliente.nombre+' · '+o.ref);
+  if(Number.isFinite(+e.lat)&&Number.isFinite(+e.lng)&&e.lat!=null&&e.lng!=null)q.push('dropoff[latitude]='+e.lat,'dropoff[longitude]='+e.lng,'dropoff[nickname]='+nick);
+  else q.push('dropoff[nickname]='+nick);
   if(e.senas)q.push('dropoff[formatted_address]='+encodeURIComponent(e.senas));
   return 'https://m.uber.com/ul/?'+q.join('&');
 }
@@ -690,13 +693,13 @@ function pintarEncargo(){
     <div class="mo-metrics"><div><span>Revisados</span><b>${r}/${n}</b></div><div><span>Peso real</span><b>${pesoR?kg(pesoR)+' kg':'—'}</b></div><div><span>${N.esAprox(o)?'Total aprox.':'Total exacto'}</span><b>${$c(tot)}</b></div></div>
     <div class="mo-blk"><h4>Productos · pesá cada uno · si algo no hay: ${SUST[o.sust]||''}</h4>${o.items.map((it,i)=>pesoHtml(it,i,edit)).join('')}
       ${Math.abs(dif)>=5&&o.estado!=='nuevo'?`<div class="mo-tot m"><span>Ajuste por peso real (vs. ${$c(est)} aprox.)</span><span>${dif>0?'+':'−'}${$c(Math.abs(dif))}</span></div>`:''}
-      ${o.retiro.envio&&+o.retiro.envio.costo?`<div class="mo-tot m"><span>🛵 Envío Uber</span><span>${$c(o.retiro.envio.costo)}</span></div>`:''}
+      ${o.retiro.envio&&+o.retiro.envio.costo?`<div class="mo-tot m"><span>🛵 Envío Uber · parte del cliente</span><span>${$c(o.retiro.envio.costo)}</span></div>`:''}
       ${o.premio?`<div class="mo-tot m o"><span>🎁 Premio con hojas (${+o.premio.hojas} 🍃)</span><span>−${$c(o.premio.valor)}</span></div>`:''}
       <div class="mo-tot"><span>${N.esAprox(o)?'Total aproximado':'Total exacto'}</span><b>${$c(tot)}</b></div>${o.nota?`<div class="mo-s" style="margin-top:8px">📝 ${esc(o.nota)}</div>`:''}</div>
     <div class="mo-blk"><h4>Cliente</h4><div class="mo-row"><span style="flex:1"><strong style="font-size:16px">${esc(o.cliente.nombre)}</strong><br><small style="color:var(--m)">${esc(fmtTel(o.cliente.tel))}${o.cliente.correo?`<br>${esc(o.cliente.correo)}`:''}</small></span><a class="mo-btn" href="tel:${esc(telDig(o.cliente.tel))}" aria-label="Llamar">📞</a><button type="button" class="mo-btn" data-mo="wa" aria-label="WhatsApp">💬</button></div>${lealtadHtml(o)}</div>
     ${o.retiro.envio?envioHtml(o):`<div class="mo-blk"><h4>Retiro</h4><div style="font-weight:900">${esc(sucNom(o.sucursal))}</div><div class="mo-s">${fdia(o.retiro.at)} a las ${fh(o.retiro.at)} (${falta(o.retiro.at)}) · ${o.retiro.carro?'🚗 al carro'+(o.retiro.placa?': '+esc(o.retiro.placa):''):'🚶 adentro'}</div></div>`}
     <div class="mo-blk"><h4>Pago</h4><div style="font-weight:900">${P.e||''} ${esc(P.n||'')} ${o.cobro?`<span class="mo-pill g">🧾 cobrado ${$c(o.cobro.total)}${o.cobro.venta?' · '+esc(o.cobro.venta):''}</span>`:o.pago.estado==='verificado'?'<span class="mo-pill g">✓ pagado</span>':o.pago.estado==='reportado'?'<span class="mo-pill o">el cliente dice que pagó</span>':'<span class="mo-pill">pendiente</span>'}</div>${o.pago.conCuanto?`<div class="mo-s">Paga con ${$c(o.pago.conCuanto)} → vuelto ${$c(Math.max(0,o.pago.conCuanto-tot))}</div>`:''}</div>
-    ${o.factura?`<div class="mo-blk"><h4>Factura electrónica</h4><div style="font-weight:900">Solicitada</div><div class="mo-s">Cédula: ${esc(o.factura.cedula||'pendiente')} · ${esc(o.factura.correo||'sin correo')}</div></div>`:''}
+    ${o.factura?`<div class="mo-blk"><h4>🧾 Factura electrónica · solicitada</h4><div style="font-weight:900">${esc(o.factura.nombre||o.cliente.nombre)}</div><div class="mo-s">${esc(facTipo(o.factura))} · cédula ${esc(o.factura.cedula||'pendiente')}<br>${esc(o.factura.correo||'sin correo')}</div>${o.items.some(i=>i.cabys)?'':'<div class="mo-s" style="margin-top:6px">Ningún producto tiene código CABYS todavía: se llena en 🏷️ Vitrina → producto.</div>'}</div>`:''}
     <details class="mo-blk"><summary style="font-weight:900;font-size:13px">🧾 Bitácora del pedido</summary><div class="mo-log" style="margin-top:8px">${(o.log||[]).map(l=>`${fdia(l.t)} ${fh(l.t)} · ${l.by==='cliente'?'👤':'🛎️'} ${esc(l.m||{nuevo:'Recibido',alistando:'Empezó a alistarse',listo:'Quedó lista',entregado:'Entregado',cancelado:'Cancelado'}[l.s]||l.s)}`).join('<br>')}</div></details>`);
   if(o.comprobante?.path){N.comprobanteUrl?.(o.comprobante.path).then(url=>{if(url&&$('moSheet'))$('moSheet').insertAdjacentHTML('beforeend',`<div class="mo-blk"><h4>📎 Comprobante SINPE</h4><a class="mo-btn" href="${esc(url)}" target="_blank" rel="noopener">Abrir comprobante</a></div>`);});}
   $('moSheet').querySelectorAll('[data-mo-q]').forEach(inp=>inp.addEventListener('change',()=>{
@@ -705,7 +708,6 @@ function pintarEncargo(){
   }));
   $('moSheet').querySelectorAll('[data-mo-sub]').forEach(inp=>inp.addEventListener('change',()=>{const i=+inp.dataset.moSub;N.cambiar(o.id,x=>{x.items[i].sub=inp.value.trim();},'tienda');}));
   if(edit)$('moSheet').querySelectorAll('.mo-it.no').forEach((row,i)=>row.insertAdjacentHTML('beforeend',`<button type="button" class="mo-btn o" data-mo="sub-prop" data-i="${i}">🔁 Proponer cambio</button>`));
-  const ce=$('moEnvio');if(ce)ce.addEventListener('change',()=>{const v=Math.max(0,+ce.value||0);N.cambiar(o.id,x=>{if(x.retiro.envio)x.retiro.envio.costo=v;},'tienda','Envío Uber: '+$c(v)).then(()=>{repintar(pintarEncargo);pintarMostrador();});});
 }
 // ══════════════ ⚖️ Pesar en caja ══════════════
 // Pantalla tipo POS: el pedido montado, un renglón por producto y un teclado
@@ -790,16 +792,22 @@ document.addEventListener('keydown',e=>{
   else if(e.key==='ArrowDown'||e.key==='ArrowUp'){e.preventDefault();const o=N.get(M.abierto);M.pk={i:Math.max(0,Math.min(o.items.length-1,M.pk.i+(e.key==='ArrowDown'?1:-1))),buf:''};repintar(pintarEncargo);}
 });
 function envioHtml(o){
-  const e=o.retiro.envio,s=suc(o.sucursal),d=.003;
+  const e=o.retiro.envio,s=suc(o.sucursal),d=.003,ub=N.ubiSuc(s),real=+e.costoUber>0,estU=+e.uberEst>0?+e.uberEst:0,cli=+e.costo||0;
+  const totU=real?+e.costoUber:estU,tie=e.tienda!=null?+e.tienda:(totU?Math.max(0,totU-cli):null);
+  const cuenta=totU||cli?`<div class="mo-tot m"><span>${real?'Uber real':'Uber estimado'}</span><span>${$c(totU||cli)}</span></div><div class="mo-tot m"><span>Lo paga el cliente${e.pct&&e.pct<100?' ('+e.pct+' %)':''}</span><span>${$c(cli)}</span></div>${tie!=null?`<div class="mo-tot m o"><span>Lo pone ARAMO</span><span>${$c(tie)}</span></div>`:''}`:'';
   return `<div class="mo-blk"><h4>🛵 Envío con Uber</h4>
+    <button type="button" class="mo-btn w" data-mo="uber" style="margin-bottom:8px">📍 Ubicación del cliente · tocá para abrir Uber</button>
     <iframe class="mo-mapa" title="Ubicación del cliente" loading="lazy" src="https://www.openstreetmap.org/export/embed.html?bbox=${e.lng-d},${e.lat-d},${e.lng+d},${e.lat+d}&layer=mapnik&marker=${e.lat},${e.lng}"></iframe>
     <div class="mo-s" style="margin-top:8px">Sale de ${esc(s?.n||'')} ${fdia(o.retiro.at)} a las ${fh(o.retiro.at)} (${falta(o.retiro.at)})${e.acc?` · ubicación ±${e.acc} m`:''}</div>
     ${e.senas?`<div style="margin-top:6px;font-weight:800">📝 ${esc(e.senas)}</div>`:''}
     ${e.uber?`<div class="mo-s" style="margin-top:6px;color:var(--g);font-weight:900">✓ Uber pedido a las ${fh(e.uber)}</div>`:''}
     <button type="button" class="mo-btn p w" style="margin-top:10px" data-mo="uber">🚗 ${e.uber?'Abrir Uber de nuevo':'Pedir Uber a esta ubicación'}</button>
     <div class="mo-btns"><a class="mo-btn" href="${mapaUrl(e)}" target="_blank" rel="noopener">🗺️ Ver en mapa</a><button type="button" class="mo-btn" data-mo="copiar" data-v="${esc(mapaUrl(e)+(e.senas?' · '+e.senas:''))}">📋 Copiar dirección</button></div>
-    <label class="mo-field">Costo del envío (se suma al total)<input type="number" inputmode="numeric" min="0" step="50" placeholder="Ej.: 1800" value="${+e.costo||''}" id="moEnvio"></label>
-    ${s?.lat?'':'<div class="mo-s" style="margin-top:6px">💡 Uber toma como salida donde estás. Para fijar la tienda: ⚙️ Pagos y horarios → "Guardar ubicación de la tienda".</div>'}</div>`;
+    ${cuenta}
+    <label class="mo-field">¿Cuánto costó el Uber de verdad? (₡)<input type="number" inputmode="numeric" min="0" step="50" placeholder="${estU?'Estimado '+estU:'Ej.: 3500'}" value="${real?+e.costoUber:''}" id="moUberReal"></label>
+    <button type="button" class="mo-btn o w" data-mo="uber-costo" style="margin-top:6px">${real?'Cambiar el costo del Uber':'Guardar el costo del Uber'}</button>
+    <div class="mo-s" style="margin-top:6px">Se recalcula lo que paga el cliente con la regla del envío (pedido menor de ${$c(N.envioCfg().repartoMin)}: todo el cliente; desde ahí, ${100-(+N.envioCfg().repartoPct||50)} % ARAMO) y queda en el historial que mejora el estimado.</div>
+    ${ub.exacta?'':'<div class="mo-s" style="margin-top:6px">💡 La tienda todavía no tiene su ubicación exacta: Uber toma como salida donde estás ahora. <button type="button" class="mo-btn" data-mo="tienda-gps" data-k="'+esc(o.sucursal)+'">📍 Guardar la ubicación de la tienda (estando aquí)</button></div>'}</div>`;
 }
 function pintarPin(o){
   const d=M.pin.padEnd(4,' ').split('');
@@ -872,13 +880,16 @@ async function cobrar(){
   toast(`🧾 ${o.ref} cobrado ${$c(tot)}${venta?' · '+venta+' en ARAMO POS':''}`);
   M.vista='tiquete';pintarEncargo();pintarMostrador();pintarPuerta();
 }
+const facTipo=f=>({fisica:'Persona física',juridica:'Persona jurídica',dimex:'Extranjero (DIMEX)'}[f?.tipo]||'Persona física');
 function tiqueteTexto(o){
   const t=T(),c=o.cobro||{};
   return [`${sucNom(o.sucursal)||t.nombre||'ARAMO'}`,`Pedido ${o.ref}${c.venta?' · '+c.venta:''}`,`${fdia(c.fecha||o.updated)} ${fh(c.fecha||o.updated)} · ${o.cliente.nombre}`,'',
-    ...o.items.filter(i=>i.estado!=='nohay').map(i=>`${i.n} ${i.u==='kg'?kg(qReal(i))+' kg':qtxt(qReal(i),i.u)} x ${$c(precioIt(i))} = ${$c(qReal(i)*precioIt(i))}`),
+    ...o.items.filter(i=>i.estado!=='nohay').map(i=>`${i.n} ${i.u==='kg'?kg(qReal(i))+' kg':qtxt(qReal(i),i.u)} x ${$c(precioIt(i))} = ${$c(qReal(i)*precioIt(i))}${o.factura&&i.cabys?'\n   CABYS '+i.cabys:''}`),
     ...(o.retiro.envio&&+o.retiro.envio.costo?[`Envío Uber = ${$c(o.retiro.envio.costo)}`]:[]),
     ...(o.premio?[`Premio con hojas (${o.premio.hojas}) = −${$c(o.premio.valor)}`]:[]),
-    '',`TOTAL ${$c(N.totalDe(o))}`,`${N.PAGOS[c.metodo]?.n||''}${c.metodo==='efectivo'?` · recibido ${$c(c.recibido)} · vuelto ${$c(c.vuelto)}`:''}`,'','¡Gracias por comprar en ARAMO!'].join('\n');
+    '',`TOTAL ${$c(N.totalDe(o))}`,`${N.PAGOS[c.metodo]?.n||''}${c.metodo==='efectivo'?` · recibido ${$c(c.recibido)} · vuelto ${$c(c.vuelto)}`:''}`,
+    ...(o.factura?['','FACTURA ELECTRÓNICA SOLICITADA',`${facTipo(o.factura)} · cédula ${o.factura.cedula||''}`,o.factura.nombre||o.cliente.nombre,o.factura.correo||'']:[]),
+    '','¡Gracias por comprar en ARAMO!'].join('\n');
 }
 function pintarTiquete(o){
   const c=o.cobro||{};
@@ -945,6 +956,7 @@ function pintarProd(){
   abrirHoja(`<p class="mo-kick">${e.nuevo?'Producto nuevo':'Editar producto'} · se actualiza en todo lado</p><div class="mo-h">${esc(e.e)} ${esc(e.n||'Nuevo producto')}</div>
     <div class="mo-dos"><label class="mo-field">Nombre<input id="peN" value="${esc(e.n)}" placeholder="Ej.: Tomate cherry"></label><label class="mo-field">Ícono<input id="peE" value="${esc(e.e)}" maxlength="4"></label></div>
      <label class="mo-field">¿Qué es exactamente? (lo ve el cliente)<input id="peD" value="${esc(e.d||'')}" placeholder="Ej.: Bandeja de 250 g, rojos y dulces"></label>
+     <label class="mo-field">Código CABYS (13 números, opcional · para la factura electrónica)<input id="peCabys" inputmode="numeric" maxlength="13" value="${esc(e.cabys||'')}" placeholder="Dejalo vacío hasta tenerlo"></label>
      <label class="mo-field">Orden en la vitrina (menor = primero)<input id="peOrden" type="number" min="1" step="1" value="${+e.orden||''}" placeholder="Dejalo vacío para el orden normal"></label>
     <div class="mo-dos"><label class="mo-field">Se vende por<select id="peU">${UNIDADES.map(([v,n])=>`<option value="${v}"${e.u===v?' selected':''}>${n}</option>`).join('')}</select></label><label class="mo-field">De a cuánto<select id="peS">${(e.u==='kg'?[.25,.5,1]:[1,2,6,12]).map(v=>`<option value="${v}"${+e.s===v?' selected':''}>${fq(v)} ${UNI[e.u]||e.u}</option>`).join('')}</select></label></div>
      <div class="mo-dos"><label class="mo-field">Pasillo<select id="peC">${CFG.pasillos.filter(p=>p.k!=='top').map(p=>`<option value="${p.k}"${e.c===p.k?' selected':''}>${p.e} ${esc(p.n)}</option>`).join('')}</select></label><label class="mo-field">Precio ₡ por ${esc(UNI[e.u]||e.u)}<input id="peP" type="number" inputmode="numeric" min="0" step="5" value="${+e.p||''}" ${e.auto?'disabled':''}></label></div>
@@ -960,11 +972,12 @@ function pintarProd(){
 }
 function leerProd(){
   const e=M.edit,v=id=>$(id)?.value??'';
-  return{...e,n:v('peN').trim(),e:v('peE').trim()||'🧺',d:v('peD').trim(),foto:v('peFotoUrl').trim(),orden:v('peOrden')===''?null:Math.max(1,+v('peOrden')||1),u:v('peU'),s:+v('peS')||(v('peU')==='kg'?.5:1),c:v('peC'),p:Math.round(+v('peP')||0),auto:$('peA').checked};
+  return{...e,n:v('peN').trim(),e:v('peE').trim()||'🧺',d:v('peD').trim(),foto:v('peFotoUrl').trim(),orden:v('peOrden')===''?null:Math.max(1,+v('peOrden')||1),cabys:v('peCabys').replace(/\D/g,'').slice(0,13),u:v('peU'),s:+v('peS')||(v('peU')==='kg'?.5:1),c:v('peC'),p:Math.round(+v('peP')||0),auto:$('peA').checked};
 }
 function guardarProd(){
   const e=leerProd();
   if(e.n.length<2){toast('Escribí el nombre del producto');return;}
+  if(e.cabys&&e.cabys.length!==13){toast('El código CABYS lleva 13 números (o dejalo vacío)');$('peCabys')?.focus();return;}
   const t=T(),prods={...(t.prods||{})},precios={...(t.precios||{})},nuevos=[...(t.nuevos||[])];
   let k=e.k;
   if(e.nuevo){
@@ -973,6 +986,7 @@ function guardarProd(){
     nuevos.push({k,n:e.n,d:e.d,e:e.e,c:e.c,u:e.u,s:e.s,p:e.p||0,orden:e.orden});
   }else prods[k]={...(prods[k]||{}),n:e.n,d:e.d,e:e.e,c:e.c,u:e.u,s:e.s,foto:e.foto,orden:e.orden,auto:e.auto};
   if(e.nuevo)prods[k]={...(prods[k]||{}),foto:e.foto,orden:e.orden,auto:e.auto};
+  prods[k]={...(prods[k]||{}),cabys:e.cabys||''}; // CABYS: vacío hasta que la tienda lo llene; viaja en cada línea del pedido
   if(e.auto){const c=costoHoy(e.n);if(c)precios[k]=precioAuto(c.pr,t.margen??35);}
   else if(e.p>0)precios[k]=e.p;
   N.guardarTienda({prods,precios,nuevos});
@@ -1190,11 +1204,19 @@ function pintarAjSec(sec){
       ${ajCampo('ajFeriados','Feriados',(t.feriados||[]).join(', '),{ph:'2026-12-25, 2027-01-01',ayuda:'Fechas así: año-mes-día, separadas por coma.'})}
       ${ajCampo('ajEspecial','Horario especial',Object.entries(t.horariosEspeciales||{}).map(([d,x])=>`${d} | ${x.cerrada?'cerrado':`${x.abre||''}-${x.cierra||''}`}`).join('\n'),{area:3,ph:'2026-12-24 | 07:00-15:00\n2026-12-25 | cerrado',ayuda:'Un día por renglón: fecha | hora-hora, o fecha | cerrado.'})}${guardar}`],
     pagos:['Pagos y SINPE',`<div class="aj6-dos">${ajCampo('ajSinpe','SINPE Móvil · número',fmtTel(sp.numero),{tipo:'tel',modo:'tel',ph:'8888-8888'})}${ajCampo('ajSinpeN','A nombre de',sp.nombre,{ph:'Ej.: ARAMO S.A.'})}</div>
-      ${ajCampo('ajLink','Link de pago con tarjeta (opcional)',t.linkTarjeta,{tipo:'url',ph:'https://…',ayuda:'Sin link, la tarjeta se cobra con datáfono al recoger. Vale para las dos tiendas.'})}${guardar}`],
+      ${ajCampo('ajLink','Link de pago con tarjeta (opcional)',t.linkTarjeta,{tipo:'url',ph:'https://…',ayuda:'Preparado para más adelante: por ahora La Feria cobra solo por SINPE Móvil. Vale para las dos tiendas.'})}${guardar}`],
     envio:['Envío a domicilio',`${ajSw('ajEnvio','Ofrecer envío a domicilio',t.envio!==false,'Vale para las dos tiendas.')}
       ${ajCampo('ajZona','Zona que cubrís',ec.zona,{ph:'Moravia y alrededores'})}
       <div class="aj6-dos">${ajCampo('ajRadio','Distancia máxima (km)',+ec.radioKm||8,{tipo:'number',modo:'decimal',min:0,paso:'0.5'})}${ajCampo('ajTarifa','Tarifa base ₡',+ec.tarifaBase||0,{tipo:'number',modo:'numeric',min:0,paso:100})}</div>
-      <div class="aj6-dos">${ajCampo('ajKm','Por cada km ₡',+ec.tarifaKm||0,{tipo:'number',modo:'numeric',min:0,paso:50})}${ajCampo('ajMinimo','Pedido mínimo ₡',+ec.minimo||0,{tipo:'number',modo:'numeric',min:0,paso:100})}</div>${guardar}`],
+      <div class="aj6-dos">${ajCampo('ajKm','Por cada km ₡',+ec.tarifaKm||0,{tipo:'number',modo:'numeric',min:0,paso:50})}${ajCampo('ajMinimo','Pedido mínimo ₡',+ec.minimo||0,{tipo:'number',modo:'numeric',min:0,paso:100})}</div>
+      <div class="aj6-dos">${ajCampo('ajUberMin','Uber mínimo ₡',+ec.uberMinimo||0,{tipo:'number',modo:'numeric',min:0,paso:100})}${ajCampo('ajFactor','Calle vs. línea recta (×)',+ec.factorCalle||1.35,{tipo:'number',modo:'decimal',min:1,paso:'0.05'})}</div>
+      <h3 class="ui-grupo-tit">Quién paga el envío</h3>
+      <div class="aj6-dos">${ajCampo('ajRepMin','Pedido desde ₡',+ec.repartoMin||0,{tipo:'number',modo:'numeric',min:0,paso:500,ayuda:'Menos que esto: el cliente paga todo el Uber.'})}${ajCampo('ajRepPct','El cliente paga %',ec.repartoPct==null?50:+ec.repartoPct,{tipo:'number',modo:'numeric',min:0,paso:5,ayuda:'Desde ese monto. 50 = mitad y mitad.'})}</div>
+      ${(ap=>`<p class="aj6-txt">${ap.n?`📈 Aprendido de ${ap.n} ${ap.n===1?'Uber real':'Ubers reales'}: ₡${Math.round(ap.tk)} por km (${ap.real!=null?'el real da ₡'+Math.round(ap.real):''}). Cada vez que anotás cuánto costó un Uber, el estimado se afina.`:'📈 Todavía no hay Ubers reales anotados. Cuando anotés cuánto costó cada Uber, el estimado aprende solo.'}</p>`)(N.tarifaKmAprendida(N.envioCfg()))}
+      <h3 class="ui-grupo-tit">Ubicación de ${esc(ajZona(k))}</h3>
+      <div class="aj6-dos">${ajCampo('ajLat','Latitud',s.lat??'',{tipo:'number',modo:'decimal',paso:'any'})}${ajCampo('ajLng','Longitud',s.lng??'',{tipo:'number',modo:'decimal',paso:'any'})}</div>
+      <p class="aj6-txt">${N.ubiSuc(s).exacta?'Ubicación exacta guardada.':'Ahora son coordenadas aproximadas: sirven para el estimado, pero para que Uber recoja justo en la tienda tocá el botón estando ahí.'}</p>
+      <button type="button" class="ui-btn ui-btn--secundario ui-btn--l" data-mo="tienda-gps" data-k="${k}">${ICO('tienda',20)}${N.ubiSuc(s).exacta?'Actualizar la ubicación (estando aquí)':'Guardar la ubicación de la tienda (estando aquí)'}</button>${guardar}`],
     legales:['Textos legales',`${ajCampo('ajPriv','Privacidad',t.privacidad,{area:4})}${ajCampo('ajCond','Condiciones',t.condiciones,{area:4})}
       ${ajCampo('ajFaq','Preguntas frecuentes',(t.faq||[]).map(x=>`${x.q} | ${x.a}`).join('\n'),{area:4,ayuda:'Una por renglón: pregunta | respuesta.'})}${guardar}`],
     avanzado:['Avanzado',`${ajCampo('ajNombre','Nombre de la tienda',t.nombre)}
@@ -1464,7 +1486,15 @@ const ACT={
   uber(){
     const o=N.get(M.abierto);if(!o?.retiro?.envio)return;
     abrir(uberLink(o));
-    if(!o.retiro.envio.uber)N.cambiar(o.id,x=>{x.retiro.envio.uber=new Date().toISOString();},'tienda','Uber pedido').then(()=>{pintarEncargo();pintarMostrador();});
+    if(!o.retiro.envio.uber)N.cambiar(o.id,x=>{x.retiro.envio.uber=new Date().toISOString();},'tienda','Uber pedido').then(()=>{pintarEncargo();pintarMostrador();toast('🚗 Cuando Uber te diga el precio, anotá cuánto costó');});
+    else toast('🚗 Abriendo Uber con el punto del cliente');
+  },
+  // La tienda anota lo que Uber cobró de verdad: se recalcula lo del cliente con la misma regla y se guarda para aprender
+  'uber-costo'(){
+    const o=N.get(M.abierto);if(!o?.retiro?.envio)return;
+    const v=Math.round(+String($('moUberReal')?.value||'').replace(',','.'));
+    if(!(v>0)){toast('Escribí cuánto costó el Uber');$('moUberReal')?.focus();return;}
+    N.costoRealUber(o.id,v).then(r=>{if(!r){toast('No se pudo guardar el costo');return;}repintar(pintarEncargo);pintarMostrador();const e=r.retiro.envio;toast(`🛵 Uber ${$c(v)} · el cliente paga ${$c(e.costo)} · ARAMO pone ${$c(e.tienda||0)}`);});
   },
   'entregado-uber'(){
     const o=N.get(M.abierto);if(!confirm(`¿${o.cliente.nombre} ya recibió ${o.ref}?`))return;
@@ -1475,8 +1505,8 @@ const ACT={
     toast('📍 Tomando la ubicación de la tienda…');
     navigator.geolocation.getCurrentPosition(p=>{
       const t=T(),k=el.dataset.k;
-      N.guardarTienda({sucursales:(t.sucursales||[]).map(s=>s.k===k?{...s,lat:+p.coords.latitude.toFixed(6),lng:+p.coords.longitude.toFixed(6)}:s)});
-      toast('📍 Ubicación de la tienda guardada');if(M.vista==='aj-contacto')repintar(()=>pintarAjSec('contacto'));else pintarAjustes();
+      N.guardarTienda({sucursales:(t.sucursales||[]).map(s=>s.k===k?{...s,lat:+p.coords.latitude.toFixed(6),lng:+p.coords.longitude.toFixed(6),aprox:false}:s)});
+      toast('📍 Ubicación de la tienda guardada');if(M.vista==='aj-contacto'||M.vista==='aj-envio')repintar(()=>pintarAjSec(M.vista.slice(3)));else if(M.vista==='encargo'&&M.abierto&&N.get(M.abierto))repintar(pintarEncargo);else pintarAjustes();
     },()=>toast('No se pudo tomar la ubicación'),{enableHighAccuracy:true,timeout:15000});
   },
   clientes(){M.vista='clientes';M.prog=null;pintarClientes();},
@@ -1517,13 +1547,23 @@ const ACT={
     if(hay('ajLink'))c.linkTarjeta=v('ajLink');
     if(hay('ajFeriados'))c.feriados=v('ajFeriados').split(',').map(x=>x.trim()).filter(x=>/^\d{4}-\d{2}-\d{2}$/.test(x));
     if(hay('ajEspecial')){const horarios={};v('ajEspecial').split(/\n+/).forEach(line=>{const [f,raw]=line.split('|').map(x=>x.trim());if(!/^\d{4}-\d{2}-\d{2}$/.test(f)||!raw)return;if(raw.toLowerCase()==='cerrado')horarios[f]={cerrada:true};else{const [abre,cierra]=raw.split('-').map(x=>x.trim());if(abre&&cierra)horarios[f]={abre,cierra};}});c.horariosEspeciales=horarios;}
-    if(['ajZona','ajRadio','ajTarifa','ajKm','ajMinimo'].some(hay)){
+    if(['ajLat','ajLng'].some(hay)&&hay('ajLat')&&hay('ajLng')){
+      const la=v('ajLat')===''?null:+v('ajLat'),lo=v('ajLng')===''?null:+v('ajLng'),antes=(t.sucursales||[]).find(x=>x.k===k)||{};
+      if(la!=null&&lo!=null&&Math.abs(la)<=90&&Math.abs(lo)<=180&&(la!==+antes.lat||lo!==+antes.lng)){
+        c.sucursales=(c.sucursales||t.sucursales||[]).map(s=>s.k===k?{...s,lat:la,lng:lo,aprox:false}:s);
+      }
+    }
+    if(['ajZona','ajRadio','ajTarifa','ajKm','ajMinimo','ajUberMin','ajFactor','ajRepMin','ajRepPct'].some(hay)){
       const e={...(t.envioConfig||{})};
       if(hay('ajZona'))e.zona=v('ajZona');
       if(hay('ajRadio'))e.radioKm=Math.max(0,+v('ajRadio')||0);
       if(hay('ajTarifa'))e.tarifaBase=Math.max(0,+v('ajTarifa')||0);
       if(hay('ajKm'))e.tarifaKm=Math.max(0,+v('ajKm')||0);
       if(hay('ajMinimo'))e.minimo=Math.max(0,+v('ajMinimo')||0);
+      if(hay('ajUberMin'))e.uberMinimo=Math.max(0,+v('ajUberMin')||0);
+      if(hay('ajFactor'))e.factorCalle=Math.max(1,+v('ajFactor')||1.35);
+      if(hay('ajRepMin'))e.repartoMin=Math.max(0,+v('ajRepMin')||0);
+      if(hay('ajRepPct'))e.repartoPct=Math.min(100,Math.max(0,v('ajRepPct')===''?50:+v('ajRepPct')||0));
       c.envioConfig=e;
     }
     if(hay('ajPriv'))c.privacidad=v('ajPriv');
