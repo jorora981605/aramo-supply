@@ -550,8 +550,8 @@ function mesaCanasta(){
   const eP=env&&eu?eu:null,pr=premioSel(),L=N.lealtad(),c=cuentaActiva()&&perfilOk()?miCuenta():null;
   return cabSub('Tu canasta','armar')+avisoAgotados()+`<div class="bloques" id="tlSecBloques">
     ${bloque('canasta','#1d2a22',svgI('cesta'),'Canasta',`${n} ${n===1?'cosa':'cosas'}${peso?` · ≈ ${kg(peso)} kg`:''}${sp?` · ${sp} con precio al pesar`:''}`,fA?pastilla():`<span class="bq-m">${$c(tot)}</span>`,'lista',!!fA)}
-    ${bloque('entrega','#1d9a8a',svgI(env?'camion':'casa'),'Entrega',entSub,entDer,'entrega',!!fR&&fR.p!=='canasta')}
-    ${bloque('datos','#e07a2e',svgI('persona'),'Tus datos',datSub,datDer,'datos',!!fD)}
+    ${bloque('entrega','#178276',svgI(env?'camion':'casa'),'Entrega',entSub,entDer,'entrega',!!fR&&fR.p!=='canasta')}
+    ${bloque('datos','#c9621a',svgI('persona'),'Tus datos',datSub,datDer,'datos',!!fD)}
   </div>
   <section class="bq-hondo" id="tlPagar"><small>Total${num?` · SINPE ${esc(fmtTel(num))}`:''}</small><b class="bq-tot" id="tlTotal">${$c(totalPagar())}</b><button type="button" class="bq-pagar" id="tlSellar" data-act="pedir">Pagar y pedir</button>${fl?`<p class="bq-aviso" role="status">${esc(fl.b||fl.m)}</p>`:''}</section>
   <div class="resumen quieto"><div><span>Productos</span><b>${$c(tot)}</b></div>${env?`<div><span>Envío con Uber · tu parte</span><b>${eP?$c(eP.costo):ee?'fuera de zona':'elegí ubicación'}</b></div>${eP?`<p class="reparte-r">${reparteTxt(eP)}</p>`:''}`:''}${pr?`<div class="desc"><span>🎁 ${esc(pr.n)}</span><b>−${$c(pr.valor)}</b></div>`:''}${L.activa&&c?`<div class="gana"><span>🍃 Con este pedido ganás</span><b>~${hojasEstimadas()} ${hojasEstimadas()===1?'hoja':'hojas'}${L.dobles?' 🔥':''}</b></div>`:''}<p>${sp?`Total aproximado · ${sp} ${sp===1?'producto va':'productos van'} con precio al pesar. `:''}El monto es estimado: ARAMO confirma el total definitivo después de alistar y pesar.</p></div>
@@ -856,7 +856,7 @@ function pintarBar(){
   let h='';
   if(!o&&!C.actual&&n&&!MINI&&(C.paso==='armar'||C.paso==='cat')){
     const it=cestaItems();
-    h=`<button type="button" class="tk" data-act="siguiente" aria-label="Ver mi canasta"><span class="tk-ico" id="tlTk">${it.slice(-3).map(x=>`<i>${foto(x.k,x.p.e)}</i>`).join('')}</span><span class="tk-t"><strong>Canasta · ${n} · <span id="tlTot">${$c(_totBar)}</span></strong></span><span class="tk-go" aria-hidden="true">→</span></button>`;
+    h=`<button type="button" class="tk" data-act="siguiente" aria-label="Ver mi canasta"><span class="tk-ico" id="tlTk">${it.slice(-1).map(x=>`<i>${foto(x.k,x.p.e)}</i>`).join('')}</span><span class="tk-t"><strong>Canasta · ${n} · <span id="tlTot">${$c(_totBar)}</span></strong></span><span class="tk-go" aria-hidden="true">→</span></button>`;
   }
   bar.classList.toggle('hide',!h);
   if(h){const tb=cestaTotal();inn.innerHTML=h;contar($('tlTot'),_totBar,tb);_totBar=tb;}
