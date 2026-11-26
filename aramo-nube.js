@@ -25,6 +25,8 @@ let supa=null,modo='local',motivo='conectando…',solo=null,canal=null,reintento
 const envios=new Map();
 let authUser=null,authSession=null,authHook=false,authCambio=0,authPersonal=false;
 const subs=new Set();
+// Este aparato (esta pestaña) y quién atiende: cada movimiento de un pedido queda con hora, quién y cuánto.
+const DEV='d'+Math.random().toString(36).slice(2,9);let quienFn=null;
 const bc=('BroadcastChannel' in window)?new BroadcastChannel('aramo-encargos'):null;
 
 function persist(){write(LKEY,store);write(PKEY,[...pend]);write(CKEY,[...pendCambios]);}
@@ -211,6 +213,24 @@ function conectar(opts){
 }
 window.addEventListener('online',()=>{if(modo!=='nube'){conectando=null;conectar();}});
 document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='visible'&&modo==='nube'&&solo)solo.forEach(async id=>{const o=await leerUno(id);if(o)take(o);});});
+// Pedidos en vivo para todos: además del canal en vivo (que el cliente sin cuenta no tiene), cada pocos
+// segundos se revisa lo que cambió. El Mostrador lee los últimos pedidos; el cliente, solo los suyos que siguen en curso.
+let _sync=0;
+async function sincronizar(forzar){
+  if(modo!=='nube'||!supa||document.visibilityState!=='visible')return;
+  if(!forzar&&Date.now()-_sync<8000)return;
+  _sync=Date.now();
+  try{
+    if(authUser&&authSession&&authPersonal){
+      const r=await timeout(supa.from(TABLE).select('id,data').neq('id',TIENDA_ID).order('updated_at',{ascending:false}).limit(80),9000);
+      (r.data||[]).forEach(x=>{if(x.data?.id)take(x.data);});
+    }else{
+      const ids=Object.values(store).filter(o=>!o.borrado&&!['entregado','cancelado'].includes(o.estado)&&(!solo||solo.has(o.id))).slice(0,6).map(o=>o.id);
+      for(const id of ids){const o=await leerUno(id);if(o)take(o);}
+    }
+  }catch{}
+}
+setInterval(()=>sincronizar(),12000);
 
 // ── Encargos ──
 function crear(o){
@@ -231,8 +251,16 @@ async function cambiar(id,fn,quien,nota){
   const o=clone(cur);
   const antes=o.estado;
   fn(o);
+  // fn puede dejar o._ev={tipo,monto,metodo,q}: queda en la bitácora con la hora y quién lo hizo.
+  const ev=o._ev;delete o._ev;
   o.v=(cur.v||0)+1;o.updated=now();
-  if(nota||o.estado!==antes||o.fase!==(cur.fase||''))(o.log=o.log||[]).push({t:o.updated,s:o.fase||o.estado,by:quien||'tienda',m:nota||''});
+  if(nota||ev||o.estado!==antes||o.fase!==(cur.fase||'')){
+    const l={t:o.updated,s:o.fase||o.estado,by:quien||'tienda',m:nota||'',dev:DEV};
+    const q=(ev&&ev.q)||((quien||'tienda')==='tienda'&&quienFn?quienFn():'');
+    if(q)l.q=q;
+    if(ev)Object.keys(ev).forEach(k=>{if(k!=='q'&&ev[k]!=null&&ev[k]!=='')l[k]=ev[k];});
+    (o.log=o.log||[]).push(l);
+  }
   take(o);avisar(o);
   const envio=pend.has(id)&&!pendCambios.has(id)?subir(o):subirCambio(o);
   await envio;
@@ -544,6 +572,48 @@ async function cupoHorario(sucursal,at,limite){
   if(!supa||!limite)return true;
   try{const r=await timeout(supa.rpc('aramo_cupo_horario',{p_sucursal:sucursal,p_at:new Date(at).toISOString(),p_limite:+limite}),6000);return r.error?true:r.data!==false;}catch{return true;}
 }
+// Foto del comprobante SINPE en chiquito (cabe dentro del pedido) para que la tienda la vea de una vez.
+function reducirImagen(file,max=900){
+  return new Promise(res=>{
+    if(!/^image\//i.test(file?.type||'')){res(null);return;}
+    const url=URL.createObjectURL(file),im=new Image();
+    im.onload=()=>{
+      try{
+        const k=Math.min(1,max/Math.max(im.width,im.height)),c=document.createElement('canvas');
+        c.width=Math.max(1,Math.round(im.width*k));c.height=Math.max(1,Math.round(im.height*k));
+        c.getContext('2d').drawImage(im,0,0,c.width,c.height);
+        let d=c.toDataURL('image/jpeg',.72);if(d.length>150000)d=c.toDataURL('image/jpeg',.5);
+        res(d.length<=200000?d:null);
+      }catch{res(null);}
+      URL.revokeObjectURL(url);
+    };
+    im.onerror=()=>{URL.revokeObjectURL(url);res(null);};
+    im.src=url;
+  });
+}
+// "📷 Subir el SINPE": guarda la foto en el pedido (y, con cuenta, también el original en la nube) y avisa que ya pagó.
+async function enviarComprobante(file,o){
+  if(!file)throw new Error('Elegí la foto del comprobante');
+  if(file.size>8*1024*1024)throw new Error('La foto pesa mucho (máximo 8 MB)');
+  const img=await reducirImagen(file);
+  let path=null;
+  if(modo==='nube'&&supa&&authUser&&authSession&&/^image\/(jpeg|png|webp|heic|heif)$|^application\/pdf$/i.test(file.type||'')&&file.size<=5*1024*1024){
+    try{
+      const ext=(file.name.split('.').pop()||'jpg').toLowerCase().replace(/[^a-z0-9]/g,'')||'jpg';
+      path=authUser.id+'/'+o.id+'-'+Date.now()+'.'+ext;
+      const up=await timeout(supa.storage.from('aramo-comprobantes').upload(path,file,{upsert:false,contentType:file.type||'image/jpeg'}),12000);
+      if(up.error)throw new Error(up.error.message);
+    }catch(e){path=null;if(!img)throw e;}
+  }
+  if(!img&&!path)throw new Error('Subí una foto JPG o PNG del comprobante');
+  const d={nombre:String(file.name||'comprobante').slice(0,80),subido:now(),...(path?{path}:{}),...(img?{img}:{})};
+  await cambiar(o.id,x=>{
+    x.comprobante=d;
+    if(x.pago&&x.pago.estado!=='verificado'){x.pago.estado='reportado';x.pago.reportado=now();}
+    x._ev={tipo:'sinpe-reportado',monto:totalDe(x),metodo:'SINPE'};
+  },'cliente','Subió el comprobante del SINPE');
+  return d;
+}
 async function subirComprobante(file,o){
   if(!supa||!authUser)throw new Error('Verificá tu cuenta primero');
   if(!file||file.size>5*1024*1024)throw new Error('El comprobante debe pesar menos de 5 MB');
@@ -594,7 +664,31 @@ const FASES=[
   {k:'alistando',n:'Alistando',e:'🧑‍🌾',txt:'La tienda está terminando de armar tu pedido.'},
   {k:'entregado',n:'Entregado',e:'🛍️',txt:'¡Gracias por comprar en ARAMO!'},
 ];
+// La línea de pasos que ve el cliente son 4: Enviado → Recibido → Alistando → Entregado.
+// La confirmación de la cotización ya no es un paso: es un aviso dentro de Alistando.
+const PASOS4=[
+  {k:'enviado',n:'Enviado',e:'📤'},
+  {k:'recibido',n:'Recibido por la tienda',e:'📥'},
+  {k:'alistando',n:'Alistando',e:'🧑‍🌾'},
+  {k:'entregado',n:'Entregado',e:'🛍️'},
+];
+function paso4De(o){const f=faseDe(o);return f==='confirmacion'?'alistando':f;}
+// El total es "definitivo" solo cuando el cliente confirmó la cotización de la tienda (o ya se cobró / entregó).
+function definitivo(o){return !!(o?.confirmacion?.at||o?.cobro||o?.estado==='entregado');}
+// Qué cambió respecto a lo que pidió el cliente (cantidades, no hay, precios)
+const q0De=it=>it.q0!=null?+it.q0:+it.q||0;
+const p0De=it=>it.p0!=null?+it.p0:+it.p||0;
+function cambiosDe(o){
+  const out=[];
+  (o?.items||[]).forEach(it=>{
+    const a=q0De(it),b=qtyItem(it),pa=p0De(it),pb=it.pr!=null&&it.pr!==''?+it.pr:+it.p||0,nohay=it.estado==='nohay';
+    if(nohay||Math.abs(a-b)>1e-9||Math.abs(pa-pb)>.5)out.push({k:it.k,n:it.n,e:it.e,u:it.u,antes:a,ahora:b,pAntes:pa,pAhora:pb,nohay,pide:it.pide||null});
+  });
+  return out;
+}
+function totalAntesDe(o){return redondear5(Math.max(0,(o?.items||[]).reduce((t,it)=>t+q0De(it)*p0De(it),0)+(+o?.retiro?.envio?.costo||0)-(+o?.premio?.valor||0)));}
 function faseDe(o){
+  if(o?.estado==='entregado')return 'entregado';
   const f=String(o?.fase||'');
   if(FASES.some(x=>x.k===f))return f;
   if(o?.estado==='nuevo')return 'enviado';
@@ -624,6 +718,7 @@ window.AramoNube={
   envioCfg,estimarEnvio,repartoEnvio,costoRealUber,productosDe,ubiSuc,tarifaKmAprendida,distKm,
   nuevoId,nuevoRef,nuevoPin,colones,redondear5,qtyItem,totalDe,esAprox,telCR,wa,
   ESTADOS,FASES,faseDe,PAGOS,NIVELES,lealtad,hojasDe,cuentaCliente,historial,telDe,
+  FASES4:PASOS4,paso4De,definitivo,cambiosDe,totalAntesDe,sincronizar,enviarComprobante,DEV,setQuien:f=>{quienFn=f;},
   authEstado,actualizarCuenta:refrescarAuth,registrarCorreo,entrarCorreo,recuperarCorreo,enviarCodigo,verificarCodigo,salir,direcciones,guardarDireccion,borrarDireccion,
   registrarEvento,metricas,guardarSuscripcion,cupoHorario,subirComprobante,comprobanteUrl,subirFoto,
 };

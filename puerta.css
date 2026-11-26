@@ -449,3 +449,26 @@ html[data-theme="dark"] .loc-ir{color:#06150d}
 .mo-niveles{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:6px}
 .mo-niveles span{display:grid;justify-items:center;gap:2px;padding:10px 4px;border-radius:14px;color:#fff;font-size:12px;font-weight:900;text-align:center;background:linear-gradient(140deg,var(--n1),var(--n2))}
 .mo-niveles b{font-size:22px}.mo-niveles small{font-size:10.5px;opacity:.85;color:var(--n3)}
+
+/* ═══ Flujo del pedido (2026-11-25): comprobante, traslado a otra tienda y bitácora ═══ */
+.mo-comp{display:flex;align-items:center;gap:12px;width:100%;margin-bottom:8px;padding:10px;border-radius:16px;border:1.5px solid var(--og);background:var(--card);color:var(--t);text-align:left}
+.mo-comp-img{flex:none;display:grid;place-items:center;width:84px;height:84px;border-radius:12px;background:var(--ch);overflow:hidden;font-size:34px}
+.mo-comp-img img{width:100%;height:100%;object-fit:cover}
+.mo-comp-t{flex:1;min-width:0}
+.mo-comp-t b{display:block;font-size:15px}
+.mo-comp-t small{display:block;margin-top:2px;font-size:12.5px;font-weight:800;color:var(--m)}
+.mo-light{position:fixed;inset:0;z-index:3800;display:none;flex-direction:column;align-items:center;justify-content:center;gap:10px;padding:16px;background:rgba(5,10,7,.9);cursor:zoom-out}
+.mo-light.open{display:flex}
+.mo-light img{max-width:100%;max-height:78dvh;object-fit:contain;border-radius:12px;background:#fff}
+.mo-light p{color:#fff;font-size:14px;font-weight:800}
+.mo-light-x{position:absolute;top:calc(12px + env(safe-area-inset-top,0px));right:14px;width:48px;height:48px;border-radius:50%;background:rgba(255,255,255,.18);color:#fff;font-size:22px}
+.mo-traslado{display:grid;gap:8px;margin-top:10px}
+.mo-traslado .mo-aviso{margin-top:0}
+.mo-acc-nota.ok{background:var(--gd);color:var(--g)}
+.mo-acc-nota.mal{background:rgba(208,64,47,.12);color:#d0402f}
+.mo-acc-nota{padding:10px 12px;border-radius:12px;font-size:13px;font-weight:700;line-height:1.45}
+.mo-bit{display:grid;grid-template-columns:auto 1fr;gap:0 10px;padding:6px 0;border-top:1px solid var(--b2)}
+.mo-bit:first-child{border-top:0}
+.mo-bit .h{grid-row:span 2;font-weight:900;color:var(--t);white-space:nowrap}
+.mo-bit .q{font-weight:900;color:var(--m)}
+.mo-bit .m{color:var(--t);font-weight:600}
