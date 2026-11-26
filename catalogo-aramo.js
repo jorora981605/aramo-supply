@@ -449,6 +449,16 @@ function fuera(nombre){return FUERA.has(norm(nombre));}
 // Clave del producto en La Feria: la de fábrica si La Feria ya lo tenía; si no, c_<id>
 function claveFeria(id){const p=POR_ID.get(id);return p&&p.f?p.f:'c_'+id;}
 
+// ── El precio que sale del costo (la regla única de todo ARAMO: Cierre → POS, Vitrina y La Feria) ──
+// Precio meta = costo + 40 % (o más, si la tienda lo pidió), redondeado hacia arriba a ₡25.
+// El 40 % es el mínimo: un margen de 35 guardado de antes, o vacío, se lee como 40.
+const MARGEN_MIN=40,PASO_PRECIO=25;
+const margenDe=m=>Math.max(MARGEN_MIN,+m||0);
+function precioMeta(costo,margen){
+  const c=+costo;if(!(c>0))return 0;
+  return Math.ceil(c*(100+margenDe(margen))/100/PASO_PRECIO-1e-9)*PASO_PRECIO; // el -1e-9 evita que 1000×1,4 suba a ₡1.425 por decimales
+}
+
 // ── La nube: lo que Surtido tiene hoy y lo que publicó el POS de cada tienda ──
 const LS_NUBE='aramo_cat_nube';
 let NUBE=(()=>{try{return JSON.parse(localStorage.getItem(LS_NUBE))||{};}catch(e){return {};}})();
@@ -508,5 +518,5 @@ function todos(suc){
 }
 
 window.ARAMO_CAT={CATS,CAT_NOMBRE,LISTA,norm,buscar,idDe,deFeria,categoria,emoji,fuera,claveFeria,unidadFeria,nombreBonito,
-  reglaCat,cargar,ponerNube,surtidoNube,posDe,posFecha,todos,get sinTabla(){return !!NUBE.sinTabla;}};
+  reglaCat,MARGEN_MIN,margenDe,precioMeta,cargar,ponerNube,surtidoNube,posDe,posFecha,todos,get sinTabla(){return !!NUBE.sinTabla;}};
 })();

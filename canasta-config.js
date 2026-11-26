@@ -167,7 +167,7 @@ window.ARAMO_CANASTA={
     alistadoMin:40,         // minutos que tarda en estar lista
     alCarro:true,           // ofrecer "me lo llevan al carro"
     envio:true,             // ofrecer envío a domicilio con Uber
-    margen:35,              // % sobre el costo de Surtido para el precio automático
+    margen:40,              // % sobre el costo del Cierre para el precio automático (40 es el mínimo: nunca baja de ahí)
     sucursales:[
       // lat/lng aprox.: sirven para el estimado del envío. Mostrador → Ajustes → Envío → "Guardar ubicación (estando aquí)" las afina.
       {k:'moravia',n:'ARAMO',zona:'Moravia',mapa:'ARAMO verdulería Moravia',abre:'07:00',cierra:'19:00',activa:true,whatsapp:'',lat:9.964,lng:-84.048,aprox:true},

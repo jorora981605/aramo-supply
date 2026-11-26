@@ -192,37 +192,66 @@ function surtidoResumen(){
   }catch{}
   return{prods,provs:provs.size,sinEnviar:sinEnviar.size};
 }
-function costoHoy(nombre){
-  // Precio más bajo que ARAMO paga hoy por ese producto en Inventario.
+// Cuándo se puso cada costo (precios.updated_at, solo lectura): si un producto lo trae más de un proveedor, vale el costo más nuevo.
+const costoT={};let _costoTc=0;
+function cargarCostoT(){
   try{
+    if(typeof supa==='undefined'||!supa||Date.now()-_costoTc<120000)return;_costoTc=Date.now();
+    supa.from('precios').select('proveedor,producto_id,updated_at').then(r=>{
+      if(!r||r.error||!Array.isArray(r.data))return;
+      r.data.forEach(f=>{costoT[f.proveedor+'|'+f.producto_id]=Date.parse(f.updated_at)||0;});
+    },()=>{});
+  }catch{}
+}
+function costoHoy(nombre){
+  // El costo que ARAMO paga hoy por ese producto en Inventario: el que se puso más recién (si no se sabe cuándo, el más bajo).
+  try{
+    cargarCostoT();
     const exacto=nrm(nombre),key=exacto.split(' ')[0];let best=null;
     Object.entries(getAllProviders()).forEach(([prov,d])=>{
       if(d?.deleted)return;
       (d.products||[]).forEach(p=>{
         const pn=nrm(p.name);
-        if(pn===exacto||pn.split(/\s+/)[0]===key){const pr=+getPrice(prov,p.id)||0;if(pr>0&&(!best||pr<best.pr))best={pr,prov,u:p.unit};}
+        if(pn===exacto||pn.split(/\s+/)[0]===key){
+          const pr=+getPrice(prov,p.id)||0,tt=costoT[prov+'|'+p.id]||0;
+          if(pr>0&&(!best||tt>best.t||(tt===best.t&&pr<best.pr)))best={pr,prov,u:p.unit,t:tt};
+        }
       });
     });
     return best;
   }catch{return null;}
 }
-const precioAuto=(costo,margen)=>Math.ceil(costo*(1+(+margen||0)/100)/25)*25;
-// Precio automático: si un producto está en 🤖, su precio sigue al costo de Inventario + margen.
+// La regla única (catalogo-aramo.js): costo + 40 % (mínimo), redondeado hacia arriba a ₡25. Igual que en el POS.
+const margenTienda=()=>{const C=window.ARAMO_CAT;return C&&C.margenDe?C.margenDe(T().margen):Math.max(40,+T().margen||0);};
+const precioAuto=(costo,margen)=>{const C=window.ARAMO_CAT;return C&&C.precioMeta?C.precioMeta(costo,margen):Math.ceil((+costo||0)*(100+Math.max(40,+margen||0))/100/25-1e-9)*25;};
+// Precio automático: si un producto está en 🤖, su precio sigue al costo del Cierre + margen.
+//  · el costo sube y el precio queda corto → sube solo;
+//  · el costo baja → el precio NO baja solo: queda una nota en la Vitrina («podés bajarlo a ₡X») con su botón.
+const notasVit=()=>LS.get('aramo_vit_notas',{});
 let _autoT=0;
 function autoPrecios(){
   clearTimeout(_autoT);
   _autoT=setTimeout(()=>{
-    const t=T(),ed=t.prods||{},precios={...(t.precios||{})};let cambios=0;
+    const t=T(),ed=t.prods||{},precios={...(t.precios||{})},sucursales=(t.sucursales||[]).map(s=>({...s,precios:{...(s.precios||{})}})),notas={...notasVit()},mg=margenTienda();
+    let subio=0,tocoSuc=false,tocoNotas=false;const nuevas=[];
     N.catalogo().forEach(p=>{
       if(!ed[p.k]?.auto)return;
       const c=costoHoy(p.n);if(!c)return;
-      const v=precioAuto(c.pr,t.margen??35);
-      if(+precios[p.k]!==v){precios[p.k]=v;cambios++;}
+      const v=precioAuto(c.pr,mg);let alto=0,subioEste=false;
+      [{hoy:+precios[p.k]||0,g:1},...sucursales.filter(s=>s.precios[p.k]!=null).map(s=>({hoy:+s.precios[p.k]||0,s}))].forEach(l=>{
+        if(l.hoy<v){if(l.g)precios[p.k]=v;else{l.s.precios[p.k]=v;tocoSuc=true;}subioEste=true;}
+        else alto=Math.max(alto,l.hoy);
+      });
+      if(subioEste)subio++;
+      if(alto>v){const n=notas[p.k];if(!n||n.sug!==v||n.hoy!==alto){notas[p.k]={sug:v,costo:c.pr,hoy:alto,t:Date.now()};nuevas.push(p.n);tocoNotas=true;}}
+      else if(notas[p.k]){delete notas[p.k];tocoNotas=true;}
     });
-    if(cambios){N.guardarTienda({precios});toast(`🤖 ${cambios} precio${cambios>1?'s':''} actualizado${cambios>1?'s':''} con el costo de hoy`);}
+    if(tocoNotas)LS.set('aramo_vit_notas',notas);
+    if(subio){N.guardarTienda(tocoSuc?{precios,sucursales}:{precios});toast(`🤖 ${subio} precio${subio>1?'s':''} subió solo con el costo de hoy`);}
+    else if(nuevas.length)toast(`💡 El costo bajó: ${nuevas.length>1?nuevas.length+' precios se pueden bajar':'podés bajar el precio de '+nuevas[0]} (Vitrina)`);
   },600);
 }
-if(typeof window.setPrice==='function'){const _sp=window.setPrice;window.setPrice=function(){const r=_sp.apply(this,arguments);autoPrecios();return r;};}
+if(typeof window.setPrice==='function'){const _sp=window.setPrice;window.setPrice=function(){const r=_sp.apply(this,arguments);try{costoT[arguments[0]+'|'+arguments[1]]=Date.now();}catch{}autoPrecios();return r;};}
 
 // ══════════════ Encargos ══════════════
 const activos=()=>N.lista().filter(o=>!o.archivado&&!['entregado','cancelado'].includes(o.estado));
@@ -1111,21 +1140,22 @@ function pintarCajaHoy(){
 function pintarVitrina(){
   const t=T(),cat=N.catalogo(M.suc==='todas'?null:M.suc),q=nrm(M.vq);
   const L=cat.filter(p=>(M.vcat==='todos'||p.c===M.vcat)&&(!q||nrm(p.n+' '+(p.d||'')).includes(q)));
-  const margen=t.margen??35;
+  const margen=margenTienda(),notas=notasVit();
   abrirHoja(`<p class="mo-kick">Vitrina · lo que ven los clientes en La Feria</p><div class="mo-h">🏷️ Precios y productos</div><div class="mo-s">Todo se guarda solo y se ve al instante en La Feria y las recetas. Los pedidos ya sellados conservan su precio.</div>
-    <div class="mo-dos" style="margin-top:10px"><label class="mo-field">Buscar<input type="search" id="moVitQ" value="${esc(M.vq)}" placeholder="Ej.: aguacate" autocomplete="off"></label><label class="mo-field">🤖 Margen automático<input type="number" id="moMargen" min="0" max="300" step="1" value="${margen}"></label></div>
+    <div class="mo-dos" style="margin-top:10px"><label class="mo-field">Buscar<input type="search" id="moVitQ" value="${esc(M.vq)}" placeholder="Ej.: aguacate" autocomplete="off"></label><label class="mo-field">🤖 Margen automático (mínimo 40 %)<input type="number" id="moMargen" min="40" max="300" step="1" value="${margen}"></label></div>
     <div class="mo-chips" style="flex-wrap:nowrap;overflow-x:auto">${[{k:'todos',n:'Todos',e:'🧺'},...CFG.pasillos.filter(p=>p.k!=='top')].map(p=>`<button type="button" class="mo-chip${M.vcat===p.k?' on':''}" data-mo="vcat" data-k="${p.k}">${p.e} ${esc(p.n)}</button>`).join('')}</div>
     <button type="button" class="mo-btn p w" style="margin-top:10px" data-mo="prod-nuevo">＋ Producto nuevo</button>
     <div class="mo-blk" style="padding:4px 12px">${L.map(p=>{
       const auto=!!(t.prods||{})[p.k]?.auto,c=auto||M.vq?costoHoy(p.n):null;
       return `<div class="mo-vi${p.oculto?' oculto':''}"><button type="button" class="e" data-mo="prod-edit" data-k="${p.k}" aria-label="Editar ${esc(p.n)}">${p.e}</button>
-        <button type="button" class="t" data-mo="prod-edit" data-k="${p.k}"><strong>${esc(p.n)}${p.propio?' <span class="mo-pill">nuevo</span>':''}</strong><small>${esc(p.d||'')}${p.d?' · ':''}por ${esc(UNI[p.u]||p.u)}${auto?` · 🤖 ${c?'costo '+$c(c.pr)+' + '+margen+'%':'sin costo en Inventario'}`:''}</small></button>
+        <button type="button" class="t" data-mo="prod-edit" data-k="${p.k}"><strong>${esc(p.n)}${p.propio?' <span class="mo-pill">nuevo</span>':''}</strong><small>${auto&&notas[p.k]?'':esc(p.d||'')+(p.d?' · ':'')}por ${esc(UNI[p.u]||p.u)}${auto?(notas[p.k]?` · 💡 podés bajarlo a ${$c(notas[p.k].sug)}`:` · 🤖 ${c?'costo '+$c(c.pr)+' + '+margen+'%':'sin costo en Inventario'}`):''}</small></button>
         <input type="number" inputmode="numeric" min="0" step="5" value="${p.p}" data-mo-pr="${p.k}" aria-label="Precio de ${esc(p.n)}" ${auto?'disabled':''}>
+        ${auto&&notas[p.k]?`<button type="button" class="tg on" data-mo="vit-bajar" data-k="${p.k}" aria-label="Bajar a ${$c(notas[p.k].sug)}" title="El costo bajó: bajar a ${$c(notas[p.k].sug)}">⬇</button>`:''}
         <button type="button" class="tg${auto?' on':''}" data-mo="auto" data-k="${p.k}" aria-label="Precio automático" title="Precio automático con el costo de Inventario">🤖</button>
         <button type="button" class="tg${p.oculto?'':' on'}" data-mo="vis" data-k="${p.k}" aria-label="Mostrar">${p.oculto?'🙈':'👁'}</button>
         <button type="button" class="tg ag${p.agotado?' on':''}" data-mo="ago" data-k="${p.k}" aria-label="Agotado">🚫</button></div>`;}).join('')||'<div class="mo-vacio">Nada con ese nombre.</div>'}</div>`);
   const qi=$('moVitQ');qi.addEventListener('input',()=>{M.vq=qi.value;const pos=qi.selectionStart;repintar(pintarVitrina);const n=$('moVitQ');n.focus();n.setSelectionRange(pos,pos);});
-  const mg=$('moMargen');mg.addEventListener('change',()=>{N.guardarTienda({margen:Math.max(0,+mg.value||0)});autoPrecios();toast('🤖 Margen '+mg.value+'% guardado');});
+  const mg=$('moMargen');mg.addEventListener('change',()=>{const m=Math.max(40,+mg.value||0);mg.value=m;N.guardarTienda({margen:m});autoPrecios();toast('🤖 Margen '+m+'% guardado');});
   $('moSheet').querySelectorAll('[data-mo-pr]').forEach(i=>i.addEventListener('change',()=>{
     const k=i.dataset.moPr,v=Math.max(0,Math.round(+i.value||0));
     const precios={...(T().precios||{})};if(v>0)precios[k]=v;else delete precios[k];
@@ -1149,8 +1179,8 @@ function pintarProd(){
      <div class="mo-dos"><label class="mo-field">Pasillo<select id="peC">${CFG.pasillos.filter(p=>p.k!=='top').map(p=>`<option value="${p.k}"${e.c===p.k?' selected':''}>${p.e} ${esc(p.n)}</option>`).join('')}</select></label><label class="mo-field">Precio ₡ por ${esc(UNI[e.u]||e.u)}<input id="peP" type="number" inputmode="numeric" min="0" step="5" value="${+e.p||''}" ${e.auto?'disabled':''}></label></div>
      <label class="mo-field">Foto del producto<input id="peFoto" type="file" accept="image/jpeg,image/png,image/webp,image/heic"><small>JPG, PNG o WebP · máximo 5 MB. La foto se publica en el catálogo.</small></label>
      <label class="mo-field">URL de foto existente<input id="peFotoUrl" type="url" value="${esc(e.foto||'')}" placeholder="https://…"></label>
-    <label class="mo-sw">🤖 Precio automático (costo de Inventario + ${t.margen??35}%)<input type="checkbox" id="peA" ${e.auto?'checked':''}></label>
-    <div class="mo-s">${c?`Costo de hoy en Inventario: <b>${$c(c.pr)}</b> (${esc(c.prov)}) → precio automático <b>${$c(precioAuto(c.pr,t.margen??35))}</b>`:'No encontramos este producto en Inventario con ese nombre; el automático necesita un costo.'}</div>
+    <label class="mo-sw">🤖 Precio automático (costo del Cierre + ${margenTienda()}%)<input type="checkbox" id="peA" ${e.auto?'checked':''}></label>
+    <div class="mo-s">${c?`Costo de hoy en Inventario: <b>${$c(c.pr)}</b> (${esc(c.prov)}) → precio automático <b>${$c(precioAuto(c.pr,margenTienda()))}</b>`:'No encontramos este producto en Inventario con ese nombre; el automático necesita un costo.'}</div>
     <button type="button" class="mo-btn p w big" style="margin-top:12px" data-mo="prod-ok">Guardar · se ve al instante en La Feria</button>
     ${e.nuevo?'':'<button type="button" class="mo-btn w" style="margin-top:8px" data-mo="vitrina">‹ Volver a la vitrina</button>'}`);
   const u=$('peU');u.addEventListener('change',()=>{M.edit={...leerProd(),u:u.value,s:u.value==='kg'?.5:1};repintar(pintarProd);});
@@ -1174,7 +1204,7 @@ function guardarProd(){
   }else prods[k]={...(prods[k]||{}),n:e.n,d:e.d,e:e.e,c:e.c,u:e.u,s:e.s,foto:e.foto,orden:e.orden,auto:e.auto};
   if(e.nuevo)prods[k]={...(prods[k]||{}),foto:e.foto,orden:e.orden,auto:e.auto};
   prods[k]={...(prods[k]||{}),cabys:e.cabys||''}; // CABYS: vacío hasta que la tienda lo llene; viaja en cada línea del pedido
-  if(e.auto){const c=costoHoy(e.n);if(c)precios[k]=precioAuto(c.pr,t.margen??35);}
+  if(e.auto){const c=costoHoy(e.n);if(c)precios[k]=precioAuto(c.pr,margenTienda());}
   else if(e.p>0)precios[k]=e.p;
   N.guardarTienda({prods,precios,nuevos});
   toast(`🏷️ ${e.n} guardado · ya se ve en La Feria`);
@@ -1550,6 +1580,13 @@ const ACT={
   'promo-add'(){const t=T(),v=id=>$(id)?.value.trim()||'',p={k:'promo_'+Date.now().toString(36),titulo:v('prT'),texto:v('prD'),producto:v('prK'),hasta:v('prH')};if(!p.titulo){toast('Poné un título');return;}N.guardarTienda({promos:[...(t.promos||[]),p]});toast('✨ Oferta guardada');pintarPromos();},
   'promo-del'(el){const t=T(),promos=(t.promos||[]).filter((_,i)=>i!==+el.dataset.i);N.guardarTienda({promos});pintarPromos();},
   vcat(el){M.vcat=el.dataset.k;repintar(pintarVitrina);},
+  'vit-bajar'(el){
+    const k=el.dataset.k,notas={...notasVit()},n=notas[k];if(!n)return;
+    const t=T(),precios={...(t.precios||{})},sucursales=(t.sucursales||[]).map(s=>(s.precios&&s.precios[k]!=null&&+s.precios[k]>n.sug)?{...s,precios:{...s.precios,[k]:n.sug}}:s);
+    if(+precios[k]>n.sug)precios[k]=n.sug;
+    delete notas[k];LS.set('aramo_vit_notas',notas);
+    N.guardarTienda({precios,sucursales});toast('⬇ Bajó a '+$c(n.sug)+' · ya se ve en La Feria');repintar(pintarVitrina);
+  },
   'prod-nuevo'(){editarProd(null);},
   'prod-edit'(el){editarProd(el.dataset.k);},
   'prod-ok'(){guardarProd();},
@@ -1557,7 +1594,7 @@ const ACT={
     const k=el.dataset.k,t=T(),prods={...(t.prods||{})},on=!prods[k]?.auto;
     prods[k]={...(prods[k]||{}),auto:on};
     const precios={...(t.precios||{})};
-    if(on){const p=N.catalogo(M.suc==='todas'?null:M.suc).find(x=>x.k===k),c=p&&costoHoy(p.n);if(!c){toast('No hay costo de '+(p?.n||k)+' en Inventario; queda el precio manual');return;}precios[k]=precioAuto(c.pr,t.margen??35);}
+    if(on){const p=N.catalogo(M.suc==='todas'?null:M.suc).find(x=>x.k===k),c=p&&costoHoy(p.n);if(!c){toast('No hay costo de '+(p?.n||k)+' en Inventario; queda el precio manual');return;}precios[k]=precioAuto(c.pr,margenTienda());}
     const sucursales=(t.sucursales||[]).map(s=>s.k===M.suc?{...s,precios:{...(s.precios||{}),...(on?{[k]:precios[k]}:{})}}:s);
     N.guardarTienda({prods,precios,sucursales});toast(on?'🤖 Precio automático: sigue al costo de Inventario':'Precio manual');repintar(pintarVitrina);
   },
