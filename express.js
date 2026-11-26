@@ -467,6 +467,7 @@ function xpRenderProveedores(){
   const list=$('providersNavList');
   if(!list)return;
   const tools=$('inventoryTools');if(tools)tools.hidden=false;
+  const ciTop=$('ciTop');if(ciTop)ciTop.innerHTML=ciMostrar()?ciBarra():'';
   const history=$('surtidoHistory');if(history)history.innerHTML=xpHistoryHtml();
   const notice=$('inventoryResetNotice');
   if(notice)notice.innerHTML=XP.undo&&Date.now()-XP.undo.at<120000?`<div class="pd-undo">Pedido reiniciado. <button type="button" data-inventory-undo>Deshacer</button></div>`:'';
@@ -1475,6 +1476,17 @@ function ciCuadre(c){
   return c.dif<0?{cls:'falta',txt:`Faltan ₡${fmt(-c.dif)}`}:{cls:'sobra',txt:`Sobran ₡${fmt(c.dif)}`};
 }
 const ciClaseProv=p=>!p.visto?'':p.faltan?'falta':'ok';
+// El botón del Cierre se ve en Ambos cuando hay pedido, cuando hay un cierre a medio llenar o
+// cuando ya se envió algo hoy (aunque el pedido se haya reiniciado). Va arriba, en Proveedores y
+// en Pedido, y no solo al fondo.
+function ciMostrar(){
+  if(activeOrderSides().length<2)return false;
+  const st=CI.st||ciLeer();
+  if(ciVigente(st)&&ciTieneDatos(st))return true;
+  if(xpTotals().items>0)return true;
+  const ult=xpLatestSent(),hoy=new Date().toDateString();
+  return !!ult&&new Date(ult.at).toDateString()===hoy;
+}
 // ── Barra en "Tu pedido de hoy" (solo en Ambos) ──
 function ciBarra(){
   const st=CI.st||ciLeer(),c=ciVigente(st)&&ciTieneDatos(st)?ciCalc(st):null;
@@ -1627,7 +1639,7 @@ function ciCerrar(guardar=true){
   if(guardar)ciGuardarAhora();
   if(h.contains(document.activeElement))document.activeElement.blur(); // guarda el precio que se estaba escribiendo
   h.classList.remove('open');document.documentElement.classList.remove('ci-abierto');
-  sxRenderTablero();
+  sxRenderTablero();xpRefresh();
 }
 function ciIr(j){
   const st=CI.st,c=ciCalc(st),n=c.provs.length;
@@ -1804,7 +1816,7 @@ function xpRenderPedido(){
     </div>
   </section>`;
   }
-  if(dos)html+=ciBarra();
+  if(dos&&ciMostrar())html+=ciBarra();
   html+=auBoton(!t.items);
   if(t.items)html+=`<button type="button" class="sx-pdf-btn" data-sx-pdf><span class="sx-pdf-i">${ico('hoja')}</span><span class="sx-pdf-t"><b>PDF del pedido</b><small>Lista completa para revisar o compartir</small></span><span class="sx-pdf-f" aria-hidden="true">›</span></button>`;
   if(t.items){
@@ -2345,7 +2357,7 @@ function wrap(name,after){
   window[name]=function(){const r=orig.apply(this,arguments);try{after.apply(this,arguments);}catch(err){console.warn('[aramo]',err);}return r;};
 }
 // Las pantallas viejas (Inicio, Hoy, Pedir) se unificaron en Proveedores y Pedido.
-const VIEW_MAP={home:'proveedores',express:'proveedores',resumen:'pedido',mercado:'pedido'};
+const VIEW_MAP={home:'proveedores',express:'proveedores',resumen:'pedido',mercado:'pedido',precios:'productos'};
 const _switchView=window.switchView;
 window.switchView=function(name){
   name=VIEW_MAP[name]||name;
@@ -2395,6 +2407,7 @@ $('provSuggest')?.addEventListener('click',xpSugClick);
 $('pedidoBody')?.addEventListener('click',xpPedidoClick);
 $('pedidoBody')?.addEventListener('click',e=>{if(e.target.closest('[data-sx-pdf]'))hojaPdfAbrir();else if(e.target.closest('[data-sx-cierre]'))ciAbrir();else if(e.target.closest('[data-sx-siempre]'))auAbrir();});
 $('sxTablero')?.addEventListener('click',xpPedidoClick);
+$('ciTop')?.addEventListener('click',e=>{if(e.target.closest('[data-sx-cierre]'))ciAbrir();});
 $('sxProvBar')?.addEventListener('click',()=>{const b=$('sxProvBar'),w=b.closest('.pv-wrap'),ab=!w.classList.contains('sx-abierto');w.classList.toggle('sx-abierto',ab);b.setAttribute('aria-expanded',String(ab));if(ab)setTimeout(()=>b.scrollIntoView({behavior:'smooth',block:'start'}),60);});
 $('pedidoBody')?.addEventListener('click',e=>{const f=e.target.closest('[data-pdx-f]');if(!f||f.disabled)return;_pdFiltro=f.dataset.pdxF;xpRenderPedido();});
 

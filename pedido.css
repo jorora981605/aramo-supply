@@ -78,6 +78,8 @@
 .pdx-vacio b{font:600 22px var(--pdx-s);color:#fff}
 .pdx-vacio small{font:600 13.5px var(--pdx-f);color:#b8dcc6}
 .pdx-vacio .pdx-cta{margin-top:12px;max-width:360px}
+.pdx-vacio .pdx-cta b{font:800 16px var(--pdx-f);color:#0b3d27}
+.pdx-vacio .pdx-cta small{color:#557363}
 
 /* ── Título y filtros ── */
 .pdx-barra-f{display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:10px 14px;margin:0 2px 14px}
@@ -118,3 +120,26 @@
 .pd-late{display:grid;gap:5px;margin:8px 0;padding:11px 12px;border:1px solid #f4cd8a;border-radius:13px;background:#fff8e9;color:#51360e;font:600 12px/1.45 var(--pdx-f)}.pd-late>small{font-size:11px}.pd-late>div{display:flex;flex-wrap:wrap;gap:6px}.pd-late button{padding:8px 10px;border:1px solid #d6ae6a;border-radius:9px;background:#fff;color:#54390e;font:800 11px var(--pdx-f)}.pd-late.confirmed{border-color:#abd8b5;background:#eef9f0;color:#16552c}
 .pd-hist-day{margin:8px 0;border:1px solid var(--pdx-b,#e7e4dc);border-radius:12px;background:#fff}.pd-hist-day>summary{padding:10px 12px;font:800 12px var(--pdx-f);cursor:pointer}.pd-hist-row{display:grid;gap:4px;padding:10px 12px;border-top:1px solid #eee;color:#28352d;font:500 11px/1.45 var(--pdx-f)}
 .pd-contactos{margin:10px 0 80px}.pd-contactos>summary{list-style:none;cursor:pointer}.pd-contactos>summary::-webkit-details-marker{display:none}.pd-contactos[open]>.cfg-acc-body{display:block}
+
+/* ── Teléfono: la tarjeta verde un poco más baja para que el Cierre de compras se vea debajo ── */
+@media (max-width:520px){
+  .pdx-hero{margin-bottom:12px;padding-top:16px}
+  .pdx-cuerpo{margin-top:12px;gap:14px}
+  .pd-sent-time{width:100%;margin:10px 0 0;padding:9px 14px;grid-template-columns:1fr auto;align-items:baseline}
+  .pd-sent-time strong{font-size:24px;text-align:right}
+  .pd-sent-time small{grid-column:1/-1}
+  .pdx-split{margin:12px 0 10px}
+  .pdx-envios{margin-top:10px}
+  .pdx-cta{margin-top:12px}
+}
+@media (max-width:520px) and (max-height:780px){
+  .pd-sent-time small{display:none}
+  .pdx-total strong{font-size:44px}
+  .pdx-total span{margin-top:4px}
+  .pdx-chip{padding:8px 10px}
+  .pdx-chip b{font-size:19px}
+  .pdx-split{margin:8px 0 8px}
+  .pdx-ley b{font-size:17px}
+  .pdx-cta{margin-top:10px;padding:8px 10px}
+  .pdx-acc2 button{min-height:40px}
+}
