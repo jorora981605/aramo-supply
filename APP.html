@@ -12,7 +12,7 @@
 <link rel="manifest" href="./manifest.json">
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.117.0"></script>
 <script src="catalogo-productos.js"></script>
-<script src="catalogo-aramo.js?v=20261125-catalogo1"></script>
+<script src="catalogo-aramo.js?v=20261126-productos3"></script>
 <script src="supplier-base.js"></script>
 <!-- Sistema de diseño ARAMO: tokens y letras locales. Va PRIMERO. -->
 <script>
@@ -700,8 +700,8 @@ html[data-theme="dark"] .today-money-card{background:linear-gradient(145deg,#125
 <link rel="stylesheet" href="express.css?v=20261020-premium-2">
 <link rel="stylesheet" href="puerta.css?v=20261126-cuadros-mostrador">
 <link rel="stylesheet" href="portadas.css?v=20261126-sin-control-moravia">
-<link rel="stylesheet" href="pedido.css?v=20261125-diario1">
-<link rel="stylesheet" href="surtido.css?v=20261125-diario1">
+<link rel="stylesheet" href="pedido.css?v=20261126-productos3">
+<link rel="stylesheet" href="surtido.css?v=20261126-productos3">
 <link rel="stylesheet" href="leido.css?v=1">
 </head>
 <body>
@@ -797,7 +797,7 @@ html[data-theme="dark"] .today-money-card{background:linear-gradient(145deg,#125
     <div class="home-grid" id="homeGrid"></div>
     <div class="hx-links">
       <button type="button" onclick="switchView('proveedores')">🏪 Proveedores</button>
-      <button type="button" onclick="switchView('precios')">💰 Precios</button>
+      <button type="button" onclick="switchView('productos')">💰 Productos</button>
     </div>
 
   </div>
@@ -816,6 +816,7 @@ html[data-theme="dark"] .today-money-card{background:linear-gradient(145deg,#125
       <div id="pvResults"></div>
       <div id="inventoryResetNotice"></div>
       <div id="surtidoHistory"></div>
+      <div id="ciTop"></div>
       <button type="button" class="sx-provbar" id="sxProvBar" aria-expanded="false" aria-controls="providersNavList"><span class="sx-pb-e">🏪</span><span class="sx-pb-t"><b>Proveedores</b><small>Tocá para ver todos y agregar productos</small></span><span class="sx-pb-n" id="sxProvBarN"></span><span class="sx-pb-f" aria-hidden="true">▾</span></button>
       <div id="providersNavList" class="pv-grid"></div>
     </div>
@@ -944,13 +945,14 @@ html[data-theme="dark"] .today-money-card{background:linear-gradient(145deg,#125
   </div>
 </div>
 
-<!-- ═══ PRECIOS ═══ -->
-<div class="view" id="view-precios">
+<!-- ═══ PRODUCTOS (antes "Precios"; acá también se buscan y se agregan productos) ═══ -->
+<div class="view" id="view-productos">
   <div class="scroll"><div class="sec">
-    <div class="sec-lbl">Buscar y comparar precios</div>
+    <div class="sec-lbl">Productos <span class="cfg-acc-count" id="accCountCatalogo"></span></div>
     <div class="price-search">
-      <input class="big-search" id="priceSearch" type="search" placeholder="Escribí un producto, por ejemplo tomate…" autocomplete="off">
+      <input class="big-search" id="priceSearch" type="search" placeholder="🔍 Buscar productos…" aria-label="Buscar productos" autocomplete="off">
     </div>
+    <button class="btn btn-g btn-full pr-add" id="addNewCatalogProduct" type="button">＋ Agregar producto nuevo</button>
     <div id="priceSearchResults"></div>
   </div></div>
 </div>
@@ -965,16 +967,6 @@ html[data-theme="dark"] .today-money-card{background:linear-gradient(145deg,#125
         <input type="checkbox" id="leidoSwitch" role="switch" checked>
         <span class="leido-sw" aria-hidden="true"></span>
       </label>
-
-      <div class="cfg-acc" data-acc="catalogo">
-        <button class="cfg-acc-hdr">🥬 Productos <span class="cfg-acc-count" id="accCountCatalogo"></span><span class="cfg-acc-arrow">▾</span></button>
-        <div class="cfg-acc-body">
-          <div class="cfg-acc-sub">Todos los productos que existen en la app. Desde acá los agregás a los proveedores que los venden.</div>
-          <input class="product-picker-search" id="catalogoSearch" type="search" placeholder="🔍 Buscar producto…" autocomplete="off" style="margin-bottom:10px">
-          <button class="btn btn-g btn-full" id="addNewCatalogProduct" type="button" style="margin-bottom:10px">＋ Agregar producto nuevo</button>
-          <div id="catalogoList"></div>
-        </div>
-      </div>
 
       <div class="cfg-acc" data-acc="importar">
         <button class="cfg-acc-hdr">📥 Importar lista Excel <span class="cfg-acc-arrow">▾</span></button>
@@ -1001,7 +993,7 @@ html[data-theme="dark"] .today-money-card{background:linear-gradient(145deg,#125
 <nav class="nav-bottom">
   <button class="nav-btn active" data-view="proveedores"><span class="ico">🏪</span>Proveedores</button>
   <button class="nav-btn" data-view="pedido"><span class="ico">🧺</span>Pedido<span class="nav-badge" id="navPedidoBadge" hidden></span></button>
-  <button class="nav-btn" data-view="precios"><span class="ico">💰</span>Precios</button>
+  <button class="nav-btn" data-view="productos"><span class="ico">💰</span>Productos</button>
   <button class="nav-btn" data-view="config"><span class="ico">⚙️</span>Config</button>
 </nav>
 
@@ -1021,8 +1013,11 @@ html[data-theme="dark"] .today-money-card{background:linear-gradient(145deg,#125
   <div class="modal">
     <div class="modal-handle"></div>
     <div class="modal-title" id="priceModalTitle">Producto</div>
-    <div style="font-size:14px;color:var(--m);margin:-6px 0 12px">Compará y editá. Los cambios se guardan automáticamente.</div>
+    <div style="font-size:14px;color:var(--m);margin:-6px 0 12px">Cambiá el nombre, el ícono, la unidad, los proveedores y los precios. Los precios se guardan solos.</div>
+    <div id="priceModalEdit"></div>
+    <div class="pm-sub">Precio por proveedor</div>
     <div id="priceCompareList"></div>
+    <div id="priceModalExtra"></div>
     <button class="btn btn-g btn-full" type="button" onclick="closePriceModal()">Listo</button>
   </div>
 </div>
@@ -1068,11 +1063,15 @@ html[data-theme="dark"] .today-money-card{background:linear-gradient(145deg,#125
   <div class="modal">
     <div class="modal-handle"></div>
     <div class="modal-title">Agregar producto nuevo</div>
-    <div style="font-size:13px;color:var(--m);line-height:1.4;margin:-5px 0 13px">Quedará disponible en <strong style="color:var(--t)">Otros</strong> para buscarlo y podrás asignarlo a un proveedor.</div>
+    <div style="font-size:13px;color:var(--m);line-height:1.4;margin:-5px 0 13px">Queda en la lista de Productos. Si lo agregás a un proveedor ya sale en su pedido, con su precio.</div>
     <label class="modal-field-label">Nombre del producto<input class="modal-inp" id="newCatalogProductName" type="text" placeholder="Ej. Pepita de ayote" autocomplete="off"></label>
     <label class="modal-field-label">Unidad<select class="modal-inp" id="newCatalogProductUnit"><option value="kg">kg</option><option value="unidad">unidad</option><option value="caja">caja</option></select></label>
     <label class="modal-field-label">Ícono<input class="modal-inp" id="newCatalogProductEmoji" type="text" value="🧺" maxlength="4" placeholder="🧺"></label>
+    <div class="modal-field-label" id="newCatalogProductCatT">Categoría (para La Feria y el POS)</div>
+    <div class="pm-cats" id="newCatalogProductCat" role="radiogroup" aria-labelledby="newCatalogProductCatT"></div>
+    <div class="pm-cat-hint" id="newCatalogProductCatHint" role="status"></div>
     <label class="modal-field-label">Agregar también a<select class="modal-inp" id="newCatalogProductProvider"></select></label>
+    <label class="modal-field-label" id="newCatalogProductPriceWrap">Precio (opcional)<input class="modal-inp" id="newCatalogProductPrice" type="number" inputmode="decimal" min="0" step="0.01" placeholder="₡ 0" autocomplete="off"></label>
     <button class="btn btn-g btn-full" id="saveNewCatalogProduct" type="button">Guardar producto</button>
     <button class="btn btn-o btn-full" type="button" onclick="closeNewCatalogProductModal()" style="margin-top:8px">Cancelar</button>
   </div>
@@ -2295,6 +2294,7 @@ function fillTestProviderPhones(){
 function switchView(name){
   // El mercado ahora vive dentro de "Hoy"; cualquier enlace viejo cae ahí.
   if(name==='mercado')name='resumen';
+  if(name==='precios')name='productos';   // la pestaña se llamaba Precios
   document.querySelectorAll('.view').forEach(v=>v.classList.remove('active'));
   document.querySelectorAll('.nav-btn').forEach(b=>b.classList.toggle('active',b.dataset.view===name));
   document.getElementById('view-'+name).classList.add('active');
@@ -2306,7 +2306,7 @@ function switchView(name){
   if(name!=='home'){const inp=document.getElementById('globalSearch');if(inp)inp.value='';const res=document.getElementById('globalSearchResults');if(res)res.style.display='none';}
   if(name==='home')renderHome();
   if(name==='proveedores')renderProveedoresNav();
-  if(name==='precios')renderPriceSearch();
+  if(name==='productos')renderProductos();
   if(name==='resumen'){renderResumen();renderHistorico();updateHomeDinero();}
   if(name==='config')scheduleConfigRender();
 }
@@ -2317,8 +2317,7 @@ function scheduleConfigRender(){
   _configRenderTimer=setTimeout(()=>{
     const view=document.getElementById('view-config');
     if(!view?.classList.contains('active'))return;
-    const catalogOpen=document.querySelector('[data-acc="catalogo"]')?.classList.contains('open');
-    renderConfig({catalog:catalogOpen});
+    renderConfig();
   },50);
 }
 
@@ -3268,7 +3267,6 @@ document.querySelectorAll('.cfg-acc-hdr').forEach(hdr=>{
   hdr.addEventListener('click',()=>{
     const acc=hdr.parentElement;
     acc.classList.toggle('open');
-    if(acc.dataset.acc==='catalogo'&&acc.classList.contains('open'))setTimeout(renderCatalogo,0);
   });
 });
 document.getElementById('catalogImportInput')?.addEventListener('change',e=>{
@@ -3276,7 +3274,7 @@ document.getElementById('catalogImportInput')?.addEventListener('change',e=>{
   e.target.value='';
 });
 
-function renderConfig({catalog=true}={}){
+function renderConfig(){
   // Los contactos de la lista completa viven dentro de Pedido y solo en Ambos.
   const waSet=(S.pdfWa||[]).filter(c=>(c.tel||'').trim()).length;
   const elW=document.getElementById('accCountPdfWa');if(elW)elW.textContent=waSet+'/5';
@@ -3290,60 +3288,14 @@ function renderConfig({catalog=true}={}){
     </div>
   `).join('');
 
-  if(catalog)renderCatalogo();
+  // Los productos viven en la pestaña Productos: si está abierta, se vuelve a dibujar.
+  if(document.getElementById('view-productos')?.classList.contains('active'))renderProductos();
 }
 
-// ── CATÁLOGO GENERAL DE PRODUCTOS ──
-// Vista única de todos los productos que existen en la app, con los proveedores
-// que venden cada uno. Desde acá se asigna un producto a un proveedor sin tener
-// que entrar proveedor por proveedor.
-function renderCatalogo(){
-  const list=document.getElementById('catalogoList');
-  if(!list)return;
-  const catalog=getKnownProductCatalog();
-  const count=document.getElementById('accCountCatalogo');
-  if(count)count.textContent=catalog.length;
-
-  const q=normalizeText(document.getElementById('catalogoSearch')?.value||'');
-  const shown=q?catalog.filter(p=>p.key.includes(q)):catalog;
-
-  const providersData=getAllProviders();
-  const provs=Object.keys(providersData).filter(name=>name!=='Otros');
-  const provsOf=key=>provs.filter(name=>
-    (providersData[name]?.products||[]).some(p=>normalizeText(p.name)===key));
-
-  if(!shown.length){
-    list.innerHTML='<div class="product-picker-empty">No hay productos con ese nombre</div>';
-    return;
-  }
-
-  list.innerHTML=shown.map(prod=>{
-    const sellers=provsOf(prod.key);
-    return `<div class="catalogo-item">
-      <div class="catalogo-item-top">
-        <span style="font-size:22px">${prod.emoji}</span>
-        <div class="catalogo-item-name">${prod.name}<small>${normUnit(prod.unit)}</small></div>
-        <button class="catalogo-add" type="button" data-key="${prod.key}">+ Proveedor</button>
-        <button class="catalogo-del" type="button" data-key="${prod.key}" title="Borrar de todos los proveedores y de la lista" aria-label="Borrar ${prod.name} de todo">🗑️</button>
-      </div>
-      <div class="catalogo-sellers">${sellers.length
-        ?sellers.map(s=>`<span class="catalogo-chip">${s}</span>`).join('')
-        :'<span class="catalogo-chip empty">Ningún proveedor lo vende</span>'}</div>
-    </div>`;
-  }).join('');
-
-  list.querySelectorAll('.catalogo-add').forEach(btn=>btn.addEventListener('click',()=>{
-    openCatalogoAssign(btn.dataset.key);
-  }));
-  list.querySelectorAll('.catalogo-del').forEach(btn=>btn.addEventListener('click',()=>{
-    const prod=getKnownProductCatalog().find(p=>p.key===btn.dataset.key);if(!prod)return;
-    const n=provsOf(prod.key).length;
-    if(!confirm(`¿Borrar "${prod.name}" de TODO?\n\nSe quita de ${n?n+' proveedor'+(n===1?'':'es')+' y de ':''}la lista de productos, en todos los equipos.`))return;
-    borrarProductoDeTodo(prod.key);
-    persist();renderCatalogo();
-    toast(`🗑️ ${prod.name} borrado de todo`,'ok');
-  }));
-}
+// ── PRODUCTOS ──
+// Todos los productos que existen en la app, con sus proveedores y precios, en la pestaña
+// Productos (renderProductos, más abajo). Desde ahí se agrega uno nuevo, se asigna a un proveedor
+// sin entrar proveedor por proveedor, se editan sus precios y se borra de todo.
 
 // Elige a qué proveedor agregar un producto del catálogo.
 function openNewCatalogProductModal(){
@@ -3353,8 +3305,16 @@ function openNewCatalogProductModal(){
   document.getElementById('newCatalogProductName').value='';
   document.getElementById('newCatalogProductUnit').value='kg';
   document.getElementById('newCatalogProductEmoji').value='🧺';
+  document.getElementById('newCatalogProductPrice').value='';
+  _catNueva='';_catNuevaManual=false;newCatalogProductCatPintar();
+  newCatalogProductPriceVis();
   document.getElementById('modalNewCatalogProduct').classList.add('open');
   setTimeout(()=>document.getElementById('newCatalogProductName').focus(),80);
+}
+// El precio es de un proveedor: sin proveedor ("Otros") no hay dónde guardarlo.
+function newCatalogProductPriceVis(){
+  const w=document.getElementById('newCatalogProductPriceWrap'),p=document.getElementById('newCatalogProductProvider')?.value;
+  if(w)w.style.display=(!p||p==='Otros')?'none':'';
 }
 function closeNewCatalogProductModal(){document.getElementById('modalNewCatalogProduct').classList.remove('open');}
 function saveNewCatalogProduct(){
@@ -3363,20 +3323,26 @@ function saveNewCatalogProduct(){
   const emoji=document.getElementById('newCatalogProductEmoji').value.trim()||'🧺';
   const provider=document.getElementById('newCatalogProductProvider').value;
   if(!name){toast('Escribí el nombre del producto','err');return;}
+  const cat=_catNueva||categoriaDeducida(name)||'';
+  if(!cat){newCatalogProductCatPintar();document.getElementById('newCatalogProductCat').scrollIntoView({block:'center'});toast('Elegí la categoría del producto','err');return;}
   const key=normalizeText(name);
   if(getKnownProductCatalog().some(product=>product.key===key)){toast('Ese producto ya existe en el catálogo','err');return;}
   ensureOtrosProvider();
-  const product={id:'master_'+Date.now()+'_'+Math.random().toString(36).slice(2,6),name,emoji,unit,agregado:Date.now()};
+  const product={id:'master_'+Date.now()+'_'+Math.random().toString(36).slice(2,6),name,emoji,unit,cat,agregado:Date.now()};
   if(!S.customProviders.Otros.masterProducts)S.customProviders.Otros.masterProducts=[];
   S.customProviders.Otros.masterProducts.push(product);
   if(provider&&provider!=='Otros'){
     ensureCustomProv(provider);
     if(!(S.customProviders[provider].products||[]).some(p=>normalizeText(p.name)===key))S.customProviders[provider].products.push({...product,agregado:Date.now()});
   }
+  const precio=parseFloat(String(document.getElementById('newCatalogProductPrice')?.value||'').replace(',','.'));
+  const conPrecio=provider&&provider!=='Otros'&&precio>0;
+  if(conPrecio)setPrice(provider,product.id,String(precio));
   persist();
-  renderCatalogo();
   closeNewCatalogProductModal();
-  toast(`✓ ${name} agregado`,'ok');
+  const buscar=document.getElementById('priceSearch');if(buscar)buscar.value=name;   // para verlo enseguida
+  renderProductos();
+  toast(`✓ ${name} agregado${conPrecio?' · ₡'+fmt(precio):''}`,'ok');
 }
 
 function openCatalogoAssign(key){
@@ -3398,7 +3364,8 @@ function openCatalogoAssign(key){
       agregado:Date.now(),id:'prod_'+Date.now()+'_'+Math.random().toString(36).slice(2,6),
       name:prod.name,emoji:prod.emoji,unit:normUnit(prod.unit)
     });
-    persist();closeProvListModal();renderConfig();
+    persist();closeProvListModal();renderProductos();
+    if(document.getElementById('modalPriceCompare').classList.contains('open'))openPriceModal(key);
     toast(`✓ ${prod.name} agregado a ${name}`,'ok');
   }));
   document.getElementById('modalProvList').classList.add('open');
@@ -3802,13 +3769,28 @@ function getPriceCatalog(){
     .sort((a,b)=>ORDEN_ES(a.name,b.name));
 }
 
-function renderPriceSearch(){
+// Lo que se ve en Productos: los que tienen proveedor (con sus ofertas) y también los que todavía
+// no tienen ninguno (recién agregados, en Otros).
+function getProductosLista(){
+  const m=new Map(getPriceCatalog().map(i=>[i.key,i]));
+  getKnownProductCatalog().forEach(p=>{
+    const i=m.get(p.key);
+    if(i){i.unit=i.unit||p.unit;return;}
+    m.set(p.key,{key:p.key,name:p.name,emoji:p.emoji||'🌿',unit:p.unit,offers:[]});
+  });
+  return [...m.values()].sort((a,b)=>ORDEN_ES(a.name,b.name));
+}
+
+function renderProductos(){
   const input=document.getElementById('priceSearch');
   const wrap=document.getElementById('priceSearchResults');
   if(!input||!wrap)return;
   const q=normalizeText(input.value||'');
-  const items=getPriceCatalog().filter(item=>!q||normalizeText(item.name).includes(q));
-  wrap.innerHTML=items.slice(0,80).map(item=>{
+  const todos=getProductosLista();
+  const count=document.getElementById('accCountCatalogo');
+  if(count)count.textContent=todos.length;
+  const items=todos.filter(item=>!q||normalizeText(item.name).includes(q));
+  wrap.innerHTML=items.slice(0,500).map(item=>{
     const known=item.offers.filter(o=>+getPrice(o.prov,o.product.id)>0);
     const best=known.sort((a,b)=>+getPrice(a.prov,a.product.id)-+getPrice(b.prov,b.product.id))[0];
     const hasPrice=known.length>0;
@@ -3816,39 +3798,160 @@ function renderPriceSearch(){
       ${hasPrice?'<span class="price-check">✓</span>':''}
       <span style="font-size:22px">${item.emoji}</span>
       <span class="price-result-name">${item.name}</span>
-      <span class="price-result-meta">${item.offers.length} prov.</span>
+      <span class="price-result-meta">${item.offers.length?item.offers.length+' prov.':'Sin proveedor'}</span>
       <strong>${best?'₡'+fmt(getPrice(best.prov,best.product.id)):'Editar'}</strong>
     </button>`;
   }).join('')||'<div class="empty-state"><div class="empty-ico">🔍</div>No encontré ese producto</div>';
   wrap.querySelectorAll('[data-price-key]').forEach(btn=>btn.addEventListener('click',()=>openPriceModal(btn.dataset.priceKey)));
 }
+const renderPriceSearch=renderProductos;   // nombre de antes
 
+const escA=s=>String(s??'').replace(/&/g,'&amp;').replace(/"/g,'&quot;').replace(/</g,'&lt;');
+
+// Categoría del producto (la que usan La Feria y el ARAMO POS: Frutas, Verduras, Hierbas, Raíces, Despensa).
+const CAT_BTN=[['frutas','🍎','Frutas'],['verduras','🥬','Verduras'],['hierbas','🌿','Hierbas'],['raices','🥔','Raíces'],['despensa','🧺','Despensa']];
+// La categoría que se deduce sola con la lista de ARAMO (catalogo-aramo.js): si el producto está en la lista
+// o su nombre calza con una regla (que no sea la de "lo que no calce va a Despensa"). Si no, null: se pregunta.
+function categoriaDeducida(nombre){
+  const C=window.ARAMO_CAT;if(!C||!String(nombre||'').trim())return null;
+  if(C.buscar(nombre))return C.categoria(nombre);
+  const c=C.reglaCat(C.norm(nombre));return c&&c!=='despensa'?c:null;
+}
+const catBotones=(sel,attr)=>CAT_BTN.map(([k,e,n])=>`<button type="button" role="radio" aria-checked="${k===sel}" class="pm-cat${k===sel?' on':''}" ${attr}="${k}"><span aria-hidden="true">${e}</span>${n}</button>`).join('');
+let _catNueva='';
+function newCatalogProductCatPintar(){
+  const c=document.getElementById('newCatalogProductCat'),h=document.getElementById('newCatalogProductCatHint');if(!c)return;
+  c.innerHTML=catBotones(_catNueva,'data-ncat');
+  if(h){const nom=(document.getElementById('newCatalogProductName')?.value||'').trim(),d=categoriaDeducida(nom);
+    h.textContent=_catNueva?(d===_catNueva?'Se puso sola según el nombre. Tocá otra si no es.':'Así lo verán en La Feria y en el POS.'):nom?'No la pude adivinar por el nombre: tocá una categoría.':'Se pone sola al escribir el nombre; si no, elegila acá.';
+    h.classList.toggle('falta',!_catNueva&&!!nom);}
+}
+// Mientras se escribe el nombre, si la categoría no se eligió a mano se deduce sola.
+let _catNuevaManual=false;
+function newCatalogProductNombre(){
+  if(!_catNuevaManual)_catNueva=categoriaDeducida(document.getElementById('newCatalogProductName').value)||'';
+  newCatalogProductCatPintar();
+}
+
+// La categoría que tiene hoy un producto: la que se le puso en Productos, o la que dice la lista de ARAMO.
+function categoriaDeProducto(item){
+  for(const o of item.offers){const c=o.product?.cat;if(CAT_BTN.some(x=>x[0]===c))return c;}
+  const m=(S.customProviders?.Otros?.masterProducts||[]).find(p=>normalizeText(p.name)===item.key);
+  if(m&&CAT_BTN.some(x=>x[0]===m.cat))return m.cat;
+  return categoriaDeducida(item.name)||(window.ARAMO_CAT?.categoria(item.name))||'despensa';
+}
 function openPriceModal(key){
-  const item=getPriceCatalog().find(row=>row.key===key);
+  const item=getProductosLista().find(row=>row.key===key);
   if(!item)return;
   document.getElementById('priceModalTitle').textContent=`${item.emoji} ${item.name}`;
-  document.getElementById('priceCompareList').innerHTML=item.offers.map(({prov,product})=>`
+  const unidad=normUnit(item.unit||item.offers[0]?.product.unit);
+  document.getElementById('priceModalEdit').innerHTML=`
+    <label class="modal-field-label">Nombre del producto<input class="modal-inp" id="pmName" type="text" value="${escA(item.name)}" autocomplete="off" aria-label="Nombre del producto"></label>
+    <div class="pm-fila">
+      <label class="modal-field-label">Ícono<input class="modal-inp" id="pmEmoji" type="text" value="${escA(item.emoji)}" maxlength="4" aria-label="Ícono"></label>
+      <label class="modal-field-label">Unidad<select class="modal-inp" id="pmUnit" aria-label="Unidad">${UNITS.map(u=>`<option value="${u}"${u===unidad?' selected':''}>${u}</option>`).join('')}</select></label>
+    </div>
+    <div class="modal-field-label" id="pmCatT">Categoría (La Feria y POS)</div>
+    <div class="pm-cats" id="pmCat" role="radiogroup" aria-labelledby="pmCatT">${catBotones(categoriaDeProducto(item),'data-pmcat')}</div>
+    <button class="btn btn-g btn-full" type="button" data-pm="guardar" data-key="${escA(item.key)}">Guardar cambios</button>`;
+  document.getElementById('priceCompareList').innerHTML=item.offers.length?item.offers.map(({prov,product})=>`
     <div class="compare-row">
       <div><div class="compare-provider">${prov}</div><div class="compare-unit">Precio por ${product.unit||'unidad'}</div></div>
       <input class="compare-price" type="number" inputmode="decimal" min="0" step="0.01"
         value="${getPrice(prov,product.id)}" placeholder="₡ 0"
-        data-prov="${prov}" data-pid="${product.id}">
-    </div>`).join('');
+        data-prov="${escA(prov)}" data-pid="${escA(product.id)}">
+      <button class="pm-quitar" type="button" data-pm="quitar" data-prov="${escA(prov)}" data-pid="${escA(product.id)}" data-key="${escA(item.key)}" aria-label="Quitar de ${escA(prov)}" title="Quitar de ${escA(prov)}">×</button>
+    </div>`).join(''):'<div class="product-picker-empty">Ningún proveedor lo vende todavía. Agregalo a uno para ponerle precio.</div>';
   document.querySelectorAll('#priceCompareList .compare-price').forEach(input=>{
     input.addEventListener('input',()=>setPrice(input.dataset.prov,input.dataset.pid,input.value));
   });
+  const extra=document.getElementById('priceModalExtra');
+  if(extra)extra.innerHTML=`<div class="pm-extra">
+    <button class="btn btn-o btn-full" type="button" data-pm="asignar" data-key="${escA(item.key)}">＋ Agregar a un proveedor</button>
+    <button class="btn btn-o btn-full pm-del" type="button" data-pm="borrar" data-key="${escA(item.key)}" aria-label="Borrar ${escA(item.name)} de todo">🗑️ Borrar de todo</button>
+  </div>`;
   document.getElementById('modalPriceCompare').classList.add('open');
+}
+
+// Cambia el nombre, el ícono y la unidad de un producto en TODOS los proveedores que lo venden (y en la
+// lista general). El producto sigue siendo el mismo: conserva su id, su precio y lo que ya está pedido.
+// Si el nombre cambia, el viejo se anota como "quitado" para que no vuelva a salir (como en Editar proveedor).
+function editarProductoDeTodo(key,{name,emoji,unit,cat}={}){
+  const prod=getKnownProductCatalog().find(p=>p.key===key);
+  if(!prod)return{error:'No encontré el producto'};
+  const nuevo=String(name??prod.name).trim();
+  if(!nuevo)return{error:'Escribí el nombre del producto'};
+  const nk=normalizeText(nuevo),cambiaClave=nk!==key;
+  if(cambiaClave&&getKnownProductCatalog().some(p=>p.key===nk))return{error:'Ya existe un producto con ese nombre'};
+  const ahora=Date.now(),emo=String(emoji||'').trim()||prod.emoji||'🧺',uni=normUnit(unit||prod.unit);
+  // La categoría se conserva aunque el nombre cambie (si no, el producto nuevo la perdería en La Feria y el POS).
+  const categoria=CAT_BTN.some(x=>x[0]===cat)?cat:(categoriaDeProducto(getProductosLista().find(i=>i.key===key)||{offers:[],key,name:prod.name}));
+  let n=0;
+  Object.entries(getAllProviders()).forEach(([prov,data])=>{
+    if(prov==='Otros')return;
+    (data.products||[]).filter(p=>normalizeText(p.name)===key).forEach(p=>{
+      ensureCustomProv(prov);
+      const r=(S.customProviders[prov].products||[]).find(x=>x.id===p.id);if(!r)return;
+      if(cambiaClave)S.customProviders[prov].quitados={...(S.customProviders[prov].quitados||{}),[key]:ahora};
+      r.name=nuevo;r.emoji=emo;r.unit=uni;r.cat=categoria;if(cambiaClave)r.agregado=ahora+1;n++;
+    });
+  });
+  ensureOtrosProvider();
+  const O=S.customProviders.Otros;
+  if(!O.masterProducts)O.masterProducts=[];
+  const m=O.masterProducts.find(p=>normalizeText(p.name)===key);
+  if(m){m.name=nuevo;m.emoji=emo;m.unit=uni;m.cat=categoria;if(cambiaClave)m.agregado=ahora+1;}
+  else O.masterProducts.push({id:'master_'+ahora+'_'+Math.random().toString(36).slice(2,6),name:nuevo,emoji:emo,unit:uni,cat:categoria,agregado:ahora+1});
+  if(cambiaClave)O.borrados={...(O.borrados||{}),[key]:ahora};   // la lista de fábrica con el nombre viejo ya no vale
+  invalidateProvidersCache();
+  return{ok:true,key:nk,name:nuevo,n};
 }
 
 function closePriceModal(){
   document.getElementById('modalPriceCompare').classList.remove('open');
-  renderPriceSearch();
+  renderProductos();
   if(S.currentProv)renderProdTable();
 }
 
-document.getElementById('priceSearch').addEventListener('input',renderPriceSearch);
-document.getElementById('catalogoSearch').addEventListener('input',renderCatalogo);
+// Dentro de la ventana de un producto: agregarlo a un proveedor o borrarlo de todo.
+async function priceModalAccion(btn){
+  const key=btn.dataset.key,prod=getKnownProductCatalog().find(p=>p.key===key);if(!prod)return;
+  if(btn.dataset.pm==='asignar'){openCatalogoAssign(key);return;}
+  if(btn.dataset.pm==='guardar'){
+    const r=editarProductoDeTodo(key,{name:document.getElementById('pmName').value,emoji:document.getElementById('pmEmoji').value,unit:document.getElementById('pmUnit').value,cat:document.querySelector('#pmCat .pm-cat.on')?.dataset.pmcat});
+    if(r.error){toast(r.error,'err');return;}
+    const bs=document.getElementById('priceSearch'),q0=normalizeText(bs?.value||'');
+    if(q0&&normalizeText(prod.name).includes(q0))bs.value=r.name;   // para que el producto no se pierda de la lista filtrada
+    persist();renderProductos();openPriceModal(r.key);
+    if(S.currentProv&&document.getElementById('view-prov')?.classList.contains('active'))renderProdTable();
+    toast(`✓ ${r.name} guardado${r.n?' en '+r.n+' proveedor'+(r.n===1?'':'es'):''}`,'ok');return;
+  }
+  if(btn.dataset.pm==='quitar'){
+    quitarDeProv(btn.dataset.prov,btn.dataset.pid);persist();renderProductos();openPriceModal(key);
+    toast(`✓ ${prod.name} quitado de ${btn.dataset.prov} · sigue en la lista de productos`,'ok');return;
+  }
+  const n=getProductosLista().find(i=>i.key===key)?.offers.length||0;
+  const texto=`Se quita de ${n?n+' proveedor'+(n===1?'':'es')+' y de ':''}la lista de productos, en todos los equipos.`;
+  const ok=window.AramoUI?.confirmar?await AramoUI.confirmar({titulo:`¿Borrar "${prod.name}" de TODO?`,texto,si:'Borrar',peligro:true}):confirm(`¿Borrar "${prod.name}" de TODO?\n\n${texto}`);
+  if(!ok)return;
+  borrarProductoDeTodo(key);
+  persist();
+  document.getElementById('modalPriceCompare').classList.remove('open');
+  renderProductos();
+  if(S.currentProv)renderProdTable();
+  toast(`🗑️ ${prod.name} borrado de todo`,'ok');
+}
+
+document.getElementById('priceSearch').addEventListener('input',renderProductos);
 document.getElementById('addNewCatalogProduct').addEventListener('click',openNewCatalogProductModal);
+document.getElementById('newCatalogProductProvider').addEventListener('change',newCatalogProductPriceVis);
+document.getElementById('newCatalogProductName').addEventListener('input',newCatalogProductNombre);
+document.getElementById('newCatalogProductCat').addEventListener('click',e=>{const b=e.target.closest('[data-ncat]');if(!b)return;_catNueva=b.dataset.ncat;_catNuevaManual=true;newCatalogProductCatPintar();});
+document.getElementById('modalPriceCompare').addEventListener('click',e=>{
+  const c=e.target.closest('[data-pmcat]');
+  if(c){document.querySelectorAll('#pmCat .pm-cat').forEach(x=>{const on=x===c;x.classList.toggle('on',on);x.setAttribute('aria-checked',on);});return;}
+  const b=e.target.closest('[data-pm]');if(b)priceModalAccion(b);
+});
 document.getElementById('saveNewCatalogProduct').addEventListener('click',saveNewCatalogProduct);
 document.getElementById('modalNewCatalogProduct').addEventListener('click',e=>{if(e.target.id==='modalNewCatalogProduct')closeNewCatalogProductModal();});
 document.getElementById('modalPriceCompare').addEventListener('click',e=>{if(e.target.id==='modalPriceCompare')closePriceModal();});
@@ -4112,7 +4215,7 @@ if(isIOS && !isInStandalone && !dismissed){
 <!-- Íconos y ventanitas del sistema de diseño: antes de express.js, que ya los usa -->
 <script src="iconos.js?v=20261122-fase1"></script>
 <script src="aramo-ui.js?v=20261123-fase2"></script>
-<script src="express.js?v=20261125-diario1"></script>
+<script src="express.js?v=20261126-productos3"></script>
 <script src="leido.js?v=1"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcode-generator/1.4.4/qrcode.min.js"></script>
 <script src="canasta-config.js?v=20261018-seguridad-1"></script>

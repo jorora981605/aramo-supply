@@ -595,3 +595,36 @@ label.ci-tienda{cursor:text}
 .au-sem-t small{font:600 14px/1.35 var(--ar-f-ui);color:var(--ar-tinta-2)}
 .au-sem-top{margin:10px 2px 0;font:500 14.5px/1.5 var(--ar-f-ui);color:var(--ar-tinta-2)}
 .au-sem-top b{color:var(--ar-tinta)}
+
+/* ── Cierre de compras a la vista (Ambos): botón grande, arriba en Proveedores y bajo la tarjeta en Pedido ── */
+.sx-pdf-btn.ci-btn{min-height:60px;margin:2px 0 14px;padding:9px 14px 9px 10px;border-radius:17px}
+.sx-pdf-btn.ci-btn b{font-size:16.5px}
+#ciTop:empty{display:none}
+#ciTop{margin-top:4px}
+
+/* ── Pestaña Productos: buscar, agregar y la lista con precios ── */
+.pr-add,#modalNewCatalogProduct .btn-g,#modalPriceCompare .btn-g{background:var(--ar-primario);color:var(--ar-sobre-primario)}
+.pr-add:hover,#modalNewCatalogProduct .btn-g:hover,#modalPriceCompare .btn-g:hover{background:var(--ar-primario-hover)}
+.pr-add{min-height:56px;margin:2px 0 14px;font-size:16px;font-weight:800;border-radius:16px}
+#view-productos .sec-lbl{display:flex;align-items:center;gap:8px}
+.pm-extra{display:grid;gap:8px;margin:14px 0 10px}
+.pm-extra .btn{min-height:50px;font-weight:800}
+.pm-extra .pm-del{color:#b91c1c;border-color:rgba(185,28,28,.4)}
+html[data-theme="dark"] .pm-extra .pm-del{color:#fca5a5;border-color:rgba(252,165,165,.4)}
+
+/* ── Ventana de un producto: editar nombre, ícono, unidad; quitar de un proveedor ── */
+.pm-sub{margin:6px 0 2px;font-size:11px;font-weight:900;color:var(--m);text-transform:uppercase;letter-spacing:.3px}
+.pm-fila{display:grid;grid-template-columns:96px 1fr;gap:10px}
+#priceModalEdit .btn{min-height:50px;margin:0 0 10px;font-weight:800}
+#priceCompareList .compare-row{grid-template-columns:1fr 112px 44px;gap:8px}
+.pm-quitar{width:44px;height:44px;border:1px solid var(--b2);border-radius:12px;background:transparent;color:var(--m);font-size:22px;line-height:1;cursor:pointer}
+.pm-quitar:hover{color:#b91c1c;border-color:rgba(185,28,28,.5)}
+
+/* ── Categoría con botones grandes (Productos) ── */
+.pm-cats{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin:4px 0 8px}
+.pm-cat{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;min-height:60px;padding:6px 4px;border:1.5px solid var(--b2);border-radius:14px;background:var(--card);color:var(--t);font:800 13.5px var(--fn,inherit);cursor:pointer}
+.pm-cat span{font-size:20px;line-height:1}
+.pm-cat.on{border-color:var(--ar-primario);background:var(--ar-primario);color:var(--ar-sobre-primario)}
+.pm-cat-hint{margin:0 0 10px;font-size:12.5px;font-weight:600;color:var(--m)}
+.pm-cat-hint.falta{color:#b45309;font-weight:800}
+html[data-theme="dark"] .pm-cat-hint.falta{color:#fcd34d}

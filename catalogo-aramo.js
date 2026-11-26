@@ -478,7 +478,7 @@ function cargar(){
     try{
       const f=await leer('app_config?select=custom_providers&id=eq.main');
       const cp=(f&&f[0]&&f[0].custom_providers)||{},borr=(cp.Otros&&cp.Otros.borrados)||{},lista=[];
-      Object.entries(cp).forEach(([prov,d])=>{if(!d||d.deleted)return;[...(d.products||[]),...(d.masterProducts||[])].forEach(p=>{if(p&&p.name)lista.push({n:String(p.name),u:p.unit||'',prov});});});
+      Object.entries(cp).forEach(([prov,d])=>{if(!d||d.deleted)return;[...(d.products||[]),...(d.masterProducts||[])].forEach(p=>{if(p&&p.name)lista.push({n:String(p.name),u:p.unit||'',prov,...(CATS.includes(p.cat)?{c:p.cat,...(p.emoji&&p.emoji!=='🧺'&&p.emoji!=='🌿'?{e:String(p.emoji)}:{})}:{})});});});
       nuevo.surtido=lista;nuevo.borrados=Object.keys(borr);cambio=true;
     }catch(e){}
     try{
@@ -506,7 +506,7 @@ function todos(suc){
     out.set(id,x);return x;
   };
   LISTA.forEach(p=>meter(p.n,p.u));
-  surtidoNube().forEach(s=>meter(s.n,s.u));
+  surtidoNube().forEach(s=>meter(s.n,s.u,s.c&&CATS.includes(s.c)?{c:s.c,...(s.e?{e:s.e}:{})}:null));   // c y e: los eligió quien agregó el producto en Productos (Inventario)
   if(suc){
     Object.entries(posDe(suc)).forEach(([k,q])=>{
       if(!q||!q.n)return;
