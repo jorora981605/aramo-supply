@@ -92,3 +92,15 @@
   .pw-menu{bottom:112px}
   .pw-toast{bottom:120px}
 }
+/* ── Fiado y Desecho al cobrar (2026-11-26) ── */
+.pm-modo-grid{grid-template-columns:repeat(3,1fr)!important}
+.pm-modo-btn{min-height:78px}
+.pm-panel .pz-nombre{padding:12px 14px;text-align:left;font-size:20px;min-height:56px;width:100%;box-sizing:border-box}
+.pz-chips{display:flex;flex-wrap:wrap;gap:8px;margin:0 0 12px}
+.pz-chip{min-height:48px;padding:0 16px;border:2px solid #FFCC80;border-radius:24px;background:#FFF8E1;color:#8a4b00;font:800 15px inherit;font-family:inherit;cursor:pointer}
+.pz-chip:hover{background:#FFE0B2}
+.pm-info-box.pz-info-des{background:#F3E5F5;color:#4a148c;border:1.5px solid #CE93D8}
+.pm-btn-cobrar.pz-des{background:#6a1b9a!important;box-shadow:0 4px 20px rgba(106,27,154,.38)!important;min-height:52px}
+.pm-btn-cobrar.pz-des:hover:not(:disabled){background:#4a148c!important}
+.pm-btn-cancel{min-height:48px}
+@media (max-width:480px){.pm-modo-btn{min-height:72px;padding:12px 4px 10px}.pm-modo-icon{font-size:26px}}
