@@ -2084,6 +2084,7 @@ function xpHistoryHtml(){
     return sideRows.join('<br>')||'Sin detalle de productos guardado';
   };
   return `<details class="pd-hist"><summary>📅 Pedidos guardados · ${fechas.length} días</summary>${fechas.map(f=>{
+    const items=days[f];
     return `<details class="pd-hist-day"><summary>${esc(fechaLabel(f))} · ${items.length} registro${items.length===1?'':'s'}</summary>${items.map(row=>{const times=row.detalle?.sentAt||(row.side?{[row.side]:row.sentAt}:{});const sent=Object.entries(times).filter(([,v])=>+v>0).map(([s,v])=>`${SIDE_NAME[s]}: ${new Date(+v).toLocaleTimeString('es-CR',{hour:'numeric',minute:'2-digit'})}`).join(' · ');return `<div class="pd-hist-row"><b>${esc(row.proveedor||'Pedido')}</b>${row.side?`<small>${esc(SIDE_NAME[row.side])} · ₡${fmt(row.total||0)}</small>`:''}<small>${detalle(row)}</small>${sent?`<small>Enviado: ${esc(sent)}</small>`:''}</div>`;}).join('')}</details>`;
   }).join('')}</details>`;
 }
