@@ -51,7 +51,9 @@ window.POSWEB={
     }
     const fn=HANDLERS[c];
     if(!fn)throw new Error('Esta función no está disponible en la web: '+c);
-    return fn({sender:null},...a);
+    const r=await fn({sender:null},...a);
+    if(ESCRIBE.has(c)&&window.PosDia){try{window.PosDia.cambio(c,a,r);}catch(e){console.warn('[pos] resumen del día',e);}}
+    return r;
   },
   send(c){if(c==='app:force-close')salirYa();},
   on(c,cb){(ESCUCHAS[c]=ESCUCHAS[c]||[]).push(cb);},
@@ -169,6 +171,75 @@ function iniciarPrecios(){
       aviso,
     });
   }catch(e){console.warn('[pos] precios',e);}
+}
+// ── Resumen del día (pos-dia.js): lo que se cobró hoy, para que el Control llene solo los ingresos ──
+function iniciarDia(){
+  if(!window.PosDia||!POS||!SUC)return;
+  try{window.PosDia.iniciar({url:SUPA_URL,key:SUPA_KEY,POS:()=>POS,suc:()=>SUC,
+    puede:()=>!!(POS&&dueno&&!soloLectura&&!muerto&&!iniciando)});}   // solo la caja activa calcula y publica
+  catch(e){console.warn('[pos] resumen del día',e);}
+}
+// ── Reinicio a cero (2026-11-26) ──
+// El dueño deja "todo en cero, como recién instalada" desde la nube: la tabla aramo_reinicio (id general, columna at) la cambia
+// solo su SQL. Aquí solo se LEE. Si `at` es más nuevo que la marca de este aparato (aramo_reinicio_visto_pos_<tienda>):
+//   · la caja activa: respaldo completo PRIMERO (sube lo que haya y pos_respaldar + una copia en este equipo), luego borra ventas,
+//     items y cajas (y lo que cuelga de ellas), sube la base en cero, limpia lo local, guarda la marca y avisa;
+//   · un aparato que no es la caja activa: solo limpia lo local y guarda la marca (la base en cero le llega al bajarla).
+// Con la misma marca no se repite. Una tabla que no existe (404) o vacía no hace nada.
+const MSG_REINICIO='La caja quedó en cero para empezar a probar. Se guardó una copia.';
+function avisoReinicio(){try{if(LS.get('aramo_reinicio_aviso_pos_'+SUC,false)){LS.del('aramo_reinicio_aviso_pos_'+SUC);aviso(MSG_REINICIO);}}catch(e){}}
+let reiniciando=false;
+async function leerReinicio(espera){
+  const c=new AbortController(),t=setTimeout(()=>c.abort(),espera);
+  try{
+    const r=await fetch(SUPA_URL+'/rest/v1/aramo_reinicio?select=at,que&id=eq.general',{headers:{apikey:SUPA_KEY,Authorization:'Bearer '+SUPA_KEY},signal:c.signal});
+    if(!r.ok)return null;                       // 404: todavía no existe la tabla
+    const a=await r.json();
+    return Array.isArray(a)&&a[0]&&a[0].at?a[0]:null;
+  }catch(e){return null;}
+  finally{clearTimeout(t);}
+}
+async function revisarReinicio(enApertura){
+  if(reiniciando||!SUC||!POS||muerto||!window.PosDia)return false;
+  const fila=await leerReinicio(enApertura?3500:9000);
+  if(!fila)return false;
+  const at=Date.parse(fila.at);if(!(at>0))return false;
+  const marca='aramo_reinicio_visto_pos_'+SUC;
+  let visto='';try{visto=String(localStorage.getItem(marca)||'').replace(/^"|"$/g,'');}catch(e){}
+  if(!(at>(Date.parse(visto)||0)))return false;      // ya se hizo con esta marca
+  const guardarMarca=()=>{try{localStorage.setItem(marca,String(fila.at));}catch(e){}};
+  const Dia=window.PosDia;
+  if(!(dueno&&!soloLectura)){                         // no es la caja activa: solo lo suyo
+    Dia.limpiarLocal(SUC);guardarMarca();return true;
+  }
+  reiniciando=true;
+  try{
+    if(enApertura)pintarCapa('cargando','Guardando una copia antes de dejar la caja en cero…');
+    // 1) PRIMERO el respaldo completo con lo que ya existe
+    if(sucio){const ok=await subir();if(!ok&&sucio)throw new Error('sin subir');}
+    const rp=await rpc('pos_respaldar',{p_suc:SUC,p_clave:CLAVE,p_disp:DISP});
+    if(rp&&rp.ok===false&&rp.motivo!=='vacio')throw new Error('respaldo '+(rp.motivo||''));
+    if(rp&&rp.ok!==false)info=rp;
+    try{await idbOp('conflictos','readwrite',s=>s.put({bytes:POS.exportar(),version,suc:SUC,motivo:'antes de dejar la caja en cero',fecha:new Date().toISOString()},SUC+':reinicio:'+new Date().toISOString()));}catch(e){}
+    const fechas=Dia.fechasConDatos(POS,SUC);
+    // 2) después se borra: ventas, items, cajas y lo que cuelga de ellas
+    if(enApertura)pintarCapa('cargando','Dejando la caja en cero…');
+    Dia.reiniciarDatos(POS);
+    marcarCambio();await guardarLocal();
+    // 3) se sube como siempre, para que otros aparatos bajen la base en cero
+    await subir();
+    // 4) lo local de este aparato y la marca
+    Dia.limpiarLocal(SUC);guardarMarca();
+    Dia.publicarFechas(fechas);                       // el resumen de esos días queda en cero (sin esperar la respuesta)
+    reiniciando=false;
+    LS.set('aramo_reinicio_aviso_pos_'+SUC,true);   // el aviso sale cuando termina de abrir (así no lo pisa otro aviso)
+    if(!enApertura){aviso(MSG_REINICIO);setTimeout(()=>location.reload(),1800);}
+    return true;
+  }catch(e){
+    console.warn('[pos] reinicio',e);
+    aviso('La caja todavía no se pudo dejar en cero (primero se guarda una copia y hace falta internet). Se intenta de nuevo al volver la conexión.');
+    return false;
+  }finally{reiniciando=false;}
 }
 let _pubando=false;
 async function publicarCatalogo(){
@@ -419,17 +490,20 @@ async function abrir(r,local){
   iniciando=false;
   if(!bytes){sucio=true;cambios++;}
   await guardarLocal();
+  iniciarDia();
+  try{await revisarReinicio(true);}catch(e){console.warn('[pos] reinicio',e);}
   pintarCapa(null);
   listoRes();
+  try{if(window.PosDia)window.PosDia.alIniciar();}catch(e){}
   montarPedidoWeb();
-  conectarCatalogo().catch(e=>console.warn('[pos] catálogo',e));
+  conectarCatalogo().catch(e=>console.warn('[pos] catálogo',e)).finally(avisoReinicio);
   pintarEstado();
   if(sucio&&dueno)programarSubida();
   if(!dueno&&info?.dueno)aviso('👀 La caja de '+zona(SUC)+' está abierta en '+(info.dueno_nombre||'otro dispositivo')+'. Aquí podés mirar; para cobrar, tocá el estado y «Usar la caja aquí».');
   setInterval(latido,LATIDO);
-  window.addEventListener('online',()=>{if(!supa)supa=crearSupa();latido();});
-  document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='hidden'){guardarLocal();subir();}else latido();});
-  window.addEventListener('pagehide',()=>{guardarLocal();subir();});
+  window.addEventListener('online',()=>{if(!supa)supa=crearSupa();latido();setTimeout(()=>revisarReinicio(false).catch(()=>{}),1500);});
+  document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='hidden'){guardarLocal();subir();if(window.PosDia)window.PosDia.vaciar();}else latido();});
+  window.addEventListener('pagehide',()=>{guardarLocal();subir();if(window.PosDia)window.PosDia.vaciar();});
 }
 async function pedirClave(msg){
   pintarCapa('clave',msg||'');

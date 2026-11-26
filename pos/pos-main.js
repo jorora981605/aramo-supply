@@ -419,13 +419,13 @@ async function initDB() {
 }
 
 // Número de venta
-function generarNumeroVenta() {
+function generarNumeroVenta(prefijo = 'VTA') {
   const cfg = prepare('SELECT valor FROM configuracion WHERE clave = ?').get(['siguiente_numero']);
   const n = parseInt(cfg?.valor || '1', 10);
   db.run('UPDATE configuracion SET valor = ? WHERE clave = ?', [String(n + 1), 'siguiente_numero']);
   const now = new Date();
   const fecha = `${now.getFullYear()}${String(now.getMonth()+1).padStart(2,'0')}${String(now.getDate()).padStart(2,'0')}`;
-  return `VTA-${fecha}-${String(n).padStart(4,'0')}`;
+  return `${prefijo}-${fecha}-${String(n).padStart(4,'0')}`;
 }
 
 // ──────────────────────────────────────────────
@@ -750,9 +750,11 @@ ipcMain.handle('caja:resumen', (_, id) => {
         CASE WHEN (pago_efectivo+pago_tarjeta+pago_sinpe)>0 THEN pago_sinpe
              WHEN metodo_pago='sinpe' THEN total ELSE 0 END
       ),0) AS sinpe,
+      COALESCE(SUM(CASE WHEN metodo_pago='fiado' THEN total ELSE 0 END),0) AS fiado,
       COALESCE(SUM(descuento_total),0) AS descuentos
     FROM ventas WHERE caja_id = ? AND estado = 'completada'
   `).get([id]);
+  ventas.desechos = prepare(`SELECT COALESCE(SUM(total),0) AS t FROM ventas WHERE caja_id = ? AND estado = 'desecho'`).get([id]).t;
   ventas.sinpe_destinos = sinpePorDestino('caja_id = ?', [id]);
   const denominaciones = prepare(
     'SELECT * FROM arqueo_detalle WHERE caja_id = ? ORDER BY tipo, tipo_denominacion DESC, denominacion DESC'
@@ -763,9 +765,37 @@ ipcMain.handle('caja:resumen', (_, id) => {
 // ──────────────────────────────────────────────
 // IPC — VENTAS
 // ──────────────────────────────────────────────
+// Fiado y desecho (2026-11-26)
+//  · fiado: se cobra "a crédito" a nombre de un cliente (obligatorio); no entra plata a la caja.
+//  · desecho: lo que se bota. Vale al COSTO (costo × cantidad), baja el stock y NO es venta ni plata:
+//    queda con estado 'desecho' (todos los reportes y la caja solo cuentan 'completada') y número DES-…
+function prepararVenta(data) {
+  data = { ...data };
+  if (data.metodo_pago === 'fiado') {
+    const nombre = String(data.cliente_nombre || '').trim().slice(0, 60);
+    if (!nombre) throw new Error('Falta el nombre del cliente para anotar el fiado.');
+    return { ...data, cliente_nombre: nombre, monto_recibido: 0, cambio: 0, pago_efectivo: 0, pago_tarjeta: 0, pago_sinpe: 0, sinpe_destino: '' };
+  }
+  if (data.metodo_pago === 'desecho') {
+    const items = (data.items || []).map(it => {
+      const p = it.producto_id ? prepare('SELECT costo FROM productos WHERE id = ?').get([it.producto_id]) : null;
+      const costo = Math.max(0, +(p && p.costo) || 0);
+      const subtotal = Math.round(costo * (+it.cantidad || 0) * 100) / 100;
+      return { ...it, precio_unitario: costo, tasa_impuesto: 0, descuento: 0, subtotal, promocion_id: null, promocion_descripcion: '', desc_manual_pct: 0 };
+    });
+    const total = Math.round(items.reduce((s, it) => s + it.subtotal, 0) * 100) / 100;
+    return { ...data, items, subtotal: total, total, descuento_total: 0, impuesto: 0, monto_recibido: 0, cambio: 0,
+      pago_efectivo: 0, pago_tarjeta: 0, pago_sinpe: 0, desc_global_pct: 0, desc_global_monto: 0, sinpe_destino: '',
+      cliente_nombre: '', cliente_cedula: '', notas: 'Desecho' };
+  }
+  return data;
+}
+
 ipcMain.handle('ventas:crear', (_, data) => {
+  data = prepararVenta(data);
   const crearVenta = transaction((data) => {
-    const numero   = generarNumeroVenta();
+    const esDesecho = data.metodo_pago === 'desecho';
+    const numero   = generarNumeroVenta(esDesecho ? 'DES' : 'VTA');
     const cajaRow  = prepare(`SELECT id, usuario FROM cajas WHERE estado='abierta' LIMIT 1`).get();
     const cajaId   = cajaRow ? cajaRow.id : null;
 
@@ -785,6 +815,7 @@ ipcMain.handle('ventas:crear', (_, data) => {
     ]);
 
     const ventaId = r.lastInsertRowid;
+    if (esDesecho) prepare(`UPDATE ventas SET estado='desecho' WHERE id = ?`).run([ventaId]);
 
     for (const item of (data.items || [])) {
       prepare(`
@@ -808,11 +839,12 @@ ipcMain.handle('ventas:crear', (_, data) => {
         prepare('UPDATE productos SET stock = stock - ? WHERE id = ?').run([item.cantidad, item.producto_id]);
         registrarMovimiento({
           producto_id:    item.producto_id,
-          tipo:           'venta',
+          tipo:           esDesecho ? 'ajuste' : 'venta',
           cantidad:       -item.cantidad,
           stock_anterior: stockAnterior,
           stock_nuevo:    stockAnterior - item.cantidad,
-          motivo:         `Venta ${numero}`,
+          motivo:         `${esDesecho ? 'Desecho' : 'Venta'} ${numero}`,
+          costo_unitario: esDesecho ? item.precio_unitario : 0,
           usuario:        cajaRow?.usuario || '',
         });
       }
@@ -906,7 +938,7 @@ ipcMain.handle('ventas:devolver_item', (_, ventaId, itemId) => {
 
 ipcMain.handle('ventas:anular', (_, id, data = {}) => {
   const venta = prepare('SELECT * FROM ventas WHERE id = ?').get([id]);
-  if (!venta || venta.estado !== 'completada') return { ok: false };
+  if (!venta || (venta.estado !== 'completada' && venta.estado !== 'desecho')) return { ok: false };
   const ahora = new Date().toISOString();
   transaction(() => {
     const items = prepare('SELECT * FROM venta_items WHERE venta_id = ?').all([id]);
@@ -1406,5 +1438,6 @@ ipcMain.handle('tiquete:guardar', (_, texto, numero) => {
     exportar: () => db.export(),
     prepare,
     pinHash,
+    transaction,
   };
 };
