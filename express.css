@@ -327,7 +327,9 @@ html[data-theme="dark"] .both-summary-table th{background:#1e2a22}.both-summary-
   .both-summary{padding:12px;border-radius:19px}.both-summary-title{font-size:18px}.both-summary-totals{gap:5px}.both-summary-total{padding:9px 4px}.both-summary-total strong{font-size:13px}.both-summary-provider{padding:9px}.both-summary-send,.both-summary-edit{min-height:34px;padding:0 8px;font-size:10px}
 }
 @media(prefers-reduced-motion:reduce){.provider-nav-card,.pv-search,.both-summary-action{transition:none!important}}
-@media(max-width:390px){.inventory-reset-btn{min-height:34px;padding:0 8px;font-size:11px}.inventory-reset-btn span{display:none}.topbar{gap:7px}.logo{font-size:18px}.logo span{font-size:10px}}
+@media(max-width:480px){.topbar #themeToggle{display:none}.inventory-reset-menu{left:auto;right:-60px}}
+@media(max-width:390px){.inventory-reset-btn{min-height:38px;padding:0 9px;font-size:12px}.topbar{gap:6px;padding-left:12px;padding-right:12px}.logo{font-size:18px}.logo span{font-size:10px}}
+@media(max-width:360px){.topbar .pu-home-label{display:none}}
 
 /* Operación en primer plano: proveedor, sucursales, acciones y total. */
 .both-summary-provider-head{display:grid;grid-template-columns:minmax(0,1fr) auto;grid-template-areas:"identity actions" "states actions";align-items:center;gap:8px 12px;margin-bottom:10px}

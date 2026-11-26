@@ -2073,7 +2073,7 @@ function xpHistoryHtml(){
   const days={};
   rows.forEach(row=>{if(!row?.fecha)return;(days[row.fecha]||(days[row.fecha]=[])).push(row);});
   const fechas=Object.keys(days).sort((a,b)=>b.localeCompare(a)).slice(0,30);
-  if(!fechas.length)return'<details class="pd-hist"><summary>Historial de pedidos: 0 dias</summary><p class="pd-hist-empty">Los pedidos reiniciados aparecen aqui.</p></details>';
+  if(!fechas.length)return'<details class="pd-hist"><summary>Historial de pedidos: 0 días</summary><p class="pd-hist-empty">Los pedidos reiniciados aparecen aquí.</p></details>';
   const fechaLabel=f=>new Date(f+'T12:00:00').toLocaleDateString('es-CR',{weekday:'short',day:'numeric',month:'short'});
   const detalle=row=>{
     if(row.side&&Array.isArray(row.items))return row.items.length?row.items.map(x=>`${esc(x.name)}: ${fmtQ(x.qty)} ${esc(x.unit||'')}`).join('<br>'):'Pedido vacío en ese reinicio';
