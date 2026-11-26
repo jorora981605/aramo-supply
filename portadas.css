@@ -486,3 +486,7 @@ html[data-theme="dark"] .po6{--ar-p-control:#3b7fd4}
   .po6-door .po6-collage img:nth-child(3){width:62px;height:62px}
   .po6-collage--ico .ic{width:56px;height:56px}
 }
+
+/* En un aparato de Moravia no sale la puerta del Control (por ahora es solo de Los Ángeles): tres puertas, sin hueco */
+.po6-puertas.sin-control{grid-template-rows:repeat(3,1fr)}
+.po6-door[hidden]{display:none!important}

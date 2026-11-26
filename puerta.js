@@ -378,6 +378,10 @@ function pintarPuerta(){
   }
   const raiz=$('puIn');if(!raiz||!window.AramoPortadas)return;
   const v=window.AramoPortadas.pintar(raiz,datosPuerta());
+  // El Control por ahora es solo de Los Ángeles: en un aparato de Moravia su puerta no sale.
+  const sinControl=LOCAL==='moravia';
+  raiz.querySelectorAll('[data-pu="control"]').forEach(b=>{b.hidden=sinControl;});
+  raiz.querySelector('.po6-puertas')?.classList.toggle('sin-control',sinControl);
   if(v!==_portadaMontada){
     _portadaMontada=v;
     if(v===1){clonarSurtido();requestAnimationFrame(escalarMinis);}
@@ -1846,6 +1850,7 @@ document.addEventListener('keydown',e=>{
   if(!$('puerta')?.classList.contains('open')||$('moSheet')?.classList.contains('open'))return;
   if(e.ctrlKey||e.metaKey||e.altKey||e.target.matches?.('input,textarea,select'))return;
   const mapa={'1':'surtido','2':'canasta','3':'pos','4':'control',m:'mostrador',M:'mostrador'};
+  if(mapa[e.key]==='control'&&LOCAL==='moravia')return; // en Moravia no hay Control por ahora
   if(mapa[e.key]){e.preventDefault();const el=document.querySelector(`#puIn [data-pu="${mapa[e.key]}"]`);ACT[mapa[e.key]](el);}
   else if(e.key==='/'&&$('poCmdQ')){e.preventDefault();$('poCmdQ').focus();}
 });
