@@ -932,7 +932,6 @@
       <a class="ctl-inicio" href="APP.html" aria-label="Volver al Inicio de ARAMO"><span data-ic="inicio"></span><span>Inicio</span></a>
       <div class="ctl-mod"><span class="ctl-cuadro" data-ic="grafico" aria-hidden="true"></span><b>Control</b></div>
       <div class="ctl-tiendas" role="group" aria-label="Tienda">
-        <a href="control.html?suc=moravia" data-ctl-suc="moravia">Moravia</a>
         <a href="control.html?suc=angeles" data-ctl-suc="angeles">Los Ángeles</a>
       </div>
     </header>
@@ -1388,7 +1387,7 @@
 <script src="control-puente.js?v=20261126-control4"></script>
 <script>
 // ARAMO: un Control por tienda. La tienda sale de ?suc=, o de la que se eligió al entrar a ARAMO.
-const TIENDA=(()=>{let l=new URLSearchParams(location.search).get('suc');try{l=l||sessionStorage.getItem('aramo_local_sesion')||JSON.parse(localStorage.getItem('aramo_local')||'null');}catch(e){}return l==='moravia'?'moravia':'angeles';})();
+const TIENDA='angeles'; // por ahora el Control es solo de Los Ángeles (LASR)
 const TIENDA_NOMBRE=TIENDA==='moravia'?'Moravia':'Los Ángeles';
 const KEY='aramo_control_v3_'+TIENDA;
 

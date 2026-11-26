@@ -358,7 +358,7 @@ function datosInicio(sr,a,c){
      s6:{sub:'Pedido a proveedores',ins:(sr.sinEnviar?`<span class="ui-estado ui-estado--pendiente">${ICO('reloj',16)}${sr.sinEnviar} por enviar</span>`:'')+`<span class="ui-estado">${sr.prods?pl(sr.prods,'producto','productos'):'Pedido vacío'}</span>`},
     t6:{sub:'Tienda en línea de los clientes',ins:a.length?`<span class="ui-estado ui-estado--pendiente">${ICO('reloj',16)}${a.length} en curso</span>`:''},
     p6:{sub:'Caja de '+zona},
-    c6:{sub:'Cierres, personal y gastos'},
+    c6:{sub:'Los Ángeles · cierres y gastos'},
   };
 }
 let _portadaMontada=0,_fotoT=0;
@@ -1263,7 +1263,7 @@ const ACT={
   surtido(el){entrar('surtido',el);},canasta(el){entrar('canasta',el);},mostrador(el){entrar('mostrador',el);},pos(el){entrar('pos',el);},
   puerta(){volverAlMenu();},
   // Control: la app de cierres del dueño, por tienda (control.html)
-  control(){buzz(12);location.href='control.html?suc='+encodeURIComponent(LOCAL&&LOCAL!=='todas'?LOCAL:'moravia');},
+  control(){buzz(12);location.href='control.html?suc=angeles';}, // por ahora el Control es solo de Los Ángeles (LASR)
   portada(){M.vista='portada';abrirHoja(window.AramoPortadas.selectorHtml());},
   'portada-usar'(el){window.AramoPortadas.elegir(+el.dataset.v);cerrarHoja();_portadaMontada=0;const r=$('puIn');if(r)r.dataset.v='';pintarPuerta();$('puerta').scrollTop=0;toast('🎨 Portada '+el.dataset.v+' · '+(window.AramoPortadas.LISTA.find(x=>x.n===+el.dataset.v)?.t||''));},
   compartir(){M.vista='compartir';pintarCompartir();},
