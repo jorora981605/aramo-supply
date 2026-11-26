@@ -619,3 +619,12 @@ html[data-theme="dark"] .pm-extra .pm-del{color:#fca5a5;border-color:rgba(252,16
 #priceCompareList .compare-row{grid-template-columns:1fr 112px 44px;gap:8px}
 .pm-quitar{width:44px;height:44px;border:1px solid var(--b2);border-radius:12px;background:transparent;color:var(--m);font-size:22px;line-height:1;cursor:pointer}
 .pm-quitar:hover{color:#b91c1c;border-color:rgba(185,28,28,.5)}
+
+/* ── Categoría con botones grandes (Productos) ── */
+.pm-cats{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin:4px 0 8px}
+.pm-cat{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;min-height:60px;padding:6px 4px;border:1.5px solid var(--b2);border-radius:14px;background:var(--card);color:var(--t);font:800 13.5px var(--fn,inherit);cursor:pointer}
+.pm-cat span{font-size:20px;line-height:1}
+.pm-cat.on{border-color:var(--ar-primario);background:var(--ar-primario);color:var(--ar-sobre-primario)}
+.pm-cat-hint{margin:0 0 10px;font-size:12.5px;font-weight:600;color:var(--m)}
+.pm-cat-hint.falta{color:#b45309;font-weight:800}
+html[data-theme="dark"] .pm-cat-hint.falta{color:#fcd34d}
