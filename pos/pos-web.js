@@ -569,24 +569,84 @@ function pintarMenu(){
     <button type="button" data-pw="olvidar">🔒 Cerrar sesión del local</button>
     <button type="button" data-pw="salir" class="pw-m-salir">⌂ Volver al menú de ARAMO</button>`;
 }
-// Puente móvil para un pedido que viene del Mostrador. El POS conserva aquí
-// las cantidades/precios revisados y devuelve la cotización al mismo pedido;
-// no crea una venta hasta que el cliente la confirme en el Mostrador.
+// ── Pedidos de La Feria en el POS ──
+// "Abrir este pedido en POS" (Mostrador) lo monta como un tiquete del POS con el nombre del cliente.
+// "Guardar y volver al Mostrador" devuelve la cotización (aramo_pos_cotizacion_<id>) y cierra esta pestaña;
+// el tiquete queda montado (aramo_pos_feria_<tienda>) para cobrarlo con F12 cuando el cliente confirme.
+// Al cobrarlo, la venta lleva el nombre del cliente y el Mostrador ve el número (aramo_pos_venta_<id>).
+const feriaClave=()=>'aramo_pos_feria_'+SUC;
+const sinCanasta=s=>String(s||'').replace(/^🧺\s*/,'');
+function feriaPendientes(){return (LS.get(feriaClave(),[])||[]).filter(x=>x&&x.id&&Date.now()-(+x.t||0)<4*864e5);}
+function feriaGuardar(L){LS.set(feriaClave(),L.slice(-20));}
+function feriaProducto(it){
+  const cat=window.ARAMO_CAT;let cid='';
+  try{const c=cat&&cat.deFeria?cat.deFeria(it.k):null;cid=c?c.id:(cat?cat.idDe(it.n):'');}catch(e){}
+  const q=(sql,arg)=>{try{return POS.prepare(sql).get([arg])||null;}catch(e){return null;}};
+  const campos=c=>`SELECT id,nombre,unidad,precio,tasa_impuesto${c?',cabys_codigo':''} FROM productos WHERE activo=1 AND `;
+  const buscar=c=>(cid&&q(campos(c)+'catalogo_id=? LIMIT 1',cid))||q(campos(c)+'lower(nombre)=lower(?) LIMIT 1',String(it.n||''));
+  return buscar(true)||buscar(false);
+}
+function feriaLineas(d){
+  return (d.items||[]).filter(it=>it&&it.estado!=='nohay').map(it=>{
+    // si el POS lo vende en otra unidad (kilo contra unidad), va como línea suelta con la unidad y el precio del pedido
+    let pr=feriaProducto(it);const cant=(it.qr!=null&&it.qr!=='')?+it.qr:+it.q||0;
+    if(pr&&((pr.unidad==='kg')!==(it.u==='kg')))pr=null;
+    return{k:it.k,pid:pr?pr.id:null,nombre:pr?pr.nombre:it.n,precio:+it.p>0?+it.p:(pr?+pr.precio||0:0),cantidad:cant,
+      unidad:pr?pr.unidad:(it.u==='kg'?'kg':'unidad'),tasa:pr?+pr.tasa_impuesto||0:0,cabys:(pr&&pr.cabys_codigo)||it.cabys||''};
+  });
+}
+function feriaMontarPendientes(){
+  if(!window.posTiquetes)return 0;let n=0;
+  feriaPendientes().forEach(p=>{if(!window.posTiquetes.tiene(p.id)){window.posTiquetes.montar({id:p.id,ref:p.ref,nombre:p.nombre,lineas:p.lineas});n++;}});
+  return n;
+}
 function montarPedidoWeb(){
   const id=new URLSearchParams(location.search).get('encargo'),d=LS.get('aramo_pos_encargo',null);
-  if(!id||!d||d.id!==id||document.getElementById('pwPedidoWeb'))return;
-  const box=document.createElement('aside');box.id='pwPedidoWeb';
-  Object.assign(box.style,{position:'fixed',right:'12px',top:'12px',zIndex:1200,width:'min(380px,calc(100vw - 24px))',maxHeight:'62vh',overflow:'auto',padding:'14px',borderRadius:'16px',background:'#fff',color:'#18351f',boxShadow:'0 18px 50px rgba(0,0,0,.25)',fontFamily:'system-ui,sans-serif'});
-  const filas=(d.items||[]).map((it,i)=>`<div style="display:grid;grid-template-columns:1fr 74px 88px;gap:6px;align-items:center;padding:8px 0;border-top:1px solid #dbe7dd"><span><b>${esc(it.n)}</b><small style="display:block;color:#607565">${esc(it.u||'unidad')}</small></span><input type="number" step="0.001" min="0" value="${+it.q||0}" data-pw-q="${i}" aria-label="Cantidad de ${esc(it.n)}" style="width:100%;padding:8px;border:1px solid #b8cbbd;border-radius:8px"><input type="number" step="1" min="0" value="${+it.p||0}" data-pw-p="${i}" aria-label="Precio de ${esc(it.n)}" style="width:100%;padding:8px;border:1px solid #b8cbbd;border-radius:8px"></div>`).join('');
-  box.innerHTML=`<button type="button" data-pw-close style="float:right;border:0;background:transparent;font-size:20px">×</button><div style="font-size:11px;text-transform:uppercase;letter-spacing:.08em;color:#55765e">Pedido web · ${esc(d.sucursal||'')}</div><h3 style="margin:3px 0 5px">${esc(d.ref||id)}</h3><p style="margin:0 0 10px;font-size:13px">${esc(d.cliente?.nombre||'Cliente')} · revisá cantidades y precios antes de cotizar.</p><div style="display:grid;grid-template-columns:1fr 74px 88px;gap:6px;font-size:11px;color:#607565"><span>Producto</span><span>Cantidad</span><span>Precio</span></div>${filas}<div style="display:flex;gap:8px;margin-top:12px"><button type="button" data-pw-save style="flex:1;border:0;border-radius:10px;padding:10px;background:#1b7f42;color:#fff;font-weight:800">Guardar cotización</button><a href="../APP.html#ver=${encodeURIComponent(id)}" style="display:grid;place-items:center;padding:0 10px;border-radius:10px;background:#eef6ef;color:#1b7f42;font-weight:800;text-decoration:none">Mostrador</a></div><small data-pw-msg style="display:block;margin-top:8px;color:#607565">La venta se registra en POS solo después de la confirmación del cliente.</small>`;
+  let vueltas=0;
+  const listo=()=>{
+    if(!window.posTiquetes){if(++vueltas<80)setTimeout(listo,250);return;}
+    const n=feriaMontarPendientes();
+    if(id&&d&&d.id===id){
+      window.posTiquetes.montar({id,ref:d.ref||'',nombre:'🧺 '+((d.cliente&&d.cliente.nombre)||'Cliente'),lineas:feriaLineas(d)});
+      feriaBarra(d,id);
+    }else if(n)aviso('🧺 '+(n===1?'Hay 1 pedido de La Feria listo':'Hay '+n+' pedidos de La Feria listos')+' para cobrar: elegí su tiquete y tocá F12.');
+  };
+  listo();
+  // si otra pestaña deja un pedido listo, aparece aquí también
+  window.addEventListener('storage',e=>{if(e.key===feriaClave()&&feriaMontarPendientes())aviso('🧺 Llegó un pedido de La Feria para cobrar: elegí su tiquete y tocá F12.');});
+}
+function feriaBarra(d,id){
+  if(document.getElementById('pwPedidoWeb'))return;
+  const box=document.createElement('aside');box.id='pwPedidoWeb';box.setAttribute('role','region');box.setAttribute('aria-label','Pedido de La Feria');
+  Object.assign(box.style,{position:'fixed',left:'50%',transform:'translateX(-50%)',bottom:'14px',zIndex:1200,width:'min(640px,calc(100vw - 24px))',padding:'12px 14px',borderRadius:'16px',background:'#fff',color:'#18351f',boxShadow:'0 18px 50px rgba(0,0,0,.28)',border:'2px solid #2f8f5b',fontFamily:'system-ui,sans-serif',display:'flex',flexWrap:'wrap',alignItems:'center',gap:'10px'});
+  box.innerHTML=`<div style="flex:1 1 260px;min-width:0"><div style="font-size:12px;text-transform:uppercase;letter-spacing:.06em;color:#55765e;font-weight:800">🧺 Pedido de La Feria · ${esc(d.ref||'')}</div><div style="font-size:17px;font-weight:800;margin-top:2px">${esc((d.cliente&&d.cliente.nombre)||'Cliente')}</div><div style="font-size:13px;color:#46604c;margin-top:2px">Ya está en su tiquete. Revisá pesos y precios ahí y tocá Guardar.</div><div data-pw-msg style="font-size:13px;font-weight:700;margin-top:4px"></div></div>
+    <button type="button" data-pw-save style="min-height:52px;padding:0 18px;border:0;border-radius:12px;background:#1f7a45;color:#fff;font-size:16px;font-weight:800;cursor:pointer">✅ Guardar y volver al Mostrador</button>
+    <button type="button" data-pw-close aria-label="Cerrar este aviso" style="min-height:52px;min-width:52px;border:1px solid #cfe0d4;border-radius:12px;background:#fff;font-size:20px;cursor:pointer">✕</button>`;
   box.querySelector('[data-pw-close]').onclick=()=>box.remove();
   box.querySelector('[data-pw-save]').onclick=()=>{
-    const items=(d.items||[]).map((it,i)=>({...it,q:Math.max(0,+box.querySelector(`[data-pw-q="${i}"]`)?.value||0),p:Math.max(0,+box.querySelector(`[data-pw-p="${i}"]`)?.value||0)}));
-    LS.set('aramo_pos_cotizacion_'+id,{id,items,total:items.reduce((s,it)=>s+(+it.q||0)*(+it.p||0),0),at:new Date().toISOString()});
-    const m=box.querySelector('[data-pw-msg]');if(m)m.textContent='✅ Cotización guardada. Volvé al Mostrador para aplicarla y enviarla al cliente.';
+    const t=window.posTiquetes&&window.posTiquetes.leer(id),m=box.querySelector('[data-pw-msg]');
+    if(!t){if(m)m.textContent='⚠️ No encuentro el tiquete de este pedido.';return;}
+    const cart=t.cart||[];
+    const items=(d.items||[]).map(it=>{const c=cart.find(x=>x.feriaK===it.k);return c?{...it,q:+c.cantidad||0,p:+c.precio_cobrado||0,qr:null}:{...it,q:0,qr:null};});
+    cart.filter(x=>!x.feriaK).forEach(x=>items.push({k:'pos_'+(x.productoId||x.cartId),n:x.nombre,e:'🧺',q:+x.cantidad||0,p:+x.precio_cobrado||0,u:x.unidad==='kg'?'kg':'unid',s:x.unidad==='kg'?.25:1,nuevo:1}));
+    const total=items.reduce((s,it)=>s+(+it.q||0)*(+it.p||0),0);
+    LS.set('aramo_pos_cotizacion_'+id,{id,items,total,at:new Date().toISOString()});
+    feriaGuardar([...feriaPendientes().filter(x=>x.id!==id),{id,ref:d.ref||'',nombre:t.nombre,t:Date.now(),
+      lineas:cart.map(c=>({k:c.feriaK||'',pid:c.productoId,nombre:c.nombre,precio:+c.precio_cobrado||0,cantidad:+c.cantidad||0,unidad:c.unidad,tasa:+c.tasa_impuesto||0,cabys:c.cabys_codigo||''}))}]);
+    if(m)m.textContent='✅ Guardado. El tiquete queda listo para cobrar con F12. Volviendo al Mostrador…';
+    setTimeout(()=>{try{window.close();}catch(e){}setTimeout(()=>{if(!document.hidden)location.href='../APP.html';},500);},900);
   };
   document.body.appendChild(box);
 }
+// La venta de un pedido de La Feria: el Mostrador la ve y el tiquete deja de estar pendiente.
+window.posVentaHecha=(t,v,se)=>{
+  if(!t||!t.encargo)return;
+  const cli=sinCanasta(t.nombre);
+  LS.set('aramo_pos_venta_'+t.encargo,{numero:(v&&v.numero)||'',total:+se.total||0,metodo:se.metodo_pago||'',sinpe:+se.pago_sinpe||0,efectivo:+se.pago_efectivo||0,tarjeta:+se.pago_tarjeta||0,at:new Date().toISOString(),cliente:cli});
+  feriaGuardar(feriaPendientes().filter(x=>x.id!==t.encargo));
+  aviso('🧺 Venta '+((v&&v.numero)||'')+' de '+cli+' registrada · La Feria');
+};
+window.posTiqueteDescartado=t=>{if(t&&t.encargo)feriaGuardar(feriaPendientes().filter(x=>x.id!==t.encargo));};
 let _tt=0;
 function aviso(m){const t=document.getElementById('pwToast');if(!t)return;t.textContent=m;t.classList.add('show');clearTimeout(_tt);_tt=setTimeout(()=>t.classList.remove('show'),5200);}
 function alerta(t,m){setTimeout(()=>alert(t+'\n\n'+m),50);}
