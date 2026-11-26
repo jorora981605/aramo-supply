@@ -299,10 +299,19 @@ function catalogo(sucursal){
   // Un producto oculto globalmente se puede volver a mostrar solo en una sucursal.
   (bs.visibles||[]).forEach(k=>ocultos.delete(k));
   const vistos=new Set();
-  const out=[...base,...(t.nuevos||[])].filter(p=>p&&p.k&&!vistos.has(p.k)&&vistos.add(p.k)).map(p=>{
-    const e=ed[p.k]||{},u=e.u||p.u;
-    const s=+e.s||(e.u&&e.u!==p.u?pasoDe(u):+p.s)||pasoDe(u);
-    return{...p,...e,u,s,p:+precios[p.k]||+e.p||+p.p||0,agotado:agot.has(p.k),oculto:ocultos.has(p.k),propio:!base.some(b=>b.k===p.k)};
+  // ARAMO conectado (2026-11-25): además de La Feria de fábrica y lo que agregó la tienda, TODOS los productos
+  // de ARAMO (Surtido y el POS de esta tienda) en su pasillo. Si el POS de esta tienda tiene precio, manda el POS.
+  const CAT=window.ARAMO_CAT,pos=CAT&&sucursal?CAT.posDe(sucursal):{},conectados=[];
+  if(CAT){
+    const propios=[...base,...(t.nuevos||[])],ks=new Set(propios.map(p=>p&&p.k)),ids=new Set(propios.map(p=>p&&CAT.idDe(p.n)));
+    CAT.todos(sucursal).forEach(x=>{const k=CAT.claveFeria(x.id);if(ks.has(k)||ids.has(x.id))return;conectados.push({k,n:x.n,d:'',e:x.e,c:x.c,u:x.u,s:pasoDe(x.u),p:0,conectado:1});});
+  }
+  const out=[...base,...(t.nuevos||[]),...conectados].filter(p=>p&&p.k&&!vistos.has(p.k)&&vistos.add(p.k)).map(p=>{
+    const e=ed[p.k]||{};let u=e.u||p.u;
+    let s=+e.s||(e.u&&e.u!==p.u?pasoDe(u):+p.s)||pasoDe(u),precio=+precios[p.k]||+e.p||+p.p||0;
+    const q=pos[p.k],dePos=!!(q&&+q.p>0);
+    if(dePos){precio=+q.p;if(q.u==='kg'&&u!=='kg'){u='kg';s=pasoDe('kg');}else if(q.u!=='kg'&&u==='kg'){u='unid';s=1;}}
+    return{...p,...e,u,s,p:precio,pos:dePos,agotado:agot.has(p.k),oculto:ocultos.has(p.k),propio:!p.conectado&&!base.some(b=>b.k===p.k)};
   });
   return out.map((p,i)=>({...p,__orden:i})).sort((a,b)=>((+a.orden||999999)-(+b.orden||999999))||a.__orden-b.__orden).map(({__orden,...p})=>p);
 }
@@ -533,6 +542,8 @@ const PAGOS={
   link:{n:'Tarjeta en línea',e:'🔗',txt:'Te llega el link de pago con el total exacto.'},
 };
 
+// La lista única de productos (catalogo-aramo.js): cuando llega lo nuevo de Surtido o del POS, se vuelve a pintar
+try{if(window.ARAMO_CAT){window.addEventListener('aramo-catalogo',()=>emit('tienda'));const cargarCat=()=>window.ARAMO_CAT.cargar().catch(()=>{});setTimeout(cargarCat,300);setInterval(cargarCat,10*60e3);document.addEventListener('visibilitychange',()=>{if(!document.hidden)cargarCat();});}}catch(e){}
 window.AramoNube={
   conectar,crear,cambiar,importar,borrarTodo,restaurar,
   get desfase(){return desfase;},

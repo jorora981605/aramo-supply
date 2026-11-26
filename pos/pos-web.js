@@ -145,6 +145,32 @@ async function rpc(fn,args){
   if(error){const e=new Error(error.message||String(error));e.codigo=error.code;e.red=/fetch|network|Failed|timeout|ERR_/i.test(error.message||'');throw e;}
   return data;
 }
+// ── Catálogo de ARAMO: el POS tiene los mismos productos que Surtido y La Feria, y publica sus precios ──
+async function conectarCatalogo(){
+  if(!window.PosCatalogo||!window.ARAMO_CAT||!POS)return;
+  if(!dueno||soloLectura)return;
+  try{await Promise.race([window.ARAMO_CAT.cargar(),new Promise(r=>setTimeout(r,5000))]);}catch(e){}
+  const r=window.PosCatalogo.sincronizar(POS);
+  if(r.agregados||r.unidos)marcarCambio();
+  if(r.agregados)aviso('🧺 '+r.agregados+' productos de ARAMO quedaron en el POS (en Inventario). El precio se pone la primera vez que se venden.');
+  publicarCatalogo();
+}
+let _pubando=false;
+async function publicarCatalogo(){
+  if(_pubando||!supa||!CLAVE||!SUC||!POS||!dueno||!window.PosCatalogo)return;
+  const lista=window.PosCatalogo.lista(POS),f=window.PosCatalogo.firma(lista);
+  if(f===LS.get('pos_cat_pub_'+SUC,''))return;
+  _pubando=true;
+  try{const r=await rpc('pos_publicar_catalogo',{p_suc:SUC,p_clave:CLAVE,p_productos:lista});if(r&&r.ok)LS.set('pos_cat_pub_'+SUC,f);}
+  catch(e){/* sin la tabla todavía o sin internet: se vuelve a intentar en la próxima subida */}
+  finally{_pubando=false;}
+}
+// La primera vez que se vende un producto sin precio, el precio que se escribe queda guardado
+window.posPrecioRapido=(id,precio)=>{
+  if(!POS||soloLectura||!(+precio>0))return false;
+  POS.prepare("UPDATE productos SET precio = ?, fecha_modificacion = datetime('now','localtime') WHERE id = ?").run([+precio,id]);
+  marcarCambio();return true;
+};
 const faltaNube=e=>e&&(e.codigo==='PGRST202'||e.codigo==='42883'||/Could not find the function|does not exist/i.test(e.message||''));
 const vencido=i=>!i?.dueno||!i.dueno_visto||(Date.parse(i.ahora||new Date().toISOString())-Date.parse(i.dueno_visto))>VENCE;
 
@@ -189,7 +215,7 @@ async function subir(){
     const c=await rpc('pos_confirmar',{p_suc:SUC,p_clave:CLAVE,p_disp:DISP,p_base:version,p_partes:partes.length,p_tamano:bytes.length});
     if(!c?.ok)throw Object.assign(new Error(c?.motivo||'confirmar'),{motivo:c?.motivo,estado:c?.estado});
     version=c.version;if(cambios===marca)sucio=false;
-    offline=false;falloRed=0;
+    offline=false;falloRed=0;publicarCatalogo();
     await guardarLocal();
     return true;
   }catch(e){
@@ -381,6 +407,7 @@ async function abrir(r,local){
   pintarCapa(null);
   listoRes();
   montarPedidoWeb();
+  conectarCatalogo().catch(e=>console.warn('[pos] catálogo',e));
   pintarEstado();
   if(sucio&&dueno)programarSubida();
   if(!dueno&&info?.dueno)aviso('👀 La caja de '+zona(SUC)+' está abierta en '+(info.dueno_nombre||'otro dispositivo')+'. Aquí podés mirar; para cobrar, tocá el estado y «Usar la caja aquí».');

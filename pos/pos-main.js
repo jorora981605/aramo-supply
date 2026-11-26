@@ -327,7 +327,7 @@ async function initDB() {
   const cats = [
     ['Frutas','#FF9800'],['Verduras','#4CAF50'],['Hierbas','#8BC34A'],
     ['Raíces','#795548'],['Cítricos','#FFC107'],['Lácteos','#90CAF9'],
-    ['Granos','#FFD54F'],['Otros','#9E9E9E'],
+    ['Granos','#FFD54F'],['Otros','#9E9E9E'],['Despensa','#A1887F'],
   ];
   for (const [n, c] of cats) {
     db.run('INSERT OR IGNORE INTO categorias (nombre, color) VALUES (?, ?)', [n, c]);
@@ -367,6 +367,10 @@ async function initDB() {
 
   // Migración — a quién le hicieron el SINPE (texto "Nombre · teléfono", NULL si no hubo SINPE)
   try { db.run('ALTER TABLE ventas ADD COLUMN sinpe_destino TEXT DEFAULT NULL'); } catch(e) {}
+
+  // Migración — catálogo de ARAMO: a qué producto de ARAMO corresponde y si lo agregó el catálogo
+  try { db.run("ALTER TABLE productos ADD COLUMN catalogo_id TEXT DEFAULT ''"); } catch(e) {}
+  try { db.run("ALTER TABLE productos ADD COLUMN origen TEXT DEFAULT ''"); } catch(e) {}
 
   // Admin por defecto si no existe ningún administrador
   const adminCnt = prepare(`SELECT COUNT(*) AS n FROM cajeros WHERE rol = 'administrador'`).get();

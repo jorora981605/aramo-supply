@@ -12,6 +12,7 @@
 <link rel="manifest" href="./manifest.json">
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.117.0"></script>
 <script src="catalogo-productos.js"></script>
+<script src="catalogo-aramo.js?v=20261125-catalogo1"></script>
 <script src="supplier-base.js"></script>
 <!-- Sistema de diseño ARAMO: tokens y letras locales. Va PRIMERO. -->
 <script>
@@ -1405,6 +1406,15 @@ function getOtrosProducts(){
   (Array.isArray(window.ARAMO_XLSX_PRODUCTS)?window.ARAMO_XLSX_PRODUCTS:[]).forEach(add);
   const base=window.ARAMO_SUPPLIER_BASE?.providers||{};
   Object.values(base).forEach(data=>(data?.products||[]).forEach(add));
+  // ARAMO conectado (catalogo-aramo.js): los productos de La Feria y los que solo están en el POS de
+  // alguna tienda también se pueden pedir aquí. El mismo producto escrito distinto no se repite.
+  const CAT=window.ARAMO_CAT;
+  if(CAT){
+    const ids=new Set([...catalog.values()].map(p=>CAT.idDe(p.name)));
+    const sumar=(n,e,u)=>{const id=CAT.idDe(n);if(!n||ids.has(id)||CAT.fuera(n))return;ids.add(id);add({name:n,emoji:e||'🧺',unit:u==='kg'?'kg':'unidad'});};
+    CAT.todos().forEach(x=>sumar(x.n,x.e,x.u));
+    ['moravia','angeles'].forEach(suc=>Object.values(CAT.posDe(suc)).forEach(q=>q&&sumar(q.n,q.e,q.u)));
+  }
   return [...catalog.values()].sort((a,b)=>ORDEN_ES(a.name,b.name));
 }
 
@@ -4096,9 +4106,9 @@ if(isIOS && !isInStandalone && !dismissed){
 <script src="express.js?v=20261125-diario1"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcode-generator/1.4.4/qrcode.min.js"></script>
 <script src="canasta-config.js?v=20261018-seguridad-1"></script>
-<script src="aramo-nube.js?v=20261020-circuito-6"></script>
+<script src="aramo-nube.js?v=20261125-catalogo1"></script>
 <script src="portadas.js?v=20261124-control"></script>
-<script src="puerta.js?v=20261124-control"></script>
+<script src="puerta.js?v=20261125-catalogo1"></script>
 <script>
   // El menú, Mostrador y Surtido se desplazan verticalmente; no usar gestos
   // horizontales como Atrás/Adelante del navegador en el teléfono.

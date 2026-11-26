@@ -92,7 +92,7 @@ function fq(n){
 const UNI={kg:['kg','kg'],unid:['unid.','unid.'],rollo:['rollo','rollos'],paquete:['paquete','paquetes'],bolsita:['bolsita','bolsitas'],bolsa:['bolsa','bolsas'],'cartón':['cartón','cartones'],frasco:['frasco','frascos'],botella:['botella','botellas']};
 const fu=(u,q)=>(UNI[u]||[u,u])[q===1?0:1];
 const qtxt=(q,u)=>fq(q)+' '+fu(u,q);
-const porU=p=>$c(p.p)+(p.u==='kg'?'/kg':p.u==='unid'?' c/u':'/'+fu(p.u,1));
+const porU=p=>+p.p>0?$c(p.p)+(p.u==='kg'?'/kg':p.u==='unid'?' c/u':'/'+fu(p.u,1)):'Precio al pesar'; // sin precio todavía: la tienda lo pone al alistar
 const kg=n=>(Math.round((+n||0)*100)/100).toLocaleString('es-CR',{maximumFractionDigits:2});
 const MAD={hoy:'Para comer hoy',semana:'Para la semana',verde:'Bien verde'};
 const SUST={avisar:{e:'📞',n:'Avisame'},similar:{e:'🔁',n:'Algo parecido'},quitar:{e:'✖️',n:'Quitalo'}};
@@ -480,8 +480,8 @@ function mesaCanasta(){
     <span class="ch-e">${it.slice(-4).reverse().map(x=>`<i>${foto(x.k,x.p.e)}</i>`).join('')}${n>4?`<i class="mas">+${n-4}</i>`:''}</span>
     <small>${n} ${n===1?'producto':'productos'}${peso?` · ≈ ${kg(peso)} kg`:''}</small>
     <b id="tlHeroTot">${$c(_totHero)}</b>
-    <p>Total aproximado · pagás lo que pese de verdad</p></div>
-  <div class="grupo cesta" id="tlSecCesta">${it.map(x=>{const ag=!!x.p.agotado,min=ag||x.q<=pasoU(x.p,x.u)+1e-9;return `<div class="linea c-${esc(x.p.c||'')}${ag?' agotada':''}${x.k===C.toque?' toque':''}${x.k===C.ultimo?' nueva':''}" role="button" tabindex="0" data-act="info" data-k="${x.k}" aria-label="${esc(x.p.n)}: detalles"><span class="li-e">${foto(x.k,x.p.e)}</span><span class="t"><b>${esc(x.p.n)}</b><small>${esc(porU(x.p))}${x.u!==x.p.u?' · ≈ '+esc(qtxt(x.qb,x.p.u)):''}</small>${x.mad||x.nota?`<span class="li-n">${[x.mad?MAD[x.mad]:'',x.nota||''].filter(Boolean).map(esc).join(' · ')}</span>`:''}</span><span class="pz">${ag?'Agotado':$c(x.qb*x.p.p)}</span><span class="step-q"><button type="button" class="${min?'quita':''}" data-act="menos" data-k="${x.k}" aria-label="${min?'Quitar':'Menos'} ${esc(x.p.n)}">${min?BASURA:'−'}</button><em>${esc(qtxt(x.q,x.u))}</em><button type="button" data-act="mas" data-k="${x.k}" aria-label="Más ${esc(x.p.n)}">+</button></span></div>`;}).join('')}
+    <p>${(()=>{const sp=it.filter(x=>!x.p.agotado&&!(+x.p.p>0)).length;return sp?`Total aproximado · ${sp} ${sp===1?'producto va':'productos van'} con precio al pesar`:'Total aproximado · pagás lo que pese de verdad';})()}</p></div>
+  <div class="grupo cesta" id="tlSecCesta">${it.map(x=>{const ag=!!x.p.agotado,min=ag||x.q<=pasoU(x.p,x.u)+1e-9;return `<div class="linea c-${esc(x.p.c||'')}${ag?' agotada':''}${x.k===C.toque?' toque':''}${x.k===C.ultimo?' nueva':''}" role="button" tabindex="0" data-act="info" data-k="${x.k}" aria-label="${esc(x.p.n)}: detalles"><span class="li-e">${foto(x.k,x.p.e)}</span><span class="t"><b>${esc(x.p.n)}</b><small>${esc(porU(x.p))}${x.u!==x.p.u?' · ≈ '+esc(qtxt(x.qb,x.p.u)):''}</small>${x.mad||x.nota?`<span class="li-n">${[x.mad?MAD[x.mad]:'',x.nota||''].filter(Boolean).map(esc).join(' · ')}</span>`:''}</span><span class="pz">${ag?'Agotado':+x.p.p>0?$c(x.qb*x.p.p):'Al pesar'}</span><span class="step-q"><button type="button" class="${min?'quita':''}" data-act="menos" data-k="${x.k}" aria-label="${min?'Quitar':'Menos'} ${esc(x.p.n)}">${min?BASURA:'−'}</button><em>${esc(qtxt(x.q,x.u))}</em><button type="button" data-act="mas" data-k="${x.k}" aria-label="Más ${esc(x.p.n)}">+</button></span></div>`;}).join('')}
     <button type="button" class="agregar-mas" data-act="ir" data-p="armar">＋ Agregar más productos</button></div>
   ${sug.length?`<p class="grupo-h">¿Te falta algo?</p><div class="sug2">${sug.map(p=>`<button type="button" class="mini-p c-${esc(p.c||'')}" data-act="sumar" data-k="${p.k}"><span class="mp-e">${foto(p.k,p.e)}<i aria-hidden="true">+</i></span><b>${esc(p.n)}</b><small>${esc(porU(p))}</small></button>`).join('')}</div>`:''}`;
 }
@@ -911,7 +911,7 @@ function refrescarProd(){
   const p=prod(H.k),u=unidadDe(p,H.u),q=limpiaQ(H.q,u),en=!!C.cesta[H.k],b=$('tlHOk');
   const un=$('tlHU');if(un)un.textContent=fu(u,q||1);
   const cv=$('tlHConv');if(cv)cv.textContent=convTxt(p,u,q);
-  if(b){b.disabled=!q;b.textContent=q?`${en?'Listo':'Agregar'} · ${$c(N.redondear5(aBase(p,q,u)*p.p))}`:'Escribí cuánto querés';}
+  if(b){b.disabled=!q;b.textContent=q?`${en?'Listo':'Agregar'}${+p.p>0?' · '+$c(N.redondear5(aBase(p,q,u)*p.p)):''}`:'Escribí cuánto querés';}
 }
 
 // ══════════════ Sellar ══════════════
