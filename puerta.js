@@ -546,7 +546,7 @@ const filtrar=L=>L.filter(o=>M.suc==='todas'||o.sucursal===M.suc);
 // Un pedido cancelado o entregado ya no queda montado como tiquete pendiente en el POS de esta tienda.
 function limpiarTiquetesPOS(){try{['moravia','angeles'].forEach(k=>{const L=LS.get('aramo_pos_feria_'+k,null);if(!Array.isArray(L)||!L.length)return;const R=L.filter(p=>{const o=N.get(p.id);return !o||!(o.estado==='cancelado'||o.estado==='entregado'||(o.cobro&&!o.cobro.porPOS));});if(R.length!==L.length)LS.set('aramo_pos_feria_'+k,R);});}catch(e){}}
 // ── Cuadros (2026-11-26): colores por estado, lo que urge, tarjetas sencillas ──
-const COL={nuevo:'#e07a2e',alistando:'#d99a1c',listo:'#2f8f5b',entregado:'#1f6b40',cancelado:'#8a978e'};
+const COL={nuevo:'#c9621a',alistando:'#b07a0c',listo:'#2f8f5b',entregado:'#1f6b40',cancelado:'#8a978e'};
 const COLBANDA={...COL,alistando:'#f2b33d'};          // el área pintada del estado (la letra va oscura)
 const COLBOTON={...COL,cancelado:'#5f6d64'};          // el botón grande necesita más contraste
 const FILAS=[['nuevo','Nuevos'],['alistando','Alistando'],['listo','Listos']];
