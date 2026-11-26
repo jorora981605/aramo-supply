@@ -154,6 +154,21 @@ async function conectarCatalogo(){
   if(r.agregados||r.unidos)marcarCambio();
   if(r.agregados)aviso('🧺 '+r.agregados+' productos de ARAMO quedaron en el POS (en Inventario). El precio se pone la primera vez que se venden.');
   publicarCatalogo();
+  iniciarPrecios();
+}
+// El costo que se pone en el Cierre de compras actualiza solo los precios de este POS (pos-precios.js)
+let _preciosIniciado=false;
+function iniciarPrecios(){
+  if(_preciosIniciado||!window.PosPrecios||!POS||!SUC)return;
+  _preciosIniciado=true;
+  try{
+    window.PosPrecios.iniciar({
+      url:SUPA_URL,key:SUPA_KEY,POS:()=>POS,suc:()=>SUC,
+      puede:()=>!!(POS&&dueno&&!soloLectura&&!muerto&&!iniciando),
+      recargar:()=>{try{if(window.posRecargarProductos)window.posRecargarProductos();}catch(e){}},
+      aviso,
+    });
+  }catch(e){console.warn('[pos] precios',e);}
 }
 let _pubando=false;
 async function publicarCatalogo(){
