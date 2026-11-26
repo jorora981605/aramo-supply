@@ -623,6 +623,18 @@ ipcMain.handle('promociones:eliminar', (_, id) => {
 // ──────────────────────────────────────────────
 const SQL_MONTO_SINPE = `CASE WHEN (pago_efectivo+pago_tarjeta+pago_sinpe)>0 THEN pago_sinpe
                WHEN metodo_pago='sinpe' THEN total ELSE 0 END`;
+// Lo que cada venta completada deja en cada método, en colones enteros y SIN el vuelto (la suma da el total):
+//  · efectivo / tarjeta / sinpe: todo el total en ese método (pago_efectivo guarda lo que el cliente entregó, vuelto incluido: no sirve);
+//  · mixto: tarjeta y SINPE como se guardaron (sin pasar del total) y el efectivo es lo que falta para el total;
+//  · fiado y otros: nada de esto (el fiado no es plata que entró).
+// pos-dia.js (partir) hace la misma cuenta: la pantalla Caja, el cierre y el resumen del día dan lo mismo.
+const SQL_TARJETA = `CASE metodo_pago WHEN 'tarjeta' THEN ROUND(total)
+    WHEN 'mixto' THEN MIN(ROUND(total), MAX(0, ROUND(pago_tarjeta))) ELSE 0 END`;
+const SQL_SINPE = `CASE metodo_pago WHEN 'sinpe' THEN ROUND(total)
+    WHEN 'mixto' THEN MIN(ROUND(total) - MIN(ROUND(total), MAX(0, ROUND(pago_tarjeta))), MAX(0, ROUND(pago_sinpe))) ELSE 0 END`;
+const SQL_EFECTIVO = `CASE metodo_pago WHEN 'efectivo' THEN ROUND(total)
+    WHEN 'mixto' THEN ROUND(total) - MIN(ROUND(total), MAX(0, ROUND(pago_tarjeta)))
+      - MIN(ROUND(total) - MIN(ROUND(total), MAX(0, ROUND(pago_tarjeta))), MAX(0, ROUND(pago_sinpe))) ELSE 0 END`;
 function sinpePorDestino(where, params) {
   return prepare(`
     SELECT COALESCE(NULLIF(TRIM(sinpe_destino),''),'Sin destinatario') AS destino,
@@ -654,18 +666,9 @@ ipcMain.handle('caja:historial', () =>
       SELECT caja_id,
         COUNT(*) AS num_ventas,
         COALESCE(SUM(total),0) AS total_ventas,
-        COALESCE(SUM(
-          CASE WHEN (pago_efectivo+pago_tarjeta+pago_sinpe)>0 THEN pago_efectivo
-               WHEN metodo_pago='efectivo' THEN total ELSE 0 END
-        ),0) AS efectivo,
-        COALESCE(SUM(
-          CASE WHEN (pago_efectivo+pago_tarjeta+pago_sinpe)>0 THEN pago_tarjeta
-               WHEN metodo_pago='tarjeta' THEN total ELSE 0 END
-        ),0) AS tarjeta,
-        COALESCE(SUM(
-          CASE WHEN (pago_efectivo+pago_tarjeta+pago_sinpe)>0 THEN pago_sinpe
-               WHEN metodo_pago='sinpe' THEN total ELSE 0 END
-        ),0) AS sinpe,
+        COALESCE(SUM(${SQL_EFECTIVO}),0) AS efectivo,
+        COALESCE(SUM(${SQL_TARJETA}),0) AS tarjeta,
+        COALESCE(SUM(${SQL_SINPE}),0) AS sinpe,
         COALESCE(SUM(descuento_total),0) AS descuentos
       FROM ventas WHERE estado = 'completada'
       GROUP BY caja_id
@@ -696,8 +699,8 @@ ipcMain.handle('caja:abrir', (_, d) => {
 
 ipcMain.handle('caja:cerrar', (_, id, d) => {
   const tv = prepare(`
-    SELECT COALESCE(SUM(total),0) AS total FROM ventas
-    WHERE caja_id = ? AND estado = 'completada' AND metodo_pago = 'efectivo'
+    SELECT COALESCE(SUM(${SQL_EFECTIVO}),0) AS total FROM ventas
+    WHERE caja_id = ? AND estado = 'completada'
   `).get([id]);
 
   const calculado = (d.monto_apertura||0) + (tv?.total||0);
@@ -738,18 +741,9 @@ ipcMain.handle('caja:resumen', (_, id) => {
   const caja  = prepare('SELECT * FROM cajas WHERE id = ?').get([id]);
   const ventas = prepare(`
     SELECT COUNT(*) AS num_ventas, COALESCE(SUM(total),0) AS total_ventas,
-      COALESCE(SUM(
-        CASE WHEN (pago_efectivo+pago_tarjeta+pago_sinpe)>0 THEN pago_efectivo
-             WHEN metodo_pago='efectivo' THEN total ELSE 0 END
-      ),0) AS efectivo,
-      COALESCE(SUM(
-        CASE WHEN (pago_efectivo+pago_tarjeta+pago_sinpe)>0 THEN pago_tarjeta
-             WHEN metodo_pago='tarjeta' THEN total ELSE 0 END
-      ),0) AS tarjeta,
-      COALESCE(SUM(
-        CASE WHEN (pago_efectivo+pago_tarjeta+pago_sinpe)>0 THEN pago_sinpe
-             WHEN metodo_pago='sinpe' THEN total ELSE 0 END
-      ),0) AS sinpe,
+      COALESCE(SUM(${SQL_EFECTIVO}),0) AS efectivo,
+      COALESCE(SUM(${SQL_TARJETA}),0) AS tarjeta,
+      COALESCE(SUM(${SQL_SINPE}),0) AS sinpe,
       COALESCE(SUM(CASE WHEN metodo_pago='fiado' THEN total ELSE 0 END),0) AS fiado,
       COALESCE(SUM(descuento_total),0) AS descuentos
     FROM ventas WHERE caja_id = ? AND estado = 'completada'

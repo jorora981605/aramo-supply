@@ -168,11 +168,10 @@ function fechasConDatos(POS,tienda){
   return [...s].sort().slice(-40);
 }
 // Borra ventas, sus items y las cajas con lo que cuelga de ellas. Se quedan productos, precios, categorías, stock, clientes,
-// usuarios y ajustes. El contador de tiquetes vuelve a 1 (como recién instalada: todo lo anterior ya no existe).
+// usuarios y ajustes. NO se toca la configuración: `siguiente_numero` arma el consecutivo de las facturas de Hacienda y no se repite.
 function reiniciarDatos(POS){
   POS.transaction(()=>{
-    ['DELETE FROM facturas_electronicas','DELETE FROM venta_items','DELETE FROM ventas','DELETE FROM arqueo_detalle','DELETE FROM cajas',
-     "UPDATE configuracion SET valor = '1' WHERE clave = 'siguiente_numero'"].forEach(sql=>POS.prepare(sql).run());
+    ['DELETE FROM facturas_electronicas','DELETE FROM venta_items','DELETE FROM ventas','DELETE FROM arqueo_detalle','DELETE FROM cajas'].forEach(sql=>POS.prepare(sql).run());
   })();
 }
 // Lo que este aparato guarda de ventas de prueba, pedidos de La Feria, tiquetes y notas
