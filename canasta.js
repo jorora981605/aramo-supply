@@ -129,7 +129,8 @@ function sumar(k,qb){const p=prod(k);if(!p)return;const c=C.cesta[k]||{},u=unida
 
 // ══════════════ Pedidos del cliente ══════════════
 const misPedidos=()=>C.mis.map(id=>N.get(id)).filter(Boolean);
-const pedidosVisibles=()=>misPedidos().filter(o=>o.estado!=='cancelado').sort((a,b)=>Date.parse(b.created||0)-Date.parse(a.created||0)).slice(0,5);
+// Un pedido que la tienda rechazó (o que el cliente rechazó) se sigue viendo un día para que no desaparezca sin explicación.
+const pedidosVisibles=()=>misPedidos().filter(o=>o.estado!=='cancelado'||(o.rechazo&&Date.now()-Date.parse(o.updated||0)<864e5)).sort((a,b)=>Date.parse(b.created||0)-Date.parse(a.created||0)).slice(0,5);
 const activo=()=>misPedidos().filter(o=>!['entregado','cancelado'].includes(o.estado))[0]||null;
 const ultimoEntregado=()=>misPedidos().find(o=>o.estado==='entregado')||null;
 const ultimoPedido=()=>misPedidos().find(o=>o.estado!=='cancelado')||null;
@@ -390,10 +391,12 @@ const nombreSuc=s=>s?[s.n,s.zona].filter(Boolean).join(' '):'';
 const fhm=hhmm=>fh(aFecha(0,hm(hhmm)));
 // Estado de un pedido en palabras cortas, con su ícono y su avance (0-100)
 function estadoDe(o){
-  const {r,n}=avance(o),env=o.retiro?.envio,E=o.estado,f=N.faseDe?.(o)||({nuevo:'enviado',alistando:'recibido',listo:'alistando',entregado:'entregado'}[E]||'enviado');
-  const t={enviado:'Enviado',recibido:'Recibido · la tienda pesa',confirmacion:'Confirmación pendiente',alistando:`Alistando · ${r} de ${n}`,entregado:'Entregado',cancelado:'Cancelado'}[f]||'';
-  const e={enviado:'📤',recibido:'📥',confirmacion:'🧾',alistando:'🧑‍🌾',entregado:'🛍️',cancelado:'✖️'}[f]||'🧺';
-  const p={enviado:12,recibido:32,confirmacion:55,alistando:75,entregado:100,cancelado:0}[f]??0;
+  const {r,n}=avance(o),f=N.faseDe?.(o)||'enviado',E=o.estado;
+  if(E==='cancelado')return {t:o.rechazo?.por==='cliente'?'Rechazado por vos':o.rechazo?.por==='tienda'?'Rechazado por la tienda':'Cancelado',e:'✖️',p:0,f:'cancelado'};
+  const lista=E==='listo'&&f!=='entregado';
+  const t=f==='confirmacion'?'Esperando tu confirmación':lista?'Lista':({enviado:'Enviado',recibido:'Recibido por la tienda',alistando:`Alistando · ${r} de ${n}`,entregado:'Entregado'}[f]||'');
+  const e=f==='confirmacion'?'🧾':lista?'✅':({enviado:'📤',recibido:'📥',alistando:'🧑‍🌾',entregado:'🛍️'}[f]||'🧺');
+  const p=f==='confirmacion'?62:lista?90:({enviado:12,recibido:38,alistando:75,entregado:100}[f]??0);
   return {t,e,p,f};
 }
 // Encabezado de los pasos del pedido: volver y la línea Canasta · Entrega · Datos · Pago
@@ -555,13 +558,13 @@ function mejorarPedido(o){
   let extra='';
   const fase=N.faseDe?.(o)||'';
   if(o.estado==='nuevo')extra+=`<div class="pedido-extra"><button type="button" class="btn ghost w" data-act="agregar-pedido">➕ Agregar algo a este pedido</button><small>Se suma a ${esc(o.ref)} y la tienda revisa el cambio dentro del mismo pedido.</small></div>`;
-  if(fase==='confirmacion')extra+=`<div class="pedido-extra confirmacion-pedido"><p><b>🧾 La tienda ya preparó tu cotización final.</b><small>Revisá el total en la tarjeta de pago y confirmalo para que termine de alistar tu pedido.</small></p></div>`;
+  // (la cotización se confirma en su tarjeta, dentro de Alistando)
   if(o.estado==='entregado')extra+=`<div class="pedido-extra"><button type="button" class="btn ghost w" data-act="suscribir">🔁 Repetir este pedido cada semana</button></div>`;
   const propuestas=(o.items||[]).map((it,i)=>it.subPropuesta&&!it.subAceptada?`<div class="sust-propuesta"><b>🔁 ${esc(it.n)} no está disponible</b><p>La tienda propone <strong>${esc(it.subPropuesta.n||it.subPropuesta.nombre||'otra opción')}</strong>${it.subPropuesta.p?` · ${$c(it.subPropuesta.p)}`:''}.</p><div class="dos-b"><button type="button" class="btn" data-act="sub-accept" data-i="${i}">Aceptar cambio</button><button type="button" class="btn ghost" data-act="sub-reject" data-i="${i}">No, gracias</button></div></div>`:'').join('');
   if(propuestas)extra+=`<div class="pedido-propuestas"><p class="grupo-h">La tienda necesita tu aprobación</p>${propuestas}</div>`;
-  if(o.estado==='listo'&&o.pago?.metodo==='sinpe'&&!o.comprobante)extra+=`<div class="comprobante-box"><p><b>📎 Subí el comprobante de SINPE</b><small>Al elegir el archivo se sube de forma segura para que ARAMO lo revise junto con tu pedido.</small></p><input id="tlComprobante" type="file" accept="image/*,application/pdf"></div>`;
+
   if(extra)root.insertAdjacentHTML('beforeend',extra);
-  const fi=$('tlComprobante');if(fi)fi.addEventListener('change',async()=>{const file=fi.files?.[0];if(!file)return;try{toast('Subiendo comprobante…');await N.subirComprobante(file,o);toast('✅ Comprobante enviado');render();}catch(e){toast(e.message||'No se pudo subir');}});
+  const fs=$('tlSinpeFile');if(fs)fs.addEventListener('change',async()=>{const file=fs.files?.[0];if(!file)return;try{toast('📷 Subiendo el SINPE…');await N.enviarComprobante(file,o);toast('✅ SINPE enviado: la tienda ya lo ve');render();}catch(e){toast(e.message||'No se pudo subir');}});
 }
 
 // ── Paso 4 · Pago (con "si algo no hay") ──
@@ -605,18 +608,57 @@ function billetes(t){
 
 // ── Tu pedido (seguimiento en vivo) ──
 const _okAntes={},_pAntes={},_eAntes={};
+// Qué cambió en la cotización: "pediste 6 → ahora 5" y cuánto suma o resta
+function cambiosHtml(o){
+  return (N.cambiosDe?.(o)||[]).map(c=>{
+    const pide=c.pide&&Math.abs(c.ahora-c.antes)>1e-9?qtxt(c.pide.q,c.pide.u):qtxt(c.antes,c.u);
+    const precio=Math.abs(c.pAntes-c.pAhora)>.5?` · precio ${$c(c.pAntes)} → ${$c(c.pAhora)}`:'';
+    const dif=(c.nohay?0:c.ahora*c.pAhora)-c.antes*c.pAntes;
+    const det=c.nohay?`no hubo (pediste ${pide})`:`${pide} → ${qtxt(c.ahora,c.u)}${precio}`;
+    return `<div class="cot-cambio"><span class="e">${foto(c.k,c.e)}</span><span class="t"><b>${esc(c.n)}</b><small>${esc(det)}</small></span><span class="dif ${dif>0?'mas':'menos'}">${Math.abs(dif)>=1?(dif>0?'+':'−')+$c(Math.abs(dif)):''}</span></div>`;
+  }).join('');
+}
+function cotizacionInner(o){
+  const tot=N.totalDe(o),antes=N.totalAntesDe?N.totalAntesDe(o):tot,L=cambiosHtml(o);
+  return `<div class="monto">${$c(tot)}</div>${Math.abs(tot-antes)>=5?`<p class="cot-antes">Antes: ${$c(antes)} · ${tot>antes?'subió':'bajó'} ${$c(Math.abs(tot-antes))}</p>`:''}
+  ${L?`<p class="grupo-h">Qué cambió</p><div class="cot-cambios">${L}</div>`:'<p class="cot-igual">Todo quedó como lo pediste.</p>'}`;
+}
+const cotBotones=o=>`<div class="cot-bot"><button type="button" class="cot-b ok" data-act="confirmar-cotizacion" data-id="${o.id}">✅ Confirmar</button><button type="button" class="cot-b no" data-act="cot-rechazar" data-id="${o.id}">✖ Rechazar</button></div>`;
+// "Ya lo recibí / No lo recibí": dos botones enormes cuando el pedido está listo, va en camino o espera para retirar
+function recibidoHtml(o){
+  if(o.estado!=='listo')return '';
+  const rc=o.recibidoCliente;
+  if(rc?.ok)return `<div class="card2 recibido-ok"><h3>✅ Registramos que lo recibiste</h3><p>${esc(fh(rc.at))} · ¡gracias! La tienda ya lo ve.</p></div>`;
+  const env=o.retiro?.envio;
+  return `<div class="recibido-box" role="group" aria-label="${env?'¿Ya te llegó tu pedido?':'¿Ya retiraste tu pedido?'}"><p class="rc-q">${env?'¿Ya te llegó tu pedido?':'¿Ya retiraste tu pedido?'}</p>
+    <button type="button" class="rc-b si" data-act="recibido-si"><span aria-hidden="true">✅</span>Ya lo recibí</button>
+    <button type="button" class="rc-b no" data-act="recibido-no"><span aria-hidden="true">❌</span>No lo recibí</button>
+    ${rc&&rc.ok===false?`<p class="rc-nota">Avisaste a las ${esc(fh(rc.at))} que no lo recibiste. La tienda ya lo sabe y te va a escribir.</p>`:''}
+    <small>Queda anotada la hora y la tienda lo ve al instante.</small></div>`;
+}
 function mesaPedido(o){
-  const s=suc(o.sucursal),{r,n}=avance(o),total=N.totalDe(o),E=o.estado,env=o.retiro.envio,fase=N.faseDe?.(o)||'enviado';
-  const pendiente=N.estadoEnvio?.(o.id)==='pendiente',aprox=!['confirmacion','alistando','entregado'].includes(fase)&&N.esAprox(o),fin=E==='entregado'||E==='cancelado',est=estadoDe(o);
-  const V={enviado:['Enviado','run'],recibido:['Recibido · tienda pesa','run'],confirmacion:['Confirmación pendiente','run'],alistando:[`Alistando ${r}/${n}`,'run'],entregado:['Entregado','ok']}[fase]||['Cancelado','bad'];
-  const tit={enviado:'¡Pedido enviado!',recibido:'La tienda ya lo está revisando',confirmacion:'Revisá tu cotización',alistando:'Estamos alistando tu pedido',entregado:'¡Que la disfrutés!',cancelado:'Pedido cancelado'}[fase]||'Tu pedido';
-  const ahora={enviado:pendiente?'Guardado en este dispositivo; la nube aún no confirmó la recepción.':'El pedido fue enviado a la tienda.',recibido:'La tienda recibió el pedido y está pesando y revisando cada producto.',confirmacion:'La tienda terminó de pesar y dejó listo el total definitivo. Confirmalo antes de pagar.',alistando:env?'Tu pedido está confirmado y va a salir con Uber cuando esté listo.':'Tu pedido está confirmado y la tienda termina de alistarlo.',entregado:'Gracias por comprar en ARAMO.',cancelado:esc(o.motivo||'El pedido no siguió.')}[fase];
-  const hora=k=>{const l=(o.log||[]).find(x=>x.s===k);return l?fh(l.t):'';};
-  const idx=['enviado','recibido','confirmacion','alistando','entregado'].indexOf(fase);
+  const s=suc(o.sucursal),{r,n}=avance(o),total=N.totalDe(o),E=o.estado,env=o.retiro.envio,fase=N.faseDe?.(o)||'enviado',paso=N.paso4De?.(o)||fase;
+  const pendiente=N.estadoEnvio?.(o.id)==='pendiente',conf=fase==='confirmacion'&&E!=='cancelado',def=!!N.definitivo?.(o),aprox=!def,fin=E==='entregado'||E==='cancelado',est=estadoDe(o);
+  const rech=E==='cancelado'?(o.rechazo||{}):null,lista=E==='listo'&&!fin;
+  const V=E==='cancelado'?[rech.por==='cliente'?'Rechazado por vos':rech.por==='tienda'?'Rechazado por la tienda':'Cancelado','bad']
+    :conf?['Esperando tu confirmación','run']:lista?['Lista','ok']
+    :({enviado:['Enviado','run'],recibido:['Recibido por la tienda','run'],alistando:[`Alistando ${r}/${n}`,'run'],entregado:['Entregado','ok']}[paso]||['Cancelado','bad']);
+  const tit=E==='cancelado'?(rech.por==='cliente'?'Pedido rechazado':rech.por==='tienda'?'La tienda no pudo hacerlo':'Pedido cancelado')
+    :conf?'Revisá tu cotización':lista?(env?'¡Tu pedido va en camino!':'¡Tu pedido está listo!')
+    :({enviado:'¡Pedido enviado!',recibido:'La tienda recibió tu pedido',alistando:'Estamos alistando tu pedido',entregado:'¡Que la disfrutés!'}[paso]||'Tu pedido');
+  const trasl=o.traspaso&&o.traspaso.a===o.sucursal&&paso!=='entregado'?` Tu pedido pasó a ${esc(nombreSuc(s))}: ahí te lo preparan.`:'';
+  const ahora=E==='cancelado'?(rech.por==='cliente'?`Rechazaste la cotización${rech.motivo?': '+esc(rech.motivo):''}. Gracias por avisarnos: esperamos servirte pronto.`:esc(o.motivo||'El pedido no siguió.'))
+    :conf?'La tienda terminó de pesar y te mandó la cotización. Confirmala o rechazala: todavía no es el total definitivo.'
+    :lista?(env?(env.uber?'Va en camino con Uber a tu ubicación.':'Está lista; la tienda pide el Uber.'):`Te espera en ${esc(nombreSuc(s))}.`)
+    :({enviado:pendiente?'Guardado en este dispositivo; la nube aún no confirmó la recepción.':'El pedido fue enviado a la tienda. En cuanto lo acepte vas a ver “Recibido por la tienda”.'+trasl,recibido:'La tienda aceptó tu pedido y está pesando y revisando cada producto.'+trasl,alistando:def?(env?'Confirmaste la cotización y tu pedido va a salir con Uber cuando esté listo.':'Confirmaste la cotización y la tienda termina de alistar tu pedido.'):'La tienda está alistando tu pedido.',entregado:'Gracias por comprar en ARAMO.'}[paso]||'');
+  const logDe=ks=>(o.log||[]).find(x=>ks.includes(x.s));
+  const hora=ks=>{const l=logDe(ks);return l?fh(l.t):'';};
+  const idx=N.FASES4.findIndex(x=>x.k===paso);
   // la línea de avance se llena desde donde estaba la última vez
-  const fr={enviado:.06,recibido:.28,confirmacion:.52,alistando:.76,entregado:1}[fase]??0,p0=_pAntes[o.id]??0;_pAntes[o.id]=fr;
+  const fr={enviado:.06,recibido:.36,alistando:.68,entregado:1}[paso]??0,p0=_pAntes[o.id]??0;_pAntes[o.id]=fr;
   const cambio=!!_eAntes[o.id]&&_eAntes[o.id]!==E;_eAntes[o.id]=E;
-  const pasos=E==='cancelado'?'':`<ol class="pasos4 pasos5" style="--p0:${p0.toFixed(3)};--p:${fr.toFixed(3)}">${[['Enviado',hora('enviado')|| (o.created?fh(o.created):'')],['Recibido · tienda',hora('recibido')],['Confirmación',hora('confirmacion')],['Alistando',hora('alistando')],['Entregado',hora('entregado')]].map(([tt,h],i)=>`<li class="${i<idx||(i===idx&&fase==='entregado')?'si':i===idx?'ya':''}"><i></i>${tt}<small>${esc(h||'')}</small></li>`).join('')}</ol>`;
+  const horas=[hora(['enviado'])||(o.created?fh(o.created):''),hora(['recibido']),hora(['confirmacion','alistando']),hora(['entregado'])];
+  const pasos=E==='cancelado'?'':`<ol class="pasos4" style="--p0:${p0.toFixed(3)};--p:${fr.toFixed(3)}">${N.FASES4.map((p,i)=>`<li class="${i<idx||(i===idx&&paso==='entregado')?'si':i===idx?'ya':''}"><i></i>${esc(p.n)}<small>${esc(horas[i]||'')}</small></li>`).join('')}</ol>`;
   const antes=_okAntes[o.id],ahoraOk=new Set();let dif=0;
   const items=o.items.map((i,j)=>{
     const real=i.qr!=null&&i.qr!=='',q=real?+i.qr:+i.q,pr=i.pr!=null&&i.pr!==''?+i.pr:+i.p;
@@ -632,50 +674,57 @@ function mesaPedido(o){
   const acc=[
     s&&!env&&!fin?fila('🗺️','Cómo llegar',esc(s.n),'mapa'):'',
     fila('💬','Escribir a la tienda','Por WhatsApp','wa-tienda'),
-    E==='alistando'&&N.modo()==='nube'?fila('🔄','Revisar estado','','actualizar-pedido'):'',
-    !fin&&N.avisos.soportado()&&N.avisos.permiso()==='default'?fila('🔔','Avisarme cuando esté lista','Notificación en el teléfono','avisame'):'',
+    !fin&&N.modo()==='nube'?fila('🔄','Revisar estado','','actualizar-pedido'):'',
     E==='nuevo'?`<button type="button" class="fila-link rojo" data-act="cancelar"><span class="e">✖️</span><span class="t"><b>Cancelar pedido</b></span></button>`:'',
   ].join('');
+  // Aviso amable para pedir el permiso de notificaciones (la respuesta de la tienda te llega al teléfono)
+  const notif=!fin&&N.avisos.soportado()&&N.avisos.permiso()==='default'?`<div class="aviso-notif"><b>🔔 ¿Te avisamos cuando la tienda responda?</b><p>Te llega una notificación al teléfono con cada novedad de tu pedido.</p><button type="button" class="btn big w" data-act="avisame">🔔 Sí, avisame</button></div>`:'';
+  const notaTotal=def?`Total definitivo${o.confirmacion?.at?' · lo confirmaste a las '+fh(o.confirmacion.at):o.cobro?' · cobrado en la tienda':''}.`:conf?'Esta cotización todavía no es definitiva: lo es cuando la confirmás.':'El monto mostrado es estimado. El total definitivo es el de la cotización que la tienda te manda después de pesar, cuando la confirmás.';
   return titulo(tit,{volver:'armar',volverTxt:'Volver a la tienda',verdict:V[0],cls:V[1]})
-  +`<div class="estado tracker est-${E}${cambio?' cambio':''}"><div class="es-ico"><span>${est.e}</span></div><p class="es-ref">Pedido ${esc(o.ref)}</p><p class="es-t">${ahora}</p>${pasos}</div>${comprobantePedido(o,total,aprox,s)}
+  +`<div class="estado tracker est-${E}${cambio?' cambio':''}"><div class="es-ico"><span>${est.e}</span></div><p class="es-ref">Pedido ${esc(o.ref)}</p><p class="es-t">${ahora}</p>${pasos}</div>
+  ${conf?`<div class="card2 w cot-card" id="tlCotCard"><h3>🧾 La tienda te mandó la cotización</h3>${cotizacionInner(o)}<p class="cot-nota">Todavía no es el total definitivo: lo es cuando la confirmás.</p>${cotBotones(o)}</div>`:''}
+  ${recibidoHtml(o)}${notif}${comprobantePedido(o,total,aprox,s)}
   ${E==='nuevo'&&!pendiente?`<div class="aviso"><b>✅ Pedido enviado a ARAMO</b><p>La tienda ya lo puede ver en el Mostrador. El siguiente paso será <strong>Recibido por la tienda</strong>.</p></div>`:''}
   ${E==='nuevo'&&pendiente?`<div class="aviso"><b>⚠️ La nube aún no confirmó el envío</b><p>El pedido está protegido en este dispositivo y se reintentará. No se muestra como enviado hasta que Supabase confirme la recepción.</p></div>`:''}
   ${!fin?`<div class="sello" id="tlStep6"><div class="qr" id="tlQR" aria-label="Código QR de retiro"></div><div><small>Código de retiro</small><div class="pin">${esc(o.pin)}</div><small>${env?'Dáselo al repartidor si te lo pide':'Mostralo al recoger en '+esc(nombreSuc(s))}${o.retiro.carro?' · te la llevamos al carro':''}</small></div></div>`:''}
   ${pagoHtml(o,total,aprox)}
   ${env&&!fin?`<div class="card2"><h3>🛵 Envío con Uber</h3><p>${env.uber?`Pedido a las ${esc(fh(env.uber))} · va en camino.`:'Lo pedimos apenas tu canasta esté lista.'}${costoEnvio?` Envío: ${$c(costoEnvio)} (incluido).`:''}</p></div>`:''}
   ${E!=='cancelado'?`<p class="grupo-h">Tu canasta${E==='alistando'?` <small>${r} de ${n} listos</small>`:''}</p>
-  <div class="grupo items">${items}${costoEnvio?`<div class="it"><span class="e">🛵</span><span class="t"><b>Envío Uber</b></span><span class="pz">${$c(costoEnvio)}</span><span class="ck"></span></div>`:''}${pesado&&Math.abs(dif)>=1?`<div class="it ajuste"><span class="e">⚖️</span><span class="t"><b>Ajuste por peso real</b></span><span class="pz">${dif>0?'+':'−'}${$c(Math.abs(dif))}</span><span class="ck"></span></div>`:''}${o.premio?`<div class="it premio"><span class="e">🎁</span><span class="t"><b>Premio con hojas</b><small>${+o.premio.hojas} 🍃</small></span><span class="pz">−${$c(o.premio.valor)}</span><span class="ck"></span></div>`:''}<div class="it total"><span class="e"></span><span class="t"><b>${aprox?'Total estimado':'Total definitivo'}</b></span><span class="pz">${$c(total)}</span><span class="ck"></span></div></div><p class="pedido-estimado">${aprox?'El monto mostrado es estimado. ARAMO confirma el total definitivo cuando termina de alistar y pesar los productos.':'Total definitivo confirmado por ARAMO.'}</p>`:''}
+  <div class="grupo items">${items}${costoEnvio?`<div class="it"><span class="e">🛵</span><span class="t"><b>Envío Uber</b></span><span class="pz">${$c(costoEnvio)}</span><span class="ck"></span></div>`:''}${pesado&&Math.abs(dif)>=1?`<div class="it ajuste"><span class="e">⚖️</span><span class="t"><b>Ajuste por peso real</b></span><span class="pz">${dif>0?'+':'−'}${$c(Math.abs(dif))}</span><span class="ck"></span></div>`:''}${o.premio?`<div class="it premio"><span class="e">🎁</span><span class="t"><b>Premio con hojas</b><small>${+o.premio.hojas} 🍃</small></span><span class="pz">−${$c(o.premio.valor)}</span><span class="ck"></span></div>`:''}<div class="it total"><span class="e"></span><span class="t"><b>${def?'Total definitivo':conf?'Total de la cotización':'Total estimado'}</b></span><span class="pz">${$c(total)}</span><span class="ck"></span></div></div><p class="pedido-estimado">${notaTotal}</p>`:''}
   ${E==='entregado'&&N.hojasDe(o)?`<div class="ganaste"><span>🍃</span><div><b>+${N.hojasDe(o)} hojas</b><small>Ganaste con este pedido · <button type="button" class="link" data-act="perfil">ver mi perfil</button></small></div></div>`:''}
   ${E==='entregado'?`<div class="card2 centro"><h3>¿Qué tal estuvo todo?</h3><div class="caritas">${['😍','🙂','😐'].map((c,i)=>`<button type="button" class="${o.rating===3-i?'on':''}" data-act="rating" data-v="${3-i}" aria-label="Calificar ${3-i}">${c}</button>`).join('')}</div><button type="button" class="btn w" style="margin-top:12px" data-act="repetir" data-id="${o.id}">🔁 Pedir lo mismo otra vez</button></div>`:''}
   <div class="grupo acciones-l">${acc}</div>
   <button type="button" class="btn w big ${fin?'':'ghost'} seguir" data-act="nuevo">🛒 Seguir comprando</button>`;
 }
+// Los dos botones de arriba del SINPE: subir la foto del comprobante o avisar que ya pagó
+const sinpeAcciones=(o,solo)=>`<div class="dos-b sinpe-acc">${solo?'':'<button type="button" class="btn big ghost" data-act="ya-pague">Ya pagué</button>'}<label class="btn big sinpe-subir" for="tlSinpeFile"${solo?' style="grid-column:1/-1"':''}>📷 Subir el SINPE</label></div><input id="tlSinpeFile" type="file" accept="image/*,application/pdf" hidden>`;
 function pagoHtml(o,total,aprox){
-  const t=T(),m=o.pago||{},M=N.PAGOS[m.metodo]||N.PAGOS.efectivo;
+  const t=T(),m=o.pago||{},M=N.PAGOS[m.metodo]||N.PAGOS.efectivo,def=!!N.definitivo?.(o);
   if(o.estado==='cancelado')return '';
-  if(N.faseDe?.(o)==='confirmacion')return `<div class="card2 w"><h3>🧾 Confirmá tu cotización</h3><div class="monto">${$c(total)}</div><p>Este es el monto definitivo después de alistar y pesar tu pedido. Todavía no transfirás ni se cobra: primero confirmá que estás de acuerdo.</p><button type="button" class="btn w" data-act="confirmar-cotizacion">✅ Confirmar y continuar</button></div>`;
+  if(N.faseDe?.(o)==='confirmacion')return ''; // la cotización se confirma en su propia tarjeta, arriba
   if(m.estado==='verificado')return `<div class="card2"><h3>✅ Pago confirmado</h3><p>${M.n} · ${$c(total)}</p></div>`;
   if(m.metodo==='sinpe'){
-    if(m.estado==='reportado')return `<div class="card2"><h3>📲 Pago reportado</h3><p>Le avisaste a la tienda que pagaste ${$c(total)}. El pago y el total todavía deben ser confirmados por ARAMO.</p></div>`;
-    if(o.estado==='listo'){
+    if(m.estado==='reportado')return `<div class="card2"><h3>📲 Pago reportado</h3><p>Le avisaste a la tienda que pagaste ${$c(total)}.${o.comprobante?' Ya recibió tu comprobante.':''} Falta que ARAMO lo confirme.</p>${o.comprobante?'':sinpeAcciones(o,true)}</div>`;
+    if(o.estado==='listo'||(o.estado==='alistando'&&def)){
       const sp=N.sinpeDe(o.sucursal),num=telDig(sp.numero);
       return `<div class="card2 w"><h3>📲 Pagá por SINPE Móvil</h3><div class="monto">${$c(total)}</div>
-        <p class="pedido-estimado"><b>Total definitivo confirmado por ARAMO.</b> Este es el monto que la tienda calculó después de alistar y pesar.</p>
+        ${sinpeAcciones(o)}
+        <p class="pedido-estimado">${def?'<b>Total definitivo.</b> Es el de la cotización que confirmaste.':'<b>Total estimado.</b> Puede cambiar un poco cuando la tienda termine de pesar.'}</p>
         ${num?`<div class="copia"><div><small>Número</small>${esc(fmtTel(num))}${sp.nombre?` · ${esc(sp.nombre)}`:''}</div><button type="button" data-act="copiar" data-v="${num}">Copiar</button></div>`:'<p>El número SINPE todavía está pendiente de configurar por la tienda.</p>'}
         <div class="copia"><div><small>Monto</small>${$c(total)}</div><button type="button" data-act="copiar" data-v="${Math.round(total)}">Copiar</button></div>
         <div class="copia"><div><small>Descripción</small>${esc(o.ref)}</div><button type="button" data-act="copiar" data-v="${esc(o.ref)}">Copiar</button></div>
-        <div class="dos-b" style="margin-top:12px"><button type="button" class="btn" data-act="ya-pague">Ya pagué</button></div><p>Después de transferir, adjuntá el comprobante abajo para que ARAMO lo revise.</p></div>`;
+        <p>Después de transferir, tocá <b>Subir el SINPE</b> para mandar la foto del comprobante, o <b>Ya pagué</b> si no la tenés.</p></div>`;
     }
-    return `<div class="card2"><h3>📲 SINPE Móvil</h3><p>Esperá aquí el monto definitivo de ARAMO, calculado después de alistar y pesar. Todavía no transfirás: recibir la canasta no confirma el total.</p></div>`;
+    return `<div class="card2"><h3>📲 SINPE Móvil</h3><p>Cuando confirmes la cotización de la tienda vas a ver aquí el monto para pagar. Todavía no transfieras.</p></div>`;
   }
   if(m.metodo==='link'&&o.estado==='listo'&&t.linkTarjeta)
     return `<div class="card2 w"><h3>🔗 Pagá con tarjeta</h3><div class="monto">${$c(total)}</div><button type="button" class="btn w" data-act="link-pago">Abrir pago seguro</button><p class="centro" style="margin-top:8px"><button type="button" class="link" data-act="ya-pague">Ya pagué</button></p></div>`;
   const vuelto=m.metodo==='efectivo'&&+m.conCuanto>total?` Llevás ${$c(m.conCuanto)}: tu vuelto es ${$c(+m.conCuanto-total)}.`:'';
-  return `<div class="card2"><h3>${M.e} ${M.n}</h3><p>${aprox?'Total aproximado':'Total'} ${$c(total)}.${vuelto}</p></div>`;
+  return `<div class="card2"><h3>${M.e} ${M.n}</h3><p>${aprox?'Total estimado':'Total'} ${$c(total)}.${vuelto}</p></div>`;
 }
 function comprobantePedido(o,total,aprox,s){
   const P=N.PAGOS[o.pago?.metodo]||{},r=o.retiro||{},modalidad=r.envio?'Envío express':`Retiro en ${s?.n||'ARAMO'}`;
-  return `<details class="card2 comprobante-pedido"><summary><b>🧾 Comprobante del pedido</b><span>Ver detalle</span></summary><div class="comprobante-grid"><div><small>Pedido</small><b>${esc(o.ref)}</b></div><div><small>Sucursal</small><b>${esc(s?.n||'ARAMO')}</b></div><div><small>Entrega</small><b>${esc(modalidad)}</b></div><div><small>Horario</small><b>${esc(cuando(r.at))}</b></div><div><small>Cliente</small><b>${esc(o.cliente?.nombre||'')}</b><small>${esc(fmtTel(o.cliente?.tel||''))}</small></div><div><small>Pago</small><b>${P.e||''} ${esc(P.n||'')}</b></div></div><p class="pedido-estimado">${aprox?'Total estimado':'Total definitivo'}: <strong>${$c(total)}</strong>. ${aprox?'La tienda lo confirma después de alistar y pesar.':'La tienda ya confirmó el monto definitivo.'}</p></details>`;
+  return `<details class="card2 comprobante-pedido"><summary><b>🧾 Comprobante del pedido</b><span>Ver detalle</span></summary><div class="comprobante-grid"><div><small>Pedido</small><b>${esc(o.ref)}</b></div><div><small>Sucursal</small><b>${esc(s?.n||'ARAMO')}</b></div><div><small>Entrega</small><b>${esc(modalidad)}</b></div><div><small>Horario</small><b>${esc(cuando(r.at))}</b></div><div><small>Cliente</small><b>${esc(o.cliente?.nombre||'')}</b><small>${esc(fmtTel(o.cliente?.tel||''))}</small></div><div><small>Pago</small><b>${P.e||''} ${esc(P.n||'')}</b></div></div><p class="pedido-estimado">${aprox?'Total estimado':'Total definitivo'}: <strong>${$c(total)}</strong>. ${aprox?'Se vuelve definitivo cuando confirmás la cotización de la tienda.':'Ya lo confirmaste.'}</p></details>`;
 }
 
 // ══════════════ Pintar ══════════════
@@ -916,7 +965,7 @@ function refrescarProd(){
 
 // ══════════════ Sellar ══════════════
 const estados={};
-misPedidos().forEach(o=>{estados[o.id]=o.estado+'|'+(N.faseDe?.(o)||'');});
+misPedidos().forEach(o=>{estados[o.id]=o.estado+'|'+(N.faseDe?.(o)||'')+'|'+o.sucursal;});
 async function hacerPedido(){
   const falta=faltaAlgo();if(falta){avisarFalta(falta);return;}
   if(!metodosPago().some(([k])=>k===C.pago.metodo))C.pago.metodo='sinpe';
@@ -943,6 +992,7 @@ async function hacerPedido(){
         x.items=items;
         x.totalEst=N.redondear5(items.reduce((z,i)=>z+(+i.q||0)*(+i.p||0),0)+(+x.retiro?.envio?.costo||0));
         x.subacciones={accion:'agregar',items:itemData.map(i=>({k:i.k,n:i.n,q:i.q,u:i.u}))};
+        x._ev={tipo:'agregado',monto:x.totalEst};
       },'cliente','El cliente agregó productos al pedido para confirmación de la tienda');
       if(actualizado){
         C.mis=[actualizado.id,...C.mis.filter(x=>x!==actualizado.id)];C.cesta={};C.editOrder=null;C.paso='armar';guardar();
@@ -1000,16 +1050,87 @@ function abrir(url){const w=window.open(url,'_blank','noopener');if(!w)location.
 // Mostrador cuando llega un pedido nuevo. Al cliente sí le suena cuando su canasta está lista.
 const silencio=()=>!MINI&&!!LS.get('aramo_local',null);
 function vigilar(){
-  const callado=silencio(),aviso=callado?{mostrar(){}}:N.avisos;
+  const callado=silencio(),aviso=callado?{mostrar(){}}:N.avisos,url=location.href.split('#')[0];
   misPedidos().forEach(o=>{
-    const actual=o.estado+'|'+(N.faseDe?.(o)||''),antes=estados[o.id];estados[o.id]=actual;
+    const f=N.faseDe?.(o)||'',actual=o.estado+'|'+f+'|'+o.sucursal,antes=estados[o.id];estados[o.id]=actual;
     if(!antes||antes===actual)return;
-    if(o.estado==='listo'&&N.faseDe?.(o)==='confirmacion'){toast('🧾 Revisá y confirmá la cotización de '+o.ref);if(!callado){buzz([90,60,90]);campana();}aviso.mostrar('🧾 Confirmá tu pedido '+o.ref,'La tienda ya pesó los productos. Revisá el total definitivo dentro de ARAMO.',{tag:'pedido-'+o.id,url:location.href.split('#')[0]});}
-    else if(o.estado==='listo'){toast('✅ ¡Tu canasta '+o.ref+' está lista!');if(!callado){buzz([90,60,90,60,160]);campana();}aviso.mostrar('✅ Tu canasta '+o.ref+' está lista',o.retiro.envio?'Va en camino con Uber a tu ubicación.':'Te espera en '+(suc(o.sucursal)?.n||'ARAMO')+'. Total '+$c(N.totalDe(o))+'.',{tag:'pedido-'+o.id,url:location.href.split('#')[0]});}
-    else if(o.estado==='alistando'){toast('🧑‍🌾 Ya están escogiendo tu canasta');aviso.mostrar('🧑‍🌾 Estamos escogiendo tu canasta','Pedido '+o.ref+' · te avisamos cuando esté lista.',{tag:'pedido-'+o.id});}
+    const [eA,fA,sA]=antes.split('|'),nom=nombreSuc(suc(o.sucursal));
+    if(o.estado==='cancelado'&&eA!=='cancelado'){
+      if(o.rechazo?.por==='cliente')return; // lo hizo este mismo cliente: ya tiene su pantalla de gracias
+      const por=o.rechazo?.por==='tienda';
+      toast(por?'✖️ La tienda no pudo hacer tu pedido '+o.ref+(o.motivo?': '+o.motivo:''):'El pedido '+o.ref+' fue cancelado');
+      if(!callado)buzz([90,60,90]);
+      if(por)aviso.mostrar('✖️ La tienda no pudo hacer tu pedido '+o.ref,o.motivo||'Abrí La Feria para ver el motivo.',{tag:'pedido-'+o.id,url});
+    }
+    else if(sA&&sA!==o.sucursal){
+      toast('🔀 Tu pedido '+o.ref+' pasó a '+nom);
+      aviso.mostrar('🔀 Tu pedido pasó a '+nom,'Pedido '+o.ref+' · ahí te lo van a preparar.',{tag:'pedido-'+o.id,url});
+    }
+    else if(f==='confirmacion'&&fA!=='confirmacion'){toast('🧾 Revisá y confirmá la cotización de '+o.ref);if(!callado){buzz([90,60,90]);campana();}aviso.mostrar('🧾 Confirmá tu pedido '+o.ref,'La tienda ya pesó los productos. Revisá la cotización dentro de La Feria.',{tag:'pedido-'+o.id,url,fijo:true});}
+    else if(o.estado==='listo'&&eA!=='listo'){toast('✅ ¡Tu canasta '+o.ref+' está lista!');if(!callado){buzz([90,60,90,60,160]);campana();}aviso.mostrar('✅ Tu canasta '+o.ref+' está lista',o.retiro.envio?'Va en camino con Uber a tu ubicación.':'Te espera en '+(suc(o.sucursal)?.n||'ARAMO')+'. Total '+$c(N.totalDe(o))+'.',{tag:'pedido-'+o.id,url});}
+    else if(eA==='nuevo'&&o.estado==='alistando'){toast('✅ La tienda recibió tu pedido '+o.ref);if(!callado)buzz([60,40,60]);aviso.mostrar('✅ La tienda recibió tu pedido '+o.ref,'Ya lo están revisando y pesando.',{tag:'pedido-'+o.id,url});}
     else if(o.estado==='entregado'){const h=N.hojasDe(o);toast(h?`🛍️ ¡Entregada! Ganaste ${h} 🍃`:'🛍️ ¡Entregada! Gracias');if(h)fiesta(['🍃','🍃','🌿']);}
-    else if(o.estado==='cancelado')toast('El pedido '+o.ref+' fue cancelado');
   });
+  revisarCotizacion();
+}
+// ══════════════ Cotización pendiente: lo primero que ve el cliente ══════════════
+// Al abrir La Feria con una cotización de la tienda sin responder, sale primero esa pantalla: total nuevo,
+// qué cambió, y dos botones grandes (Confirmar / Rechazar). Rechazar deja el pedido cancelado por el cliente.
+const COT={id:null,modo:'ver',motivo:'',ref:'',total:0,visto:new Set()};
+const MOTIVOS_COT=['Es más caro de lo que pensé','Ya no lo necesito','Cambió mucho mi pedido'];
+const pendienteCot=()=>misPedidos().find(o=>o.estado!=='cancelado'&&N.faseDe?.(o)==='confirmacion'&&!COT.visto.has(o.id))||null;
+function quitarCot(){$('tlCot')?.remove();document.body.classList.remove('cot-abierta');}
+function revisarCotizacion(){
+  if(MINI)return;
+  if(COT.modo==='gracias'&&$('tlCot')){pintarCot(null);return;}
+  const o=pendienteCot();
+  if(!o){quitarCot();COT.id=null;COT.modo='ver';return;}
+  if(COT.id!==o.id){COT.id=o.id;COT.modo='ver';COT.motivo='';}
+  pintarCot(o);
+}
+function pintarCot(o){
+  let el=$('tlCot');
+  if(!el){el=document.createElement('div');el.id='tlCot';el.className='cot-ov';el.setAttribute('role','dialog');el.setAttribute('aria-modal','true');el.setAttribute('aria-label','Cotización de tu pedido');document.body.appendChild(el);document.body.classList.add('cot-abierta');}
+  let h='';
+  if(COT.modo==='gracias'){
+    h=`<div class="cot-in cot-gracias"><span class="cot-ico" aria-hidden="true">🙏</span><h2>Gracias por avisarnos</h2><p>Rechazaste la cotización del pedido <b>${esc(COT.ref)}</b> (${$c(COT.total)}). Quedó anotado y la tienda ya lo sabe.</p><p>Cuando quieras volver a pedir, aquí estamos.</p><button type="button" class="cot-b ok" data-act="cot-cerrar">🏠 Volver a la tienda</button></div>`;
+  }else if(COT.modo==='rechazar'&&o){
+    h=`<div class="cot-in"><p class="cot-kick">Pedido ${esc(o.ref)}</p><h2>¿Por qué lo rechazás?</h2><p class="cot-sub">Es opcional, pero nos ayuda a mejorar.</p>
+      <div class="cot-motivos">${MOTIVOS_COT.map(m=>`<button type="button" class="cot-chip${COT.motivo===m?' on':''}" data-act="cot-motivo" data-v="${esc(m)}">${esc(m)}</button>`).join('')}</div>
+      <div class="cot-bot"><button type="button" class="cot-b no" data-act="cot-rechazar-ok" data-id="${o.id}">✖ Sí, rechazar el pedido</button><button type="button" class="cot-b ghost" data-act="cot-volver">‹ Volver a la cotización</button></div></div>`;
+  }else if(o){
+    h=`<div class="cot-in"><p class="cot-kick">Pedido ${esc(o.ref)} · ${esc(nombreSuc(suc(o.sucursal)))}</p><h2>🧾 Revisá tu cotización</h2><p class="cot-sub">La tienda ya pesó tu pedido. Este es el total nuevo:</p>
+      ${cotizacionInner(o)}${cotBotones(o)}<button type="button" class="link cot-luego" data-act="cot-luego" data-id="${o.id}">Ver mi pedido primero</button></div>`;
+  }
+  const sc=el.scrollTop;el.innerHTML=h;el.scrollTop=sc;
+}
+async function rechazarCotizacion(id,motivo){
+  const o0=N.get(id);if(!o0||N.faseDe?.(o0)!=='confirmacion')return;
+  const total=N.totalDe(o0),ref=o0.ref,m=String(motivo||'').trim();
+  await N.cambiar(id,x=>{
+    if(N.faseDe?.(x)!=='confirmacion')return;
+    x.estado='cancelado';x.motivo='Lo rechazó el cliente'+(m?': '+m:'');
+    x.rechazo={por:'cliente',at:new Date().toISOString(),motivo:m,total};
+    x._ev={tipo:'cot-no',monto:total};
+  },'cliente','Rechazó la cotización'+(m?' · '+m:''));
+  if(N.modo()==='nube'&&N.refrescarPedido)await N.refrescarPedido(id);
+  const x=N.get(id);
+  if(x?.estado==='cancelado'){COT.modo='gracias';COT.ref=ref;COT.total=total;COT.visto.add(id);pintarCot(null);render();}
+  else{
+    // la nube no aceptó el cambio (falta pegar el SQL de esta versión): se avisa por WhatsApp
+    toast('No pudimos avisarle a la tienda desde acá: se lo mandamos por WhatsApp');
+    abrir(N.wa(N.waDe(o0.sucursal),`Hola, rechazo la cotización del pedido ${ref} (${$c(total)})${m?': '+m:''}. ¡Gracias!`));
+    revisarCotizacion();
+  }
+}
+async function marcarRecibido(ok){
+  const o=pedidoVisto();if(!o||o.estado!=='listo')return;
+  const total=N.totalDe(o),ref=o.ref,sucK=o.sucursal;
+  await N.cambiar(o.id,x=>{x.recibidoCliente={ok,at:new Date().toISOString()};x._ev={tipo:ok?'recibido-ok':'recibido-no',monto:total};},'cliente',ok?'El cliente dice que ya lo recibió':'El cliente dice que NO lo recibió');
+  if(N.modo()==='nube'&&N.refrescarPedido)await N.refrescarPedido(o.id);
+  const y=N.get(o.id);
+  if(y?.recibidoCliente&&y.recibidoCliente.ok===ok){toast(ok?'✅ ¡Gracias! Anotamos que lo recibiste':'Avisamos a la tienda: te van a escribir enseguida');buzz(ok?[30,40,30]:[60,40,60]);if(ok)fiesta(['🍃','✨','🌿']);render();}
+  else{toast('No pudimos avisarle a la tienda desde acá: se lo mandamos por WhatsApp');abrir(N.wa(N.waDe(sucK),ok?`Hola, ya recibí mi pedido ${ref}. ¡Gracias!`:`Hola, NO he recibido mi pedido ${ref}. ¿Me ayudan?`));}
 }
 function campana(){
   try{
@@ -1157,7 +1278,7 @@ const ACT={
   'edit-perfil'(){abrirHoja({tipo:'perfil',editar:true});setTimeout(()=>$('tlPNom')?.focus(),60);},
   pedir(){hacerPedido();},
   'wa-tienda'(){const o=pedidoVisto();abrir(N.wa(N.waDe(o?.sucursal),`Hola, sobre mi pedido ${o?.ref||''} de ARAMO: `));},
-  'ya-pague'(){N.cambiar(C.actual,o=>{o.pago.estado='reportado';o.pago.reportado=new Date().toISOString();},'cliente','El cliente avisó que pagó').then(()=>{toast('¡Gracias! La tienda lo confirma al entregarte');render();});},
+  'ya-pague'(){N.cambiar(C.actual,o=>{o.pago.estado='reportado';o.pago.reportado=new Date().toISOString();o._ev={tipo:'sinpe-reportado',monto:N.totalDe(o),metodo:(N.PAGOS[o.pago.metodo]||{}).n||''};},'cliente','El cliente avisó que pagó').then(()=>{toast('¡Gracias! La tienda lo confirma al entregarte');render();});},
   'actualizar-pedido'(){
     const o=pedidoVisto();if(!o)return;
     toast('🔄 Revisando el estado de tu pedido…');
@@ -1165,7 +1286,9 @@ const ACT={
     Promise.resolve(refresco).then(()=>{
       const actualizado=N.get(o.id);
       render();
-      if(actualizado?.estado==='listo')toast('✅ ¡La tienda ya lo marcó como listo!');
+      if(actualizado?.estado==='cancelado')toast('✖️ El pedido está cancelado');
+      else if(N.faseDe?.(actualizado)==='confirmacion')revisarCotizacion();
+      else if(actualizado?.estado==='listo')toast('✅ ¡La tienda ya lo marcó como listo!');
       else if(actualizado?.estado==='entregado')toast('🛍️ Tu pedido ya fue entregado');
       else if(N.modo()!=='nube')toast('⏳ Esperando conexión con la tienda');
       else toast('⏳ La tienda todavía lo está alistando');
@@ -1179,7 +1302,26 @@ const ACT={
   instalar(){if(!_installPrompt)return;_installPrompt.prompt();_installPrompt.userChoice.finally(()=>{_installPrompt=null;window.__aramoInstallPrompt=null;render();});},
   promo(el){const p=(T().promos||[]).find(x=>x.k===el.dataset.k);if(p?.producto)abrirProd(p.producto);},
   'agregar-pedido'(){const o=pedidoVisto();if(!o||o.estado!=='nuevo')return;C.cesta={};C.editOrder=o.id;guardar();toast('Agregá solo lo nuevo y lo sumamos a '+o.ref);ir('armar');},
-  'confirmar-cotizacion'(){const o=pedidoVisto();if(!o||N.faseDe?.(o)!=='confirmacion')return;N.cambiar(o.id,x=>{x.fase='alistando';x.confirmacion={at:new Date().toISOString(),por:'cliente',total:N.totalDe(x)};},'cliente','Cliente confirmó la cotización final').then(()=>{toast('✅ Cotización confirmada · la tienda termina de alistar');render();});},
+  'confirmar-cotizacion'(el){
+    const id=el?.dataset?.id||pedidoVisto()?.id,o=id&&N.get(id);if(!o||N.faseDe?.(o)!=='confirmacion')return;
+    const total=N.totalDe(o);
+    N.cambiar(o.id,x=>{x.fase='alistando';x.confirmacion={at:new Date().toISOString(),por:'cliente',total:N.totalDe(x)};x._ev={tipo:'cot-ok',monto:N.totalDe(x)};},'cliente','El cliente confirmó la cotización').then(async()=>{
+      if(N.modo()==='nube'&&N.refrescarPedido)await N.refrescarPedido(o.id);
+      const y=N.get(o.id);
+      if(y&&N.faseDe?.(y)==='confirmacion'){toast('No pudimos avisarle a la tienda desde acá: se lo mandamos por WhatsApp');abrir(N.wa(N.waDe(o.sucursal),`Hola, confirmo la cotización del pedido ${o.ref} (${$c(total)}). ¡Gracias!`));return;}
+      COT.visto.add(o.id);quitarCot();COT.id=null;COT.modo='ver';
+      toast('✅ Cotización confirmada · la tienda termina de alistar');buzz([30,40,30]);
+      if(C.actual!==o.id)ver(o.id);else render();
+    });
+  },
+  'cot-luego'(el){COT.visto.add(el.dataset.id);quitarCot();COT.id=null;ver(el.dataset.id);},
+  'cot-rechazar'(el){COT.id=el.dataset.id;COT.modo='rechazar';COT.motivo='';if($('tlCot'))pintarCot(N.get(el.dataset.id));else{const o=N.get(el.dataset.id);if(o)pintarCot(o);}},
+  'cot-motivo'(el){COT.motivo=COT.motivo===el.dataset.v?'':el.dataset.v;pintarCot(N.get(COT.id));},
+  'cot-volver'(){COT.modo='ver';pintarCot(N.get(COT.id));},
+  'cot-rechazar-ok'(el){rechazarCotizacion(el.dataset.id,COT.motivo);},
+  'cot-cerrar'(){quitarCot();COT.modo='ver';COT.id=null;ir('armar');},
+  'recibido-si'(){marcarRecibido(true);},
+  'recibido-no'(){marcarRecibido(false);},
   suscribir(){const o=pedidoVisto();if(!o)return;const at=new Date(o.retiro?.at||Date.now()),next=new Date(Date.now()+7*864e5);N.guardarSuscripcion({sucursal:o.sucursal,weekday:at.getDay(),at_time:String(at.getHours()).padStart(2,'0')+':'+String(at.getMinutes()).padStart(2,'0'),next_run:next.toISOString().slice(0,10),data:{...o,id:null,estado:'nuevo',log:[]}}).then(()=>toast('✅ Pedido semanal activado')).catch(e=>toast(e.message||'Verificá tu cuenta para activarlo'));},
   'sub-accept'(el){const o=pedidoVisto(),i=+el.dataset.i;if(!o)return;N.cambiar(o.id,x=>{const it=x.items[i];if(it?.subPropuesta){Object.assign(it,it.subPropuesta);it.subAceptada=true;it.estado='';delete it.subPropuesta;x.subacciones={i,accion:'aceptar'};}},'cliente','Cliente aceptó una sustitución').then(()=>{toast('✅ Cambio aceptado');render();});},
   'sub-reject'(el){const o=pedidoVisto(),i=+el.dataset.i;if(!o)return;N.cambiar(o.id,x=>{const it=x.items[i];if(it){it.subAceptada=false;it.subRechazada=true;delete it.subPropuesta;x.subacciones={i,accion:'rechazar'};}},'cliente','Cliente rechazó una sustitución').then(()=>{toast('Anotado: no querés el cambio');render();});},
@@ -1187,7 +1329,7 @@ const ACT={
   cancelar(){
     const o=pedidoVisto();if(!o||o.estado!=='nuevo')return;
     if(!confirm('¿Cancelar el pedido '+o.ref+'?'))return;
-    N.cambiar(o.id,x=>{if(x.estado==='nuevo'){x.estado='cancelado';x.motivo='Lo canceló el cliente';}},'cliente').then(x=>{
+    N.cambiar(o.id,x=>{if(x.estado==='nuevo'){x.estado='cancelado';x.motivo='Lo canceló el cliente';x._ev={tipo:'cancelado-cliente',monto:N.totalDe(x)};}},'cliente','El cliente canceló el pedido').then(x=>{
       if(x?.estado!=='cancelado'){toast('Ya lo están alistando; escribile a la tienda');render();return;}
       if(N.modo()!=='nube'&&o.avisado)abrir(N.wa(N.waDe(o.sucursal),`Hola, cancelo mi pedido ${o.ref}. ¡Gracias!`));
       toast('Pedido cancelado');render();
@@ -1302,7 +1444,7 @@ function importarHash(){
   const m=location.hash.match(/^#e=(.+)$/);if(!m)return false;
   const o=N.unpack(m[1]);if(!o?.id)return false;
   N.importar(o);C.mis=[o.id,...C.mis.filter(x=>x!==o.id)];guardar();C.actual=o.id;
-  if(!estados[o.id]){const x=N.get(o.id);estados[o.id]=x?.estado+'|'+(N.faseDe?.(x)||'');}
+  if(!estados[o.id]){const x=N.get(o.id);estados[o.id]=x?.estado+'|'+(N.faseDe?.(x)||'')+'|'+x?.sucursal;}
   vigilar();
   return true;
 }
@@ -1348,5 +1490,6 @@ document.addEventListener('touchstart',e=>{const t=e.touches?.[0];if(t){_touchX=
 document.addEventListener('touchmove',e=>{const t=e.touches?.[0];if(!t)return;const dx=t.clientX-_touchX,dy=t.clientY-_touchY;if(Math.abs(dx)>18&&Math.abs(dx)>Math.abs(dy)*1.15)e.preventDefault();},{passive:false});
 render(true);
 actualizarMeta();
+revisarCotizacion();
 window.ARAMO_CANASTA_APP={C,leerLista,hacerPedido,ir,ver};
 })();

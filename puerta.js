@@ -30,6 +30,10 @@ const $c=N.colones;
 const T=()=>N.tienda();
 const suc=k=>(T().sucursales||[]).find(s=>s.k===k);
 const sucNom=k=>{const s=suc(k);return s?`${s.n} · ${s.zona}`:'';};
+// Quién atiende en este equipo (para la bitácora de cada colón): el nombre que se puso en «Quién atiende»,
+// la cuenta de personal con la que entró, o el local.
+const quienAtiende=()=>{const a=N.authEstado?.()||{},n=String(LS.get('aramo_atiende','')||'').trim(),zona=suc(localK())?.zona||'';const who=n||(a.personal&&a.email?String(a.email).split('@')[0]:'');return who?`${who} · ${zona}`:`Mostrador ${zona}`.trim();};
+N.setQuien?.(()=>quienAtiende());
 const fh=d=>new Date(d).toLocaleTimeString('es-CR',{hour:'numeric',minute:'2-digit'});
 function fdia(d){const a=new Date();a.setHours(0,0,0,0);const b=new Date(d);b.setHours(0,0,0,0);const n=Math.round((b-a)/864e5);return n===0?'hoy':n===1?'mañana':n===-1?'ayer':b.toLocaleDateString('es-CR',{weekday:'short',day:'numeric',month:'short'});}
 const esHoy=d=>fdia(d)==='hoy';
@@ -265,7 +269,7 @@ function montar(){
       </div></div>
       <aside class="mo-caja" id="moCaja" aria-label="Caja"></aside></div></div>`;
   document.body.appendChild(mo);
-  const extraTools=$('moMas');if(extraTools)extraTools.insertAdjacentHTML('beforeend','<button type="button" data-mo="promos"><b>✨</b>Ofertas y link</button><button type="button" data-mo="analitica"><b>📊</b>Métricas</button><button type="button" data-mo="personal"><b>🔐</b>Cuenta de personal</button>');
+  const extraTools=$('moMas');if(extraTools)extraTools.insertAdjacentHTML('beforeend','<button type="button" data-mo="promos"><b>✨</b>Ofertas y link</button><button type="button" data-mo="analitica"><b>📊</b>Métricas</button><button type="button" data-mo="personal"><b>🔐</b>Cuenta de personal</button><button type="button" data-mo="atiende"><b>👤</b>Quién atiende</button>');
 
   const bg=document.createElement('div');bg.className='mo-bg';bg.id='moBg';document.body.appendChild(bg);
   const sh=document.createElement('div');sh.className='mo-sheet';sh.id='moSheet';sh.setAttribute('role','dialog');sh.setAttribute('aria-modal','true');document.body.appendChild(sh);
@@ -577,7 +581,7 @@ function tarjeta(o){
     <div class="mo-meta">${esc(s?.n||'')} · ${o.retiro.envio?(o.retiro.envio.uber?'🛵 Uber en camino':'🛵 envío Uber'):o.retiro.carro?'🚗 al carro'+(o.retiro.placa?' ('+esc(o.retiro.placa)+')':''):'🚶 adentro'} · ${n} productos</div>
     <div class="mo-nombres">${o.items.map(i=>`<span>${i.e} ${esc(i.n)} <i>${esc(i.qr!=null&&i.qr!==''?qtxt(qReal(i),i.u):i.pide?qtxt(i.pide.q,i.pide.u):qtxt(i.q,i.u))}</i></span>`).join('')}</div>
     ${o.estado==='alistando'?`<div class="mo-bar"><i style="width:${n?r/n*100:0}%"></i></div>`:''}
-     <div class="mo-foot"><span class="mo-pill ${fase==='confirmacion'?'o':fase==='entregado'?'g':''}">${esc({enviado:'Enviado',recibido:'Recibido · pesa',confirmacion:'Confirmación',alistando:'Alistando',entregado:'Entregado'}[fase]||fase)}</span>${pago}${o.premio?`<span class="mo-pill o">🎁 −${$c(o.premio.valor)}</span>`:''}${o.sust==='avisar'?'':`<span class="mo-pill">${SUST[o.sust]}</span>`}<span class="mo-total">${N.esAprox(o)?'~':''}${$c(N.totalDe(o))}</span></div>
+     <div class="mo-foot"><span class="mo-pill ${fase==='confirmacion'?'o':fase==='entregado'?'g':''}">${esc({enviado:'Enviado',recibido:'Recibido · pesa',confirmacion:'Esperando al cliente',alistando:o.estado==='listo'?'Listo':'Alistando',entregado:'Entregado'}[fase]||fase)}</span>${o.recibidoCliente?(o.recibidoCliente.ok?'<span class="mo-pill g">✅ Dice que lo recibió</span>':'<span class="mo-pill r">⚠️ Dice que NO lo recibió</span>'):''}${o.rechazo?.por==='cliente'?'<span class="mo-pill r">✖ Lo rechazó el cliente</span>':''}${pago}${o.premio?`<span class="mo-pill o">🎁 −${$c(o.premio.valor)}</span>`:''}${o.sust==='avisar'?'':`<span class="mo-pill">${SUST[o.sust]}</span>`}<span class="mo-total">${N.esAprox(o)?'~':''}${$c(N.totalDe(o))}</span></div>
   </button>`;
 }
 
@@ -625,7 +629,7 @@ function abrirEncargo(id){
 function msgCliente(o){
   const s=suc(o.sucursal),t=T(),tot=N.totalDe(o),link=N.enlace('canasta.html','e',o);
   const hola=`¡Hola ${o.cliente.nombre.split(' ')[0]}! 👋`;
-  if(N.faseDe?.(o)==='confirmacion')return `${hola}\n🧾 La tienda ya pesó tu pedido ${o.ref}. El total definitivo es ${$c(tot)}. Abrí el pedido, revisá la cotización y confirmala antes de pagar.\n\nVer pedido y confirmar 👉 ${link}`;
+  if(N.faseDe?.(o)==='confirmacion')return `${hola}\n🧾 La tienda ya pesó tu pedido ${o.ref}. La cotización es ${$c(tot)} (todavía no es el total definitivo). Abrí el pedido, revisala y confirmala o rechazala antes de pagar.\n\nVer pedido y confirmar 👉 ${link}`;
   if(o.estado==='listo'){
     const pago=o.pago.metodo==='sinpe'&&!cobrado(o)
       ?`\n📲 Pagá ${$c(tot)} por SINPE Móvil${(sp=>telDig(sp.numero)?' al '+fmtTel(sp.numero)+(sp.nombre?' ('+sp.nombre+')':''):'')(N.sinpeDe(o.sucursal))} con la descripción ${o.ref}.`
@@ -655,6 +659,93 @@ function pesoHtml(it,i,edit){
     ${edit&&it.estado==='nohay'?`<input class="sub" type="text" placeholder="Cambio por… (opcional)" value="${esc(it.sub||'')}" data-mo-sub="${i}">`:''}
   </div>`;
 }
+// ── Cotización, comprobante, traslado y bitácora ──
+// La cotización se manda al cliente y el pedido SIGUE en Alistando: nunca queda «Listo» hasta que el cliente confirma
+// y todo está pesado (si no, parecería que ya salió).
+function sellarCotizacion(x,origen){
+  const t=N.totalDe(x);
+  x.estado='alistando';x.fase='confirmacion';x.totalFinal=t;delete x.confirmacion;
+  x.cotizacion={at:new Date().toISOString(),total:t,totalAntes:N.totalAntesDe(x),por:quienAtiende(),...(origen?{origen}:{})};
+  x._ev={tipo:'cot-enviada',monto:t};
+}
+// La contraoferta que vuelve del POS (localStorage) se aplica sola y se manda al cliente.
+async function aplicarPOS(id,manual){
+  const key='aramo_pos_cotizacion_'+id,d=LS.get(key,null),o=N.get(id);
+  if(!o||!d?.items?.length||['entregado','cancelado'].includes(o.estado))return false;
+  const x=await N.cambiar(id,y=>{
+    y.items=y.items.map((it,i)=>{const n=d.items.find(v=>v.k===it.k)||d.items[i];if(!n)return it;const q=Math.max(0,+n.q||0),p=Math.max(0,+n.p||it.p);return {...it,q0:it.q0??it.q,p0:it.p0??it.p,q,p,qr:q,estado:q===0?'nohay':'listo'};});
+    sellarCotizacion(y,'POS');
+  },'tienda','Cotización del POS enviada al cliente · esperando su confirmación');
+  if(!x)return false;
+  try{localStorage.removeItem(key);}catch{}
+  toast(`🧾 Cotización del POS enviada a ${x.cliente.nombre.split(' ')[0]} · ${$c(N.totalDe(x))} · esperando su confirmación`);
+  if(M.abierto===id&&M.vista==='encargo'&&$('moSheet')?.classList.contains('open'))repintar(pintarEncargo);
+  pintarMostrador();
+  return true;
+}
+const _posOcupado=new Set();
+async function revisarPOS(){
+  let keys=[];try{keys=Object.keys(localStorage);}catch{}
+  for(const key of keys){
+    if(_posOcupado.has(key))continue;
+    let m=key.match(/^aramo_pos_cotizacion_(.+)$/);
+    if(m){_posOcupado.add(key);try{await aplicarPOS(m[1]);}finally{_posOcupado.delete(key);}continue;}
+    m=key.match(/^aramo_pos_venta_(.+)$/);
+    if(m){
+      const o=N.get(m[1]),d=LS.get(key,null);if(!o||!d)continue;
+      _posOcupado.add(key);
+      try{
+        if(o.posVenta?.numero!==d.numero){
+          const met=({efectivo:'Efectivo',tarjeta:'Tarjeta',sinpe:'SINPE'}[d.metodo])||d.metodo||'';
+          await N.cambiar(o.id,x=>{x.posVenta={numero:d.numero,total:+d.total||0,metodo:d.metodo||'',at:d.at||new Date().toISOString()};x._ev={tipo:'pos-venta',monto:+d.total||0,metodo:met,numero:d.numero};},'tienda',`Venta #${d.numero} registrada en el POS (${met} ${$c(+d.total||0)})`);
+        }
+        try{localStorage.removeItem(key);}catch{}
+      }finally{_posOcupado.delete(key);}
+    }
+  }
+}
+window.addEventListener('storage',e=>{if(!e.key||/^aramo_pos_(cotizacion|venta)_/.test(e.key))revisarPOS();});
+window.addEventListener('focus',()=>revisarPOS());
+document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='visible')revisarPOS();});
+// Comprobante SINPE que subió el cliente: miniatura que se agranda al tocarla (arriba de «Confirmar SINPE»)
+const compUrls={};
+function comprobanteHtml(o){
+  const c=o.comprobante;if(!c)return '';
+  return `<button type="button" class="mo-comp" data-mo="ver-comp" aria-label="Agrandar el comprobante SINPE"><span class="mo-comp-img" id="moCompImg">${c.img?`<img src="${esc(c.img)}" alt="Comprobante SINPE">`:'📎'}</span><span class="mo-comp-t"><b>📎 Comprobante que subió el cliente</b><small>${esc(fh(c.subido||o.updated))} · tocalo para agrandarlo</small></span></button>`;
+}
+function cargarComprobante(o){
+  const c=o.comprobante;if(!c||c.img||!c.path)return;
+  const poner=url=>{const b=$('moCompImg');if(b&&url&&!/\.pdf(\?|$)/i.test(c.path))b.innerHTML=`<img src="${esc(url)}" alt="Comprobante SINPE">`;else if(b&&url)b.innerHTML='📄';};
+  if(compUrls[c.path]){poner(compUrls[c.path]);return;}
+  N.comprobanteUrl?.(c.path).then(url=>{if(!url)return;compUrls[c.path]=url;poner(url);});
+}
+// Enviar a la otra tienda (por la ubicación del cliente)
+function distKm(a,b){const R=6371,rad=x=>x*Math.PI/180,da=rad(b.lat-a.lat),dl=rad(b.lng-a.lng);return 2*R*Math.asin(Math.sqrt(Math.sin(da/2)**2+Math.cos(rad(a.lat))*Math.cos(rad(b.lat))*Math.sin(dl/2)**2));}
+function masCercana(o){
+  const e=o.retiro?.envio;if(!e||!(+e.lat||+e.lng))return null;
+  const L=(T().sucursales||[]).filter(s=>s.activa!==false).map(s=>({s,d:+s.lat&&+s.lng?distKm({lat:+s.lat,lng:+s.lng},{lat:+e.lat,lng:+e.lng}):null}));
+  if(L.length<2||L.some(x=>x.d==null))return{falta:true,L};
+  L.sort((a,b)=>a.d-b.d);return{k:L[0].s.k,L};
+}
+function trasladoHtml(o){
+  const otras=(T().sucursales||[]).filter(s=>s.k!==o.sucursal&&s.activa!==false);if(!otras.length)return '';
+  const c=masCercana(o),km=k=>{const x=c?.L?.find(y=>y.s.k===k);return x&&x.d!=null?` · a ${x.d.toFixed(1).replace('.',',')} km del cliente`:'';};
+  const rec=c&&!c.falta?c.k:'';
+  const hint=c?(c.falta?'<div class="mo-s">📍 El cliente compartió su ubicación. Guardá la ubicación de cada tienda en Pagos y horarios y te digo cuál le queda más cerca.</div>'
+    :rec!==o.sucursal?`<div class="mo-aviso">📍 Al cliente le queda más cerca ${esc(sucNom(rec))}.</div>`:'<div class="mo-s">📍 Esta es la tienda más cercana al cliente.</div>')
+    :'<div class="mo-s">Usalo si el pedido es de la zona de la otra tienda.</div>';
+  return `<div class="mo-traslado">${otras.map(s=>`<button type="button" class="mo-btn w${rec===s.k?' o':''}" data-mo="enviar-a" data-k="${esc(s.k)}">🔀 Enviar a ${esc(s.n)} · ${esc(s.zona)}${rec===s.k?' ⭐ la más cercana':''}${esc(km(s.k))}</button>`).join('')}${hint}</div>`;
+}
+// Bitácora: cada movimiento con hora, quién, cuánto y cómo se pagó
+function bitacoraHtml(o){
+  const L=(o.log||[]).map(l=>{
+    const quien=l.by==='cliente'?'Cliente':(l.q||'Tienda');
+    const txt=l.m||({nuevo:'Recibido',alistando:'Empezó a alistarse',listo:'Quedó lista',entregado:'Entregado',cancelado:'Cancelado'}[l.s]||l.s);
+    const extra=[l.monto!=null?`<b>${$c(l.monto)}</b>`:'',l.metodo?esc(l.metodo):''].filter(Boolean).join(' · ');
+    return `<div class="mo-bit"><span class="h">${esc(fdia(l.t))} ${esc(fh(l.t))}</span><span class="q">${l.by==='cliente'?'👤':'🛎️'} ${esc(quien)}</span><span class="m">${esc(txt)}${extra?' · '+extra:''}</span></div>`;
+  }).join('');
+  return `<details class="mo-blk mo-bitacora" open><summary style="font-weight:900;font-size:13px">🧾 Bitácora · quién, cuándo y cuánto</summary><div class="mo-log" style="margin-top:8px">${L||'<div class="mo-s">Todavía no hay movimientos.</div>'}</div></details>`;
+}
 function pintarEncargo(){
   const o=N.get(M.abierto);if(!o){cerrarHoja();return;}
   guardarBorr();
@@ -663,21 +754,26 @@ function pintarEncargo(){
   if(M.vista==='tiquete')return pintarTiquete(o);
   if(M.vista==='pesar')return pintarPesar(o);
   const s=suc(o.sucursal),{r,n}=avance(o),P=N.PAGOS[o.pago?.metodo]||{},tot=N.totalDe(o),edit=o.estado==='alistando',fase=N.faseDe?.(o)||'enviado';
-  const estadoTxt={enviado:'📤 Enviado',recibido:'📥 Recibido · tienda pesa',confirmacion:'🧾 Esperando confirmación del cliente',alistando:'🧑‍🌾 Alistando',entregado:'🛍️ Entregado',cancelado:'✖️ Cancelado'}[fase]||({nuevo:o.avisado?'📥 Pendiente de aceptación':'📥 Nuevo',alistando:'🧑‍🌾 Alistando',listo:'✅ Listo',entregado:'🛍️ Entregado',cancelado:'✖️ Cancelado'}[o.estado]);
+  const listoE=o.estado==='listo'&&fase!=='confirmacion';
+  const estadoTxt=o.estado==='cancelado'?(o.rechazo?.por==='cliente'?'✖️ Lo rechazó el cliente':'✖️ Cancelado'):listoE?'✅ Listo · esperando que el cliente lo reciba':({enviado:'📤 Enviado',recibido:'📥 Recibido · tienda pesa',confirmacion:'🧾 Esperando confirmación del cliente',alistando:'🧑‍🌾 Alistando',entregado:'🛍️ Entregado'}[fase]||({nuevo:o.avisado?'📥 Pendiente de aceptación':'📥 Nuevo',alistando:'🧑‍🌾 Alistando',listo:'✅ Listo',entregado:'🛍️ Entregado',cancelado:'✖️ Cancelado'}[o.estado]));
   const pesoR=o.items.reduce((t,i)=>t+(i.u==='kg'&&i.estado==='listo'?qReal(i):0),0);
   const est=N.redondear5(o.items.reduce((t,i)=>t+(+i.q)*(+i.p),0)),dif=tot+(+o.premio?.valor||0)-est-(+o.retiro?.envio?.costo||0);
-  const verd={enviado:['Enviado','run'],recibido:['Recibido · pesar','run'],confirmacion:['Confirmación del cliente','run'],alistando:[`Alistando ${r}/${n}`,'run'],entregado:['Entregado','ok'],cancelado:['Cancelado','bad']}[fase]||({nuevo:[o.avisado?'Pendiente de aceptación':'Nuevo','run'],alistando:[`Alistando ${r}/${n}`,'run'],listo:[o.cobro?'Cobrado':'Listo','ok'],entregado:['Entregado','ok'],cancelado:['Cancelado','bad']}[o.estado]||['','']);
+  const verd=o.estado==='cancelado'?[o.rechazo?.por==='cliente'?'Lo rechazó el cliente':'Cancelado','bad']:listoE?[o.cobro?'Cobrado':'Listo','ok']:({enviado:['Enviado','run'],recibido:['Recibido · pesar','run'],confirmacion:['Confirmación del cliente','run'],alistando:[`Alistando ${r}/${n}`,'run'],entregado:['Entregado','ok']}[fase]||({nuevo:[o.avisado?'Pendiente de aceptación':'Nuevo','run'],alistando:[`Alistando ${r}/${n}`,'run'],listo:[o.cobro?'Cobrado':'Listo','ok'],entregado:['Entregado','ok'],cancelado:['Cancelado','bad']}[o.estado]||['','']));
   const holo=o.items.map(i=>`<div class="mo-hit ${i.estado==='listo'?'ok':i.estado==='nohay'?'no':o.estado==='alistando'?'wait':''}" title="${esc(i.n)}"><b>${i.e}</b><em>${esc(i.n)}</em><small>${esc(i.u==='kg'&&i.qr!=null&&i.qr!==''?kg(qReal(i))+' kg':qtxt(qReal(i),i.u))}</small></div>`).join('');
   let acc='';
   const posDraft=LS.get('aramo_pos_cotizacion_'+o.id,null);
   const posBox=`<div class="mo-pos-link"><button type="button" class="mo-btn p w" data-mo="pos-pedido">🧾 Abrir este pedido en POS</button><small>Se abre con los productos y cantidades del pedido. Al guardar la nueva cotización, regresá aquí para enviarla al cliente.</small></div>`;
   const draftBox=posDraft?.items?.length?`<div class="mo-pos-link"><b>🧾 Hay una cotización devuelta desde POS</b><small>Revisá los cambios antes de enviarlos al cliente.</small><button type="button" class="mo-btn o w" data-mo="aplicar-pos">Aplicar cotización del POS</button></div>`:'';
-  if(o.estado==='nuevo')acc=`<div class="mo-acc2"><button type="button" class="mo-btn p big" data-mo="aceptar">✅ Aceptar</button><button type="button" class="mo-btn r big" data-mo="rechazar">✖ Rechazar</button></div><div class="mo-s mo-acc-nota">Al aceptar se abre ⚖️ Pesar en caja para cargar los pesos de un solo.</div>`;
-  if(o.estado==='alistando')acc=`<button type="button" class="mo-btn p w big" data-mo="pesar">⚖️ Pesar en caja${r<n?` · faltan ${n-r}`:''}</button><div class="mo-btns"><button type="button" class="mo-btn" data-mo="listo" ${r<n?'disabled':''}>✅ Lista y avisar</button><button type="button" class="mo-btn o" data-mo="todo-y-listo">✓ Todo como lo pidió</button></div>`;
-  if(o.estado==='listo'&&fase==='confirmacion')acc=`<div class="mo-acc-nota"><b>🧾 Cotización enviada al cliente</b><br>Esperá su confirmación antes de cobrar o entregar. El total definitivo es ${$c(tot)}.</div>`;
+  const recBox=o.recibidoCliente?(o.recibidoCliente.ok?`<div class="mo-acc-nota ok"><b>✅ El cliente dice que ya lo recibió</b><br>${esc(fh(o.recibidoCliente.at))} · cerralo con el botón de abajo.</div>`:`<div class="mo-acc-nota mal"><b>⚠️ El cliente dice que NO lo recibió</b><br>${esc(fh(o.recibidoCliente.at))} · escribile o llamalo ya.</div>`):'';
+  const sinpeBox=o.pago?.metodo==='sinpe'&&!cobrado(o)&&(o.estado==='listo'||(o.estado==='alistando'&&N.definitivo(o)))&&fase!=='confirmacion'
+    ?`${comprobanteHtml(o)}<button type="button" class="mo-btn o w" data-mo="pagado" style="margin-bottom:8px">📲 Confirmar SINPE de ${$c(tot)}${o.pago.estado==='reportado'?' (el cliente dice que pagó)':''}</button>`:'';
+  if(o.estado==='nuevo')acc=`<div class="mo-acc2"><button type="button" class="mo-btn p big" data-mo="aceptar">✅ Aceptar</button><button type="button" class="mo-btn r big" data-mo="rechazar">✖ Rechazar</button></div>${trasladoHtml(o)}<div class="mo-s mo-acc-nota">Al aceptar se abre ⚖️ Pesar en caja para cargar los pesos de un solo.</div>`;
+  if(o.estado==='alistando'&&fase==='recibido')acc=`<button type="button" class="mo-btn p w big" data-mo="pesar">⚖️ Pesar en caja${r<n?` · faltan ${n-r}`:''}</button><div class="mo-btns"><button type="button" class="mo-btn" data-mo="listo" ${r<n?'disabled':''}>📤 Enviar cotización</button><button type="button" class="mo-btn o" data-mo="todo-y-listo">✓ Todo como lo pidió · enviar cotización</button></div><div class="mo-s mo-acc-nota">La cotización le llega al cliente al instante. El pedido sigue en Alistando hasta que el cliente la confirme.</div>`;
+  if(o.estado==='alistando'&&fase==='alistando')acc=`<div class="mo-acc-nota ok"><b>✅ El cliente confirmó la cotización</b><br>Total definitivo ${$c(tot)}${o.confirmacion?.at?' · '+esc(fh(o.confirmacion.at)):''}. Terminá de alistar y avisale.</div>${sinpeBox}<button type="button" class="mo-btn p w big" data-mo="pesar">⚖️ Pesar en caja${r<n?` · faltan ${n-r}`:''}</button><div class="mo-btns"><button type="button" class="mo-btn p" data-mo="marcar-listo" ${r<n?'disabled':''}>✅ Lista y avisar</button><button type="button" class="mo-btn" data-mo="corregir-cot">↩︎ Corregir y reenviar</button></div>`;
+  if(fase==='confirmacion'&&['alistando','listo'].includes(o.estado))acc=`<div class="mo-acc-nota"><b>🧾 Cotización enviada al cliente</b><br>Está en Alistando: esperá su confirmación antes de cobrar o entregar. El total de la cotización es ${$c(tot)}.</div><div class="mo-btns"><button type="button" class="mo-btn" data-mo="corregir-cot">↩︎ Corregir y volver a pesar</button><button type="button" class="mo-btn o" data-mo="confirmar-tienda">📞 Ya aceptó por llamada o WhatsApp</button></div>`;
   if(o.estado==='listo'&&fase!=='confirmacion'){
     const env=o.retiro.envio;
-    acc=`${o.pago.metodo==='sinpe'&&!cobrado(o)?`<button type="button" class="mo-btn o w" data-mo="pagado" style="margin-bottom:8px">📲 Confirmar SINPE de ${$c(tot)}${o.pago.estado==='reportado'?' (el cliente dice que pagó)':''}</button>`:''}
+    acc=`${recBox}${sinpeBox}
       ${env?(env.uber?'':'<button type="button" class="mo-btn o w" style="margin-bottom:8px" data-mo="uber">🚗 Pedir Uber</button>')+'<button type="button" class="mo-btn p w" data-mo="entregado-uber">🛍️ El cliente ya la recibió</button>'
         :`<button type="button" class="mo-btn p w" data-mo="entregar">🛍️ Entregar ${cobrado(o)?'':'y cobrar '}con código</button>`}
       <div class="mo-btns">${cobrado(o)?'<button type="button" class="mo-btn" data-mo="tiquete">🧾 Tiquete</button>':`<button type="button" class="mo-btn" data-mo="cobrar" data-id="${o.id}">🧾 Cobrar sin entregar</button>`}<button type="button" class="mo-btn" data-mo="volver-alistar">↩︎ Volver a alistar</button></div>`;
@@ -695,10 +791,10 @@ function pintarEncargo(){
       <div class="mo-tot"><span>${N.esAprox(o)?'Total aproximado':'Total exacto'}</span><b>${$c(tot)}</b></div>${o.nota?`<div class="mo-s" style="margin-top:8px">📝 ${esc(o.nota)}</div>`:''}</div>
     <div class="mo-blk"><h4>Cliente</h4><div class="mo-row"><span style="flex:1"><strong style="font-size:16px">${esc(o.cliente.nombre)}</strong><br><small style="color:var(--m)">${esc(fmtTel(o.cliente.tel))}${o.cliente.correo?`<br>${esc(o.cliente.correo)}`:''}</small></span><a class="mo-btn" href="tel:${esc(telDig(o.cliente.tel))}" aria-label="Llamar">📞</a><button type="button" class="mo-btn" data-mo="wa" aria-label="WhatsApp">💬</button></div>${lealtadHtml(o)}</div>
     ${o.retiro.envio?envioHtml(o):`<div class="mo-blk"><h4>Retiro</h4><div style="font-weight:900">${esc(sucNom(o.sucursal))}</div><div class="mo-s">${fdia(o.retiro.at)} a las ${fh(o.retiro.at)} (${falta(o.retiro.at)}) · ${o.retiro.carro?'🚗 al carro'+(o.retiro.placa?': '+esc(o.retiro.placa):''):'🚶 adentro'}</div></div>`}
-    <div class="mo-blk"><h4>Pago</h4><div style="font-weight:900">${P.e||''} ${esc(P.n||'')} ${o.cobro?`<span class="mo-pill g">🧾 cobrado ${$c(o.cobro.total)}${o.cobro.venta?' · '+esc(o.cobro.venta):''}</span>`:o.pago.estado==='verificado'?'<span class="mo-pill g">✓ pagado</span>':o.pago.estado==='reportado'?'<span class="mo-pill o">el cliente dice que pagó</span>':'<span class="mo-pill">pendiente</span>'}</div>${o.pago.conCuanto?`<div class="mo-s">Paga con ${$c(o.pago.conCuanto)} → vuelto ${$c(Math.max(0,o.pago.conCuanto-tot))}</div>`:''}</div>
+    <div class="mo-blk"><h4>Pago</h4><div style="font-weight:900">${P.e||''} ${esc(P.n||'')} ${o.cobro?`<span class="mo-pill g">🧾 cobrado ${$c(o.cobro.total)}${o.cobro.venta?' · '+esc(o.cobro.venta):''}</span>`:o.pago.estado==='verificado'?'<span class="mo-pill g">✓ pagado</span>':o.pago.estado==='reportado'?'<span class="mo-pill o">el cliente dice que pagó</span>':'<span class="mo-pill">pendiente</span>'}</div>${o.pago.conCuanto?`<div class="mo-s">Paga con ${$c(o.pago.conCuanto)} → vuelto ${$c(Math.max(0,o.pago.conCuanto-tot))}</div>`:''}${o.comprobante&&!sinpeBox?comprobanteHtml(o):''}${o.posVenta?`<div class="mo-s" style="margin-top:6px;color:var(--g);font-weight:900">🧾 Venta #${esc(o.posVenta.numero)} registrada en el POS (${esc(({efectivo:'Efectivo',tarjeta:'Tarjeta',sinpe:'SINPE'}[o.posVenta.metodo])||o.posVenta.metodo||'')} ${$c(o.posVenta.total)})</div>`:''}</div>
     ${o.factura?`<div class="mo-blk"><h4>Factura electrónica</h4><div style="font-weight:900">Solicitada</div><div class="mo-s">Cédula: ${esc(o.factura.cedula||'pendiente')} · ${esc(o.factura.correo||'sin correo')}</div></div>`:''}
-    <details class="mo-blk"><summary style="font-weight:900;font-size:13px">🧾 Bitácora del pedido</summary><div class="mo-log" style="margin-top:8px">${(o.log||[]).map(l=>`${fdia(l.t)} ${fh(l.t)} · ${l.by==='cliente'?'👤':'🛎️'} ${esc(l.m||{nuevo:'Recibido',alistando:'Empezó a alistarse',listo:'Quedó lista',entregado:'Entregado',cancelado:'Cancelado'}[l.s]||l.s)}`).join('<br>')}</div></details>`);
-  if(o.comprobante?.path){N.comprobanteUrl?.(o.comprobante.path).then(url=>{if(url&&$('moSheet'))$('moSheet').insertAdjacentHTML('beforeend',`<div class="mo-blk"><h4>📎 Comprobante SINPE</h4><a class="mo-btn" href="${esc(url)}" target="_blank" rel="noopener">Abrir comprobante</a></div>`);});}
+    ${bitacoraHtml(o)}`);
+  cargarComprobante(o);
   $('moSheet').querySelectorAll('[data-mo-q]').forEach(inp=>inp.addEventListener('change',()=>{
     const i=+inp.dataset.moQ,v=inp.value===''?null:Math.max(0,+String(inp.value).replace(',','.'));
     N.cambiar(o.id,x=>{const it=x.items[i];it.qr=v;if(v===0)it.estado='nohay';else if(v!=null&&it.estado!=='nohay')it.estado='listo';},'tienda').then(()=>{repintar(pintarEncargo);pintarMostrador();});
@@ -775,9 +871,10 @@ function terminarPesaje(){
   const faltan=o.items.filter(x=>x.estado!=='listo'&&x.estado!=='nohay').length;
   if(faltan&&!confirm(`Faltan ${faltan} producto${faltan>1?'s':''}: se marcan como lo pidió el cliente. ¿Seguimos?`))return;
   borrarBorr(o.id,'pk');
-  N.cambiar(o.id,x=>{x.items.forEach(t=>{if(t.estado!=='listo'&&t.estado!=='nohay'){t.estado='listo';if(t.qr==null||t.qr==='')t.qr=t.q;}});x.estado='listo';x.totalFinal=N.totalDe(x);},'tienda','Pesado en caja · lista · '+$c(N.totalDe(o))).then(x=>{
-    M.tab='listo';M.vista='encargo';pintarEncargo();pintarMostrador();
-    toast('✅ '+x.ref+' lista · '+$c(N.totalDe(x))+' · avisando a '+x.cliente.nombre.split(' ')[0]);
+  N.cambiar(o.id,x=>{x.items.forEach(t=>{if(t.estado!=='listo'&&t.estado!=='nohay'){t.estado='listo';if(t.qr==null||t.qr==='')t.qr=t.q;}});sellarCotizacion(x);},'tienda','Pesado en caja · cotización enviada al cliente · esperando su confirmación').then(x=>{
+    if(!x)return;
+    M.tab='alistando';M.vista='encargo';pintarEncargo();pintarMostrador();
+    toast('🧾 '+x.ref+' · cotización '+$c(N.totalDe(x))+' enviada a '+x.cliente.nombre.split(' ')[0]+' · esperando su confirmación');
     abrir(N.wa(x.cliente.tel,msgCliente(x)));
   });
 }
@@ -866,7 +963,8 @@ async function cobrar(){
   await N.cambiar(o.id,x=>{
     x.cobro={metodo:c.metodo,total:tot,recibido:rec,vuelto:Math.max(0,rec-tot),fecha:new Date().toISOString(),venta,sucursal:x.sucursal};
     x.pago.estado='verificado';
-    if(entregar){x.estado='entregado';x.entregado=new Date().toISOString();}
+    if(entregar){x.estado='entregado';x.fase='entregado';x.entregado=new Date().toISOString();}
+    x._ev={tipo:entregar?'entregado':'cobro',monto:tot,metodo:N.PAGOS[c.metodo]?.n||c.metodo};
   },'tienda',`Cobrado ${$c(tot)} (${N.PAGOS[c.metodo]?.n||c.metodo})${venta?' · '+venta:''}${entregar?' · entregado':''}`);
   buzz([40,40,80]);
   toast(`🧾 ${o.ref} cobrado ${$c(tot)}${venta?' · '+venta+' en ARAMO POS':''}`);
@@ -1401,25 +1499,54 @@ const ACT={
     const u='pos/index.html?suc='+encodeURIComponent(k)+'&encargo='+encodeURIComponent(o.id);
     toast('🧾 Abriendo POS con '+o.ref+'…');abrir(u);
   },
-  'aplicar-pos'(){
-    const o=N.get(M.abierto),d=LS.get('aramo_pos_cotizacion_'+M.abierto,null);if(!o||!d?.items?.length)return;
-    N.cambiar(o.id,x=>{x.items=x.items.map((it,i)=>{const n=d.items.find(v=>v.k===it.k)||d.items[i];if(!n)return it;return {...it,q:Math.max(0,+n.q||0),p:Math.max(0,+n.p||it.p),qr:null,estado:''};});x.estado='listo';x.fase='confirmacion';x.totalFinal=N.totalDe(x);x.cotizacion={at:new Date().toISOString(),total:x.totalFinal,origen:'POS'};},'tienda','Cotización ajustada desde ARAMO POS').then(x=>{if(!x)return;localStorage.removeItem('aramo_pos_cotizacion_'+o.id);repintar(pintarEncargo);pintarMostrador();toast('✅ Cotización aplicada · lista para enviar al cliente');});
-  },
-  aceptar(){N.cambiar(M.abierto,o=>{o.estado='alistando';o.fase='recibido';},'tienda','La tienda recibió el pedido y empezó a pesar').then(o=>{M.tab='alistando';M.vista='pesar';M.pk=pkInicial(o);pintarEncargo();pintarMostrador();toast('⚖️ A pesar: tocá los números y Siguiente');});},
+  'aplicar-pos'(){aplicarPOS(M.abierto,true).then(ok=>{if(!ok)toast('No hay cotización del POS para aplicar');});},
+  aceptar(){N.cambiar(M.abierto,o=>{o.estado='alistando';o.fase='recibido';o._ev={tipo:'aceptado'};},'tienda','La tienda aceptó el pedido y empezó a pesar').then(o=>{M.tab='alistando';M.vista='pesar';M.pk=pkInicial(o);pintarEncargo();pintarMostrador();toast('⚖️ A pesar: tocá los números y Siguiente');});},
   rechazar(){
     const o=N.get(M.abierto);const m=prompt('¿Por qué no se puede hacer? (se lo decimos al cliente)','No tenemos varios productos hoy');
     if(m===null)return;
-    N.cambiar(o.id,x=>{x.estado='cancelado';x.motivo=m||'La tienda no pudo hacerlo';},'tienda','Rechazado: '+(m||'')).then(x=>{pintarEncargo();pintarMostrador();abrir(N.wa(x.cliente.tel,msgCliente(x)));});
+    N.cambiar(o.id,x=>{x.estado='cancelado';x.motivo=m||'La tienda no pudo hacerlo';x.rechazo={por:'tienda',at:new Date().toISOString(),motivo:m||''};x._ev={tipo:'rechazado'};},'tienda','Rechazado: '+(m||'')).then(x=>{pintarEncargo();pintarMostrador();abrir(N.wa(x.cliente.tel,msgCliente(x)));});
+  },
+  // Enviar el pedido a la otra tienda: le aparece en su Mostrador y el cliente ve la tienda nueva
+  'enviar-a'(el){
+    const o=N.get(M.abierto),k=el.dataset.k,s=suc(k);if(!o||!s||o.estado!=='nuevo'||k===o.sucursal)return;
+    if(!confirm(`¿Enviar ${o.ref} a ${s.n} ${s.zona}?\n\nLe va a aparecer en su Mostrador y el cliente va a ver la tienda nueva.`))return;
+    N.cambiar(o.id,x=>{const de=x.sucursal;x.sucursal=k;x.traspaso={de,a:k,at:new Date().toISOString(),por:quienAtiende()};x._ev={tipo:'traspaso',de,a:k};},'tienda',`Enviado de ${sucNom(o.sucursal)} a ${sucNom(k)}`).then(x=>{
+      if(!x)return;
+      sinAbrir.delete(x.id);guardarSinAbrir();cerrarHoja();pintarMostrador();pintarPuerta();
+      toast(`🔀 ${x.ref} se envió a ${s.n} ${s.zona}`);
+    });
+  },
+  atiende(){AramoUI.pedir({titulo:'¿Quién atiende?',texto:'Este nombre queda en la bitácora de cada pedido que movás desde este equipo.',etiqueta:'Tu nombre',valor:LS.get('aramo_atiende',''),si:'Guardar'}).then(v=>{if(v===null)return;LS.set('aramo_atiende',v.trim());toast('👤 Atiende: '+quienAtiende());});},
+  'ver-comp'(){
+    const o=N.get(M.abierto),c=o?.comprobante;if(!c)return;
+    const src=c.img||compUrls[c.path];if(!src){toast('Todavía estoy cargando el comprobante…');return;}
+    let el=$('moLight');if(!el){el=document.createElement('div');el.id='moLight';el.className='mo-light';el.setAttribute('data-mo','cerrar-comp');document.body.appendChild(el);}
+    el.innerHTML=`<button type="button" class="mo-light-x" data-mo="cerrar-comp" aria-label="Cerrar">✕</button><img src="${esc(src)}" alt="Comprobante SINPE"><p>${esc(o.ref)} · ${$c(N.totalDe(o))} · tocá para cerrar</p>`;
+    el.classList.add('open');
+  },
+  'cerrar-comp'(){$('moLight')?.classList.remove('open');},
+  'confirmar-tienda'(){
+    const o=N.get(M.abierto);if(!o||N.faseDe?.(o)!=='confirmacion')return;
+    if(!confirm(`¿${o.cliente.nombre} ya aceptó la cotización de ${$c(N.totalDe(o))} por llamada o WhatsApp?`))return;
+    N.cambiar(o.id,x=>{x.fase='alistando';x.confirmacion={at:new Date().toISOString(),por:'tienda',total:N.totalDe(x),quien:quienAtiende()};x._ev={tipo:'cot-ok-tienda',monto:N.totalDe(x)};},'tienda','Confirmó la cotización por el cliente (llamada o WhatsApp)').then(()=>{pintarEncargo();pintarMostrador();toast('✅ Cotización confirmada por el cliente (anotado)');});
+  },
+  'corregir-cot'(){N.cambiar(M.abierto,o=>{o.estado='alistando';o.fase='recibido';delete o.confirmacion;},'tienda','Volvió a pesar: se corrige la cotización').then(()=>{M.tab='alistando';pintarEncargo();pintarMostrador();});},
+  'marcar-listo'(){
+    N.cambiar(M.abierto,o=>{if(o.estado!=='alistando')return;o.estado='listo';o.totalFinal=N.totalDe(o);o._ev={tipo:'listo',monto:o.totalFinal};},'tienda','Pedido listo para entregar').then(o=>{
+      if(!o)return;M.tab='listo';pintarEncargo();pintarMostrador();
+      toast('✅ '+o.ref+' lista · avisando a '+o.cliente.nombre.split(' ')[0]);
+      abrir(N.wa(o.cliente.tel,msgCliente(o)));
+    });
   },
   'it-ok'(el){const i=+el.dataset.i;N.cambiar(M.abierto,o=>{const it=o.items[i];it.estado=it.estado==='listo'?'':'listo';if(it.estado==='listo'&&(it.qr==null||it.qr===''))it.qr=it.q;},'tienda').then(()=>{buzz(8);repintar(pintarEncargo);pintarMostrador();});},
   'it-no'(el){const i=+el.dataset.i;N.cambiar(M.abierto,o=>{const it=o.items[i];it.estado=it.estado==='nohay'?'':'nohay';},'tienda').then(()=>{buzz(8);repintar(pintarEncargo);pintarMostrador();});},
   'sub-prop'(el){const o=N.get(M.abierto),i=+el.dataset.i;if(!o||o.sust!=='avisar')return toast('El cliente eligió otra opción para los faltantes');const it=o.items[i],nombre=prompt('¿Qué producto proponés en lugar de '+it.n+'?',N.catalogo().find(p=>p.k!==it.k&&!p.agotado)?.n||'');if(!nombre?.trim())return;const p=N.catalogo().find(x=>nrm(x.n)===nrm(nombre))||N.catalogo().find(x=>nrm(x.n).includes(nrm(nombre)));if(!p)return toast('No encontré ese producto en la vitrina');const precio=+prompt('Precio por '+(p.u==='kg'?'kg':'unidad'),String(p.p||0));if(!(precio>=0))return;N.cambiar(o.id,x=>{x.items[i].subPropuesta={k:p.k,n:p.n,e:p.e,u:p.u,q:x.items[i].q,p:precio};x.items[i].estado='nohay';},'tienda','Se propuso sustitución para '+it.n).then(()=>{repintar(pintarEncargo);pintarMostrador();toast('🔁 Propuesta enviada al cliente');});},
   'todo-ok'(){N.cambiar(M.abierto,o=>{o.items.forEach(it=>{if(it.estado!=='nohay'){it.estado='listo';if(it.qr==null||it.qr==='')it.qr=it.q;}});},'tienda').then(()=>{repintar(pintarEncargo);pintarMostrador();});},
   'todo-y-listo'(){
-    N.cambiar(M.abierto,o=>{o.items.forEach(it=>{if(it.estado!=='nohay'){it.estado='listo';if(it.qr==null||it.qr==='')it.qr=it.q;}});o.estado='listo';o.fase='confirmacion';o.totalFinal=N.totalDe(o);o.cotizacion={at:new Date().toISOString(),total:o.totalFinal};},'tienda','Cotización final enviada al cliente para confirmación').then(o=>{
+    N.cambiar(M.abierto,o=>{o.items.forEach(it=>{if(it.estado!=='nohay'){it.estado='listo';if(it.qr==null||it.qr==='')it.qr=it.q;}});sellarCotizacion(o);},'tienda','Cotización final enviada al cliente para confirmación').then(o=>{
       if(!o)return;
-      M.tab='listo';pintarEncargo();pintarMostrador();
-       toast('✅ '+o.ref+' · cotización enviada a '+o.cliente.nombre.split(' ')[0]);
+      M.tab='alistando';pintarEncargo();pintarMostrador();
+      toast('🧾 '+o.ref+' · cotización enviada a '+o.cliente.nombre.split(' ')[0]+' · esperando su confirmación');
     });
   },
   'precio-it'(el){
@@ -1429,13 +1556,14 @@ const ACT={
     N.cambiar(o.id,x=>{x.items[i].pr=n;},'tienda',`Precio de ${it.n}: ${$c(n)}`).then(()=>{repintar(pintarEncargo);pintarMostrador();});
   },
   listo(){
-    N.cambiar(M.abierto,o=>{o.estado='listo';o.fase='confirmacion';o.totalFinal=N.totalDe(o);o.cotizacion={at:new Date().toISOString(),total:o.totalFinal};},'tienda','Cotización final enviada al cliente · total exacto '+$c(N.totalDe(N.get(M.abierto)))).then(o=>{
-      M.tab='listo';pintarEncargo();pintarMostrador();
-       toast('✅ '+o.ref+' · cotización enviada a '+o.cliente.nombre.split(' ')[0]);
+    N.cambiar(M.abierto,o=>{sellarCotizacion(o);},'tienda','Cotización final enviada al cliente · esperando su confirmación').then(o=>{
+      if(!o)return;
+      M.tab='alistando';pintarEncargo();pintarMostrador();
+      toast('🧾 '+o.ref+' · cotización enviada a '+o.cliente.nombre.split(' ')[0]+' · esperando su confirmación');
     });
   },
-  'volver-alistar'(){N.cambiar(M.abierto,o=>{o.estado='alistando';o.fase='recibido';},'tienda').then(()=>{M.tab='alistando';pintarEncargo();pintarMostrador();});},
-  pagado(){const o=N.get(M.abierto);if(!confirm(`¿Te entró el SINPE de ${$c(N.totalDe(o))} con la descripción ${o.ref}?`))return;N.cambiar(o.id,x=>{x.pago.estado='verificado';},'tienda','Pago SINPE confirmado').then(()=>{pintarEncargo();pintarMostrador();toast('📲 Pago confirmado');});},
+  'volver-alistar'(){N.cambiar(M.abierto,o=>{o.estado='alistando';o.fase=o.confirmacion?.at?'alistando':'recibido';},'tienda','Volvió a alistar').then(()=>{M.tab='alistando';pintarEncargo();pintarMostrador();});},
+  pagado(){const o=N.get(M.abierto);if(!confirm(`¿Te entró el SINPE de ${$c(N.totalDe(o))} con la descripción ${o.ref}?`))return;N.cambiar(o.id,x=>{x.pago.estado='verificado';x.pago.verificado={at:new Date().toISOString(),por:quienAtiende(),monto:N.totalDe(x)};x._ev={tipo:'sinpe-ok',monto:N.totalDe(x),metodo:'SINPE'};},'tienda','Pago SINPE confirmado').then(()=>{pintarEncargo();pintarMostrador();toast('📲 Pago confirmado');});},
   entregar(){M.vista='pin';M.pin='';pintarEncargo();},
   pin(el){
     const o=N.get(M.abierto),k=el.dataset.k;
@@ -1464,7 +1592,7 @@ const ACT={
   uber(){
     const o=N.get(M.abierto);if(!o?.retiro?.envio)return;
     abrir(uberLink(o));
-    if(!o.retiro.envio.uber)N.cambiar(o.id,x=>{x.retiro.envio.uber=new Date().toISOString();},'tienda','Uber pedido').then(()=>{pintarEncargo();pintarMostrador();});
+    if(!o.retiro.envio.uber)N.cambiar(o.id,x=>{x.retiro.envio.uber=new Date().toISOString();x._ev={tipo:'uber'};},'tienda','Uber pedido').then(()=>{pintarEncargo();pintarMostrador();});
   },
   'entregado-uber'(){
     const o=N.get(M.abierto);if(!confirm(`¿${o.cliente.nombre} ya recibió ${o.ref}?`))return;
@@ -1550,7 +1678,7 @@ function codigoOk(o,como){
   else{abrirCobro(o.id,{entregar:true,desdePin:true});toast('✓ Código correcto · ahora cobrá');}
 }
 async function entregar(o,como){
-  await N.cambiar(o.id,x=>{x.estado='entregado';x.fase='entregado';x.entregado=new Date().toISOString();if(x.pago.estado==='reportado')x.pago.estado='verificado';},'tienda',como);
+  await N.cambiar(o.id,x=>{x.estado='entregado';x.fase='entregado';x.entregado=new Date().toISOString();if(x.pago.estado==='reportado')x.pago.estado='verificado';x._ev={tipo:'entregado',monto:N.totalDe(x),metodo:(N.PAGOS[x.cobro?.metodo||x.pago?.metodo]||{}).n||''};},'tienda',como);
   pararCamara();buzz([40,40,80]);
   toast(`🛍️ ${o.ref} entregado`);
   M.vista='encargo';pintarEncargo();pintarMostrador();pintarPuerta();
@@ -1575,7 +1703,7 @@ async function escanear(o){
 function pararCamara(){clearTimeout(_scan);if(_stream){_stream.getTracks().forEach(t=>t.stop());_stream=null;}}
 document.addEventListener('click',e=>{
   const el=e.target.closest('[data-pu],[data-mo]');if(!el||el.disabled)return;
-  if(!el.closest('#puerta,#mostrador,#moSheet'))return;
+  if(!el.closest('#puerta,#mostrador,#moSheet,#moLight'))return;
   const f=ACT[el.dataset.pu||el.dataset.mo];if(!f)return;
   e.preventDefault();f(el);
 });
@@ -1591,7 +1719,8 @@ document.addEventListener('keydown',e=>{
 
 // ══════════════ En vivo: alarma de pedido nuevo ══════════════
 let _vitT=0;
-const vistos=new Map(N.lista().map(o=>[o.id,o.estado+'|'+(o.pago?.estado||'')]));
+const vistos=new Map(N.lista().map(o=>[o.id,o.estado+'|'+(o.pago?.estado||'')+'|'+o.sucursal]));
+const logVisto=new Map(N.lista().map(o=>[o.id,(o.log||[]).length]));
 let _rep=0;
 function repetirAlarma(){
   clearInterval(_rep);
@@ -1602,30 +1731,80 @@ function repetirAlarma(){
   },25000);
 }
 function vigilar(){
-  let nuevos=0;
+  let nuevos=0,traspasos=0;
   sinAbrir.forEach(id=>{if(!N.get(id))sinAbrir.delete(id);}); // borrados al reiniciar en otro equipo
   N.lista().forEach(o=>{
-    const k=o.estado+'|'+(o.pago?.estado||''),antes=vistos.get(o.id);vistos.set(o.id,k);
+    const k=o.estado+'|'+(o.pago?.estado||'')+'|'+o.sucursal,antes=vistos.get(o.id);vistos.set(o.id,k);
     if(o.archivado){sinAbrir.delete(o.id);return;}
     if(antes===k)return;
-    if(!antes&&o.estado==='nuevo'&&paraMi(o)){
-      nuevos++;sinAbrir.add(o.id);
-       if(R.sonido)N.avisos.mostrar(`🛎️ Pedido nuevo · ${o.ref}`,`${o.cliente.nombre} · ${o.items.length} productos · ${sucNom(o.sucursal)} · ${o.retiro.envio?'envío':'recoge'} ${fh(o.retiro.at)}`,{tag:'nuevo-'+o.id,fijo:true,url:new URL('APP.html#ver='+o.id,location.href).href});
+    const [eA,,sA]=(antes||'').split('|');
+    // un pedido que otra tienda le pasó a esta también suena como pedido nuevo
+    const llegoTraspaso=!!antes&&sA!==o.sucursal&&o.estado==='nuevo'&&paraMi(o)&&R.suc!=='todas';
+    if((!antes&&o.estado==='nuevo'&&paraMi(o))||llegoTraspaso){
+      nuevos++;if(llegoTraspaso)traspasos++;sinAbrir.add(o.id);
+      if(R.sonido)N.avisos.mostrar(`${llegoTraspaso?'🔀 Pedido pasado a tu tienda':'🛎️ Pedido nuevo'} · ${o.ref}`,`${o.cliente.nombre} · ${o.items.length} productos · ${sucNom(o.sucursal)} · ${o.retiro.envio?'envío':'recoge'} ${fh(o.retiro.at)}`,{tag:'nuevo-'+o.id,fijo:true,url:new URL('APP.html#ver='+o.id,location.href).href});
     }
-    else if(antes&&o.pago?.estado==='reportado'&&!antes.endsWith('reportado')&&paraMi(o))toast(`📲 ${o.cliente.nombre} dice que pagó ${o.ref}`); // sin sonido: solo suenan los pedidos nuevos
-    else if(antes&&o.estado==='cancelado'&&!antes.startsWith('cancelado')&&paraMi(o)){toast(`✖️ ${o.ref} fue cancelado`);sinAbrir.delete(o.id);}
+    else if(antes&&o.estado==='cancelado'&&eA!=='cancelado'&&paraMi(o))sinAbrir.delete(o.id); // el aviso sale en la bitácora de eventos
   });
   if(nuevos){
     const o=[...sinAbrir].map(id=>N.get(id)).filter(Boolean)[0];
-    toast(`🛎️ ${nuevos>1?nuevos+' pedidos nuevos':'Pedido nuevo '+o.ref+' · '+o.cliente.nombre}`);
+    toast(`${traspasos&&nuevos===traspasos?'🔀':'🛎️'} ${nuevos>1?nuevos+' pedidos nuevos':(traspasos?'Pedido pasado a tu tienda ':'Pedido nuevo ')+o.ref+' · '+o.cliente.nombre}`);
     campana(true);buzz([120,60,120,60,240]);repetirAlarma();
   }
   guardarSinAbrir();
   const n=activos().filter(o=>o.estado==='nuevo'&&paraMi(o)).length;
   document.title=(n?`(${n}) `:'')+'ARAMO';
 }
+// ── Avisos de cada movimiento (instante a instante): toast + notificación del sistema, sin sonido ──
+const EVT={
+  aceptado:['✅','Aceptado'],rechazado:['✖️','Rechazado por la tienda'],traspaso:['🔀','Pasó a otra tienda'],
+  'cot-enviada':['🧾','Cotización enviada'],'cot-ok':['✅','El cliente confirmó la cotización'],'cot-no':['✖️','El cliente RECHAZÓ la cotización'],
+  agregado:['➕','El cliente agregó productos'],'sinpe-reportado':['📲','El cliente dice que pagó'],'sinpe-ok':['📲','SINPE confirmado'],
+  cobro:['🧾','Cobrado'],entregado:['🛍️','Entregado'],listo:['✅','Pedido listo'],'recibido-ok':['✅','El cliente dice que ya lo recibió'],
+  'recibido-no':['⚠️','El cliente dice que NO lo recibió'],'cancelado-cliente':['✖️','El cliente canceló el pedido'],
+  'pos-venta':['🧾','Venta registrada en el POS'],uber:['🚗','Uber pedido'],
+};
+function avisoEvento(o,l){
+  const [e,t]=EVT[l.tipo],quien=l.by==='cliente'?'el cliente':(l.q||'la tienda');
+  const detalle=[o.cliente?.nombre,l.monto!=null?$c(l.monto):'',l.metodo||'',l.tipo==='traspaso'?'de '+sucNom(l.de)+' a '+sucNom(l.a):'','por '+quien].filter(Boolean).join(' · ');
+  toast(`${e} ${o.ref} · ${t}${l.monto!=null?' · '+$c(l.monto):''}`);
+  if(R.sonido)N.avisos.mostrar(`${e} ${o.ref} · ${t}`,detalle,{tag:'ev-'+o.id+'-'+l.tipo,url:new URL('APP.html#ver='+o.id,location.href).href});
+  if(['cot-no','recibido-no'].includes(l.tipo))buzz([200,100,200]);
+}
+// Lo que hace el cliente (confirmar o rechazar la cotización, subir el SINPE, "ya lo recibí", cancelar, agregar):
+// se detecta mirando cómo cambió el pedido, así avisa igual aunque la nube no haya anotado el renglón en la bitácora.
+const clVisto=new Map();
+const instClie=o=>({conf:o.confirmacion?.por==='cliente'?o.confirmacion.at:'',rech:o.rechazo?.por==='cliente'?o.rechazo.at:'',rec:o.recibidoCliente?o.recibidoCliente.at+'|'+o.recibidoCliente.ok:'',rep:o.pago?.estado==='reportado'?(o.pago.reportado||'1'):'',comp:o.comprobante?(o.comprobante.subido||'1'):'',canc:o.estado==='cancelado'&&!o.rechazo&&/cliente/i.test(o.motivo||'')?'1':'',n:(o.items||[]).length});
+N.lista().forEach(o=>clVisto.set(o.id,instClie(o)));
+function vigilarCliente(){
+  N.lista().forEach(o=>{
+    const a=clVisto.get(o.id),b=instClie(o);clVisto.set(o.id,b);
+    if(!a||o.archivado||!paraMi(o))return;
+    const tot=N.totalDe(o),ev=[];
+    if(b.conf&&b.conf!==a.conf)ev.push({tipo:'cot-ok',monto:tot});
+    if(b.rech&&b.rech!==a.rech)ev.push({tipo:'cot-no',monto:+o.rechazo?.total||tot});
+    if(b.rec&&b.rec!==a.rec)ev.push({tipo:o.recibidoCliente.ok?'recibido-ok':'recibido-no',monto:tot});
+    if(b.canc&&b.canc!==a.canc)ev.push({tipo:'cancelado-cliente',monto:tot});
+    if((b.rep&&b.rep!==a.rep)||(b.comp&&b.comp!==a.comp))ev.push({tipo:'sinpe-reportado',monto:tot,metodo:b.comp?'SINPE · con comprobante':(N.PAGOS[o.pago?.metodo]||{}).n||''});
+    if(b.n>a.n&&o.estado==='nuevo')ev.push({tipo:'agregado',monto:tot});
+    ev.forEach(l=>avisoEvento(o,{...l,by:'cliente'}));
+  });
+}
+function vigilarLogs(){
+  N.lista().forEach(o=>{
+    const L=o.log||[],n=logVisto.get(o.id);logVisto.set(o.id,L.length);
+    if(n==null||L.length<=n||o.archivado)return;
+    L.slice(n).forEach(l=>{
+      if(l.dev===N.DEV||l.by==='cliente'||!EVT[l.tipo])return; // lo del cliente se detecta por cómo cambió el pedido (vigilarCliente)
+      const mio=paraMi(o)||(l.tipo==='traspaso'&&(R.suc==='todas'||l.de===R.suc));
+      if(!mio)return;
+      if(l.tipo==='traspaso'&&R.suc!=='todas'&&l.a===R.suc)return; // la tienda que lo recibe ya oye "pedido pasado a tu tienda"
+      avisoEvento(o,l);
+    });
+  });
+}
 N.on(tipo=>{
-  if(tipo==='encargo')vigilar();
+  if(tipo==='encargo'){vigilar();vigilarLogs();vigilarCliente();revisarPOS();}
   if(tipo==='tienda'){clearTimeout(_vitT);_vitT=setTimeout(()=>{if(['vitrina','recetario'].includes(M.vista)&&$('moSheet').classList.contains('open')&&!document.activeElement?.matches?.('#moSheet input,#moSheet textarea'))repintar(M.vista==='vitrina'?pintarVitrina:pintarRecetario);},350);}
   pintarPuerta();pintarMostrador();
   if(M.vista==='encargo'&&$('moSheet').classList.contains('open')&&!document.activeElement?.matches?.('#moSheet input'))repintar(pintarEncargo);
@@ -1663,5 +1842,6 @@ $('puFoto')?.remove(); // la foto del arranque ya no hace falta: la portada de v
 navigator.serviceWorker?.addEventListener?.('message',e=>{if(e.data?.tipo==='abrir'&&e.data.id)mostrarEnLista(e.data.id);});
 N.avisos.insignia(sinAbrir.size);
 if(sinAbrir.size)repetirAlarma();
+setTimeout(revisarPOS,1200); // una contraseña del POS que quedó guardada mientras la app estaba cerrada
 window.AramoPuerta={abrirPuerta,abrirSurtidoAmbos,abrirMostrador,pintarMostrador,abrirCobro,autoPrecios,R};
 })();

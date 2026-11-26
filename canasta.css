@@ -774,3 +774,61 @@ html.mini .fondo{display:none}
 .comprobante-grid small{display:block;color:var(--muted);font-size:11px}
 .comprobante-grid b{display:block;font-size:13px;margin-top:2px}
 html,body{overscroll-behavior-x:none}
+
+/* ═══ Flujo del pedido (2026-11-25): cotización, "Ya lo recibí", SINPE y avisos ═══ */
+.pasos4 li{text-align:center;line-height:1.2}
+.pasos4 li small{display:block}
+.aviso-notif{margin-top:12px;padding:16px;border-radius:22px;background:var(--g-soft);border:1px solid color-mix(in srgb,var(--g) 30%,transparent)}
+.aviso-notif b{display:block;font-size:17px}
+.aviso-notif p{margin:4px 0 12px;font-size:14.5px;color:var(--ink-2)}
+/* Cotización: confirmar o rechazar */
+.cot-card .monto,.cot-ov .monto{font-size:44px}
+.cot-antes{margin:0 0 4px;font-size:15px;font-weight:700;color:var(--muted)}
+.cot-igual{margin-top:8px;font-size:15px;font-weight:700;color:var(--g)}
+.cot-nota{margin-top:10px;font-size:14px;font-weight:600}
+.cot-cambios{display:flex;flex-direction:column;gap:8px;margin-top:6px}
+.cot-cambio{display:flex;align-items:center;gap:12px;padding:10px 12px;border-radius:16px;background:var(--card);border:1px solid var(--line)}
+.cot-cambio .e{flex:none;width:44px;height:44px;display:grid;place-items:center;font-size:26px}
+.cot-cambio .e img{width:44px;height:44px;object-fit:cover;border-radius:12px}
+.cot-cambio .t{flex:1;min-width:0}
+.cot-cambio .t b{display:block;font-size:16px}
+.cot-cambio .t small{display:block;font-size:14px;font-weight:700;color:var(--ink-2)}
+.cot-cambio .dif{flex:none;font-size:15px;font-weight:800}
+.cot-cambio .dif.mas{color:var(--o)}
+.cot-cambio .dif.menos{color:var(--g)}
+.cot-bot{display:grid;gap:10px;margin-top:16px}
+.cot-b{display:flex;align-items:center;justify-content:center;gap:8px;width:100%;min-height:64px;padding:0 18px;border-radius:20px;font-size:21px;font-weight:800;text-align:center}
+.cot-b.ok{background:var(--g);color:var(--g-ink);box-shadow:0 8px 22px color-mix(in srgb,var(--g) 30%,transparent)}
+.cot-b.no{background:var(--card);color:var(--r);border:2px solid color-mix(in srgb,var(--r) 45%,transparent)}
+.cot-b.ghost{background:var(--card);color:var(--ink);border:1px solid var(--line-2);font-size:17px;min-height:56px}
+.cot-b:active{transform:scale(.98)}
+.cot-ov{position:fixed;inset:0;z-index:90;overflow-y:auto;background:var(--bg);padding:calc(18px + env(safe-area-inset-top,0px)) 16px calc(24px + env(safe-area-inset-bottom,0px));display:flex;justify-content:center;animation:cotEntra .35s var(--suave)}
+@keyframes cotEntra{from{opacity:0;transform:translateY(18px)}}
+.cot-in{width:100%;max-width:520px;margin:auto 0}
+.cot-in h2{font-family:var(--display);font-size:30px;line-height:1.15;margin:4px 0 6px}
+.cot-kick{font-size:13px;font-weight:800;letter-spacing:.06em;text-transform:uppercase;color:var(--muted)}
+.cot-sub{font-size:16px;color:var(--ink-2)}
+.cot-luego{display:block;width:100%;margin-top:14px;padding:12px;font-size:16px;text-align:center}
+.cot-motivos{display:flex;flex-direction:column;gap:10px;margin-top:14px}
+.cot-chip{min-height:56px;padding:0 16px;border-radius:18px;background:var(--card);border:2px solid var(--line-2);font-size:17px;font-weight:700;text-align:left}
+.cot-chip.on{border-color:var(--g);background:var(--g-soft)}
+.cot-gracias{text-align:center}
+.cot-gracias p{font-size:17px;margin:8px 0;color:var(--ink-2)}
+.cot-gracias .cot-ico{font-size:64px;display:block}
+.cot-gracias .cot-b{margin-top:18px}
+body.cot-abierta{overflow:hidden}
+/* "Ya lo recibí / No lo recibí": dos botones enormes */
+.recibido-box{display:flex;flex-direction:column;gap:12px;margin-top:14px}
+.rc-q{font-family:var(--display);font-size:26px;font-weight:700;text-align:center}
+.rc-b{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:6px;width:100%;min-height:clamp(150px,27vh,260px);border-radius:28px;font-size:clamp(28px,8vw,40px);font-weight:800;text-align:center}
+.rc-b span{font-size:clamp(40px,12vw,64px);line-height:1}
+.rc-b.si{background:var(--g);color:var(--g-ink);box-shadow:0 12px 30px color-mix(in srgb,var(--g) 32%,transparent)}
+.rc-b.no{background:var(--card);color:var(--r);border:3px solid color-mix(in srgb,var(--r) 50%,transparent)}
+.rc-b:active{transform:scale(.985)}
+.rc-nota{font-size:16px;font-weight:700;color:var(--r);text-align:center}
+.recibido-box small{text-align:center;font-size:14px;color:var(--muted)}
+.recibido-ok{border-color:color-mix(in srgb,var(--g) 40%,transparent)}
+/* SINPE: subir el comprobante junto a "Ya pagué" */
+.sinpe-acc{margin:10px 0 6px}
+.sinpe-acc .btn{min-height:60px;font-size:17px;border-radius:19px}
+.sinpe-acc .sinpe-subir{cursor:pointer}
