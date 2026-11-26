@@ -5579,6 +5579,7 @@ function clEditAllowed(date){
 }
 function clClosureDigest(date,d){return JSON.stringify({date,ingreso:d.ingresoReal,salio:d.ganancia,daily:d.manual,partners:clPartnerLedgerFor(date)});}
 function clCloseDay(date){
+  if(typeof role!=='undefined'&&role!=='owner'){alert('Solo Roger, como responsable del cierre, puede blindar el día.');return;}
   const d=clComputeWeek(clState.start).perDay.find(x=>x.date===date),check=d&&clClosureChecklist(date,d);
   if(!d||!check?.ready){alert(`No se puede blindar este cierre todavía:\n\n${(check?.issues||['No se encontró el día.']).map(x=>'• '+x).join('\n')}`);return;}
   data.closureLocks=data.closureLocks||{};
@@ -5586,6 +5587,7 @@ function clCloseDay(date){
   save();
 }
 function clReopenDay(date){
+  if(typeof role!=='undefined'&&role!=='owner'){alert('Solo Roger, como responsable del cierre, puede reabrir el día.');return;}
   const lock=clClosureLockFor(date);if(!lock)return;
   const reason=prompt('Motivo obligatorio para reabrir el cierre:','Corrección documentada');
   if(!reason||!reason.trim())return;
