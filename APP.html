@@ -700,8 +700,8 @@ html[data-theme="dark"] .today-money-card{background:linear-gradient(145deg,#125
 <link rel="stylesheet" href="express.css?v=20261020-premium-2">
 <link rel="stylesheet" href="puerta.css?v=20261013-perfil-1">
 <link rel="stylesheet" href="portadas.css?v=20261124-control">
-<link rel="stylesheet" href="pedido.css?v=20261126-productos1">
-<link rel="stylesheet" href="surtido.css?v=20261126-productos1">
+<link rel="stylesheet" href="pedido.css?v=20261126-productos2">
+<link rel="stylesheet" href="surtido.css?v=20261126-productos2">
 <link rel="stylesheet" href="leido.css?v=1">
 </head>
 <body>
@@ -1013,7 +1013,9 @@ html[data-theme="dark"] .today-money-card{background:linear-gradient(145deg,#125
   <div class="modal">
     <div class="modal-handle"></div>
     <div class="modal-title" id="priceModalTitle">Producto</div>
-    <div style="font-size:14px;color:var(--m);margin:-6px 0 12px">Compará y editá. Los cambios se guardan automáticamente.</div>
+    <div style="font-size:14px;color:var(--m);margin:-6px 0 12px">Cambiá el nombre, el ícono, la unidad, los proveedores y los precios. Los precios se guardan solos.</div>
+    <div id="priceModalEdit"></div>
+    <div class="pm-sub">Precio por proveedor</div>
     <div id="priceCompareList"></div>
     <div id="priceModalExtra"></div>
     <button class="btn btn-g btn-full" type="button" onclick="closePriceModal()">Listo</button>
@@ -3798,26 +3800,69 @@ function renderProductos(){
 }
 const renderPriceSearch=renderProductos;   // nombre de antes
 
+const escA=s=>String(s??'').replace(/&/g,'&amp;').replace(/"/g,'&quot;').replace(/</g,'&lt;');
+
 function openPriceModal(key){
   const item=getProductosLista().find(row=>row.key===key);
   if(!item)return;
   document.getElementById('priceModalTitle').textContent=`${item.emoji} ${item.name}`;
+  const unidad=normUnit(item.unit||item.offers[0]?.product.unit);
+  document.getElementById('priceModalEdit').innerHTML=`
+    <label class="modal-field-label">Nombre del producto<input class="modal-inp" id="pmName" type="text" value="${escA(item.name)}" autocomplete="off" aria-label="Nombre del producto"></label>
+    <div class="pm-fila">
+      <label class="modal-field-label">Ícono<input class="modal-inp" id="pmEmoji" type="text" value="${escA(item.emoji)}" maxlength="4" aria-label="Ícono"></label>
+      <label class="modal-field-label">Unidad<select class="modal-inp" id="pmUnit" aria-label="Unidad">${UNITS.map(u=>`<option value="${u}"${u===unidad?' selected':''}>${u}</option>`).join('')}</select></label>
+    </div>
+    <button class="btn btn-g btn-full" type="button" data-pm="guardar" data-key="${escA(item.key)}">Guardar cambios</button>`;
   document.getElementById('priceCompareList').innerHTML=item.offers.length?item.offers.map(({prov,product})=>`
     <div class="compare-row">
       <div><div class="compare-provider">${prov}</div><div class="compare-unit">Precio por ${product.unit||'unidad'}</div></div>
       <input class="compare-price" type="number" inputmode="decimal" min="0" step="0.01"
         value="${getPrice(prov,product.id)}" placeholder="₡ 0"
-        data-prov="${prov}" data-pid="${product.id}">
+        data-prov="${escA(prov)}" data-pid="${escA(product.id)}">
+      <button class="pm-quitar" type="button" data-pm="quitar" data-prov="${escA(prov)}" data-pid="${escA(product.id)}" data-key="${escA(item.key)}" aria-label="Quitar de ${escA(prov)}" title="Quitar de ${escA(prov)}">×</button>
     </div>`).join(''):'<div class="product-picker-empty">Ningún proveedor lo vende todavía. Agregalo a uno para ponerle precio.</div>';
   document.querySelectorAll('#priceCompareList .compare-price').forEach(input=>{
     input.addEventListener('input',()=>setPrice(input.dataset.prov,input.dataset.pid,input.value));
   });
   const extra=document.getElementById('priceModalExtra');
   if(extra)extra.innerHTML=`<div class="pm-extra">
-    <button class="btn btn-o btn-full" type="button" data-pm="asignar" data-key="${item.key}">＋ Agregar a un proveedor</button>
-    <button class="btn btn-o btn-full pm-del" type="button" data-pm="borrar" data-key="${item.key}" aria-label="Borrar ${item.name} de todo">🗑️ Borrar de todo</button>
+    <button class="btn btn-o btn-full" type="button" data-pm="asignar" data-key="${escA(item.key)}">＋ Agregar a un proveedor</button>
+    <button class="btn btn-o btn-full pm-del" type="button" data-pm="borrar" data-key="${escA(item.key)}" aria-label="Borrar ${escA(item.name)} de todo">🗑️ Borrar de todo</button>
   </div>`;
   document.getElementById('modalPriceCompare').classList.add('open');
+}
+
+// Cambia el nombre, el ícono y la unidad de un producto en TODOS los proveedores que lo venden (y en la
+// lista general). El producto sigue siendo el mismo: conserva su id, su precio y lo que ya está pedido.
+// Si el nombre cambia, el viejo se anota como "quitado" para que no vuelva a salir (como en Editar proveedor).
+function editarProductoDeTodo(key,{name,emoji,unit}={}){
+  const prod=getKnownProductCatalog().find(p=>p.key===key);
+  if(!prod)return{error:'No encontré el producto'};
+  const nuevo=String(name??prod.name).trim();
+  if(!nuevo)return{error:'Escribí el nombre del producto'};
+  const nk=normalizeText(nuevo),cambiaClave=nk!==key;
+  if(cambiaClave&&getKnownProductCatalog().some(p=>p.key===nk))return{error:'Ya existe un producto con ese nombre'};
+  const ahora=Date.now(),emo=String(emoji||'').trim()||prod.emoji||'🧺',uni=normUnit(unit||prod.unit);
+  let n=0;
+  Object.entries(getAllProviders()).forEach(([prov,data])=>{
+    if(prov==='Otros')return;
+    (data.products||[]).filter(p=>normalizeText(p.name)===key).forEach(p=>{
+      ensureCustomProv(prov);
+      const r=(S.customProviders[prov].products||[]).find(x=>x.id===p.id);if(!r)return;
+      if(cambiaClave)S.customProviders[prov].quitados={...(S.customProviders[prov].quitados||{}),[key]:ahora};
+      r.name=nuevo;r.emoji=emo;r.unit=uni;if(cambiaClave)r.agregado=ahora+1;n++;
+    });
+  });
+  ensureOtrosProvider();
+  const O=S.customProviders.Otros;
+  if(!O.masterProducts)O.masterProducts=[];
+  const m=O.masterProducts.find(p=>normalizeText(p.name)===key);
+  if(m){m.name=nuevo;m.emoji=emo;m.unit=uni;if(cambiaClave)m.agregado=ahora+1;}
+  else if(cambiaClave||!n)O.masterProducts.push({id:'master_'+ahora+'_'+Math.random().toString(36).slice(2,6),name:nuevo,emoji:emo,unit:uni,agregado:ahora+1});
+  if(cambiaClave)O.borrados={...(O.borrados||{}),[key]:ahora};   // la lista de fábrica con el nombre viejo ya no vale
+  invalidateProvidersCache();
+  return{ok:true,key:nk,name:nuevo,n};
 }
 
 function closePriceModal(){
@@ -3830,6 +3875,19 @@ function closePriceModal(){
 async function priceModalAccion(btn){
   const key=btn.dataset.key,prod=getKnownProductCatalog().find(p=>p.key===key);if(!prod)return;
   if(btn.dataset.pm==='asignar'){openCatalogoAssign(key);return;}
+  if(btn.dataset.pm==='guardar'){
+    const r=editarProductoDeTodo(key,{name:document.getElementById('pmName').value,emoji:document.getElementById('pmEmoji').value,unit:document.getElementById('pmUnit').value});
+    if(r.error){toast(r.error,'err');return;}
+    const bs=document.getElementById('priceSearch'),q0=normalizeText(bs?.value||'');
+    if(q0&&normalizeText(prod.name).includes(q0))bs.value=r.name;   // para que el producto no se pierda de la lista filtrada
+    persist();renderProductos();openPriceModal(r.key);
+    if(S.currentProv&&document.getElementById('view-prov')?.classList.contains('active'))renderProdTable();
+    toast(`✓ ${r.name} guardado${r.n?' en '+r.n+' proveedor'+(r.n===1?'':'es'):''}`,'ok');return;
+  }
+  if(btn.dataset.pm==='quitar'){
+    quitarDeProv(btn.dataset.prov,btn.dataset.pid);persist();renderProductos();openPriceModal(key);
+    toast(`✓ ${prod.name} quitado de ${btn.dataset.prov} · sigue en la lista de productos`,'ok');return;
+  }
   const n=getProductosLista().find(i=>i.key===key)?.offers.length||0;
   const texto=`Se quita de ${n?n+' proveedor'+(n===1?'':'es')+' y de ':''}la lista de productos, en todos los equipos.`;
   const ok=window.AramoUI?.confirmar?await AramoUI.confirmar({titulo:`¿Borrar "${prod.name}" de TODO?`,texto,si:'Borrar',peligro:true}):confirm(`¿Borrar "${prod.name}" de TODO?\n\n${texto}`);
@@ -3845,7 +3903,7 @@ async function priceModalAccion(btn){
 document.getElementById('priceSearch').addEventListener('input',renderProductos);
 document.getElementById('addNewCatalogProduct').addEventListener('click',openNewCatalogProductModal);
 document.getElementById('newCatalogProductProvider').addEventListener('change',newCatalogProductPriceVis);
-document.getElementById('priceModalExtra').addEventListener('click',e=>{const b=e.target.closest('[data-pm]');if(b)priceModalAccion(b);});
+document.getElementById('modalPriceCompare').addEventListener('click',e=>{const b=e.target.closest('[data-pm]');if(b)priceModalAccion(b);});
 document.getElementById('saveNewCatalogProduct').addEventListener('click',saveNewCatalogProduct);
 document.getElementById('modalNewCatalogProduct').addEventListener('click',e=>{if(e.target.id==='modalNewCatalogProduct')closeNewCatalogProductModal();});
 document.getElementById('modalPriceCompare').addEventListener('click',e=>{if(e.target.id==='modalPriceCompare')closePriceModal();});
@@ -4109,7 +4167,7 @@ if(isIOS && !isInStandalone && !dismissed){
 <!-- Íconos y ventanitas del sistema de diseño: antes de express.js, que ya los usa -->
 <script src="iconos.js?v=20261122-fase1"></script>
 <script src="aramo-ui.js?v=20261123-fase2"></script>
-<script src="express.js?v=20261126-productos1"></script>
+<script src="express.js?v=20261126-productos2"></script>
 <script src="leido.js?v=1"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcode-generator/1.4.4/qrcode.min.js"></script>
 <script src="canasta-config.js?v=20261018-seguridad-1"></script>

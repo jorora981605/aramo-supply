@@ -294,6 +294,9 @@ function xpApplyQtys(prov,qtys){
 // y solo donde no hay nada escrito. Mientras no haya historia de ese día, propone lo de la última vez.
 // La jornada empieza a las 6 a. m.: un pedido mandado a la 1 de la madrugada cuenta para la noche anterior.
 const AU={nube:[],nubeT:0,cargando:null,cache:null};
+// APAGADO (2026-11-26, pedido del dueño): "Lo de siempre" ya no sale en ninguna pantalla ni trabaja solo.
+// El código y lo guardado (historial en la nube y en el teléfono) quedan intactos por si se vuelve a querer.
+const AU_ACTIVO=false;
 const AU_DIAS=['domingo','lunes','martes','miércoles','jueves','viernes','sábado'];
 const auJornada=t=>new Date(+t-6*3600e3);
 const auDiaTxt=d=>d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');
@@ -307,6 +310,7 @@ function auDeNube(r){
 // Pide a la nube solo los días que sirven: el mismo día de la semana de las últimas 5 semanas y los
 // últimos 4 días (la fecha de la nube va en hora UTC, así que también se pide el día siguiente).
 function auCargar(){
+  if(!AU_ACTIVO)return;   // apagado: tampoco pide el historial a la nube
   if(AU.cargando||Date.now()-AU.nubeT<20*60e3||typeof supa==='undefined')return AU.cargando;
   const hoy=auJornada(Date.now()),fechas=new Set(),agregar=(base,dias)=>{const d=new Date(base);d.setDate(d.getDate()+dias);fechas.add(auDiaTxt(d));};
   for(let w=1;w<=5;w++){agregar(hoy,-7*w);agregar(hoy,-7*w+1);}
@@ -374,12 +378,14 @@ function auPendientes(){
 }
 function auTextoDia(modo){return modo==='semana'?`lo que se suele pedir los ${AU_DIAS[auHoySem()]}`:'lo que pediste la última vez';}
 function auBoton(vacio){
+  if(!AU_ACTIVO)return'';
   auCargar();
   const r=auPendientes();if(!r.lista.length)return'';
   const k=r.lista.length,sub=`${plural(k,'proveedor','proveedores')} · ${auTextoDia(r.modo)}`;
   return `<button type="button" class="sx-pdf-btn au-btn${vacio?' grande':''}" data-sx-siempre><span class="sx-pdf-i">${ico('estrella')}</span><span class="sx-pdf-t"><b>${vacio?'Armar el pedido con lo de siempre':`Falta lo de siempre de ${plural(k,'proveedor','proveedores')}`}</b><small>${esc(vacio?sub:capital(auTextoDia(r.modo)))}</small></span><span class="sx-pdf-f" aria-hidden="true">›</span></button>`;
 }
 function auAbrir(){
+  if(!AU_ACTIVO)return;
   const {modo,lista}=auPendientes();
   if(!lista.length){AramoUI.aviso('No hay nada que proponer: ya está todo escrito',{tipo:'info'});return;}
   const sides=activeOrderSides(),dos=sides.length>1;
@@ -776,10 +782,9 @@ function xpRenderProvSuggest(){
   const el=$('provSuggest');if(!el)return;
   const prov=S.currentProv;
   if(!prov||hasData(prov)){el.innerHTML='';return;}
-  const sug=xpSuggestion(prov),last=xpHistFor(prov)[0];
-  if(!sug&&!last){el.innerHTML='';return;}
+  const last=xpHistFor(prov)[0];   // "Cargar lo de siempre" (xpSuggestion) apagado junto con el resto de Lo de siempre
+  if(!last){el.innerHTML='';return;}
   el.innerHTML=`<div class="pp-suggest">
-    ${sug?`<button type="button" data-sug="sug">✨ Cargar lo de siempre</button>`:''}
     ${last?`<button type="button" data-sug="last">↺ Repetir último pedido <small>${new Date(last.date).toLocaleDateString('es-CR',{day:'numeric',month:'short'})}</small></button>`:''}
   </div>`;
 }
@@ -1178,7 +1183,7 @@ async function hojaPdfHacer(firma){
   await hojaCargarJsPDF();
   const doc=new window.jspdf.jsPDF({unit:'pt',format:'letter'}),d=new Date();
   const info=hojaDibujar(doc,firma);
-  const nombre=`Pedido ARAMO ${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')} ${firma}.pdf`;
+  const nombre=`Pedido ARAMO ${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}${firma?' '+firma:''}.pdf`;
   doc.setProperties({title:nombre.replace(/\.pdf$/,''),author:'ARAMO'});
   return{...info,file:new File([doc.output('blob')],nombre,{type:'application/pdf'})};
 }
@@ -1190,7 +1195,22 @@ const hojaEsCompu=()=>matchMedia('(hover:hover) and (pointer:fine)').matches;
 // En el teléfono se comparte el archivo a WhatsApp. En la compu se descarga y se abre el chat
 // propio directamente (el menú de compartir de Windows no siempre trae WhatsApp).
 function hojaPuedeCompartir(){if(hojaEsCompu())return false;try{return !!navigator.canShare?.({files:[new File(['x'],'p.pdf',{type:'application/pdf'})]});}catch{return false;}}
+// En Moravia o Los Ángeles el PDF solo se ABRE para verlo (sin ventana de envío, sin WhatsApp, sin
+// compartir): la información ya llega sola a Ambos y desde Ambos se envía. Se abre la pestaña en el
+// mismo toque (si no, el teléfono la bloquea) y se llena cuando el PDF está listo.
+async function hojaPdfSoloVer(){
+  const win=window.open('','_blank');
+  toast('Armando el PDF…');
+  try{
+    const r=await hojaPdfHacer(hojaFirma());   // sin preguntar nada: acá solo se mira
+    const u=URL.createObjectURL(r.file);
+    if(win&&!win.closed)win.location.href=u;
+    else if(!window.open(u,'_blank')){SX.pdf=r;hojaPdfBajar();}   // sin permiso para abrir otra pestaña: se descarga
+    setTimeout(()=>URL.revokeObjectURL(u),300000);
+  }catch(err){try{win?.close();}catch{}toast('No se pudo armar el PDF','err');}
+}
 function hojaPdfAbrir(){
+  if(activeOrderSides().length<2)return hojaPdfSoloVer();
   let h=$('sxPdf');
   if(!h){
     h=document.createElement('div');h.id='sxPdf';h.className='sx-editor sx-pdf';document.body.appendChild(h);
@@ -1818,7 +1838,7 @@ function xpRenderPedido(){
   }
   if(dos&&ciMostrar())html+=ciBarra();
   html+=auBoton(!t.items);
-  if(t.items)html+=`<button type="button" class="sx-pdf-btn" data-sx-pdf><span class="sx-pdf-i">${ico('hoja')}</span><span class="sx-pdf-t"><b>PDF del pedido</b><small>Lista completa para revisar o compartir</small></span><span class="sx-pdf-f" aria-hidden="true">›</span></button>`;
+  if(t.items)html+=`<button type="button" class="sx-pdf-btn" data-sx-pdf><span class="sx-pdf-i">${ico('hoja')}</span><span class="sx-pdf-t"><b>PDF del pedido</b><small>${dos?'Lista completa para revisar o compartir':'Se abre para verlo · el envío se hace desde Ambos'}</small></span><span class="sx-pdf-f" aria-hidden="true">›</span></button>`;
   if(t.items){
     html+=`<div class="pdx-barra-f"><h3>Proveedores</h3><div class="pdx-filtros" role="group" aria-label="Qué proveedores ver">${[['todos','Todos',datos.length],['pend','Por enviar',porEnviar],['env','Enviados',enviados]].map(([k,n,c])=>`<button type="button" class="${_pdFiltro===k?'on':''}" data-pdx-f="${k}"${c||k==='todos'?'':' disabled'} aria-pressed="${_pdFiltro===k}">${n} <b>${c}</b></button>`).join('')}</div></div>`;
     html+=`<div class="sx-grid">${datos.filter(d=>_pdFiltro==='todos'||(_pdFiltro==='pend'?!d.sent:d.sent)).map((d,i)=>sxTarjeta(d,i,sides,'pedido')).join('')}</div>`;

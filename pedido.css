@@ -133,13 +133,7 @@
   .pdx-cta{margin-top:12px}
 }
 @media (max-width:520px) and (max-height:780px){
-  .pd-sent-time small{display:none}
   .pdx-total strong{font-size:44px}
   .pdx-total span{margin-top:4px}
-  .pdx-chip{padding:8px 10px}
-  .pdx-chip b{font-size:19px}
   .pdx-split{margin:8px 0 8px}
-  .pdx-ley b{font-size:17px}
-  .pdx-cta{margin-top:10px;padding:8px 10px}
-  .pdx-acc2 button{min-height:40px}
 }

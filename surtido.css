@@ -611,3 +611,11 @@ label.ci-tienda{cursor:text}
 .pm-extra .btn{min-height:50px;font-weight:800}
 .pm-extra .pm-del{color:#b91c1c;border-color:rgba(185,28,28,.4)}
 html[data-theme="dark"] .pm-extra .pm-del{color:#fca5a5;border-color:rgba(252,165,165,.4)}
+
+/* ── Ventana de un producto: editar nombre, ícono, unidad; quitar de un proveedor ── */
+.pm-sub{margin:6px 0 2px;font-size:11px;font-weight:900;color:var(--m);text-transform:uppercase;letter-spacing:.3px}
+.pm-fila{display:grid;grid-template-columns:96px 1fr;gap:10px}
+#priceModalEdit .btn{min-height:50px;margin:0 0 10px;font-weight:800}
+#priceCompareList .compare-row{grid-template-columns:1fr 112px 44px;gap:8px}
+.pm-quitar{width:44px;height:44px;border:1px solid var(--b2);border-radius:12px;background:transparent;color:var(--m);font-size:22px;line-height:1;cursor:pointer}
+.pm-quitar:hover{color:#b91c1c;border-color:rgba(185,28,28,.5)}
