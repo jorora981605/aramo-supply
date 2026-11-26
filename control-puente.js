@@ -38,6 +38,12 @@ function comprasDe(dia,tienda){
   });
   return r;
 }
+function comprasDetalle(dia,tienda){
+  return cierres().filter(c=>diaDe(c.inicio)===dia&&c.tiendas&&c.tiendas[tienda]&&c.tiendas[tienda].pago).map(c=>{
+    const t=c.tiendas[tienda];
+    return {id:c.id||'',inicio:c.inicio||'',proveedores:Array.isArray(c.provs)?c.provs.map(p=>({prov:p.prov||'',total:n(p[tienda==='angeles'?'ta':'tm']??p.total),pago:p.pago||''})):[],total:n(t.total),pago:{efectivo:n(t.pago.efectivo),tarjeta:n(t.pago.tarjeta),sinpe:n(t.pago.sinpe)}};
+  });
+}
 // Cobros del Mostrador (pedidos de clientes ya cobrados). Los pedidos de prueba no cuentan.
 function cobrosDe(dia,tienda){
   const r={efectivo:0,tarjeta:0,sinpe:0,n:0},N=window.AramoNube;
@@ -54,7 +60,7 @@ function cobrosDe(dia,tienda){
 function posNormalizar(raw,origen,dia){
   const x=raw?.resumen||raw||{};
   if(!x||String(x.fecha||dia)!==dia)return null;
-  return {fecha:dia,efectivo:n(x.efectivo),sinpe:n(x.sinpe),tarjeta:n(x.tarjeta),total:n(x.total),n:n(x.n||x.transacciones||x.ventasCount),ventas:Array.isArray(x.ventas)?x.ventas:(Array.isArray(x.movimientos)?x.movimientos:[]),actualizado:x.actualizado||x.generadoEn||raw?.actualizado||'',huella:x.huella||'',origen};
+  return {fecha:dia,efectivo:n(x.efectivo),sinpe:n(x.sinpe),tarjeta:n(x.tarjeta),total:n(x.total),bodega:n(x.bodega),bodegaDetalle:Array.isArray(x.bodegaDetalle)?x.bodegaDetalle:[],departamentos:Array.isArray(x.departamentos)?x.departamentos:[],n:n(x.n||x.transacciones||x.ventasCount),ventas:Array.isArray(x.ventas)?x.ventas:(Array.isArray(x.movimientos)?x.movimientos:[]),actualizado:x.actualizado||x.generadoEn||raw?.actualizado||'',huella:x.huella||'',origen};
 }
 function posDe(dia,tienda){
   tienda=tienda||P.tienda;
@@ -68,13 +74,13 @@ function posDe(dia,tienda){
 function fuentesDia(fecha,tienda){
   tienda=tienda||P.tienda;
   const c=comprasDe(fecha,tienda),v=cobrosDe(fecha,tienda),p=posDe(fecha,tienda);
-  return {pos:p||{efectivo:0,sinpe:0,tarjeta:0,n:0,ventas:[],origen:'pendiente'},mostrador:{...v,actualizado:'local'},compras:c,cierres:c.n,sinTabla:P.sinTabla,posSinTabla:P.posSinTabla};
+  return {pos:p||{efectivo:0,sinpe:0,tarjeta:0,bodega:0,bodegaDetalle:[],departamentos:[],n:0,ventas:[],origen:'pendiente'},mostrador:{...v,actualizado:'local'},compras:c,cierres:c.n,sinTabla:P.sinTabla,posSinTabla:P.posSinTabla};
 }
 function dia(fecha,tienda){
   tienda=tienda||P.tienda;const k=fecha+'|'+tienda;
   if(P.memo.has(k))return P.memo.get(k);
   const s=fuentesDia(fecha,tienda),c=s.compras,v=s.mostrador,p=s.pos;
-  const out={cash:v.efectivo+n(p.efectivo),sinpe:v.sinpe+n(p.sinpe),card:v.tarjeta+n(p.tarjeta),comprasEfectivo:c.efectivo,comprasSinpe:c.sinpe,comprasTarjeta:c.tarjeta,cierres:c.n,cobros:v.n+n(p.n),posVentas:n(p.n),mostradorCobros:v.n,posFuente:p.origen,posActualizado:p.actualizado,posHuella:p.huella};
+  const out={cash:v.efectivo+n(p.efectivo),sinpe:v.sinpe+n(p.sinpe),card:v.tarjeta+n(p.tarjeta),bodega:n(p.bodega),bodegaDetalle:p.bodegaDetalle||[],departamentos:p.departamentos||[],comprasEfectivo:c.efectivo,comprasSinpe:c.sinpe,comprasTarjeta:c.tarjeta,cierres:c.n,cobros:v.n+n(p.n),posVentas:n(p.n),mostradorCobros:v.n,posFuente:p.origen,posActualizado:p.actualizado,posHuella:p.huella};
   P.memo.set(k,out);return out;
 }
 // Resumen para el aviso de arriba: cuánto llegó solo en los últimos 30 días.
@@ -118,7 +124,7 @@ function pintarAviso(){
   const el=document.getElementById('ctlPuente');if(!el)return;
   const r=resumen();
   const partes=[r.cierres?`${r.cierres} cierre${r.cierres===1?'':'s'} de compras`:'',r.cobros?`${r.cobros} cobro${r.cobros===1?'':'s'} del Mostrador`:'',r.posVentas?`${r.posVentas} venta${r.posVentas===1?'':'s'} del POS`:'' ].filter(Boolean);
-  const posMsg=r.posConectado?(r.posVentas?' El POS está conectado y sus ventas se concilian solas.':' El POS está conectado; todavía no hay ventas publicadas en los últimos 30 días.'):' El POS todavía no está conectado a este Control.';
+  const posMsg=r.posSinTabla?' El POS sí está guardando el resumen local, pero falta aplicar la migración del resumen POS en Supabase.':r.posConectado?(r.posVentas?' El POS está conectado y sus ventas se concilian solas.':' El POS está conectado; todavía no hay ventas publicadas en los últimos 30 días.'):' El POS todavía no está conectado a este Control.';
   const posBtn=r.posConectado?'':' <button type="button" class="ctl-pos-connect" onclick="window.AramoPuente.conectarPOS()">Conectar POS</button>';
   el.hidden=false;
   el.innerHTML=`<b>Conectado con ARAMO.</b> ${partes.length?'De los últimos 30 días '+(r.cierres+r.cobros===1?'llegó solo ':'llegaron solos ')+partes.join(' y ')+'. Se ven en las casillas moradas.':'Cuando haya un Cierre de compras o un cobro del Mostrador, sus montos llegan solos a esta hoja.'} Si escribís un número a mano, manda el tuyo.${r.sinTabla?' <span class="ctl-falta">Las compras hechas en otro teléfono todavía no llegan: falta un pegado en Supabase.</span>':''}`;
@@ -128,7 +134,7 @@ function pintarAviso(){
   const el=document.getElementById('ctlPuente');if(!el)return;
   const r=resumen();
   const partes=[r.cierres?`${r.cierres} cierre${r.cierres===1?'':'s'} de compras`:'',r.cobros?`${r.cobros} cobro${r.cobros===1?'':'s'} del Mostrador`:'',r.posVentas?`${r.posVentas} venta${r.posVentas===1?'':'s'} del POS`:'' ].filter(Boolean);
-  const posMsg=r.posConectado?(r.posVentas?' El POS está conectado y sus ventas se concilian solas.':' El POS está conectado; todavía no hay ventas publicadas en los últimos 30 días.'):' El POS todavía no está conectado a este Control.';
+  const posMsg=r.posSinTabla?' El POS sí está guardando el resumen local, pero falta aplicar la migración del resumen POS en Supabase.':r.posConectado?(r.posVentas?' El POS está conectado y sus ventas se concilian solas.':' El POS está conectado; todavía no hay ventas publicadas en los últimos 30 días.'):' El POS todavía no está conectado a este Control.';
   const posBtn=r.posConectado?'':' <button type="button" class="ctl-pos-connect" onclick="window.AramoPuente.conectarPOS()">Conectar POS</button>';
   el.hidden=false;
   el.innerHTML=`<b>Conectado con ARAMO.</b> ${partes.length?'De los últimos 30 días '+(partes.length===1?'llegó solo ':'llegaron solos ')+partes.join(' y ')+'. Se ven en las casillas moradas.':'Cuando haya un Cierre de compras, un cobro del Mostrador o una venta del POS, sus montos llegan solos a esta hoja.'} Si escribís un número a mano, manda el tuyo.${posMsg}${posBtn}${r.posError?` <span class="ctl-falta">${r.posError}</span>`:''}${r.sinTabla?' <span class="ctl-falta">Las compras hechas en otro teléfono todavía no llegan: falta un pegado en Supabase.</span>':''}${r.posSinTabla?' <span class="ctl-falta">Falta aplicar la migración del resumen POS en Supabase; mientras tanto el Control conserva el resumen local.</span>':''}`;
@@ -154,5 +160,5 @@ function empezar(tienda){
   setInterval(cargarNube,5*60e3);
   cargarNube();pintarAviso();
 }
-window.AramoPuente={dia,resumen,empezar,cargarNube,comprasDe,cobrosDe,posDe,fuentesDia,conectarPOS};
+window.AramoPuente={dia,resumen,empezar,cargarNube,comprasDe,comprasDetalle,cobrosDe,posDe,fuentesDia,conectarPOS};
 })();

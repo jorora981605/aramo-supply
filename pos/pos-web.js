@@ -187,8 +187,34 @@ function posResumenDia(fecha){
     return {id:+v.id||0,numero:String(v.numero||''),fecha:v.fecha,total:+v.total||0,estado:String(v.estado||''),metodo:String(v.metodo_pago||''),efectivo:split?(+v.pago_efectivo||0):v.metodo_pago==='efectivo'?(+v.total||0):0,tarjeta:split?(+v.pago_tarjeta||0):v.metodo_pago==='tarjeta'?(+v.total||0):0,sinpe:split?(+v.pago_sinpe||0):v.metodo_pago==='sinpe'?(+v.total||0):0,cajero:String(v.cajero||''),anuladoPor:String(v.anulado_por||''),anuladoFecha:String(v.anulado_fecha||''),anuladoMotivo:String(v.anulado_motivo||'')};
   });
   const completadas=ventas.filter(v=>v.estado==='completada');
-  const resumen={v:1,sucursal:SUC,fecha,efectivo:completadas.reduce((t,v)=>t+v.efectivo,0),tarjeta:completadas.reduce((t,v)=>t+v.tarjeta,0),sinpe:completadas.reduce((t,v)=>t+v.sinpe,0),total:completadas.reduce((t,v)=>t+(+v.total||0),0),n:completadas.length,ventas,generadoEn:new Date().toISOString()};
-  resumen.huella=sha256hex(JSON.stringify({fecha,ventas}));
+  // Bodega se calcula desde los productos vendidos, no se vuelve a digitar
+  // en Control. La categoría Bodega/Bebidas es la fuente principal y el
+  // nombre del producto funciona como respaldo para jugos, agua, café, etc.
+  let bodegaRows=[];
+  try{
+    bodegaRows=POS.prepare(`SELECT v.id AS venta_id,v.fecha,vi.nombre,vi.cantidad,vi.subtotal,
+      COALESCE(c.nombre,'Sin categoría') AS categoria
+      FROM venta_items vi JOIN ventas v ON v.id=vi.venta_id
+      LEFT JOIN productos p ON p.id=vi.producto_id
+      LEFT JOIN categorias c ON c.id=p.categoria_id
+      WHERE DATE(v.fecha)=? AND v.estado='completada' ORDER BY v.fecha,vi.id`).all([fecha]);
+  }catch(e){bodegaRows=[];}
+  const bodegagg=(name,category)=>{
+    const s=String((category||'')+' '+(name||'')).toLocaleLowerCase('es-CR').normalize('NFD').replace(/[\u0300-\u036f]/g,'');
+    return /\bbodega\b|bebida|jugo|agua|refresco|cafe|te\b|powerade|gatorade|kombucha|horchata|gaseosa|chubby|kern/.test(s);
+  };
+  const bodegaMap=new Map(),departamentoMap=new Map();
+  bodegaRows.forEach(r=>{
+    const amount=Number(r.subtotal)||0, category=String(r.categoria||'Sin categoría'), name=String(r.nombre||'Producto');
+    if(!bodegagg(name,category))return;
+    departamentoMap.set(category,(departamentoMap.get(category)||0)+amount);
+    const key=category+' · '+name;
+    const current=bodegaMap.get(key)||{categoria:category,nombre:name,cantidad:0,total:0};
+    current.cantidad+=(Number(r.cantidad)||0);current.total+=amount;bodegaMap.set(key,current);
+  });
+  const bodegaDetalle=[...bodegaMap.values()].sort((a,b)=>b.total-a.total).slice(0,100);
+  const resumen={v:1,sucursal:SUC,fecha,efectivo:completadas.reduce((t,v)=>t+v.efectivo,0),tarjeta:completadas.reduce((t,v)=>t+v.tarjeta,0),sinpe:completadas.reduce((t,v)=>t+v.sinpe,0),total:completadas.reduce((t,v)=>t+(+v.total||0),0),n:completadas.length,ventas,bodega:bodegaDetalle.reduce((t,v)=>t+v.total,0),bodegaDetalle,departamentos:[...departamentoMap.entries()].map(([nombre,total])=>({nombre,total})),generadoEn:new Date().toISOString()};
+  resumen.huella=sha256hex(JSON.stringify({fecha,ventas,bodegaDetalle,departamentos:resumen.departamentos}));
   return resumen;
 }
 async function posPublicarResumen(fecha){
