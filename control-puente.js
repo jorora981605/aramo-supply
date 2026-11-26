@@ -3,7 +3,7 @@
 //   · Compras  → de cada Cierre de compras terminado (los de este aparato y los de la nube), por tienda y forma de pago.
 //   · Ventas   → de los cobros del Mostrador (pedidos de La Feria), por tienda y forma de pago.
 // Lo que se escribe a mano en el Control siempre manda sobre lo que llega solo.
-// El POS publica un resumen diario firmado por la clave del local; aquí solo se
+// El POS publica un resumen diario validado por la clave del local; aquí solo se
 // leen totales y referencias de venta, nunca la base completa del POS.
 (function(){
 'use strict';
