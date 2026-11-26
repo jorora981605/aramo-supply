@@ -702,6 +702,7 @@ html[data-theme="dark"] .today-money-card{background:linear-gradient(145deg,#125
 <link rel="stylesheet" href="portadas.css?v=20261124-control">
 <link rel="stylesheet" href="pedido.css?v=20261125-diario1">
 <link rel="stylesheet" href="surtido.css?v=20261125-diario1">
+<link rel="stylesheet" href="leido.css?v=1">
 </head>
 <body>
 <script>
@@ -958,6 +959,12 @@ html[data-theme="dark"] .today-money-card{background:linear-gradient(145deg,#125
 <div class="view" id="view-config" style="padding-bottom:80px">
   <div class="scroll" style="padding-bottom:120px">
     <div class="sec">
+
+      <label class="leido-cfg" for="leidoSwitch">
+        <span class="leido-cfg-t"><b>📖 Enviar enlace de lectura a los proveedores</b><small>Al final del WhatsApp va un enlace con el pedido bien bonito. Cuando lo abren, te aviso con la hora.</small><span class="leido-estado" id="leidoEstado" aria-live="polite"></span></span>
+        <input type="checkbox" id="leidoSwitch" role="switch" checked>
+        <span class="leido-sw" aria-hidden="true"></span>
+      </label>
 
       <div class="cfg-acc" data-acc="catalogo">
         <button class="cfg-acc-hdr">🥬 Productos <span class="cfg-acc-count" id="accCountCatalogo"></span><span class="cfg-acc-arrow">▾</span></button>
@@ -2943,7 +2950,7 @@ function borrarProductoDeTodo(key){
 // ── PREVIEW & MSG ──
 function getBranchNote(p,side){const key=side==='moravia'?'__note_moravia':'__note_angeles';return String(p?.notes?.[key]||((side==='moravia'&&!p?.notes?.__note_moravia)?p?.note||'':'')).trim();}
 
-function buildMsg(prov,side='both'){
+function buildMsg(prov,side='both',enlace=''){
   prov=prov||S.currentProv;
   if(side==='both'&&scopeSide()!=='both')side=scopeSide();
   if(!prov||!S.pedidos[prov])return'';
@@ -2965,6 +2972,7 @@ function buildMsg(prov,side='both'){
   if((side==='both'||side==='moravia')&&getBranchNote(p,'moravia'))msg+=`\n📝 Moravia: ${getBranchNote(p,'moravia')}\n`;
   if((side==='both'||side==='angeles')&&getBranchNote(p,'angeles'))msg+=`\n📝 Los Ángeles: ${getBranchNote(p,'angeles')}\n`;
   msg+='\nGracias.';
+  if(enlace)msg+='\n\n📄 Ver el pedido: '+enlace;   // leido.js: el proveedor lo abre y a ARAMO le llega el "Leído"
   return msg;
 }
 
@@ -3020,7 +3028,8 @@ function sendWA(side='both'){
   const prov=S.currentProv;
   if(scopeSide()!=='both'){toast('El envío está disponible en la vista Ambos','err');return;}
   side=['moravia','angeles'].includes(side)?side:'both';
-  const msg=buildMsg(prov,side);
+  const lk=window.AramoLeido?.preparar(prov,side)||null;   // enlace de lectura (null = sin enlace, como siempre)
+  const msg=buildMsg(prov,side,lk?.url||'');
   if(!msg){toast('El pedido está vacío','err');return;}
   const contacts=(S.waContacts[prov]||[]).map(normalizeCostaRicaPhone).filter(Boolean);
   const p=getPedido(prov);
@@ -3034,7 +3043,7 @@ function sendWA(side='both'){
   else{sentPedido.sentByBranch[side]=true;sentPedido.sent=!!sentPedido.sentByBranch.moravia&&!!sentPedido.sentByBranch.angeles;}
   if(!sentPedido.notes)sentPedido.notes={};
   const sentAt=Date.now();
-  (side==='both'?['moravia','angeles']:[side]).forEach(s=>{sentPedido.notes['__sentAt_'+s]=sentAt;sentPedido.notes['__sentSnapshot_'+s]={qtys:JSON.parse(JSON.stringify(sentPedido.qtys?.[s]||{})),extras:JSON.parse(JSON.stringify(sentPedido.extras?.[s]||[])),at:sentAt};delete sentPedido.notes['__late_'+s];delete sentPedido.notes['__lateConfirmed_'+s];});
+  (side==='both'?['moravia','angeles']:[side]).forEach(s=>{sentPedido.notes['__sentAt_'+s]=sentAt;sentPedido.notes['__sentSnapshot_'+s]={qtys:JSON.parse(JSON.stringify(sentPedido.qtys?.[s]||{})),extras:JSON.parse(JSON.stringify(sentPedido.extras?.[s]||[])),at:sentAt};delete sentPedido.notes['__late_'+s];delete sentPedido.notes['__lateConfirmed_'+s];if(lk)sentPedido.notes['__link_'+s]={c:lk.c,at:sentAt};else delete sentPedido.notes['__link_'+s];});
   sentPedido.notes.__sentByBranch={...sentPedido.sentByBranch};
   pushHistoricoToSupabase(prov,side,tM,tA);
   renderProvStatus();renderHome();
@@ -4104,6 +4113,7 @@ if(isIOS && !isInStandalone && !dismissed){
 <script src="iconos.js?v=20261122-fase1"></script>
 <script src="aramo-ui.js?v=20261123-fase2"></script>
 <script src="express.js?v=20261125-diario1"></script>
+<script src="leido.js?v=1"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcode-generator/1.4.4/qrcode.min.js"></script>
 <script src="canasta-config.js?v=20261018-seguridad-1"></script>
 <script src="aramo-nube.js?v=20261125-catalogo1"></script>

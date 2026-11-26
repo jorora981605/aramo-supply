@@ -834,6 +834,32 @@ function xpPartes(sides,valores){
 const UNI_CORTA={unidad:'u',unid:'u','unid.':'u',unidades:'u',kg:'kg',paquete:'paq',rollo:'rollo',bolsa:'bolsa',caja:'caja',docena:'doc'};
 const uniCorta=u=>UNI_CORTA[String(u||'').toLowerCase()]||String(u||'');
 function sxColor(prov){return PDX_COLORES[[...String(prov)].reduce((h,c)=>(h*31+c.charCodeAt(0))%997,7)%PDX_COLORES.length];}
+// Dos botones en uno por proveedor: a la izquierda "Enviar a …" (se llena con la hora del envío) y a la derecha
+// "Sin leer" / "Leído" (la hora en que el proveedor abrió el enlace; lo pone leido.js). Si las dos tiendas se
+// enviaron en momentos distintos, cada hora lleva el nombre de su tienda.
+function sxDos(d){
+  const L=window.AramoLeido,gs=(L&&L.grupos(d.prov))||[];
+  const sep=gs.length>1||(gs.length===1&&gs[0].sides.length<2);   // hay que decir de cuál tienda es cada hora
+  const pre=g=>sep?`<em class="${g.sides.length===1?g.sides[0]:''}">${g.sides.map(s=>SIDE_NAME[s]).join(' y ')}</em> `:'';
+  const h=ms=>esc(L?L.hora(ms):'');
+  const izq=gs.length
+    ?`<span class="sx-dos-t">${sep?gs.map(g=>`${pre(g)}<b>✓ ${h(g.at)}</b>`).join(''):`<b>✓ Enviado</b><small>${h(gs[0].at)}</small>`}</span>`
+    :`<span class="sx-dos-t"><b>Enviar a ${esc(d.prov)}</b></span>`;
+  const hayLink=gs.some(g=>g.c),n=gs.reduce((t,g)=>t+(g.est?g.est.n:0),0);
+  let der,cls;
+  if(!gs.length){der='<b>Sin leer</b>';cls='sin off';}
+  else if(!hayLink){der='<b>Sin leer</b><small>sin enlace</small>';cls='sin off';}
+  else if(gs.some(g=>g.est)){
+    cls='leido';
+    der=sep?gs.map(g=>g.c?(g.est?`${pre(g)}<b>📖 ${h(g.est.l)}</b>`:`${pre(g)}<b>Sin leer</b>`):'').join('')
+      :`<b>📖 Leído</b><small>${h(gs.find(g=>g.est).est.l)}</small>`;
+    if(n>1&&!sep)der+=`<small>${n} aperturas</small>`;
+  }else{cls='sin';der=sep?gs.map(g=>g.c?`${pre(g)}<b>Sin leer</b>`:'').join(''):'<b>Sin leer</b><small>esperando</small>';}
+  const aria=!gs.length?'Todavía no se envió, no hay nada que leer':hayLink?(cls==='leido'?`${d.prov} ya abrió el pedido. Tocá para revisar de nuevo`:`${d.prov} todavía no abrió el pedido. Tocá para revisar`):'Este envío salió sin enlace de lectura';
+  const reenv=gs.length?'Reenviar':'Enviar';
+  return `<div class="sx-dos"><button type="button" class="sx-env sx-dos-env${gs.length?' hecho':''}" data-pd="send" data-prov="${esc(d.prov)}" aria-label="${reenv} el pedido a ${esc(d.prov)}${gs.length?'. Ya se envió':''}" title="${reenv} por WhatsApp">${gs.length?'':ico('enviar')}${izq}</button>
+    <button type="button" class="sx-dos-leido ${cls}" data-pd="leido" data-prov="${esc(d.prov)}"${gs.length?'':' disabled'} aria-label="${esc(aria)}"><span class="sx-dos-t">${der}</span></button></div>`;
+}
 function sxTarjeta(d,i,sides,modo){
   const p=S.pedidos[d.prov]||{};
   const cant=(q,s)=>`<b class="${s}${q>0?'':' cero'}">${q>0?fmtQ(q):'·'}</b>`;
@@ -850,7 +876,7 @@ function sxTarjeta(d,i,sides,modo){
     <header class="sx-card-h">
       <button type="button" class="sx-card-id" data-pd="open" data-prov="${esc(d.prov)}" title="Abrir ${esc(d.prov)}"><span class="sx-av">${esc(d.prov.charAt(0).toUpperCase())}</span><span class="sx-card-t"><b>${esc(d.prov)}</b><small><i></i>${d.sent?'Enviado':'Por enviar'} · ${plural(d.n,'producto','productos')}</small></span></button>
       ${d.tot?`<span class="sx-card-tot">₡${fmt(d.tot)}</span>`:''}
-      ${modo==='pedido'&&scopeSide()==='both'?`<button type="button" class="sx-env${d.sent?' hecho':''}" data-pd="send" data-prov="${esc(d.prov)}" aria-label="${d.sent?'Reenviar':'Enviar'} el pedido a ${esc(d.prov)}" title="${d.sent?'Reenviar':'Enviar'} por WhatsApp">${ico(d.sent?'listo':'enviar')}<span class="sx-env-label">${d.sent?'Reenviar':'Enviar'}</span></button>`:''}
+      ${modo==='pedido'&&scopeSide()==='both'?sxDos(d):''}
     </header>
     <div class="sx-chips">
       ${d.lines.map(l=>{const barato=Object.entries(sxPreciosDe(d.prov,l.prod).por).find(([,x])=>x.barato);return `<div class="sx-order-line"><button type="button" class="sx-chip" data-pd="line" data-prov="${esc(d.prov)}" data-pid="${esc(l.prod.id)}" aria-label="${esc(niceName(l.prod.name))}: ${sides.map(s=>SIDE_NAME[s]+' '+(l.q[s]||0)).join(', ')} ${esc(l.unit)}. Tocá para editar."><span class="sx-e">${smartEmoji(l.prod)}</span><span class="sx-n">${esc(niceName(l.prod.name))}</span><span class="sx-q">${sides.map(s=>cant(l.q[s],s)).join('')}<small>${esc(uniCorta(l.unit))}</small></span></button>${sides.filter(s=>l.q[s]>0).map(s=>`<button type="button" class="sx-line-del ${s}" data-pd="remove-line" data-prov="${esc(d.prov)}" data-pid="${esc(l.prod.id)}" data-side="${s}" aria-label="Quitar ${esc(niceName(l.prod.name))} del pedido de ${SIDE_NAME[s]}" title="Quitar de ${SIDE_NAME[s]}">×</button>`).join('')}${barato?`<small class="sx-best-price">Más barato en <b>${esc(barato[0])}</b> · ₡${fmt(barato[1].precio)}/${esc(barato[1].u)}</small>`:''}</div>`;}).join('')}
@@ -2129,6 +2155,7 @@ function xpPedidoClick(e){
   if(act==='line')return xpOpenSheet(prov,b.dataset.pid);
   if(act==='open')return openProv(prov);
   if(act==='send'){if(scopeSide()!=='both'){toast('El envío está disponible en la vista Ambos','err');return;}if(!buildMsg(prov,'both')){toast('El pedido está vacío','err');return;}S.currentProv=prov;sendWA('both');setTimeout(xpRefresh,250);return;}
+  if(act==='leido'){window.AramoLeido?.tocar(prov);return;}
   if(act==='chain')return xpStartChain();
   if(act==='allone'){sendAllPendingWA();setTimeout(xpRefresh,250);return;}
   if(act==='lista')return sendListaWA();
@@ -2179,7 +2206,7 @@ function xpClearSide(side){
       if(!k.startsWith('__archive_')&&(k.endsWith('__'+side)||k==='__note_'+side))delete p.notes[k];
       else if(side==='moravia'&&!k.startsWith('__')&&!k.includes('__'))delete p.notes[k];
     });
-    delete p.notes['__sentSnapshot_'+side];delete p.notes['__late_'+side];delete p.notes['__lateConfirmed_'+side];delete p.notes['__upd_'+side];
+    delete p.notes['__sentSnapshot_'+side];delete p.notes['__link_'+side];delete p.notes['__late_'+side];delete p.notes['__lateConfirmed_'+side];delete p.notes['__upd_'+side];
     if(side==='moravia')p.note='';
     if(!p.sentByBranch)p.sentByBranch={...sentFlags(p)};
     p.sentByBranch[side]=false;p.sent=!!p.sentByBranch.moravia&&!!p.sentByBranch.angeles;p.notes.__sentByBranch={...p.sentByBranch};
