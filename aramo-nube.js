@@ -283,19 +283,23 @@ async function subirSiSigue(o){
 // Reiniciar: borra todos los encargos en este equipo y en la nube (los ajustes de la tienda no se tocan).
 // La llave pública no puede borrar filas de la nube: cada una se vacía y queda marcada como borrada,
 // con una versión tan alta que ningún equipo atrasado la puede revivir.
-async function borrarTodo(){
+// borrarTodo() borra los pedidos de las dos tiendas; borrarTodo('moravia') o ('angeles') solo los de esa tienda (la otra queda igual).
+async function borrarTodo(sucursal){
   if(modo==='nube'&&(!authUser||!authPersonal)){console.warn('[nube] reinicio requiere sesion de personal');return 0;}
-  const t=now(),viejos={};
-  Object.values(store).forEach(o=>{viejos[o.id]=o.v||0;});
+  const t=now(),viejos={},de=o=>!sucursal||o?.sucursal===sucursal;
+  Object.values(store).forEach(o=>{if(de(o))viejos[o.id]=o.v||0;});
   if(modo==='nube'&&supa){
-    try{const r=await timeout(supa.from(TABLE).select('id,data').neq('id',TIENDA_ID),15000);(r.data||[]).forEach(x=>{viejos[x.id]=Math.max(viejos[x.id]||0,x.data?.v||0);});}catch(e){console.warn('[nube] reinicio sin leer la nube',e.message||e);}
+    try{const r=await timeout(supa.from(TABLE).select('id,data').neq('id',TIENDA_ID),15000);(r.data||[]).forEach(x=>{if(de(x.data))viejos[x.id]=Math.max(viejos[x.id]||0,x.data?.v||0);});}catch(e){console.warn('[nube] reinicio sin leer la nube',e.message||e);}
   }
   delete viejos[TIENDA_ID];
   const tumbas=Object.keys(viejos).map(id=>({id,borrado:t,estado:'borrado',v:viejos[id]+1e9,created:t,updated:t}));
-  tumbas.forEach(o=>{store[o.id]=o;pend.add(o.id);avisar(o);});
+  tumbas.forEach(o=>{store[o.id]=o;pend.add(o.id);if(sucursal)pendCambios.add(o.id);avisar(o);});
   persist();emit('encargo');
   if(modo==='nube'&&supa){
-    if(authUser&&authPersonal){try{const r=await timeout(supa.rpc('aramo_borrar_pedidos'),15000);if(r.error)throw new Error(r.error.message);tumbas.forEach(o=>pend.delete(o.id));}catch(e){console.warn('[nube] reinicio seguro falló',e.message||e);}}
+    if(authUser&&authPersonal){
+      if(sucursal){for(const o of tumbas){try{const r=await timeout(supa.rpc('aramo_cambiar_encargo',{p_id:o.id,p_data:o}),9000);if(r.error)throw new Error(r.error.message);pend.delete(o.id);pendCambios.delete(o.id);}catch(e){console.warn('[nube] reinicio de una tienda: no subió',o.id,e.message||e);}}}
+      else{try{const r=await timeout(supa.rpc('aramo_borrar_pedidos'),15000);if(r.error)throw new Error(r.error.message);tumbas.forEach(o=>pend.delete(o.id));}catch(e){console.warn('[nube] reinicio seguro falló',e.message||e);}}
+    }
     else console.warn('[nube] reinicio requiere sesión de personal');
     persist();
   }
@@ -353,6 +357,14 @@ function recetas(){
 function waDe(k){const t=tienda(),s=(t.sucursales||[]).find(x=>x.k===k);return s?.whatsapp||t.whatsapp||'';}
 // SINPE Móvil de cada local (si un local no tiene el suyo, se usa el de la tienda).
 function sinpeDe(k){const t=tienda(),s=(t.sucursales||[]).find(x=>x.k===k);return s?.sinpe?.numero?s.sinpe:(t.sinpe||{});}
+// A quién se le hizo el SINPE: la lista (nombre y número) que se arma en Ajustes → Pagos y SINPE. El POS de la tienda la lee.
+// Sin lista guardada trae UNA entrada: «ARAMO · 8584-8428» (el SINPE que usa La Feria).
+function sinpeDestinosDe(k){
+  const t=tienda(),s=(t.sucursales||[]).find(x=>x.k===k)||{};
+  const bruta=Array.isArray(s.sinpeDestinos)&&s.sinpeDestinos.length?s.sinpeDestinos:(Array.isArray(t.sinpeDestinos)?t.sinpeDestinos:[]);
+  const L=bruta.map(d=>({nombre:String(d?.nombre||'').replace(/\s+/g,' ').trim(),numero:String(d?.numero||'').replace(/\D/g,'')})).filter(d=>d.nombre||d.numero).map(d=>({...d,nombre:d.nombre||'SINPE'}));
+  return L.length?L:[{nombre:'ARAMO',numero:String(sinpeDe(k).numero||'').replace(/\D/g,'')||'85848428'}];
+}
 
 // ── Envío con Uber: estimado, reparto y aprendizaje del historial ──
 // Todo se calcula en el aparato (sin mapas ni servicios externos). La Feria y el Mostrador usan lo mismo.
@@ -463,6 +475,40 @@ function guardarTienda(cambios){
   try{bc&&bc.postMessage({t:'tienda',d});}catch{}
   emit('tienda');
   return subirTienda(d);
+}
+
+// ── Cobros del Mostrador → ARAMO POS (tabla aramo_pos_pendientes) ──
+// Cada cobro es una fila (id = pedido|fecha del cobro, así nunca se repite). La caja activa del POS de esa tienda la registra como
+// una venta más y marca registrado_at y venta. Si el Mostrador y el POS están en el mismo navegador, además va al instante
+// por localStorage (aramo_pos_pend_<tienda>). Sin internet se queda en una cola (aramo_pos_nube) y se reintenta.
+const PPKEY='aramo_pos_pend_',PNKEY='aramo_pos_nube';
+const posRest=(q,opc={})=>fetch(SUPA_URL+'/rest/v1/aramo_pos_pendientes'+q,{...opc,headers:{apikey:SUPA_KEY,Authorization:'Bearer '+SUPA_KEY,'Content-Type':'application/json',...(opc.headers||{})},signal:AbortSignal.timeout?AbortSignal.timeout(10000):undefined});
+let _posVaciando=false;
+async function posVaciar(){
+  if(_posVaciando)return false;_posVaciando=true;
+  try{
+    for(const f of read(PNKEY,[])){
+      try{
+        const r=await posRest('?on_conflict=id',{method:'POST',headers:{Prefer:'resolution=ignore-duplicates,return=minimal'},body:JSON.stringify({id:f.id,tienda:f.tienda,datos:f.datos})});
+        if(!r.ok&&r.status!==409)throw new Error('nube '+r.status);
+      }catch(e){break;}   // sin internet o sin la tabla: se reintenta más tarde
+      write(PNKEY,read(PNKEY,[]).filter(x=>x.id!==f.id));
+    }
+  }finally{_posVaciando=false;}
+  return read(PNKEY,[]).length===0;
+}
+function posEnviar(fila){
+  const f={id:String(fila.id),tienda:fila.tienda,datos:fila.datos,creado:now()};
+  const L=read(PPKEY+f.tienda,[]).filter(x=>x.id!==f.id);L.push(f);write(PPKEY+f.tienda,L.slice(-50));
+  const Q=read(PNKEY,[]).filter(x=>x.id!==f.id);Q.push(f);write(PNKEY,Q.slice(-100));
+  return posVaciar();
+}
+// Lo que el POS ya registró de esta tienda: [{id,venta,registrado_at}] (null si no hay internet o no existe la tabla)
+async function posRegistradas(tienda){
+  try{
+    const r=await posRest('?tienda=eq.'+encodeURIComponent(tienda)+'&registrado_at=not.is.null&select=id,venta,registrado_at&order=registrado_at.desc&limit=60');
+    if(!r.ok)return null;const a=await r.json();return Array.isArray(a)?a:null;
+  }catch(e){return null;}
 }
 
 // ── Enlaces que llevan el encargo adentro (para WhatsApp) ──
@@ -713,7 +759,7 @@ window.AramoNube={
   get:id=>store[id]&&!store[id].borrado?store[id]:null,
   modo:()=>modo,motivo:()=>motivo,pendientes:()=>pend.size,estadoEnvio,esperarEnvio,refrescarPedido,
   on:f=>{subs.add(f);return()=>subs.delete(f);},
-  tienda,guardarTienda,catalogo,recetas,waDe,sinpeDe,avisos,
+  tienda,guardarTienda,catalogo,recetas,waDe,sinpeDe,sinpeDestinosDe,posEnviar,posVaciar,posRegistradas,avisos,
   pack,unpack,enlace,
   envioCfg,estimarEnvio,repartoEnvio,costoRealUber,productosDe,ubiSuc,tarifaKmAprendida,distKm,
   nuevoId,nuevoRef,nuevoPin,colones,redondear5,qtyItem,totalDe,esAprox,telCR,wa,

@@ -179,6 +179,14 @@ function iniciarDia(){
     puede:()=>!!(POS&&dueno&&!soloLectura&&!muerto&&!iniciando)});}   // solo la caja activa calcula y publica
   catch(e){console.warn('[pos] resumen del día',e);}
 }
+// ── Cobros del Mostrador → ventas del POS, y la lista de a quién se le hizo el SINPE (pos-mostrador.js) ──
+function iniciarMostrador(){
+  if(!window.PosMostrador||!POS||!SUC)return;
+  try{window.PosMostrador.iniciar({url:SUPA_URL,key:SUPA_KEY,POS:()=>POS,suc:()=>SUC,
+    puede:()=>!!(POS&&dueno&&!soloLectura&&!muerto&&!iniciando&&!reiniciando),   // solo la caja activa registra
+    invoke:(c,...a)=>window.POSWEB.invoke(c,...a),lineas:feriaLineas,aviso});}
+  catch(e){console.warn('[pos] cobros del Mostrador',e);}
+}
 // ── Reinicio a cero (2026-11-26) ──
 // El dueño deja "todo en cero, como recién instalada" desde la nube: la tabla aramo_reinicio (id general, columna at) la cambia
 // solo su SQL. Aquí solo se LEE. Si `at` es más nuevo que la marca de este aparato (aramo_reinicio_visto_pos_<tienda>):
@@ -491,6 +499,7 @@ async function abrir(r,local){
   if(!bytes){sucio=true;cambios++;}
   await guardarLocal();
   iniciarDia();
+  iniciarMostrador();
   try{await revisarReinicio(true);}catch(e){console.warn('[pos] reinicio',e);}
   pintarCapa(null);
   listoRes();
