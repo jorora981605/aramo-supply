@@ -257,6 +257,13 @@ if(typeof window.setPrice==='function'){const _sp=window.setPrice;window.setPric
 const activos=()=>N.lista().filter(o=>!o.archivado&&!['entregado','cancelado'].includes(o.estado));
 const cerradosHoy=()=>N.lista().filter(o=>!o.archivado&&['entregado','cancelado'].includes(o.estado)&&esHoy(o.updated));
 function avance(o){const it=o.items||[],r=it.filter(x=>x.estado==='listo'||x.estado==='nohay').length;return{r,n:it.length};}
+// El Uber se pacta ANTES de pagar: con envío, la cotización no sale sin el costo real que la tienda ve en la app de Uber.
+const sinUber=o=>!!o?.retiro?.envio&&!(+o.retiro.envio.costoUber>0);
+function pedirUber(o){
+  toast('🛵 Antes de mandar la cotización poné el costo del Uber (mirá el precio en la app de Uber)');
+  if(M.abierto===o.id&&$('moSheet')?.classList.contains('open')){M.vista='encargo';repintar(pintarEncargo);}
+  setTimeout(()=>{const i=$('moUberReal');if(i){i.scrollIntoView({block:'center',behavior:'smooth'});i.focus({preventScroll:true});}},120);
+}
 const urgente=o=>o.estado!=='listo'&&minsA(o.retiro.at)<=15;
 const cobrado=o=>!!o.cobro||o.pago?.estado==='verificado';
 const qReal=it=>it.qr!=null&&it.qr!==''?+it.qr:+it.q;
@@ -592,6 +599,9 @@ const atrasado=o=>minsA(o.retiro.at)<0&&!['entregado','cancelado'].includes(o.es
 function faltas(o){
   const L=[],fase=N.faseDe?.(o)||'enviado';
   if(o.recibidoCliente&&!o.recibidoCliente.ok)L.push('Dice que NO lo recibió');
+  if(o.recibidoCliente?.ok&&o.estado==='listo')L.push('Dice que ya lo recibió');
+  if(o.recibidoTienda&&!o.recibidoCliente&&o.estado==='listo')L.push('Esperando que el cliente confirme');
+  if(camSin.has(o.id))L.push('Cambió su pedido');
   if(o.rechazo?.por==='cliente')L.push('Lo rechazó el cliente');
   if(o.pago?.metodo==='sinpe'&&!o.comprobante&&!cobrado(o)&&fase!=='confirmacion'&&(o.estado==='listo'||(o.estado==='alistando'&&N.definitivo?.(o))))L.push('Falta el comprobante');
   return L;
@@ -603,14 +613,20 @@ function siguiente(o){
   if(fase==='confirmacion'&&['alistando','listo'].includes(o.estado))return{acc:'abrir',txt:'Ver el pedido de '+nom,espera:true};
   if(o.estado==='alistando'){
     if(r<n)return{acc:'pesar',txt:r?'Seguir pesando':'Pesar el pedido'};
-    return fase==='recibido'?{acc:'listo',txt:'Enviar cotización a '+nom}:{acc:'marcar-listo',txt:'Lista · avisar a '+nom};
+    if(fase==='recibido')return sinUber(o)?{acc:'costo-uber',txt:'Poné el costo del Uber'}:{acc:'listo',txt:'Enviar cotización a '+nom};
+    return{acc:'marcar-listo',txt:'Lista · avisar a '+nom};
   }
   if(o.estado==='listo'){
-    if(env)return env.uber?{acc:'entregado-uber',txt:'El cliente ya la recibió'}:{acc:'uber',txt:'Pedir Uber'};
+    if(env){
+      if(o.recibidoCliente?.ok)return{acc:'confirmar-entrega',txt:'Confirmar entrega'};
+      if(!env.uber)return{acc:'uber',txt:'Pedir Uber'};
+      if(o.recibidoTienda&&!o.recibidoCliente)return{acc:'abrir',txt:'Ver el pedido de '+nom,espera:true};
+      return{acc:'recibido-tienda',txt:'El viaje dice que ya lo recibió'};
+    }
     return{acc:'entregar',txt:'Entregar a '+nom};
   }
   if(o.estado==='entregado'&&o.cobro)return{acc:'tiquete',txt:'Ver el tiquete'};
-  return{acc:'wa',txt:'Escribirle a '+nom};
+  return{acc:'cerrar',txt:'Cerrar'};
 }
 // El más urgente: el primer Nuevo; si no, el Alistando que más espera; si no, el Listo por entregar
 function masUrgente(g){
@@ -660,8 +676,8 @@ function tarjeta(o){
   const s=suc(o.sucursal),{n}=avance(o),fase=N.faseDe?.(o)||'enviado',F=faltas(o);
   const arrastrable=!['entregado','cancelado'].includes(o.estado);
   const espera=fase==='confirmacion'&&['alistando','listo'].includes(o.estado);
-  return `<button type="button" class="mo-card${urgente(o)?' urg':''}${sinAbrir.has(o.id)?' nuevo-flash':''}${M.marca?.id===o.id&&Date.now()<M.marca.hasta?' marcado':''}" data-mo="abrir" data-id="${o.id}" ${arrastrable?'draggable="true"':''}>
-    <span class="mo-card-i"><b class="nom">${esc(o.cliente.nombre)}${o.prueba?' <em class="mo-et">prueba</em>':''}${sinAbrir.has(o.id)?' <em class="mo-et n">nuevo</em>':''}</b>
+  return `<button type="button" class="mo-card${urgente(o)?' urg':''}${sinAbrir.has(o.id)||camSin.has(o.id)?' nuevo-flash':''}${M.marca?.id===o.id&&Date.now()<M.marca.hasta?' marcado':''}" data-mo="abrir" data-id="${o.id}" ${arrastrable?'draggable="true"':''}>
+    <span class="mo-card-i"><b class="nom">${esc(o.cliente.nombre)}${o.prueba?' <em class="mo-et">prueba</em>':''}${sinAbrir.has(o.id)?' <em class="mo-et n">nuevo</em>':''}${camSin.has(o.id)?' <em class="mo-et n">cambió</em>':''}</b>
       <small>${nProd(n)} · ${entregaTxt(o)}${M.suc==='todas'?' · '+esc(s?.zona||''):''}</small>
       <small class="${atrasado(o)?'tarde':''}">${esc(cuandoDe(o))} · ${esc(o.ref)}</small>
       ${espera?'<small>Esperando al cliente</small>':''}
@@ -710,24 +726,22 @@ function repintar(fn){const y=$('moSheet').scrollTop;fn();$('moSheet').scrollTop
 function abrirEncargo(id){
   M.abierto=id;M.vista='encargo';M.pin='';M.masD=false;
   if(sinAbrir.delete(id))guardarSinAbrir();
+  if(camSin.delete(id))guardarCamSin();
   pintarEncargo();pintarMostrador();pintarPuerta();
 }
+// WhatsApp es SOLO para mandar la cotización (si hace falta) o el total del sistema. Todo lo demás (aceptado, alistando, listo,
+// recibido, cancelado…) el cliente lo ve solo dentro de La Feria, sin mensajes.
 function msgCliente(o){
   const s=suc(o.sucursal),t=T(),tot=N.totalDe(o),link=N.enlace('canasta.html','e',o);
-  const hola=`¡Hola ${o.cliente.nombre.split(' ')[0]}! 👋`;
-  if(N.faseDe?.(o)==='confirmacion')return `${hola}\n🧾 La tienda ya pesó tu pedido ${o.ref}. La cotización es ${$c(tot)} (todavía no es el total definitivo). Abrí el pedido, revisala y confirmala o rechazala antes de pagar.\n\nVer pedido y confirmar 👉 ${link}`;
-  if(o.estado==='listo'){
+  const hola=`¡Hola ${o.cliente.nombre.split(' ')[0]}! 👋`,env=o.retiro.envio&&+o.retiro.envio.costo?` (incluye tu parte del envío con Uber: ${$c(o.retiro.envio.costo)})`:'';
+  if(N.faseDe?.(o)==='confirmacion')return `${hola}\n🧾 La tienda ya pesó tu pedido ${o.ref}. La cotización es *${$c(tot)}*${env}. Abrí el pedido, revisala y confirmala o rechazala en La Feria: ya confirmado, pagás por SINPE.\n\nVer pedido y confirmar 👉 ${link}`;
+  if(o.estado==='listo'||(o.estado==='alistando'&&N.definitivo?.(o))){
     const pago=o.pago.metodo==='sinpe'&&!cobrado(o)
       ?`\n📲 Pagá ${$c(tot)} por SINPE Móvil${(sp=>telDig(sp.numero)?' al '+fmtTel(sp.numero)+(sp.nombre?' ('+sp.nombre+')':''):'')(N.sinpeDe(o.sucursal))} con la descripción ${o.ref}.`
-      :o.pago.metodo==='link'&&t.linkTarjeta?`\n🔗 Pagá con tarjeta aquí: ${t.linkTarjeta}`:`\n💳 Total exacto: ${$c(tot)} (${(N.PAGOS[o.pago.metodo]?.n||'').toLowerCase()}).`;
-    const sin=o.items.filter(i=>i.estado==='nohay');
-    const donde=o.retiro.envio?(o.retiro.envio.uber?' y ya va en camino con Uber 🛵':'; ya pedimos el Uber a tu ubicación 🛵'):` en ${s?.n||'ARAMO'} (${s?.zona||''})`;
-    return `${hola}\n✅ Tu canasta ${o.ref} está *lista*${donde}.\n⚖️ Ya pesamos todo: el total exacto es ${$c(tot)}.${o.retiro.envio&&+o.retiro.envio.costo?` (incluye envío de ${$c(o.retiro.envio.costo)})`:''}${pago}${sin.length?`\n⚠️ No hubo: ${sin.map(i=>i.n+(i.sub?' → '+i.sub:'')).join(', ')}.`:''}${o.retiro.envio?'':'\n🧾 Mostrá tu código de retiro al llegar.'}\n\nSeguí tu pedido aquí 👉 ${link}`;
+      :o.pago.metodo==='link'&&t.linkTarjeta?`\n🔗 Pagá con tarjeta aquí: ${t.linkTarjeta}`:'';
+    return `${hola}\n⚖️ El total de tu pedido ${o.ref} es *${$c(tot)}*${env}.${pago}\n\nSeguí tu pedido aquí 👉 ${link}`;
   }
-  if(o.estado==='alistando')return `${hola}\n🧑‍🌾 Ya estamos escogiendo tu canasta ${o.ref}. Te avisamos cuando esté lista.\n\nSeguila aquí 👉 ${link}`;
-  if(o.estado==='entregado')return `${hola}\n🛍️ ¡Gracias por comprar en ${t.nombre||'ARAMO'}! Tu pedido ${o.ref} quedó entregado${o.cobro?` (pagado ${$c(o.cobro.total)})`:''}.`;
-  if(o.estado==='cancelado')return `${hola}\nTu pedido ${o.ref} quedó cancelado${o.motivo?': '+o.motivo:''}. Cualquier cosa nos escribís.`;
-  return `${hola}\n📥 Recibimos tu pedido ${o.ref}. Seguilo aquí 👉 ${link}`;
+  return `${hola}\nTe escribimos de ${t.nombre||'ARAMO'} sobre tu pedido ${o.ref}.`;
 }
 function pesoHtml(it,i,edit){
   const q=qReal(it),pr=precioIt(it),kgU=it.u==='kg';
@@ -739,7 +753,7 @@ function pesoHtml(it,i,edit){
   const sub=it.estado==='nohay'?0:q*pr;
   return `<div class="mo-it ${cls}">
     <span class="e">${it.e}</span>
-    <span class="t"><strong>${esc(it.n)}</strong><small>Pidió ${esc(pidio(it))} · <button type="button" class="mo-precio" data-mo="precio-it" data-i="${i}" ${edit?'':'disabled'}>${+pr>0?$c(pr)+(kgU?'/kg':' c/u'):'⚠️ Poné el precio'}</button>${it.mad?' · '+esc(MAD[it.mad]||''):''}${it.nota?' · 📝 '+esc(it.nota):''}</small>${difTxt}${alerta}</span>
+    <span class="t"><strong>${esc(it.n)}${it.cambio==='nuevo'?' <em class="mo-et n">nuevo</em>':it.cambio==='cant'?` <em class="mo-et n">cambió${it.qAntes!=null?' · antes '+esc(qtxt(it.qAntes,it.u)):''}</em>`:''}</strong><small>Pidió ${esc(pidio(it))} · <button type="button" class="mo-precio" data-mo="precio-it" data-i="${i}" ${edit?'':'disabled'}>${+pr>0?$c(pr)+(kgU?'/kg':' c/u'):'⚠️ Poné el precio'}</button>${it.mad?' · '+esc(MAD[it.mad]||''):''}${it.nota?' · 📝 '+esc(it.nota):''}</small>${difTxt}${alerta}</span>
     ${edit?`<span class="mo-peso"><label><small>${kgU?'Pesó (kg)':'Cantidad'}</small><input type="number" inputmode="decimal" step="${kgU?'0.005':'1'}" min="0" value="${esc(pesado?q:'')}" placeholder="${esc(fq(it.q))}" data-mo-q="${i}" aria-label="${kgU?'Peso real':'Cantidad real'} de ${esc(it.n)}"></label><b>${it.estado==='nohay'?'—':$c(sub)}</b></span><button type="button" class="mo-ck${it.estado==='listo'?' on':''}" data-mo="it-ok" data-i="${i}" aria-label="Listo">✓</button><button type="button" class="mo-ck no${it.estado==='nohay'?' on':''}" data-mo="it-no" data-i="${i}" aria-label="No hay">✕</button>`
       :`<span class="mo-peso"><small>${it.estado==='nohay'?'No hubo':kgU&&pesado?'Pesó':'Lleva'}</small><b>${it.estado==='nohay'?'—':esc(kgU&&pesado?kg(q)+' kg':qtxt(q,it.u))}</b><em>${it.estado==='nohay'?'₡0':$c(sub)}</em></span>`}
     ${edit&&it.estado==='nohay'?`<input class="sub" type="text" placeholder="Cambio por… (opcional)" value="${esc(it.sub||'')}" data-mo-sub="${i}">`:''}
@@ -751,6 +765,7 @@ function pesoHtml(it,i,edit){
 function sellarCotizacion(x,origen){
   const t=N.totalDe(x);
   x.estado='alistando';x.fase='confirmacion';x.totalFinal=t;delete x.confirmacion;
+  (x.items||[]).forEach(i=>{delete i.cambio;delete i.qAntes;});if(x.retiro?.envio)x.retiro.envio.fijo=true;
   x.cotizacion={at:new Date().toISOString(),total:t,totalAntes:N.totalAntesDe(x),por:quienAtiende(),...(origen?{origen}:{})};
   x._ev={tipo:'cot-enviada',monto:t};
 }
@@ -760,11 +775,11 @@ async function aplicarPOS(id,manual){
   if(!o||!d?.items?.length||['entregado','cancelado'].includes(o.estado))return false;
   const x=await N.cambiar(id,y=>{
     y.items=y.items.map((it,i)=>{const n=d.items.find(v=>v.k===it.k)||d.items[i];if(!n)return it;const q=Math.max(0,+n.q||0),p=Math.max(0,+n.p||it.p);return {...it,q0:it.q0??it.q,p0:it.p0??it.p,q,p,qr:q,estado:q===0?'nohay':'listo'};});
-    sellarCotizacion(y,'POS');
-  },'tienda','Cotización del POS enviada al cliente · esperando su confirmación');
+    if(!sinUber(y))sellarCotizacion(y,'POS'); // con envío, la cotización sale cuando se anota el costo del Uber
+  },'tienda','Cotización del POS aplicada · con envío falta el costo del Uber para mandarla');
   if(!x)return false;
   try{localStorage.removeItem(key);}catch{}
-  toast(`🧾 Cotización del POS enviada a ${x.cliente.nombre.split(' ')[0]} · ${$c(N.totalDe(x))} · esperando su confirmación`);
+  if(sinUber(x))pedirUber(x);else toast(`🧾 Cotización del POS enviada a ${x.cliente.nombre.split(' ')[0]} · ${$c(N.totalDe(x))} · esperando su confirmación`);
   if(M.abierto===id&&M.vista==='encargo'&&$('moSheet')?.classList.contains('open'))repintar(pintarEncargo);
   pintarMostrador();
   return true;
@@ -851,9 +866,13 @@ function pintarEncargo(){
   const posDraft=LS.get('aramo_pos_cotizacion_'+o.id,null);
   const posBox=`<div class="mo-pos-link"><button type="button" class="mo-btn w" data-mo="pos-pedido">🧾 Abrir este pedido en POS</button><small>Entra al POS como tiquete. Al «Guardar y volver», la cotización le llega sola al cliente.</small></div>`;
   const draftBox=posDraft?.items?.length?`<div class="mo-pos-link"><b>🧾 Hay una cotización devuelta desde POS</b><small>Revisá los cambios antes de enviarlos al cliente.</small><button type="button" class="mo-btn o w" data-mo="aplicar-pos">Aplicar cotización del POS</button></div>`:'';
-  const recBox=o.recibidoCliente?(o.recibidoCliente.ok?`<div class="mo-acc-nota ok"><b>✅ El cliente dice que ya lo recibió</b><br>${esc(fh(o.recibidoCliente.at))} · cerralo con el botón de abajo.</div>`:`<div class="mo-acc-nota mal"><b>⚠️ El cliente dice que NO lo recibió</b><br>${esc(fh(o.recibidoCliente.at))} · escribile o llamalo ya.</div>`):'';
+  const recBox=o.recibidoCliente?(o.recibidoCliente.ok?`<div class="mo-acc-nota ok"><b>✅ El cliente dice que ya lo recibió</b><br>${esc(fh(o.recibidoCliente.at))} · confirmá la entrega o tocá «No, revisar».</div>`:`<div class="mo-acc-nota mal"><b>⚠️ El cliente dice que NO lo recibió</b><br>${esc(fh(o.recibidoCliente.at))} · escribile o llamalo ya.</div>`):'';
   const sinpeBox=o.pago?.metodo==='sinpe'&&!cobrado(o)&&(o.estado==='listo'||(o.estado==='alistando'&&N.definitivo(o)))&&fase!=='confirmacion'
     ?`${comprobanteHtml(o)}<button type="button" class="mo-btn o w" data-mo="pagado" style="margin-bottom:8px">📲 Confirmar SINPE de ${$c(tot)}${o.pago.estado==='reportado'?' (el cliente dice que pagó)':''}</button>`:'';
+  const uc=o.ultimoCambio,hayCambio=!!uc&&['nuevo','alistando'].includes(o.estado)&&(!o.cotizacion||uc.at>o.cotizacion.at);
+  const cambioBox=hayCambio?`<div class="mo-cambio" id="moCambio"><b>✏️ ${esc(nom1)} cambió su pedido · ${esc(fh(uc.at))}</b><ul>${(uc.lineas||[]).map(l=>`<li>${esc(l)}</li>`).join('')}</ul><small>Total ${$c(uc.totalAntes)} → ${$c(uc.total)}${uc.envioAntes!==uc.envio?` · envío del cliente ${$c(uc.envioAntes)} → ${$c(uc.envio)} (es el mismo Uber)`:''}. Pesá solo lo marcado: lo que no cambió guarda su peso.</small></div>`:'';
+  const waBtn=txt=>`<button type="button" class="mo-btn w" data-mo="wa">💬 ${txt}</button>`;
+  const tiendaBox=o.recibidoTienda&&!o.recibidoCliente&&o.estado==='listo'?`<div class="mo-acc-nota"><b>📍 Marcaste que ya lo recibió</b><br>Esperando que ${esc(nom1)} lo confirme en La Feria (Sí / No).</div>`:'';
   const gran=(acc,txt)=>`<button type="button" class="mo-gran" data-mo="${acc}">${txt}</button>`;
   const quiet=(acc,txt)=>`<button type="button" class="mo-q" data-mo="${acc}">${txt}</button>`;
   // Arriba del cuerpo: avisos de la situación. Abajo (fijo): UN botón grande con el siguiente paso. «Más» guarda lo demás.
@@ -875,18 +894,19 @@ function pintarEncargo(){
   if(fase==='confirmacion'&&['alistando','listo'].includes(o.estado)){
     notas=`<div class="mo-acc-nota"><b>🧾 Cotización enviada al cliente</b><br>Está en Alistando: esperá su confirmación antes de cobrar o entregar. El total de la cotización es ${$c(tot)}.</div>`;
     pie=`<div class="mo-espera"><b>Esperando al cliente</b><small>${esc(nom1)} tiene que confirmar la cotización</small></div>`;qs=quiet('confirmar-tienda','📞 Ya aceptó por llamada o WhatsApp');
-    mas=`<button type="button" class="mo-btn w" data-mo="corregir-cot">↩︎ Corregir y volver a pesar</button>`;
+    mas=`${waBtn('Mandar la cotización por WhatsApp (si hace falta)')}<button type="button" class="mo-btn w" data-mo="corregir-cot">↩︎ Corregir y volver a pesar</button>`;
   }
   if(listoE){
-    notas=`${recBox}${sinpeBox}`;
-    pie=gran(sg.acc,(sg.acc==='uber'?'🚗 ':sg.acc==='entregado-uber'?'🛍️ ':'')+esc(sg.txt)+(sg.acc==='entregar'&&!cobrado(o)?' y cobrar':''));qs=env&&!env.uber?quiet('entregado-uber','🛍️ El cliente ya la recibió'):'';
-    mas=`${cobrado(o)?'<button type="button" class="mo-btn w" data-mo="tiquete">🧾 Tiquete</button>':`<button type="button" class="mo-btn w" data-mo="cobrar" data-id="${o.id}">🧾 Cobrar sin entregar</button>`}<button type="button" class="mo-btn w" data-mo="volver-alistar">↩︎ Volver a alistar</button>`;
+    notas=`${recBox}${tiendaBox}${sinpeBox}`;
+    pie=o.recibidoTienda&&!o.recibidoCliente&&env?.uber?`<div class="mo-espera"><b>Esperando al cliente</b><small>${esc(nom1)} tiene que confirmar en La Feria que lo recibió</small></div>`:gran(sg.acc,(sg.acc==='uber'?'🚗 ':['entregado-uber','confirmar-entrega','recibido-tienda'].includes(sg.acc)?'🛍️ ':'')+esc(sg.txt)+(sg.acc==='entregar'&&!cobrado(o)?' y cobrar':''));
+    qs=!env?'':o.recibidoCliente?.ok?quiet('revisar-entrega','No, revisar'):o.recibidoCliente?quiet('revisar-entrega','🔎 Revisar la entrega'):(o.recibidoTienda&&!o.recibidoCliente)?quiet('revisar-entrega','Quitar el aviso'):env.uber?quiet('entregado-uber','🛍️ Entregar sin esperar al cliente'):quiet('entregado-uber','🛍️ El cliente ya la recibió');
+    mas=`${o.pago?.metodo==='sinpe'&&!cobrado(o)?waBtn('Mandar el total por WhatsApp'):''}${cobrado(o)?'<button type="button" class="mo-btn w" data-mo="tiquete">🧾 Tiquete</button>':`<button type="button" class="mo-btn w" data-mo="cobrar" data-id="${o.id}">🧾 Cobrar sin entregar</button>`}<button type="button" class="mo-btn w" data-mo="volver-alistar">↩︎ Volver a alistar</button>`;
   }
   if(o.estado==='entregado'){
     pie=gran(sg.acc,esc(sg.txt));
     mas=sg.acc==='tiquete'?`<button type="button" class="mo-btn w" data-mo="wa">💬 Escribirle</button>`:'';
   }
-  if(o.estado==='cancelado')pie=gran('wa',esc(sg.txt));
+  if(o.estado==='cancelado')pie=gran('cerrar',esc(sg.txt));
   if(o.estado==='alistando'&&fase!=='confirmacion'&&sg.acc!=='pesar')mas=`<button type="button" class="mo-btn w" data-mo="pesar">⚖️ Pesar en caja</button>`+mas;
   qs+=quiet('cerrar','Cerrar');
   const masD=`<details class="mo-mas-d"${M.masD?' open':''}><summary>Más</summary><div class="mo-mas-in">
@@ -902,7 +922,7 @@ function pintarEncargo(){
   const banda=`<div class="mo-banda" style="--c:${COLBANDA[o.estado]||COLBANDA.cancelado}"><small>${esc(etq)} · ${esc(o.ref)}${o.prueba?' · prueba':''}</small><h2>${esc(o.cliente.nombre)}</h2><p>${nProd(n)} · ${entregaTxt(o)} · ${esc(s?.zona||'')}</p><div class="mo-banda-t"><span>${esc(cuandoDe(o))}</span><b>${N.esAprox(o)?'~':''}${$c(tot)}</b></div></div>`;
   abrirHoja(`${banda}<div class="mo-cuerpo">
     ${F.length?`<div class="mo-faltas">${F.map(x=>`<i class="mo-falta">${esc(x)}</i>`).join('')}</div>`:''}
-    ${draftBox}${notas}${activo?posBox:''}
+    ${cambioBox}${draftBox}${notas}${activo?posBox:''}
     <div class="mo-blk"><h4>Productos · ${r}/${n} revisados · si algo no hay: ${SUST[o.sust]||''}</h4>${o.items.map((it,i)=>pesoHtml(it,i,edit)).join('')}
       ${Math.abs(dif)>=5&&o.estado!=='nuevo'?`<div class="mo-tot m"><span>Ajuste por peso real (vs. ${$c(est)} aprox.)</span><span>${dif>0?'+':'−'}${$c(Math.abs(dif))}</span></div>`:''}
       ${o.retiro.envio&&+o.retiro.envio.costo?`<div class="mo-tot m"><span>🛵 Envío Uber · parte del cliente</span><span>${$c(o.retiro.envio.costo)}</span></div>`:''}
@@ -991,11 +1011,12 @@ function terminarPesaje(){
   const faltan=o.items.filter(x=>x.estado!=='listo'&&x.estado!=='nohay').length;
   if(faltan&&!confirm(`Faltan ${faltan} producto${faltan>1?'s':''}: se marcan como lo pidió el cliente. ¿Seguimos?`))return;
   borrarBorr(o.id,'pk');
-  N.cambiar(o.id,x=>{x.items.forEach(t=>{if(t.estado!=='listo'&&t.estado!=='nohay'){t.estado='listo';if(t.qr==null||t.qr==='')t.qr=t.q;}});sellarCotizacion(x);},'tienda','Pesado en caja · cotización enviada al cliente · esperando su confirmación').then(x=>{
+  const sinU=sinUber(o);
+  N.cambiar(o.id,x=>{x.items.forEach(t=>{if(t.estado!=='listo'&&t.estado!=='nohay'){t.estado='listo';if(t.qr==null||t.qr==='')t.qr=t.q;}});if(!sinUber(x))sellarCotizacion(x);},'tienda',sinU?'Pesado en caja · falta el costo del Uber para mandar la cotización':'Pesado en caja · cotización enviada al cliente · esperando su confirmación').then(x=>{
     if(!x)return;
     M.tab='alistando';M.vista='encargo';pintarEncargo();pintarMostrador();
+    if(sinU){pedirUber(x);return;}
     toast('🧾 '+x.ref+' · cotización '+$c(N.totalDe(x))+' enviada a '+x.cliente.nombre.split(' ')[0]+' · esperando su confirmación');
-    abrir(N.wa(x.cliente.tel,msgCliente(x)));
   });
 }
 document.addEventListener('keydown',e=>{
@@ -1009,19 +1030,28 @@ document.addEventListener('keydown',e=>{
 function envioHtml(o){
   const e=o.retiro.envio,s=suc(o.sucursal),d=.003,ub=N.ubiSuc(s),real=+e.costoUber>0,estU=+e.uberEst>0?+e.uberEst:0,cli=+e.costo||0;
   const totU=real?+e.costoUber:estU,tie=e.tienda!=null?+e.tienda:(totU?Math.max(0,totU-cli):null);
-  const cuenta=totU||cli?`<div class="mo-tot m"><span>${real?'Uber real':'Uber estimado'}</span><span>${$c(totU||cli)}</span></div><div class="mo-tot m"><span>Lo paga el cliente${e.pct&&e.pct<100?' ('+e.pct+' %)':''}</span><span>${$c(cli)}</span></div>${tie!=null?`<div class="mo-tot m o"><span>Lo pone ARAMO</span><span>${$c(tie)}</span></div>`:''}`:'';
+  // Después de que el cliente confirma el total o paga, el envío ya no cambia: lo que cobre el Uber de más lo pone la tienda
+  const fijo=!!(o.confirmacion?.at||o.comprobante||o.cobro||['reportado','verificado'].includes(o.pago?.estado));
+  const cuenta=totU||cli?`<div class="mo-tot m"><span>${real?'Uber cotizado':'Uber estimado'}</span><span>${$c(totU||cli)}</span></div><div class="mo-tot m"><span>Lo paga el cliente${e.pct&&e.pct<100?' ('+e.pct+' %)':''}</span><span>${$c(cli)}</span></div>${tie!=null?`<div class="mo-tot m o"><span>Lo pone ARAMO</span><span>${$c(tie)}</span></div>`:''}`:'';
+  const dif=e.difTienda!=null&&e.uberPedido?`<div class="mo-tot m"><span>Uber al pedirlo</span><span>${$c(e.uberPedido)}</span></div><div class="mo-tot m o"><span>${+e.difTienda>=0?'Diferencia que pone la tienda':'Salió más barato que lo pactado'}</span><span>${$c(Math.abs(+e.difTienda))}</span></div>`:'';
+  const costo=fijo
+    ?`<div class="mo-uber-paso"><b>🔒 Envío pactado: ya no cambia</b><small>El cliente confirmó el total con el Uber en ${$c(totU)} (él paga ${$c(cli)}). Si al pedirlo sale distinto, anotalo: la diferencia la pone la tienda.</small>
+      <label class="mo-field">¿Cuánto cobró el Uber al pedirlo? (₡)<input type="number" inputmode="numeric" min="0" step="50" placeholder="Pactado ${totU}" value="${e.uberPedido?+e.uberPedido:''}" id="moUberReal"></label>
+      <button type="button" class="mo-btn o w" data-mo="uber-costo" style="margin-top:6px">Anotar lo que cobró</button>${dif}</div>`
+    :`<div class="mo-uber-paso"><b>${real?'✅ Costo del Uber anotado':'1 · Poné el costo del Uber ANTES de mandar la cotización'}</b><small>El envío se pacta antes de que el cliente pague: la cotización lleva los productos más la parte del envío del cliente (menos de ${$c(N.envioCfg().repartoMin)} lo paga todo el cliente; desde ahí, mitad y mitad).${e.rango?` El cliente vio un rango de ${$c(e.rango.min)} a ${$c(e.rango.max)}.`:''}</small>
+      <button type="button" class="mo-btn w" data-mo="uber-precio">👀 Ver el precio en Uber (sin pedirlo)</button>
+      <label class="mo-field">Costo del Uber (₡) · lo que ves en la app de Uber<input type="number" inputmode="numeric" min="0" step="50" placeholder="${estU?'Estimado '+estU:'Ej.: 3500'}" value="${real?+e.costoUber:''}" id="moUberReal"></label>
+      <button type="button" class="mo-btn o w" data-mo="uber-costo" style="margin-top:6px">${real?'Cambiar el costo del Uber':'Guardar el costo del Uber'}</button>
+      <div class="mo-s" style="margin-top:6px">Queda en el historial que mejora el estimado.</div></div>`;
+  const puedePedir=fijo||o.estado==='listo';
   return `<div class="mo-blk"><h4>🛵 Envío con Uber</h4>
-    <button type="button" class="mo-btn w" data-mo="uber" style="margin-bottom:8px">📍 Ubicación del cliente · tocá para abrir Uber</button>
     <iframe class="mo-mapa" title="Ubicación del cliente" loading="lazy" src="https://www.openstreetmap.org/export/embed.html?bbox=${e.lng-d},${e.lat-d},${e.lng+d},${e.lat+d}&layer=mapnik&marker=${e.lat},${e.lng}"></iframe>
     <div class="mo-s" style="margin-top:8px">Sale de ${esc(s?.n||'')} ${fdia(o.retiro.at)} a las ${fh(o.retiro.at)} (${falta(o.retiro.at)})${e.acc?` · ubicación ±${e.acc} m`:''}</div>
     ${e.senas?`<div style="margin-top:6px;font-weight:800">📝 ${esc(e.senas)}</div>`:''}
     ${e.uber?`<div class="mo-s" style="margin-top:6px;color:var(--g);font-weight:900">✓ Uber pedido a las ${fh(e.uber)}</div>`:''}
-    <button type="button" class="mo-btn p w" style="margin-top:10px" data-mo="uber">🚗 ${e.uber?'Abrir Uber de nuevo':'Pedir Uber a esta ubicación'}</button>
+    ${cuenta}${costo}
+    ${puedePedir?`<button type="button" class="mo-btn p w" style="margin-top:10px" data-mo="uber">🚗 ${e.uber?'Abrir Uber de nuevo':'Pedir Uber a esta ubicación'}</button>`:'<div class="mo-s" style="margin-top:10px">🔒 El Uber se pide después de que el cliente confirme el total y pague.</div>'}
     <div class="mo-btns"><a class="mo-btn" href="${mapaUrl(e)}" target="_blank" rel="noopener">🗺️ Ver en mapa</a><button type="button" class="mo-btn" data-mo="copiar" data-v="${esc(mapaUrl(e)+(e.senas?' · '+e.senas:''))}">📋 Copiar dirección</button></div>
-    ${cuenta}
-    <label class="mo-field">¿Cuánto costó el Uber de verdad? (₡)<input type="number" inputmode="numeric" min="0" step="50" placeholder="${estU?'Estimado '+estU:'Ej.: 3500'}" value="${real?+e.costoUber:''}" id="moUberReal"></label>
-    <button type="button" class="mo-btn o w" data-mo="uber-costo" style="margin-top:6px">${real?'Cambiar el costo del Uber':'Guardar el costo del Uber'}</button>
-    <div class="mo-s" style="margin-top:6px">Se recalcula lo que paga el cliente con la regla del envío (pedido menor de ${$c(N.envioCfg().repartoMin)}: todo el cliente; desde ahí, ${100-(+N.envioCfg().repartoPct||50)} % ARAMO) y queda en el historial que mejora el estimado.</div>
     ${ub.exacta?'':'<div class="mo-s" style="margin-top:6px">💡 La tienda todavía no tiene su ubicación exacta: Uber toma como salida donde estás ahora. <button type="button" class="mo-btn" data-mo="tienda-gps" data-k="'+esc(o.sucursal)+'">📍 Guardar la ubicación de la tienda (estando aquí)</button></div>'}</div>`;
 }
 function pintarPin(o){
@@ -1660,7 +1690,7 @@ const ACT={
   rechazar(){
     const o=N.get(M.abierto);const m=prompt('¿Por qué no se puede hacer? (se lo decimos al cliente)','No tenemos varios productos hoy');
     if(m===null)return;
-    N.cambiar(o.id,x=>{x.estado='cancelado';x.motivo=m||'La tienda no pudo hacerlo';x.rechazo={por:'tienda',at:new Date().toISOString(),motivo:m||''};x._ev={tipo:'rechazado'};},'tienda','Rechazado: '+(m||'')).then(x=>{pintarEncargo();pintarMostrador();abrir(N.wa(x.cliente.tel,msgCliente(x)));});
+    N.cambiar(o.id,x=>{x.estado='cancelado';x.motivo=m||'La tienda no pudo hacerlo';x.rechazo={por:'tienda',at:new Date().toISOString(),motivo:m||''};x._ev={tipo:'rechazado'};},'tienda','Rechazado: '+(m||'')).then(x=>{pintarEncargo();pintarMostrador();toast('✖️ '+x.ref+' rechazado · el cliente lo ve en La Feria');});
   },
   // Enviar el pedido a la otra tienda: le aparece en su Mostrador y el cliente ve la tienda nueva
   'enviar-a'(el){
@@ -1690,8 +1720,7 @@ const ACT={
   'marcar-listo'(){
     N.cambiar(M.abierto,o=>{if(o.estado!=='alistando')return;o.estado='listo';o.totalFinal=N.totalDe(o);o._ev={tipo:'listo',monto:o.totalFinal};},'tienda','Pedido listo para entregar').then(o=>{
       if(!o)return;M.tab='listo';pintarEncargo();pintarMostrador();
-      toast('✅ '+o.ref+' lista · avisando a '+o.cliente.nombre.split(' ')[0]);
-      abrir(N.wa(o.cliente.tel,msgCliente(o)));
+      toast('✅ '+o.ref+' lista · '+o.cliente.nombre.split(' ')[0]+' lo ve en La Feria');
     });
   },
   'it-ok'(el){const i=+el.dataset.i;N.cambiar(M.abierto,o=>{const it=o.items[i];it.estado=it.estado==='listo'?'':'listo';if(it.estado==='listo'&&(it.qr==null||it.qr===''))it.qr=it.q;},'tienda').then(()=>{buzz(8);repintar(pintarEncargo);pintarMostrador();});},
@@ -1699,6 +1728,7 @@ const ACT={
   'sub-prop'(el){const o=N.get(M.abierto),i=+el.dataset.i;if(!o||o.sust!=='avisar')return toast('El cliente eligió otra opción para los faltantes');const it=o.items[i],nombre=prompt('¿Qué producto proponés en lugar de '+it.n+'?',N.catalogo().find(p=>p.k!==it.k&&!p.agotado)?.n||'');if(!nombre?.trim())return;const p=N.catalogo().find(x=>nrm(x.n)===nrm(nombre))||N.catalogo().find(x=>nrm(x.n).includes(nrm(nombre)));if(!p)return toast('No encontré ese producto en la vitrina');const precio=+prompt('Precio por '+(p.u==='kg'?'kg':'unidad'),String(p.p||0));if(!(precio>=0))return;N.cambiar(o.id,x=>{x.items[i].subPropuesta={k:p.k,n:p.n,e:p.e,u:p.u,q:x.items[i].q,p:precio};x.items[i].estado='nohay';},'tienda','Se propuso sustitución para '+it.n).then(()=>{repintar(pintarEncargo);pintarMostrador();toast('🔁 Propuesta enviada al cliente');});},
   'todo-ok'(){N.cambiar(M.abierto,o=>{o.items.forEach(it=>{if(it.estado!=='nohay'){it.estado='listo';if(it.qr==null||it.qr==='')it.qr=it.q;}});},'tienda').then(()=>{repintar(pintarEncargo);pintarMostrador();});},
   'todo-y-listo'(){
+    const o0=N.get(M.abierto);if(sinUber(o0)){pedirUber(o0);return;}
     N.cambiar(M.abierto,o=>{o.items.forEach(it=>{if(it.estado!=='nohay'){it.estado='listo';if(it.qr==null||it.qr==='')it.qr=it.q;}});sellarCotizacion(o);},'tienda','Cotización final enviada al cliente para confirmación').then(o=>{
       if(!o)return;
       M.tab='alistando';pintarEncargo();pintarMostrador();
@@ -1712,6 +1742,7 @@ const ACT={
     N.cambiar(o.id,x=>{x.items[i].pr=n;},'tienda',`Precio de ${it.n}: ${$c(n)}`).then(()=>{repintar(pintarEncargo);pintarMostrador();});
   },
   listo(){
+    const o0=N.get(M.abierto);if(sinUber(o0)){pedirUber(o0);return;}
     N.cambiar(M.abierto,o=>{sellarCotizacion(o);},'tienda','Cotización final enviada al cliente · esperando su confirmación').then(o=>{
       if(!o)return;
       M.tab='alistando';pintarEncargo();pintarMostrador();
@@ -1744,7 +1775,10 @@ const ACT={
   'wa-tiq'(){const o=N.get(M.abierto);abrir(N.wa(o.cliente.tel,'🧾 Tu tiquete de ARAMO\n\n'+tiqueteTexto(o)));},
   imprimir(){const o=N.get(M.abierto);imprimir(listaAlistado(o),'Lista para alistar · '+o.ref);},
   'imprimir-cierre'(){const {L,t,total}=resumenCaja();imprimir(`<p>${esc(M.suc==='todas'?'Ambas tiendas':sucNom(M.suc))} · ${new Date().toLocaleDateString('es-CR')}</p><table><tbody>${L.map(o=>`<tr><td>${fh(o.cobro.fecha)}</td><td>${esc(o.ref)}</td><td>${esc(o.cliente.nombre)}</td><td>${esc(N.PAGOS[o.cobro.metodo]?.n||'')}</td><td>${$c(o.cobro.total)}</td></tr>`).join('')}</tbody></table><p>Efectivo ${$c(t.efectivo)} · Tarjeta ${$c((t.tarjeta||0)+(t.link||0))} · SINPE ${$c(t.sinpe)} · <b>Total ${$c(total)}</b></p>`,'Cierre de pedidos del día');},
-  wa(){const o=N.get(M.abierto);if(o)abrir(N.wa(o.cliente.tel,msgCliente(o)));},
+  wa(){const o=N.get(M.abierto);if(o)abrir(N.wa(o.cliente.tel,msgCliente(o)));}, // el botón 💬: la cotización o el total, o un saludo
+  'costo-uber'(){const o=N.get(M.abierto);if(o)pedirUber(o);},
+  // Ver el precio del viaje en la app de Uber SIN pedirlo (así se pacta el envío antes de que el cliente pague)
+  'uber-precio'(){const o=N.get(M.abierto);if(!o?.retiro?.envio)return;abrir(uberLink(o));toast('👀 Mirá cuánto cobra Uber y anotalo abajo; todavía no se pide');},
   uber(){
     const o=N.get(M.abierto);if(!o?.retiro?.envio)return;
     abrir(uberLink(o));
@@ -1756,7 +1790,21 @@ const ACT={
     const o=N.get(M.abierto);if(!o?.retiro?.envio)return;
     const v=Math.round(+String($('moUberReal')?.value||'').replace(',','.'));
     if(!(v>0)){toast('Escribí cuánto costó el Uber');$('moUberReal')?.focus();return;}
-    N.costoRealUber(o.id,v).then(r=>{if(!r){toast('No se pudo guardar el costo');return;}repintar(pintarEncargo);pintarMostrador();const e=r.retiro.envio;toast(`🛵 Uber ${$c(v)} · el cliente paga ${$c(e.costo)} · ARAMO pone ${$c(e.tienda||0)}`);});
+    N.costoRealUber(o.id,v).then(r=>{if(!r){toast('No se pudo guardar el costo');return;}repintar(pintarEncargo);pintarMostrador();const e=r.retiro.envio;toast(e.uberPedido===v&&e.difTienda!=null?`🛵 Uber ${$c(v)} · diferencia con lo pactado: ${$c(e.difTienda)} (la pone la tienda, el cliente no paga más)`:`🛵 Uber ${$c(v)} · el cliente paga ${$c(e.costo)} · ARAMO pone ${$c(e.tienda||0)}`);});
+  },
+  // El cliente dijo que ya lo recibió: la tienda confirma la entrega o pide revisar
+  'confirmar-entrega'(){
+    const o=N.get(M.abierto);if(!o)return;
+    if(cobrado(o))entregar(o,'Entregado por Uber · el cliente confirmó que lo recibió');else abrirCobro(o.id,{entregar:true,desdePin:true});
+  },
+  'revisar-entrega'(){
+    const o=N.get(M.abierto);if(!o)return;
+    N.cambiar(o.id,x=>{delete x.recibidoCliente;delete x.recibidoTienda;x.revision={at:new Date().toISOString(),por:quienAtiende()};x._ev={tipo:'revision'};},'tienda','La tienda revisa la entrega: vuelve a En camino').then(()=>{pintarEncargo();pintarMostrador();toast('🔎 Vuelve a En camino con una nota para el cliente');});
+  },
+  // La tienda ve en el viaje de Uber que ya llegó: el cliente tiene que confirmarlo en La Feria (Sí / No)
+  'recibido-tienda'(){
+    const o=N.get(M.abierto);if(!o)return;
+    N.cambiar(o.id,x=>{x.recibidoTienda={at:new Date().toISOString(),por:quienAtiende()};delete x.recibidoCliente;delete x.revision;x._ev={tipo:'recibido-tienda'};},'tienda','La tienda marcó que el cliente ya lo recibió (según el viaje de Uber): espera su confirmación').then(()=>{pintarEncargo();pintarMostrador();toast('📍 Le preguntamos al cliente en La Feria si ya lo recibió');});
   },
   'entregado-uber'(){
     const o=N.get(M.abierto);if(!confirm(`¿${o.cliente.nombre} ya recibió ${o.ref}?`))return;
@@ -1934,7 +1982,7 @@ function vigilar(){
 const EVT={
   aceptado:['✅','Aceptado'],rechazado:['✖️','Rechazado por la tienda'],traspaso:['🔀','Pasó a otra tienda'],
   'cot-enviada':['🧾','Cotización enviada'],'cot-ok':['✅','El cliente confirmó la cotización'],'cot-no':['✖️','El cliente RECHAZÓ la cotización'],
-  agregado:['➕','El cliente agregó productos'],'sinpe-reportado':['📲','El cliente dice que pagó'],'sinpe-ok':['📲','SINPE confirmado'],
+  agregado:['➕','El cliente agregó productos'],cambiado:['✏️','El cliente cambió su pedido'],revision:['🔎','Revisando la entrega'],'recibido-tienda':['📍','Marcado como recibido por la tienda'],'uber-real':['🛵','Uber real anotado'],'sinpe-reportado':['📲','El cliente dice que pagó'],'sinpe-ok':['📲','SINPE confirmado'],
   cobro:['🧾','Cobrado'],entregado:['🛍️','Entregado'],listo:['✅','Pedido listo'],'recibido-ok':['✅','El cliente dice que ya lo recibió'],
   'recibido-no':['⚠️','El cliente dice que NO lo recibió'],'cancelado-cliente':['✖️','El cliente canceló el pedido'],
   'pos-venta':['🧾','Venta registrada en el POS'],uber:['🚗','Uber pedido'],
@@ -1942,14 +1990,24 @@ const EVT={
 function avisoEvento(o,l){
   const [e,t]=EVT[l.tipo],quien=l.by==='cliente'?'el cliente':(l.q||'la tienda');
   const detalle=[o.cliente?.nombre,l.monto!=null?$c(l.monto):'',l.metodo||'',l.tipo==='traspaso'?'de '+sucNom(l.de)+' a '+sucNom(l.a):'','por '+quien].filter(Boolean).join(' · ');
+  const nom1=String(o.cliente?.nombre||'').split(' ')[0];
+  if(l.tipo==='cambiado'){
+    toast(`✏️ ${nom1} cambió su pedido ${o.ref}${l.monto!=null?' · '+$c(l.monto):''}`);
+    if(R.sonido)N.avisos.mostrar(`✏️ ${nom1} cambió su pedido ${o.ref}`,l.txt||detalle,{tag:'ev-'+o.id+'-cambiado',fijo:true,url:new URL('APP.html#ver='+o.id,location.href).href});
+    camSin.add(o.id);guardarCamSin();campana(true);buzz([120,60,120,60,240]);return;
+  }
   toast(`${e} ${o.ref} · ${t}${l.monto!=null?' · '+$c(l.monto):''}`);
   if(R.sonido)N.avisos.mostrar(`${e} ${o.ref} · ${t}`,detalle,{tag:'ev-'+o.id+'-'+l.tipo,url:new URL('APP.html#ver='+o.id,location.href).href});
   if(['cot-no','recibido-no'].includes(l.tipo))buzz([200,100,200]);
+  if(['recibido-ok','recibido-no'].includes(l.tipo))campana(false);
 }
 // Lo que hace el cliente (confirmar o rechazar la cotización, subir el SINPE, "ya lo recibí", cancelar, agregar):
 // se detecta mirando cómo cambió el pedido, así avisa igual aunque la nube no haya anotado el renglón en la bitácora.
 const clVisto=new Map();
-const instClie=o=>({conf:o.confirmacion?.por==='cliente'?o.confirmacion.at:'',rech:o.rechazo?.por==='cliente'?o.rechazo.at:'',rec:o.recibidoCliente?o.recibidoCliente.at+'|'+o.recibidoCliente.ok:'',rep:o.pago?.estado==='reportado'?(o.pago.reportado||'1'):'',comp:o.comprobante?(o.comprobante.subido||'1'):'',canc:o.estado==='cancelado'&&!o.rechazo&&/cliente/i.test(o.motivo||'')?'1':'',n:(o.items||[]).length});
+// Pedidos que el cliente cambió y la tienda todavía no abrió: se ven con la marca «cambió» hasta que se abren
+const camSin=new Set(LS.get('aramo_cambios_sin_ver',[]));
+function guardarCamSin(){LS.set('aramo_cambios_sin_ver',[...camSin].slice(-60));}
+const instClie=o=>({conf:o.confirmacion?.por==='cliente'?o.confirmacion.at:'',rech:o.rechazo?.por==='cliente'?o.rechazo.at:'',rec:o.recibidoCliente?o.recibidoCliente.at+'|'+o.recibidoCliente.ok:'',rep:o.pago?.estado==='reportado'?(o.pago.reportado||'1'):'',comp:o.comprobante?(o.comprobante.subido||'1'):'',canc:o.estado==='cancelado'&&!o.rechazo&&/cliente/i.test(o.motivo||'')?'1':'',n:(o.items||[]).length,cam:o.ultimoCambio?.at||''});
 N.lista().forEach(o=>clVisto.set(o.id,instClie(o)));
 function vigilarCliente(){
   N.lista().forEach(o=>{
@@ -1961,7 +2019,8 @@ function vigilarCliente(){
     if(b.rec&&b.rec!==a.rec)ev.push({tipo:o.recibidoCliente.ok?'recibido-ok':'recibido-no',monto:tot});
     if(b.canc&&b.canc!==a.canc)ev.push({tipo:'cancelado-cliente',monto:tot});
     if((b.rep&&b.rep!==a.rep)||(b.comp&&b.comp!==a.comp))ev.push({tipo:'sinpe-reportado',monto:tot,metodo:b.comp?'SINPE · con comprobante':(N.PAGOS[o.pago?.metodo]||{}).n||''});
-    if(b.n>a.n&&o.estado==='nuevo')ev.push({tipo:'agregado',monto:tot});
+    if(b.cam&&b.cam!==a.cam)ev.push({tipo:'cambiado',monto:tot,txt:o.ultimoCambio?.txt});
+    else if(b.n>a.n&&o.estado==='nuevo')ev.push({tipo:'agregado',monto:tot});
     ev.forEach(l=>avisoEvento(o,{...l,by:'cliente'}));
   });
 }

@@ -151,7 +151,7 @@ html[data-theme="dark"] .bq-m.gratis{color:var(--ar-v300)}
 .bq-hondo{margin-top:16px;padding:24px 22px 22px;border-radius:30px;background:var(--verde-hondo);color:#fff}
 html[data-theme="dark"] .bq-hondo{box-shadow:inset 0 0 0 1.5px rgba(255,255,255,.14)}
 .bq-hondo small{display:block;font:700 18px/1.3 var(--ar-f-ui);opacity:.95}
-.bq-tot{display:block;margin:4px 0 20px;font:700 64px/1.02 var(--fraunces);letter-spacing:-.01em}
+.bq-tot{display:block;margin:4px 0 8px;font:700 64px/1.02 var(--fraunces);letter-spacing:-.01em}
 .bq-pagar{display:flex;align-items:center;justify-content:center;width:100%;min-height:70px;border-radius:20px;background:#fff;color:var(--verde-hondo);font:800 24px var(--ar-f-ui);box-shadow:0 8px 20px rgba(0,0,0,.18);transition:transform .16s var(--suave)}
 .bq-pagar:active{transform:scale(.98)}
 .bq-aviso{margin-top:14px;font:700 17px/1.35 var(--ar-f-ui);text-align:center;color:#fff;opacity:.95}
@@ -344,3 +344,31 @@ html[data-theme="dark"] .det-dir a{color:var(--ar-v300)}
   .mp-t{font-size:40px}
   .tl-suc{font-size:15px}
 }
+
+/* ── Primero se envía: total aproximado, cambiar un pedido ya enviado (mismo pedido, mismo Uber) ── */
+.bq-nota{margin:0 0 14px;font:700 17px/1.4 var(--ar-f-ui);opacity:.95}
+.bq-nota b{font-weight:800}
+.bq-tot+.bq-nota{margin-top:0}
+.franja-cambio{display:flex;align-items:center;justify-content:space-between;gap:12px;margin:10px 0 14px;padding:14px 18px;border-radius:20px;background:#b07a0c;color:#fff;font:600 16px/1.35 var(--ar-f-ui)}
+.franja-cambio span{display:flex;flex-direction:column;gap:2px;min-width:0}
+.franja-cambio b{font:800 20px/1.2 var(--ar-f-ui)}
+.franja-cambio small{font:600 15px/1.35 var(--ar-f-ui);opacity:.95}
+.fc-x{flex:none;min-height:48px;padding:0 16px;border-radius:14px;background:rgba(255,255,255,.2);color:#fff;font:800 16px var(--ar-f-ui)}
+.unir{margin-top:16px;padding:18px 20px;border-radius:26px;background:var(--ar-sup);border:2px solid #b07a0c;display:flex;flex-direction:column;gap:6px}
+.unir b{font:800 20px/1.25 var(--ar-f-ui);color:var(--ar-tinta)}
+.unir small{font:600 16px/1.4 var(--ar-f-ui);color:var(--ar-tinta-3);margin-bottom:8px}
+.unir .btn{min-height:64px;font-size:19px;background:#b07a0c;box-shadow:none}
+.cambio-res{margin:16px 0 8px;padding:18px 20px;border-radius:26px;background:var(--ar-sup);border:1px solid var(--ar-borde);box-shadow:var(--ar-s1)}
+.cambio-res ul{margin:8px 0 12px;padding-left:20px;font:700 18px/1.5 var(--ar-f-ui);color:var(--ar-tinta)}
+.cambio-res small{display:block;margin-top:8px;font:600 15px/1.45 var(--ar-f-ui);color:var(--ar-tinta-3)}
+.cr-vacio{font:700 18px/1.4 var(--ar-f-ui);color:var(--ar-tinta-3)}
+.cr-tot{display:flex;justify-content:space-between;align-items:baseline;gap:10px;font:800 19px var(--ar-f-ui)}
+.cr-tot b{font:700 34px/1.1 var(--fraunces)}
+.cambio-dejar{display:block;width:100%;margin:10px 0 0;min-height:52px;text-align:center;color:var(--ar-tinta-3);text-decoration:underline;font:700 17px var(--ar-f-ui)}
+.cambio-quitado .t{flex:1;min-width:0}
+.cambio-vacio{padding:16px;font:700 17px/1.4 var(--ar-f-ui);color:var(--ar-peligro-tinta)}
+.cambio-ofrece{margin-top:14px;display:flex;flex-direction:column;gap:6px}
+.cambio-ofrece .btn{min-height:64px;font-size:19px}
+.cambio-ofrece small,.cambio-nota{font:600 15px/1.4 var(--ar-f-ui);color:var(--ar-tinta-3);text-align:center}
+.cambio-nota{margin-top:12px}
+.mp-cambio{margin-top:14px;padding:14px 18px;border-radius:20px;background:var(--ar-sup);border:2px solid #b07a0c;font:700 17px/1.45 var(--ar-f-ui);color:var(--ar-tinta)}
