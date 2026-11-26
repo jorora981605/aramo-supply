@@ -280,11 +280,14 @@ function restaurar(lista){
 }
 
 // ── Ajustes de la tienda ──
+const ENVIO_DEF={activa:true,zona:'Moravia y alrededores',radioKm:8,tarifaBase:800,tarifaKm:380,uberMinimo:1800,factorCalle:1.35,minimo:0,repartoMin:10000,repartoPct:50,historial:[]};
 function tienda(){
   const base=clone(window.ARAMO_CANASTA?.tienda||{});
   const usar=(tiendaLocal&&(!tiendaNube||ts(tiendaLocal)>=ts(tiendaNube)))?tiendaLocal:tiendaNube;
   if(!usar)return base;
   const t={...base,...usar,sinpe:{...base.sinpe,...(usar.sinpe||{})}};
+  if(!String(t.sinpe.numero||'').replace(/\D/g,''))t.sinpe.numero=base.sinpe?.numero||''; // sin número guardado, vale el de fábrica
+  t.envioConfig={...ENVIO_DEF,...(base.envioConfig||{}),...(usar.envioConfig||{})};
   t.sucursales=(base.sucursales||[]).map(s=>({...s,...((usar.sucursales||[]).find(x=>x.k===s.k)||{})}));
   if(!authPersonal&&modo==='nube')delete t.acceso; // nunca le entregamos al cliente hashes de acceso del Mostrador
   return t;
@@ -322,6 +325,71 @@ function recetas(){
 function waDe(k){const t=tienda(),s=(t.sucursales||[]).find(x=>x.k===k);return s?.whatsapp||t.whatsapp||'';}
 // SINPE Móvil de cada local (si un local no tiene el suyo, se usa el de la tienda).
 function sinpeDe(k){const t=tienda(),s=(t.sucursales||[]).find(x=>x.k===k);return s?.sinpe?.numero?s.sinpe:(t.sinpe||{});}
+
+// ── Envío con Uber: estimado, reparto y aprendizaje del historial ──
+// Todo se calcula en el aparato (sin mapas ni servicios externos). La Feria y el Mostrador usan lo mismo.
+//   km por calle = km en línea recta × factorCalle
+//   Uber aprox.  = máx(uberMinimo, tarifaBase + km por calle × tarifaKm), redondeado hacia arriba a ₡100
+//   tarifaKm     = se mezcla con el promedio real de los últimos Ubers anotados (historial): con 5 o más, manda el real
+//   Reparto      = pedido < repartoMin → el cliente paga todo el envío; si no, el cliente paga repartoPct % y ARAMO el resto
+const envioCfg=()=>tienda().envioConfig;
+const esNum=v=>v!==null&&v!==''&&v!==undefined&&Number.isFinite(+v);
+function distKm(a,b){
+  if(!a||!b||!esNum(a.lat)||!esNum(a.lng)||!esNum(b.lat)||!esNum(b.lng))return null;
+  const R=6371,rad=x=>x*Math.PI/180,da=rad(b.lat-a.lat),dl=rad(b.lng-a.lng);
+  return 2*R*Math.asin(Math.sqrt(Math.sin(da/2)**2+Math.cos(rad(a.lat))*Math.cos(rad(b.lat))*Math.sin(dl/2)**2));
+}
+// La tienda: sus coordenadas y si son las exactas (guardadas estando ahí) o las aproximadas de fábrica
+function ubiSuc(s){
+  if(!s||!esNum(s.lat)||!esNum(s.lng))return{lat:null,lng:null,exacta:false};
+  const f=(window.ARAMO_CANASTA?.tienda?.sucursales||[]).find(x=>x.k===s.k)||{};
+  return{lat:+s.lat,lng:+s.lng,exacta:s.aprox===false||!(esNum(f.lat)&&+f.lat===+s.lat&&+f.lng===+s.lng)};
+}
+const sube100=x=>Math.ceil(Math.max(0,x)/100-1e-9)*100;
+const sube5=x=>Math.ceil(Math.max(0,x)/5-1e-9)*5;
+// ₡ por km que ya se aprendió de los Ubers reales (promedio de los últimos 10; con 5 o más, pesa todo)
+function tarifaKmAprendida(c=envioCfg()){
+  const f=Math.max(1,+c.factorCalle||1),H=(c.historial||[]).filter(h=>+h.km>=.3&&+h.costo>0).slice(-10);
+  if(!H.length)return{tk:Math.max(0,+c.tarifaKm||0),n:0,real:null};
+  const km=H.reduce((t,h)=>t+h.km*f,0),extra=H.reduce((t,h)=>t+Math.max(0,h.costo-(+c.tarifaBase||0)),0);
+  const real=km>0?extra/km:null,w=Math.min(1,H.length/5);
+  return{tk:real==null?Math.max(0,+c.tarifaKm||0):Math.max(0,(1-w)*(+c.tarifaKm||0)+w*real),n:H.length,real};
+}
+// Quién paga cuánto del Uber: pedido chico → todo el cliente; pedido grande → mitad y mitad (o el % que se ponga)
+function repartoEnvio(productos,uber,c=envioCfg()){
+  uber=Math.max(0,Math.round(+uber||0));
+  const min=Math.max(0,+c.repartoMin||0),bajo=(+productos||0)<min;
+  const pct=bajo?100:Math.min(100,Math.max(0,+c.repartoPct>=0?+c.repartoPct:50));
+  const cliente=Math.min(uber,sube5(uber*pct/100)); // se redondea hacia arriba: ARAMO nunca pone de más
+  return{uber,cliente,tienda:uber-cliente,pct,bajo,min};
+}
+function estimarEnvio(s,u,productos){
+  const c=envioCfg(),a=ubiSuc(s),km=a.lat==null?null:distKm(a,u),ap=tarifaKmAprendida(c);
+  const fuera=km!=null&&+c.radioKm>0&&km>+c.radioKm,kmCalle=km==null?null:km*Math.max(1,+c.factorCalle||1);
+  const crudo=(+c.tarifaBase||0)+(kmCalle||0)*ap.tk;
+  const uber=sube100(Math.max(+c.uberMinimo||0,crudo));
+  return{km,kmCalle,fuera,aprendidos:ap.n,tarifaKm:ap.tk,exacta:a.exacta,...repartoEnvio(productos,uber,c)};
+}
+// Total de productos de un pedido (sin envío ni premio), con el peso real si ya se pesó
+const productosDe=o=>redondear5((o?.items||[]).reduce((t,it)=>t+qtyItem(it)*(it.pr!=null&&it.pr!==''?+it.pr:+it.p||0),0));
+// La tienda anota cuánto costó de verdad el Uber: se recalcula la parte del cliente con la misma regla y se guarda en el historial
+async function costoRealUber(id,costo){
+  costo=Math.max(0,Math.round(+costo||0));
+  const o0=store[id];if(!o0?.retiro?.envio)return null;
+  const c=envioCfg(),e0=o0.retiro.envio,s=(tienda().sucursales||[]).find(x=>x.k===o0.sucursal);
+  const km=esNum(e0.km)?+e0.km:distKm(ubiSuc(s),e0);
+  const r=await cambiar(id,x=>{
+    const e=x.retiro.envio,rp=repartoEnvio(productosDe(x),costo,c);
+    e.costoUber=costo;e.costo=rp.cliente;e.tienda=rp.tienda;e.pct=rp.pct;e.estimado=false;
+    if(km!=null&&!esNum(e.km))e.km=+km.toFixed(2);
+  },'tienda','Uber real: ₡'+costo);
+  if(costo>0&&km!=null&&km>=.3){
+    const hist=(c.historial||[]).filter(h=>h.id!==id);
+    hist.push({id,km:+(+km).toFixed(2),costo,t:now(),s:o0.sucursal});
+    await guardarTienda({envioConfig:{...(tienda().envioConfig||{}),historial:hist.slice(-30)}});
+  }
+  return r;
+}
 
 // ── Avisos en el teléfono (notificación del sistema) ──
 const avisos={
@@ -553,6 +621,7 @@ window.AramoNube={
   on:f=>{subs.add(f);return()=>subs.delete(f);},
   tienda,guardarTienda,catalogo,recetas,waDe,sinpeDe,avisos,
   pack,unpack,enlace,
+  envioCfg,estimarEnvio,repartoEnvio,costoRealUber,productosDe,ubiSuc,tarifaKmAprendida,distKm,
   nuevoId,nuevoRef,nuevoPin,colones,redondear5,qtyItem,totalDe,esAprox,telCR,wa,
   ESTADOS,FASES,faseDe,PAGOS,NIVELES,lealtad,hojasDe,cuentaCliente,historial,telDe,
   authEstado,actualizarCuenta:refrescarAuth,registrarCorreo,entrarCorreo,recuperarCorreo,enviarCodigo,verificarCodigo,salir,direcciones,guardarDireccion,borrarDireccion,

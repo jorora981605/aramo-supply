@@ -81,3 +81,21 @@ html[data-theme="dark"] .cats .tab{background:color-mix(in srgb,var(--pc) 16%,va
 /* ── Ventana del producto y renglones de la canasta: el mismo plato neutro de las tarjetas ── */
 .ficha-e,.ficha.c-frutas .ficha-e,.ficha.c-verduras .ficha-e,.ficha.c-raices .ficha-e,.ficha.c-hierbas .ficha-e,.ficha.c-despensa .ficha-e{background:radial-gradient(circle at 50% 45%,var(--ar-sup) 0,var(--ar-sup-2) 78%);box-shadow:none}
 .li-e,.linea.c-frutas .li-e,.linea.c-verduras .li-e,.linea.c-raices .li-e,.linea.c-hierbas .li-e,.linea.c-despensa .li-e{background:var(--ar-sup-2);box-shadow:none}
+
+/* ── Envío con Uber (estimado y quién paga cuánto), factura electrónica y el botón que dice qué falta ── */
+.envio-est{font-size:16px;line-height:1.4;font-weight:800}
+.envio-est .reparte{display:block;margin-top:7px;font-size:15px;font-weight:600;color:var(--ink)}
+.envio-est .reparte b{font-weight:800}
+.envio-est small{display:block;margin-top:7px;font-size:13.5px;font-weight:500;line-height:1.45;color:var(--muted)}
+.envio-est.fuera{border-color:color-mix(in srgb,var(--o) 45%,transparent)}
+.envio-est.fuera .btn{margin-top:10px;min-height:52px}
+.resumen .reparte-r{margin:2px 0 4px;font-size:13px;line-height:1.5;color:var(--muted)}
+.resumen .reparte-r b{color:var(--ink);font-weight:700}
+.bar-in:has(.falta-b) .tk{flex:0 0 auto}
+.bar-in:has(.falta-b) .tk-ico{display:none}
+.bar .btn.falta-b{opacity:1;background:#fff3d6;color:#6b3f00;font-weight:800;flex:1 1 0;min-width:0;min-height:52px;padding:6px 14px;font-size:14.5px;line-height:1.2;white-space:normal;text-align:center}
+.factura-fields{grid-template-columns:1fr}
+.factura-fields input{min-height:48px;font-size:16px}
+.factura-fields .fac-tipo{flex-wrap:wrap}
+.factura-fields .fac-tipo button{min-height:44px;font-size:13px;white-space:normal;line-height:1.15}
+.factura-box .nota{display:block;margin-top:8px;color:var(--muted)}

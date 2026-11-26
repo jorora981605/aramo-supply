@@ -45,7 +45,7 @@ const C={
   retiro:Object.assign({suc:null,modo:'asap',dia:0,hora:null,carro:false,placa:'',entrega:'tienda',ubi:null,senas:'',visto:false},LS.get('cn_retiro',{})),
   perfil:Object.assign({nombre:'',tel:'',correo:''},LS.get('cn_perfil',{})),
   pago:Object.assign({metodo:'sinpe',conCuanto:0},LS.get('cn_pago',{})),infoOpen:!!LS.get('cn_info_open',false),
-  factura:Object.assign({quiere:false,cedula:'',correo:''},LS.get('cn_factura',{})),consent:!!LS.get('cn_consent',false),
+  factura:Object.assign({quiere:false,tipo:'fisica',cedula:'',nombre:'',correo:''},LS.get('cn_factura',{})),consent:!!LS.get('cn_consent',false),
   sust:LS.get('cn_sust','avisar'),
   nota:LS.get('cn_nota',''),
   mis:LS.get('cn_mis',[]),
@@ -152,12 +152,13 @@ function horarioDe(s,d=ahora()){
   return{abre:special?.abre||s?.abre,cierra:special?.cierra||s?.cierra};
 }
 function distKm(a,b){if(!a||!b)return null;const R=6371,rad=x=>x*Math.PI/180,da=rad(b.lat-a.lat),dl=rad(b.lng-a.lng);return 2*R*Math.asin(Math.sqrt(Math.sin(da/2)**2+Math.cos(rad(a.lat))*Math.cos(rad(b.lat))*Math.sin(dl/2)**2));}
-function envioEstimado(s,u){
-  const cfg={radioKm:8,tarifaBase:1500,tarifaKm:250,minimo:0,...(T().envioConfig||{})};
-  const km=distKm(s,u),fuera=km!=null&&cfg.radioKm>0&&km>cfg.radioKm;
-  const costo=km==null?+cfg.tarifaBase||0:Math.max(0,Math.round((+cfg.tarifaBase||0)+km*(+cfg.tarifaKm||0)));
-  return{...cfg,km,costo,fuera};
+// Estimado del envío con Uber (aramo-nube.js estimarEnvio): uber = lo que cuesta, cliente = lo que pagás vos (va en el pedido
+// como "costo"), tienda = lo que pone ARAMO. Depende de lo que llevás en la canasta (pedido chico: el envío es todo del cliente).
+function envioEstimado(s,u,prod){
+  const e=N.estimarEnvio(s,u,prod==null?cestaTotal():prod);
+  return{...N.envioCfg(),...e,costo:Math.max(0,+e.cliente||0)};
 }
+const kmTxt=k=>(Math.round((+k||0)*10)/10).toLocaleString('es-CR');
 const cumpleMinimo=()=>{const m=+T().envioConfig?.minimo||0;return cestaTotal()>=m;};
 
 // ══════════════ Horarios ══════════════
@@ -252,23 +253,34 @@ const perfilNombre=()=>{sincronizarPerfilAuth();return String(C.perfil.nombre||'
 const perfilTelefono=()=>String(C.perfil.tel||'').trim();
 const perfilCorreo=()=>String(C.perfil.correo||C.authEmail||N.authEstado?.().email||'').trim();
 const perfilOk=()=>perfilNombre().length>=2&&telDig(perfilTelefono()).length===8;
-function faltaArmar(){return disponibles().length?null:{m:cestaN()?'Lo de tu canasta se agotó: agregá otro producto':'Agregá al menos un producto',p:'armar',f:'tlQ'};}
+function faltaArmar(){return disponibles().length?null:{m:cestaN()?'Lo de tu canasta se agotó: agregá otro producto':'Agregá al menos un producto',b:'Agregá un producto para hacer el pedido',p:'armar',f:'tlQ'};}
 function faltaRetiro(){
-  if(!suc(C.retiro.suc))return{m:'Elegí la tienda',p:'entrega',f:'tlSecSuc'};
-  if(!horaRetiro())return{m:'Elegí la hora',p:'entrega',f:'tlSecHora'};
-  if(esEnvio()&&!C.retiro.ubi)return{m:'Falta tu ubicación para el envío',p:'entrega',f:'tlUbiBtn'};
-  if(esEnvio()&&T().envioConfig?.activa===false)return{m:'El envío a domicilio no está disponible hoy',p:'entrega',f:'tlSecEntrega'};
-  if(esEnvio()&&C.retiro.ubi){const e=envioEstimado(suc(C.retiro.suc),C.retiro.ubi);if(e.fuera)return{m:`Esta dirección queda fuera de la zona (${e.radioKm} km)`,p:'entrega',f:'tlSecUbi'};if(e.minimo>0&&!cumpleMinimo())return{m:`El pedido mínimo a domicilio es ${$c(e.minimo)}`,p:'canasta',f:'tlSecCesta'};}
+  if(!suc(C.retiro.suc))return{m:'Elegí la tienda',b:'Elegí la tienda para hacer el pedido',p:'entrega',f:'tlSecSuc'};
+  if(!horaRetiro())return{m:'Elegí la hora',b:'Elegí la hora para hacer el pedido',p:'entrega',f:'tlSecHora'};
+  if(esEnvio()&&!C.retiro.ubi)return{m:'Falta tu ubicación para el envío',b:'Compartí tu ubicación para el envío',p:'entrega',f:'tlUbiBtn'};
+  if(esEnvio()&&T().envioConfig?.activa===false)return{m:'El envío a domicilio no está disponible hoy',b:'El envío no está disponible hoy',p:'entrega',f:'tlSecEntrega'};
+  if(esEnvio()&&C.retiro.ubi){const e=envioEstimado(suc(C.retiro.suc),C.retiro.ubi);if(e.fuera)return{m:`Esta dirección queda fuera de la zona (${e.radioKm} km)`,b:'Fuera de la zona · elegí retiro en tienda',p:'entrega',f:'tlSecUbi'};if(e.minimo>0&&!cumpleMinimo())return{m:`El pedido mínimo a domicilio es ${$c(e.minimo)}`,b:`Pedido mínimo a domicilio ${$c(e.minimo)}`,p:'canasta',f:'tlSecCesta'};}
   return null;
 }
 function faltaDatos(){
-  if(perfilNombre().length<2)return{m:'Escribí el nombre de contacto',p:'datos',f:'tlDatosNom'};
-  if(telDig(perfilTelefono()).length!==8)return{m:'Escribí un teléfono de contacto de 8 números',p:'datos',f:'tlDatosTel'};
+  if(perfilNombre().length<2)return{m:'Escribí el nombre de contacto',b:'Escribí tu nombre para hacer el pedido',p:'datos',f:'tlDatosNom'};
+  if(telDig(perfilTelefono()).length!==8)return{m:'Escribí un teléfono de contacto de 8 números',b:'Escribí tu teléfono para hacer el pedido',p:'datos',f:'tlDatosTel'};
+  return null;
+}
+// Factura electrónica: tipo de cédula, número, nombre y correo (el CABYS va en cada producto, lo llena la tienda)
+const FAC_TIPOS=[['fisica','Persona física',[9]],['juridica','Persona jurídica',[10]],['dimex','Extranjero (DIMEX)',[11,12]]];
+const cedulaDig=t=>String(t||'').replace(/\D/g,'');
+function faltaFactura(){
+  const f=C.factura;if(!f.quiere)return null;
+  const tp=FAC_TIPOS.find(x=>x[0]===f.tipo)||FAC_TIPOS[0],d=cedulaDig(f.cedula);
+  if(!tp[2].includes(d.length))return{m:`La cédula de la factura lleva ${tp[2].join(' o ')} números`,b:'Revisá la cédula de la factura',p:'pago',f:'tlCedula'};
+  if(String(f.nombre||'').trim().length<3)return{m:'Escribí el nombre para la factura',b:'Escribí el nombre de la factura',p:'pago',f:'tlFacNom'};
+  if(!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(String(f.correo||'').trim()))return{m:'Escribí un correo válido para la factura',b:'Escribí el correo de la factura',p:'pago',f:'tlCorreo'};
   return null;
 }
 function faltaPago(){
-  if(C.factura.quiere&&(!C.factura.cedula.trim()||!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(C.factura.correo)))return{m:'Completá cédula y correo para la factura',p:'pago',f:'tlFactura'};
-  if(!C.consent)return{m:'Aceptá el aviso de privacidad y las condiciones',p:'pago',f:'tlConsent'};
+  const ff=faltaFactura();if(ff)return ff;
+  if(!C.consent)return{m:'Aceptá el aviso de privacidad y las condiciones',b:'Aceptá la privacidad para hacer el pedido',p:'pago',f:'tlConsent'};
   return null;
 }
 const faltaAlgo=()=>faltaArmar()||faltaRetiro()||faltaDatos()||faltaPago();
@@ -504,12 +516,21 @@ function mesaEntrega(){
   ${s?`<p class="grupo-h">¿Cuándo?</p><div class="opciones" id="tlSecHora">${opcion(r.modo==='asap','cuando','data-v="asap"'+(a?'':' disabled'),'⚡','Lo antes posible',a?(env?'Sale a las ':'Lista a las ')+fh(a):'Hoy ya no da')}${opcion(r.modo==='prog','cuando','data-v="prog"','🗓️','Programar','Elegí día y hora')}</div>
     ${r.modo==='prog'?`<div class="prog"><div class="chips">${[0,1,2].map(d=>`<button type="button" class="chip${r.dia===d?' on':''}" data-act="dia" data-d="${d}">${d===0?'Hoy':d===1?'Mañana':aFecha(2,0).toLocaleDateString('es-CR',{weekday:'long',...TZ})}</button>`).join('')}</div><div class="chips">${slots(s,r.dia).map(x=>`<button type="button" class="chip${r.hora&&+new Date(r.hora)===+x?' on':''}" data-act="hora" data-h="${x.toISOString()}">${fh(x)}</button>`).join('')||'<span class="nota">Ese día ya no hay horas. Probá otro.</span>'}</div></div>`:''}`:''}`;
 }
+// "Zona cubierta · ~X km · envío aprox. ₡Y" y quién paga cuánto (pedido < ₡10.000: todo el cliente; desde ahí, mitad y mitad)
+function reparteTxt(e){return `Envío aprox. <b>${$c(e.uber)}</b> · vos pagás <b>${$c(e.cliente)}</b> · ARAMO pone <b>${$c(e.tienda)}</b>`;}
+function envioEstHtml(e,u){
+  if(!e||!u)return `<div class="envio-est">🛵 ${esc(T().envioConfig?.zona||'Zona de entrega por confirmar')}${T().envioConfig?.radioKm?` · hasta ${kmTxt(T().envioConfig.radioKm)} km`:''}<small>Compartí tu ubicación y te mostramos cuánto sale el envío.</small></div>`;
+  if(e.fuera)return `<div class="envio-est fuera" id="tlFuera">⚠️ Esa dirección queda fuera de la zona<small>Está a ~${kmTxt(e.km)} km y llegamos hasta ${kmTxt(e.radioKm)} km.</small><button type="button" class="btn ghost w" data-act="entrega" data-v="tienda">🛍️ Mejor la retiro en la tienda</button></div>`;
+  const falta=Math.max(0,e.min-cestaTotal()),pct=100-e.pct;
+  const regla=e.bajo?(e.min>0?`En pedidos de menos de ${$c(e.min)} el envío lo pagás vos.${pct>0?` Con ${$c(falta)} más en productos, ARAMO pone ${pct===50?'la mitad':pct+' %'}.`:''}`:''):(e.tienda>0?`ARAMO pone ${pct===50?'la mitad':pct+' %'} del envío en pedidos desde ${$c(e.min)}.`:'');
+  return `<div class="envio-est" id="tlEnvioEst">🛵 Zona cubierta · ~${kmTxt(e.km)} km · envío aprox. ${$c(e.uber)}<span class="reparte">${reparteTxt(e)}</span>${regla?`<small>${regla}</small>`:''}<small>Es un cálculo aproximado según lo que suele cobrar Uber. La tienda confirma el monto final antes de salir${e.minimo?` · pedido mínimo ${$c(e.minimo)}`:''}.</small></div>`;
+}
 function mejorarEntrega(){
   if(C.paso!=='entrega'||C.actual||!esEnvio())return;
   const box=$('tlSecUbi'),s=suc(C.retiro.suc),u=C.retiro.ubi;if(!box)return;
   const e=s&&u?envioEstimado(s,u):null;
   const saved=C.direcciones.length?`<div class="dir-guardadas"><small>Direcciones guardadas</small>${C.direcciones.map(d=>`<button type="button" class="dir-chip${u&&Math.abs(+u.lat-d.lat)<.00001&&Math.abs(+u.lng-d.lng)<.00001?' on':''}" data-act="direccion" data-id="${esc(d.id)}">📍 ${esc(d.nombre)}</button>`).join('')}</div>`:'';
-  const extra=`${saved}<div class="envio-est">${e?`🛵 Zona cubierta · estimado ${$c(e.costo)}${e.minimo?` · mínimo ${$c(e.minimo)}`:''}<small>La tienda confirma el monto final del envío antes de salir.</small>`:`${esc(T().envioConfig?.zona||'Zona de entrega por confirmar')} · ${T().envioConfig?.radioKm?`hasta ${T().envioConfig.radioKm} km`:''}`}</div>${u&&N.authEstado?.().verificado?'<button type="button" class="link" data-act="guardar-direccion">Guardar esta dirección</button>':''}`;
+  const extra=`${saved}${envioEstHtml(e,u)}${u&&N.authEstado?.().verificado?'<button type="button" class="link" data-act="guardar-direccion">Guardar esta dirección</button>':''}`;
   box.insertAdjacentHTML('afterbegin',extra);
 }
 function mesaDatos(){
@@ -529,7 +550,9 @@ function mejorarPago(){
   if(C.paso!=='pago'||C.actual)return;
   const destino=$('tlFacturacion');if(!destino)return;
   if(!C.factura.correo)C.factura.correo=perfilCorreo();
-  const factura=`<p class="grupo-h">Factura electrónica <small>opcional</small></p><div class="factura-box" id="tlFactura"><label class="check-line"><input type="checkbox" id="tlFacturaOn" ${C.factura.quiere?'checked':''}> Quiero factura electrónica</label>${C.factura.quiere?`<div class="factura-fields"><input id="tlCedula" placeholder="Cédula" value="${esc(C.factura.cedula)}"><input id="tlCorreo" type="email" placeholder="Correo" value="${esc(C.factura.correo)}"></div>`:''}</div>`;
+  if(C.factura.quiere&&!C.factura.nombre)C.factura.nombre=perfilNombre();
+  const tp=FAC_TIPOS.find(x=>x[0]===C.factura.tipo)||FAC_TIPOS[0];
+  const factura=`<p class="grupo-h">Factura electrónica <small>opcional</small></p><div class="factura-box" id="tlFactura"><label class="check-line"><input type="checkbox" id="tlFacturaOn" ${C.factura.quiere?'checked':''}> Quiero factura electrónica</label>${C.factura.quiere?`<div class="factura-fields">${seg(FAC_TIPOS.map(([k,n])=>`<button type="button" class="${tp[0]===k?'on':''}" data-act="fact-tipo" data-v="${k}">${n}</button>`).join(''),'chico fac-tipo')}<input id="tlCedula" inputmode="numeric" autocomplete="off" maxlength="14" placeholder="Cédula (${tp[2].join(' o ')} números, sin guiones)" value="${esc(C.factura.cedula)}"><input id="tlFacNom" autocomplete="name" maxlength="80" placeholder="${tp[0]==='juridica'?'Razón social':'Nombre completo'}" value="${esc(C.factura.nombre||'')}"><input id="tlCorreo" type="email" autocomplete="email" maxlength="80" placeholder="Correo donde llega la factura" value="${esc(C.factura.correo)}"></div><small class="nota">Es opcional. Cada producto lleva su código CABYS cuando la tienda lo tiene cargado.</small>`:''}</div>`;
   const legal=`<label class="legal-check" id="tlConsent"><input type="checkbox" id="tlConsentOn" ${C.consent?'checked':''}> Acepto el <a href="privacidad.html" target="_blank" rel="noopener">aviso de privacidad</a> y las <a href="condiciones.html" target="_blank" rel="noopener">condiciones</a>.</label>`;
   if(!$('tlFactura'))destino.innerHTML=factura+legal;
 }
@@ -539,7 +562,7 @@ function mejorarHome(){
   const now=Date.now(),promos=(T().promos||[]).filter(p=>p&&(!p.hasta||Date.parse(p.hasta)>=now));
   const baseFaq=[
     {q:'¿Cuánto tarda?',a:'La app muestra la primera hora disponible de la tienda y también permite programar el pedido.'},
-    {q:'¿Cómo pago?',a:'Podés pagar por SINPE, efectivo, tarjeta o link cuando la tienda lo tenga habilitado.'},
+    {q:'¿Cómo pago?',a:'Por SINPE Móvil. Te mostramos el número y el monto al hacer el pedido.'},
     {q:'¿Dónde entregan?',a:'La app valida la zona y muestra una tarifa estimada antes de confirmar el pedido.'}
   ];
   const faq=baseFaq.map(x=>(T().faq||[]).find(f=>norm(f.q)===norm(x.q))||x);
@@ -570,6 +593,7 @@ function mesaPago(){
   const it=disponibles(),t=T(),s=suc(C.retiro.suc),env=esEnvio(),envio=env&&s&&C.retiro.ubi?envioEstimado(s,C.retiro.ubi):null,tot=cestaTotal(),n=it.length;
   const metodos=metodosPago();
   if(!metodos.some(([k])=>k===C.pago.metodo)){C.pago.metodo='sinpe';guardar();}
+  const eu=envio&&!envio.fuera?envio:null;
   const corto=m=>m.n.replace(' al recoger','').replace('Tarjeta en línea','Link de pago');
   const L=N.lealtad(),c=cuentaActiva()&&perfilOk()?miCuenta():null,ps=L.activa&&c?L.premios.filter(p=>c.saldo>=+p.hojas&&+p.valor<=tot):[];
   const pr=premioSel(),guardado=!pr&&C.premio&&L.premios.find(p=>p.k===C.premio);
@@ -579,8 +603,8 @@ function mesaPago(){
     <summary><span>📦 Información del pedido</span><b>${n} ${n===1?'producto':'productos'}</b></summary>
     <div class="info-pedido-inner"><div class="pedido-items">${filas}</div></div>
   </details>
-  <p class="grupo-h">Método de pago <small>el monto final se confirma al alistar</small></p>
-  <div class="opciones tres" id="tlSecPago">${metodos.map(([k,m])=>`<button type="button" class="opcion pago${C.pago.metodo===k?' on':''}" data-act="metodo" data-k="${k}"><span class="op-e">${m.e}</span><b>${esc(corto(m))}</b><i class="op-ck" aria-hidden="true"></i></button>`).join('')}</div>
+  <p class="grupo-h">${metodos.length>1?'Método de pago':'Cómo pagás'} <small>el monto final se confirma al alistar</small></p>
+  ${metodos.length>1?`<div class="opciones tres" id="tlSecPago">${metodos.map(([k,m])=>`<button type="button" class="opcion pago${C.pago.metodo===k?' on':''}" data-act="metodo" data-k="${k}"><span class="op-e">${m.e}</span><b>${esc(corto(m))}</b><i class="op-ck" aria-hidden="true"></i></button>`).join('')}</div>`:''}
   ${env?'<p class="nota-pago">🛵 El envío tiene una tarifa estimada. ARAMO confirmará el monto definitivo antes de salir.</p>':''}
   ${C.pago.metodo==='sinpe'?sinpeInfo(s):C.pago.metodo==='tarjeta'?`<p class="nota-pago">💳 Pagás con tarjeta (datáfono) al recoger en ${esc(nombreSuc(s)||'la tienda')}.</p>`:''}
   ${guardado&&c&&c.saldo>=+guardado.hojas?`<p class="nota-pago">🎁 Tu premio "${esc(guardado.n)}" se usa en pedidos desde ${$c(guardado.valor)}.</p>`:''}
@@ -590,7 +614,7 @@ function mesaPago(){
   <div class="grupo"><div class="g-fila">${seg(Object.entries(SUST).map(([k,x])=>`<button type="button" class="${C.sust===k?'on':''}" data-act="sust" data-k="${k}">${{avisar:'Avisame',similar:'Algo parecido',quitar:'Quitalo'}[k]||x.n}</button>`).join(''),'chico')}</div>
     <label class="g-fila"><span class="g-l">Nota</span><input id="tlNota" placeholder="Opcional: bolsas aparte…" value="${esc(C.nota)}" autocomplete="off"></label></div>
   <div id="tlFacturacion"></div>
-  <div class="resumen"><div><span>Productos</span><b>${$c(tot)}</b></div>${env?`<div><span>Envío estimado</span><b>${envio?$c(envio.costo):'elegí ubicación'}</b></div>`:''}${pr?`<div class="desc"><span>🎁 ${esc(pr.n)}</span><b>−${$c(pr.valor)}</b></div>`:''}<div class="tot"><span>Total estimado</span><b>${$c(totalPagar())}</b></div>${L.activa&&c?`<div class="gana"><span>🍃 Con este pedido ganás</span><b>~${hojasEstimadas()} ${hojasEstimadas()===1?'hoja':'hojas'}${L.dobles?' 🔥':''}</b></div>`:''}<p>El monto mostrado es estimado. ARAMO confirmará el monto definitivo después de alistar y pesar los productos.</p></div>
+  <div class="resumen"><div><span>Productos</span><b>${$c(tot)}</b></div>${env?`<div><span>Envío con Uber · tu parte</span><b>${eu?$c(eu.costo):envio?'fuera de zona':'elegí ubicación'}</b></div>${eu?`<p class="reparte-r">${reparteTxt(eu)}</p>`:''}`:''}${pr?`<div class="desc"><span>🎁 ${esc(pr.n)}</span><b>−${$c(pr.valor)}</b></div>`:''}<div class="tot"><span>Total estimado</span><b>${$c(totalPagar())}</b></div>${L.activa&&c?`<div class="gana"><span>🍃 Con este pedido ganás</span><b>~${hojasEstimadas()} ${hojasEstimadas()===1?'hoja':'hojas'}${L.dobles?' 🔥':''}</b></div>`:''}<p>El monto mostrado es estimado. ARAMO confirmará el monto definitivo después de alistar y pesar los productos.</p></div>
   <div class="estimado-box"><b>ℹ️ Total estimado</b><p>El monto definitivo se confirma después de que la tienda termine de alistar y pesar los productos. Si elegís SINPE, esperá esa confirmación antes de transferir.</p></div>`;
 }
 function sinpeInfo(s){
@@ -732,7 +756,8 @@ function pintarBar(){
     const ico=`<span class="tk-ico" id="tlTk">${it.slice(-3).map(x=>`<i>${foto(x.k,x.p.e)}</i>`).join('')}<em>${n}</em></span><span class="tk-t"><small>${P==='armar'?(n===1?'1 producto':n+' productos'):'Total estimado'}</small><strong id="tlTot">${$c(_totBar)}</strong></span>`;
     const tk=P==='armar'?`<button type="button" class="tk" data-act="siguiente" aria-label="Ver mi canasta">${ico}</button>`
       :P==='canasta'?`<div class="tk">${ico}</div>`:`<button type="button" class="tk" data-act="ir" data-p="canasta" aria-label="Ver mi canasta">${ico}</button>`;
-    const btn=P==='pago'?`<button type="button" class="btn${faltaAlgo()?' apagado':''}" data-act="pedir" id="tlSellar">Hacer pedido</button>`
+    const fl=P==='pago'?faltaAlgo():null;
+    const btn=P==='pago'?`<button type="button" class="btn${fl?' apagado falta-b':''}" data-act="pedir" id="tlSellar">${fl?esc(fl.b||fl.m):'Hacer pedido'}</button>`
       :`<button type="button" class="btn" data-act="siguiente">${P==='armar'?'Ver canasta':'Continuar'} <b aria-hidden="true">→</b></button>`;
     h=tk+btn;
   }
@@ -824,11 +849,12 @@ const mesTxt=d=>new Date(d).toLocaleDateString('es-CR',{month:'long',year:'numer
 // El premio apartado se aplica si alcanzan las hojas y el pedido es al menos del valor del descuento
 function cuentaActiva(){return!!N.authEstado?.().verificado;}
 function premioSel(){const L=N.lealtad();if(!C.premio||!L.activa||!cuentaActiva()||!perfilOk())return null;const p=L.premios.find(x=>x.k===C.premio);return p&&miCuenta().saldo>=+p.hojas&&+p.valor<=cestaTotal()?p:null;}
-function costoEnvioActual(){const s=suc(C.retiro.suc);return esEnvio()&&s&&C.retiro.ubi?envioEstimado(s,C.retiro.ubi).costo:0;}
-const totalPagar=()=>Math.max(0,cestaTotal()-(+premioSel()?.valor||0)+costoEnvioActual());
+function costoEnvioActual(){const s=suc(C.retiro.suc);if(!(esEnvio()&&s&&C.retiro.ubi))return 0;const c=+envioEstimado(s,C.retiro.ubi).costo;return Number.isFinite(c)?c:0;}
+const totalPagar=()=>{const t=Math.max(0,cestaTotal()-(+premioSel()?.valor||0)+costoEnvioActual());return Number.isFinite(t)?t:0;};
 function hojasEstimadas(){const L=N.lealtad();return L.activa&&cuentaActiva()?Math.floor(totalPagar()/L.porHoja)*(L.dobles?2:1):0;}
 // A domicilio solo se paga por SINPE Móvil (o con el link de pago, si la tienda lo tiene)
-function metodosPago(){const t=T(),env=esEnvio();return Object.entries(N.PAGOS).filter(([k])=>(k!=='link'||t.linkTarjeta)&&(!env||k==='sinpe'||k==='link'));}
+// Por ahora solo SINPE Móvil. Tarjeta, efectivo y link siguen preparados: se prenden con tienda.pagoTarjeta=true.
+function metodosPago(){const t=T(),env=esEnvio();return Object.entries(N.PAGOS).filter(([k])=>k==='sinpe'||(t.pagoTarjeta===true&&(k!=='link'||t.linkTarjeta)&&(!env||k==='link')));}
 const PERSONA='<svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="8" r="4"/><path d="M4 21a8 8 0 0 1 16 0"/></svg>';
 let _hojasVis=0;
 function filaPedido(o){
@@ -923,8 +949,10 @@ async function hacerPedido(){
   const s=suc(C.retiro.suc),h=horaRetiro(),pr=premioSel(),L=N.lealtad();
   if(s&&h&&T().capacidadPorHora){const hay=await N.cupoHorario?.(s.k,h,+T().capacidadPorHora);if(hay===false){toast('Esa hora ya se llenó. Elegí otra.');ir('entrega');return;}}
   const items=cestaItems().filter(x=>!x.p.agotado);
-  const envio=esEnvio()&&C.retiro.ubi?{...C.retiro.ubi,senas:(C.retiro.senas||'').trim(),costo:envioEstimado(s,C.retiro.ubi).costo}:null;
-  const itemData=items.map(x=>({k:x.k,n:x.p.n,e:x.p.e,u:x.p.u,q:x.qb,p:x.p.p,...(x.u!==x.p.u?{pide:{q:x.q,u:x.u}}:{}),mad:x.mad||'',nota:x.nota||''}));
+  const ee=esEnvio()&&C.retiro.ubi?envioEstimado(s,C.retiro.ubi):null;
+  // costo = lo que paga el cliente (suma en el total); uberEst = lo que se estima que cuesta el Uber; tienda = lo que pone ARAMO
+  const envio=ee?{...C.retiro.ubi,senas:(C.retiro.senas||'').trim(),costo:ee.costo,uberEst:ee.uber,tienda:ee.tienda,pct:ee.pct,km:ee.km==null?null:+(+ee.km).toFixed(2),estimado:true}:null;
+  const itemData=items.map(x=>({k:x.k,n:x.p.n,e:x.p.e,u:x.p.u,q:x.qb,p:x.p.p,cabys:String(x.p.cabys||''),...(x.u!==x.p.u?{pide:{q:x.q,u:x.u}}:{}),mad:x.mad||'',nota:x.nota||''}));
   const pedidosHoy=misPedidos().filter(o=>o.estado!=='cancelado'&&fechaClave(new Date(o.created||0))===fechaClave()).length;
   if(!C.editOrder&&pedidosHoy>=5){toast('Ya llegaste al máximo de 5 pedidos por día.');return;}
   if(C.editOrder){
@@ -958,7 +986,7 @@ async function hacerPedido(){
     cliente:{nombre:C.perfil.nombre.trim(),tel:telDig(C.perfil.tel),correo:C.perfil.correo||N.authEstado?.().email||''},
     retiro:{modo:C.retiro.modo,at:h.toISOString(),entrega:C.retiro.entrega,carro:C.retiro.entrega==='carro',placa:C.retiro.entrega==='carro'?C.retiro.placa.trim():'',envio},
     pago:{metodo:C.pago.metodo,conCuanto:C.pago.metodo==='efectivo'?+C.pago.conCuanto||0:0,estado:'pendiente'},
-    factura:C.factura.quiere?{cedula:C.factura.cedula.trim(),correo:C.factura.correo.trim()}:null,
+    factura:C.factura.quiere?{tipo:C.factura.tipo||'fisica',cedula:cedulaDig(C.factura.cedula),nombre:String(C.factura.nombre||'').trim().slice(0,80),correo:C.factura.correo.trim()}:null,
     consentimiento:{at:new Date().toISOString(),version:'2026-10-18'},
     sust:C.sust,nota:C.nota.trim(),
     items:itemData,
@@ -1073,10 +1101,11 @@ function ligar(){
   on('tlNota',v=>{C.nota=v;guardar();});
   on('tlSenas',v=>{C.retiro.senas=v;guardar();});
   on('tlPlaca',v=>{C.retiro.placa=v;guardar();});
-  on('tlCedula',v=>{C.factura.cedula=v;guardar();});
-  on('tlCorreo',v=>{C.factura.correo=v;guardar();});
+  on('tlCedula',v=>{C.factura.cedula=v;guardar();pintarBar();});
+  on('tlFacNom',v=>{C.factura.nombre=v;guardar();pintarBar();});
+  on('tlCorreo',v=>{C.factura.correo=v;guardar();pintarBar();});
   const fi=$('tlFacturaOn');if(fi)fi.addEventListener('change',e=>{C.factura.quiere=e.target.checked;guardar();render();});
-  const co=$('tlConsentOn');if(co)co.addEventListener('change',e=>{C.consent=e.target.checked;guardar();});
+  const co=$('tlConsentOn');if(co)co.addEventListener('change',e=>{C.consent=e.target.checked;guardar();pintarBar();});
   const info=$('tlInfoPedido');if(info)info.addEventListener('toggle',()=>{C.infoOpen=info.open;guardar();});
   on('tlUbiLink',v=>{const c=leerCoords(v);if(c){C.retiro.ubi=c;guardar();toast('📍 Ubicación lista');C.pulso=true;render();}else if(v.length>12)toast('Ese link no trae la ubicación; usá el botón 📍');});
 }
@@ -1153,6 +1182,7 @@ const ACT={
   direccion(el){const d=C.direcciones.find(x=>x.id===el.dataset.id);if(!d)return;C.retiro.ubi={lat:+d.lat,lng:+d.lng,acc:null};C.retiro.senas=d.senas||'';guardar();render();},
   'guardar-direccion'(){guardarDireccionActual();},
   metodo(el){C.pago.metodo=el.dataset.k;guardar();C.pulso=true;render();},
+  'fact-tipo'(el){C.factura.tipo=el.dataset.v;guardar();render();},
   con(el){C.pago.conCuanto=+el.dataset.v;guardar();render();},
   'edit-perfil'(){abrirHoja({tipo:'perfil',editar:true});setTimeout(()=>$('tlPNom')?.focus(),60);},
   pedir(){hacerPedido();},
