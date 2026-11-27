@@ -41,7 +41,7 @@
        aramo_local_sesion (tienda escogida) · aramo_mi_wa (mi WhatsApp) · aramo_pdf_auto y aramo_pdf_firma
        (firma del PDF) · aramo_leido_enlace / _ok / _permiso (interruptor y estado del "Leído")
        aramo_theme · aramo_letras · aramo_portada · aramo_portada_foto · pwa_dismissed · pwaInstallBanner
-       aramo_cat_nube (copia del catálogo) · aramo_tienda_v1 (ajustes de la tienda) · aramo-nube-auth y
+       aramo_cat_nube (copia del catálogo) · aramo_tienda_v1 y aramo_tienda_nube_v1 (ajustes de la tienda) · aramo-nube-auth y
        sb-* (inicio de sesión) · aramo_anon_id · avisos activados (permiso del navegador, no se guarda aquí)
 
    MOSTRADOR  (APP.html + puerta.js + aramo-nube.js)
@@ -50,6 +50,7 @@
        aramo_encargos_pend      pedidos por subir a la nube
        aramo_encargos_changes   cambios por subir (cambios pendientes)
        aramo_sin_abrir          pedidos "sin abrir" (de ahí sale la alarma y la insignia)
+       aramo_cambios_sin_ver    cambios que el cliente hizo a un pedido y nadie ha visto
        aramo_borradores         borradores de pedidos a medio alistar (caja y ajustes de cada pedido)
        aramo_reinicio_respaldo  el "Deshacer reinicio" de pedidos (trae pedidos viejos)
        aramo_pos_encargo        pedido que se estaba pasando al POS
@@ -57,7 +58,8 @@
        aramo_pos_cotizacion_*   cotizaciones que vuelven del POS
        aramo_pos_venta_*        ventas del POS que vuelven al Mostrador
      SE QUEDA
-       aramo_tienda_v1 (sucursales, horarios, envío, margen, SINPE) · aramo_receptor (sonido y qué tienda
+       aramo_tienda_v1 y aramo_tienda_nube_v1 (ficha de la tienda: sucursales, horarios, envío, margen,
+       SINPE; la segunda es la copia de la nube guardada en el teléfono) · aramo_receptor (sonido y qué tienda
        escucha) · aramo_atiende (quién atiende) · aramo_avisos_franja · aramo_vit_notas (notas de la
        vitrina de productos) · aramo_local / aramo_local_sesion · aramo_theme · aramo_portada_foto ·
        aramo_cat_nube · inicio de sesión del personal (aramo-nube-auth, sb-*)
@@ -67,6 +69,8 @@
        cn_cesta        la canasta
        cn_mis          la lista de "mis pedidos" de este aparato
        cn_nota         la nota del pedido en curso
+       cn_cambio       el estado de "Cambiar mi pedido" / "Agregando a tu pedido" (trae la canasta anterior)
+       cn_cot_vistas   las cotizaciones que el cliente ya había visto
        cn_premio       el premio escogido para el próximo pedido
        cn_pago         SOLO `conCuanto` (con cuánto paga); el método de pago preferido se queda
        cn_retiro       SOLO `hora` y `dia` (la hora que se había escogido); tienda, entrega, ubicación y
@@ -100,12 +104,12 @@ const DEFS={
     parciales:{aramo4:{pedidos:{}}}
   },
   mostrador:{
-    claves:[...ENCARGOS,'aramo_sin_abrir','aramo_borradores','aramo_reinicio_respaldo','aramo_pos_encargo'],
+    claves:[...ENCARGOS,'aramo_sin_abrir','aramo_cambios_sin_ver','aramo_borradores','aramo_reinicio_respaldo','aramo_pos_encargo'],
     prefijos:['aramo_pos_feria_','aramo_pos_cotizacion_','aramo_pos_venta_'],
     parciales:{}
   },
   feria:{
-    claves:[...ENCARGOS,'cn_cesta','cn_mis','cn_nota','cn_premio'],
+    claves:[...ENCARGOS,'cn_cesta','cn_mis','cn_nota','cn_premio','cn_cambio','cn_cot_vistas'],
     prefijos:[],
     parciales:{cn_pago:{conCuanto:0},cn_retiro:{hora:null,dia:0}}
   }
