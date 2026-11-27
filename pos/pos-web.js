@@ -57,6 +57,7 @@ window.POSWEB={
     const fn=HANDLERS[c];
     if(!fn)throw new Error('Esta función no está disponible en la web: '+c);
     const result=await fn({sender:null},...a);
+    if(ESCRIBE.has(c)&&window.PosDia){try{window.PosDia.cambio(c,a,result);}catch(e){console.warn('[pos] resumen del día',e);}}
     if(c==='ventas:crear'||c==='ventas:anular'||c==='ventas:devolver_item'||c==='fiados:abonar'||c==='fiados:anular_pago'){
       const fecha=result?.fecha?String(result.fecha).slice(0,10):posFechaISO();
       setTimeout(()=>{posPublicarResumen(fecha);},0);
@@ -358,6 +359,7 @@ async function colaProcesar(){
         if(NO_COLA.has(fl.c)||!ESCRIBE.has(fl.c)||!HANDLERS[fl.c])throw new Error('Eso solo se hace en el aparato que tiene la caja.');
         res=await HANDLERS[fl.c]({sender:null},...(Array.isArray(fl.args)?fl.args:[]));
         if(/^ventas:|^fiados:/.test(fl.c))fechas.add(res?.fecha?String(res.fecha).slice(0,10):posFechaISO());
+        if(window.PosDia){try{window.PosDia.cambio(fl.c,Array.isArray(fl.args)?fl.args:[],res);}catch(e){}}
       }catch(e){estado='error';res={error:String(e?.message||e)};}
       POS.prepare('INSERT OR REPLACE INTO pos_cola_hecho (id,c,estado,res,disp) VALUES (?,?,?,?,?)').run([fl.id,fl.c,estado,JSON.stringify(res??null),fl.disp||'']);
       hechos.push({id:fl.id,estado,res});
@@ -393,6 +395,7 @@ async function tomarSolo(){
   if(+t.version>version&&!(await refrescarBase(t,true)))return false;
   dueno=true;soloLectura=false;nuevos=false;LS.set('pos_dueno_'+SUC,true);
   aviso('💳 La caja de '+zona(SUC)+' pasó a este aparato (el otro no respondía).');
+  try{window.PosDia&&window.PosDia.alIniciar();}catch(e){}
   pintarEstado();emitir();
   return true;
 }
@@ -403,7 +406,7 @@ async function refrescarBase(r,forzar){
   if(sucio){if(!forzar)return false;await guardarConflicto({bytes:POS.exportar(),version},'antes de traer la copia nueva');}
   COLA.refrescando=true;
   try{
-    const bytes=await bajar(+r.version,+r.partes,true);
+    const bytes=await bajar(+r.version,+r.partes||+(info&&info.version===r.version&&info.partes)||1,true);
     BYTES=bytes;iniciando=true;await POS.initDB();iniciando=false;
     version=+r.version;sucio=false;nuevos=false;
     await guardarLocal();
@@ -581,12 +584,13 @@ async function abrir(r,local){
   montarPedidoWeb();
   pintarEstado();
   if(sucio&&dueno)programarSubida();
+  if(window.PosDia){try{window.PosDia.iniciar({url:SUPA_URL,key:SUPA_KEY,POS:()=>POS,suc:()=>SUC,puede:()=>dueno&&!soloLectura&&!muerto});window.PosDia.alIniciar();}catch(e){console.warn('[pos] resumen del día',e);}}
   colaProbar().then(si=>{if(!si&&!dueno&&info?.dueno)aviso('👀 La caja de '+zona(SUC)+' está abierta en '+(info.dueno_nombre||'otro dispositivo')+'. Aquí podés mirar; para cobrar, tocá el estado y «Usar la caja aquí».');});
   setInterval(latido,LATIDO);
   setInterval(colaVuelta,2000);
   window.addEventListener('online',()=>{if(!supa)supa=crearSupa();latido();});
-  document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='hidden'){guardarLocal();subir();}else latido();});
-  window.addEventListener('pagehide',()=>{guardarLocal();subir();});
+  document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='hidden'){guardarLocal();subir();if(window.PosDia)window.PosDia.vaciar();}else latido();});
+  window.addEventListener('pagehide',()=>{guardarLocal();subir();if(window.PosDia)window.PosDia.vaciar();});
 }
 async function pedirClave(msg){
   pintarCapa('clave',msg||'');

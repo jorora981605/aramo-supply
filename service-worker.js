@@ -1,4 +1,4 @@
-const CACHE_NAME = 'aramo-shell-v87-control-pos-celular';
+const CACHE_NAME = 'aramo-shell-v88-pos-compartido';
 const CDN_CACHE = 'aramo-cdn-v1';
 // Las páginas: al instalar se guardan junto con TODOS los archivos que cargan,
 // tal cual los piden (con su ?v=…). Así cada pantalla abre sin esperar a internet.

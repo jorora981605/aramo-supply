@@ -224,6 +224,16 @@ html[data-theme="dark"] .cb-body{
 .cb-visor-s{min-height:28px;display:flex;align-items:baseline;justify-content:center;gap:10px;font:600 15.5px/1.25 var(--ar-f-ui);color:var(--ar-tinta-2)}
 .cb-visor-s b{font:800 26px/1 var(--ar-f-ui);color:var(--cb-v);font-variant-numeric:tabular-nums}
 .cb-visor-s i{font-style:normal;color:var(--ar-tinta-3)}
+.cb-bascula{flex:none;display:flex;align-items:center;gap:10px;width:100%;min-height:50px;padding:6px 14px;border-radius:16px;background:var(--ar-sup);box-shadow:var(--ar-s1);color:var(--ar-tinta-2);text-align:left}
+.cb-bascula span{flex:1;min-width:0;display:grid;gap:2px}
+.cb-bascula span b{font:700 14.5px/1.2 var(--ar-f-ui);color:var(--ar-tinta)}
+.cb-bascula span small{font:600 12.5px/1.2 var(--ar-f-ui)}
+.cb-bascula.boton{border:1.5px dashed var(--ar-borde-2);background:none;box-shadow:none}
+.cb-bascula.on>.ic{color:var(--cb-a)}
+.cb-bascula.quieta{background:var(--cb-v-s);color:var(--cb-v)}
+.cb-bascula.quieta>.ic{color:var(--cb-v)}
+.cb-bascula-kg{font:800 18px/1 var(--ar-f-ui);font-variant-numeric:tabular-nums;color:var(--ar-tinta)}
+.cb-visor.bascula{box-shadow:0 0 0 3px var(--cb-v-b),var(--ar-s2)}
 .cb-modos{flex:none;display:grid;grid-auto-flow:column;grid-auto-columns:1fr;gap:4px;padding:4px;border-radius:16px;background:var(--ar-hundido)}
 .cb-modos[hidden]{display:none}
 .cb-modo{min-height:42px;border-radius:12px;font:700 14.5px/1 var(--ar-f-ui);color:var(--ar-tinta-2);text-align:center}

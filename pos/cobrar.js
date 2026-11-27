@@ -408,6 +408,8 @@ async function soltarPedido(t,nota){
   const yo=miDisp();
   await N.cambiar(t.pedido.id,x=>{if(x.enCaja&&x.enCaja.disp===yo)delete x.enCaja;},'tienda',nota||'Volvió al Mostrador').catch(()=>null);
 }
+// Un pedido que se abrió desde el Mostrador («Pesarlo y cobrarlo en el POS celular»)
+function abrirPedidoUrl(){const id=S.pedidoUrl;S.pedidoUrl=null;if(!id||!N)return;if(S.tk.some(t=>t.pedido&&t.pedido.id===id)){const t=S.tk.find(x=>x.pedido&&x.pedido.id===id);S.act=t.id;guardar();repintarVenta();return;}if(N.get(id))aceptarPedido(id);else aviso('Ese pedido no está en este aparato');}
 // Al cobrar la cuenta de un pedido, el pedido queda cobrado (y entregado si lo recogen) en La Feria y en el Mostrador.
 async function cerrarPedido(t,v,d){
   if(!N||!t.pedido)return;
@@ -446,12 +448,13 @@ V.cantidad=()=>{
   `<div class="cb-cant">
     <div class="cb-cant-p">${plato(p,'gr')}<div class="cb-cant-pt"><h1 class="cb-cant-n">${esc(p.nombre)}</h1><button type="button" class="cb-precio" data-a="precio" id="cbPrecio"></button></div></div>
     <div class="cb-visor" id="cbVisor"></div>
+    <div id="cbBascula"></div>
     <div class="cb-modos" id="cbModos"></div>
     <div class="cb-teclas" id="cbTeclas">${teclado()}</div>
     <button type="button" class="cb-principal" data-a="cant-ok" id="cbCantOk"><span>${c.it?'Guardar':'Listo'}</span><i>${ic(c.it?'ok':'flecha',20)}</i></button>
   </div>`;
 };
-DESPUES.cantidad=pintarCant;
+DESPUES.cantidad=()=>{pintarCant();pintarBascula();aplicarBascula();};
 function pintarCant(){
   const c=S.cant;if(!c)return;const p=c.p,u=uni(p.unidad),r=calc(c),v=D.getElementById('cbVisor');if(!v)return;
   const pre=D.getElementById('cbPrecio');
@@ -460,7 +463,7 @@ function pintarCant(){
   const uTxt=c.modo==='plata'?'':r.g?'g':p.unidad==='unidad'?(r.n===1?'unidad':'unidades'):u.c;
   const abajo=c.modo==='plata'?(r.ok?`${num(r.q)} ${u.c}`:`¿Cuánta plata quiere llevar?`)
     :r.ok?`<b>${col(r.sub)}</b>${r.g?`<i>${num(r.q)} kg</i>`:''}`:(u.dec?'Poné lo que marca la pesa':'¿Cuántos lleva?');
-  v.className='cb-visor'+(vacio?' vacio':'')+(c.fresco&&!vacio?' fresco':'');
+  v.className='cb-visor'+(vacio?' vacio':'')+(c.fresco&&!vacio?' fresco':'')+(c.desdeBascula?' bascula':'');
   v.innerHTML=`<div class="cb-visor-n">${c.modo==='plata'?'<small>₡</small>':''}<span>${esc(txt)}</span>${uTxt?`<small>${uTxt}</small>`:''}</div><div class="cb-visor-s">${abajo}</div>`;
   const m=D.getElementById('cbModos');
   if(m){
@@ -474,6 +477,7 @@ function pintarCant(){
 }
 function teclaCant(k){
   const c=S.cant;if(!c)return;
+  c.manual=true;c.desdeBascula=false; // si alguien escribe, la báscula ya no lo cambia
   let r=c.fresco?'':c.raw;c.fresco=false;
   if(k==='b')r=r.slice(0,-1);
   else if(k===','){if(c.modo==='plata'||r.includes(','))return;r=(r||'0')+',';}
@@ -536,6 +540,44 @@ async function productoSuelto(){
   abrirCant(preparar({id:null,nombre:n,precio:pr,unidad:porKilo?'kg':'unidad',tasa_impuesto:0,gen:1,categoria_color:'#9E9E9E'}),null);
 }
 
+// La báscula: el peso entra solo al visor cuando se queda quieta (si nadie escribió a mano)
+const BA=window.Bascula||null;
+const usaBascula=()=>!!(BA&&BA.soportada()&&S.cant&&S.cant.p.unidad==='kg'&&S.cant.modo!=='plata');
+function pintarBascula(){
+  const el=D.getElementById('cbBascula');if(!el)return;
+  if(!usaBascula()){el.innerHTML='';return;}
+  const e=BA.estado(),kg=e.kg!=null?num(e.kg)+' kg':'';
+  el.innerHTML=e.estado==='lista'||e.estado==='callada'?`<div class="cb-bascula on${e.estable?' quieta':''}">${ic('balanza',20)}<span><b>${e.estado==='callada'?'La báscula no manda nada':'Báscula'}</b><small>${e.estado==='callada'?'Revisá que esté encendida':e.estable?'Peso listo':'Esperando que se quede quieta…'}</small></span><b class="cb-bascula-kg">${esc(kg)}</b></div>`
+    :e.estado==='conectando'?`<div class="cb-bascula">${ic('balanza',20)}<span><b>Conectando la báscula…</b></span></div>`
+    :`<button type="button" class="cb-bascula boton" data-a="bascula">${ic('balanza',20)}<span><b>${e.estado==='perdida'?'La báscula se desconectó':'Conectar la báscula'}</b><small>${e.estado==='perdida'?'Tocá para volver a conectarla':'Y el peso entra solo'}</small></span>${ic('siguiente',18)}</button>`;
+}
+function aplicarBascula(){
+  const c=S.cant;if(!c||!usaBascula()||c.manual)return;
+  const e=BA.estado();if(e.estado!=='lista'||!e.estable||!(e.kg>0))return;
+  const raw=String(e.kg).replace('.',',');
+  if(c.raw===raw&&c.desdeBascula)return;
+  c.raw=raw;c.g=false;c.fresco=true;c.desdeBascula=true;vib(8);pintarCant(); // fresco: si se escribe encima, reemplaza
+}
+if(BA)BA.on(()=>{if(vista()==='cantidad'){pintarBascula();aplicarBascula();}});
+async function conectarBascula(){
+  if(!BA||!BA.soportada()){aviso('Este navegador no puede conectar básculas. En Android usá Chrome.',5000);return;}
+  const f=BA.formas();
+  let via='bluetooth';
+  if(f.bluetooth&&f.serie)via=await preguntar({titulo:'¿Cómo se conecta la báscula?',texto:'Si tiene un adaptador Bluetooth nuevo (BLE), escogé Bluetooth. Si está emparejada en los ajustes del teléfono o con cable, escogé la otra.',lista:true,opciones:[{n:'Bluetooth',v:'bluetooth'},{n:'Emparejada o con cable',v:'serie'}]});
+  else if(f.serie)via='serie';
+  if(!via)return;
+  const ok=await BA.conectar(via);
+  if(ok)aviso('Báscula conectada: el peso entra solo');else if(BA.estado().error)aviso('No se pudo conectar: '+BA.estado().error,5000);
+  pintarBascula();aplicarBascula();
+}
+async function menuBascula(){
+  const e=BA?BA.estado():{estado:'nada'};
+  if(e.estado!=='lista'&&e.estado!=='callada'){await conectarBascula();return;}
+  const r=await abrirHoja(`<h2 class="cb-hoja-t">Báscula</h2><p class="cb-hoja-s">${esc(e.nombre||'')} · ${esc(e.via||'')}${e.kg!=null?' · ahora marca '+num(e.kg)+' kg':''}</p>${e.ultimo?`<p class="cb-nota">Lo último que mandó: <b>${esc(e.ultimo)}</b></p>`:''}
+    <div class="cb-hoja-bot"><button type="button" class="cb-segundo cb-mal" data-h="quitar"><span>Desconectar la báscula</span></button></div>`,{click(a){cerrarHoja(a);}});
+  if(r==='quitar'){await BA.desconectar();aviso('Báscula desconectada');}
+}
+
 // 3 · Cobrar: cliente, descuento y cómo paga
 function billetes(total){
   const s=new Set();
@@ -561,6 +603,7 @@ function abrirCobroYa(){
   const ds=destinos();let ult='';try{ult=localStorage.getItem('pos_sinpe_ultimo')||'';}catch{}
   let metodo=t.pedido&&METODOS[t.pedido.pago]?t.pedido.pago:LS.get('aramo_cobrar_metodo','efectivo');
   if(!METODOS[metodo]||metodo==='mixto')metodo='efectivo';
+  S.debeDe=null; // lo que debe el cliente se vuelve a leer cada vez que se abre el cobro
   S.pago={metodo,recibido:0,destino:(ds.find(d=>d.label===ult)||ds[0]||{}).label||'',parte:null};
   if(vista()==='cobrar')pintar();else ir('cobrar');
 }
@@ -716,9 +759,10 @@ async function pagar(){
       promocion_id:i.promo_id||null,promocion_descripcion:i.promo_txt||'',desc_manual_pct:0,cabys_codigo:i.cabys||'',producto_generico:i.gen?1:0}))};
   S.pagando=true;const b=D.getElementById('cbPagar');if(b)b.disabled=true;
   try{
+    let antes=0;if(d.metodo_pago==='fiado'){try{antes=+(await window.db.fiados.debe(t.n,t.tel))||0;}catch{}}
     let v=await window.db.ventas.crear(datos);
     if(v&&v.pendiente)v={...datos,numero:'(en la fila)',fecha:new Date().toISOString(),estado:'completada',pendiente:true};
-    let debe=0;if(d.metodo_pago==='fiado'){try{debe=await window.db.fiados.debe(t.n,t.tel);}catch{}if(!v.pendiente)v.debeFiado=debe;}
+    const debe=d.metodo_pago==='fiado'?antes+T.total:0;if(debe)v.debeFiado=debe;
     if(d.sinpe_destino)try{localStorage.setItem('pos_sinpe_ultimo',d.sinpe_destino);}catch{}
     LS.set('aramo_cobrar_metodo',P.parte?'efectivo':P.metodo);
     for(const i of t.items){const p=S.porId.get(i.pid);if(p){p.stock=(+p.stock||0)-i.q;S.top.set(p.id,(S.top.get(p.id)||0)+1);}}
@@ -836,6 +880,7 @@ async function abrirCaja(){
     LS.set('aramo_cobrar_sencillo_'+S.suc,a.raw||'');
     S.cajero=await window.db.cajeros.porNombre(S.caja.usuario);S.descMax=await window.db.caja.descuentoMax()??100;
     S.apert=null;window.POSWEB.subir();pila.length=1;pila[0]='venta';pintar('adelante');aviso(`Caja abierta. ¡A cobrar, ${S.caja.usuario}!`);
+    if(S.pedidoUrl)setTimeout(abrirPedidoUrl,300);
   }catch(e){a.ocupado=false;if(!errorCaja(e))aviso('No se pudo abrir la caja');}
 }
 function pedirApertura(){S.apert={paso:S.cajeros.length>1?'quien':'pin',cajero:S.cajeros[0]||null,pin:'',raw:''};pila.length=1;pila[0]='abrir';}
@@ -938,6 +983,7 @@ async function abrirMas(){
   const h=S.hoy||{n:0,total:0};
   const r=await abrirHoja(`<h2 class="cb-hoja-t">Más</h2><div class="cb-menu">
     <button type="button" data-h="ventas">${ic('recibo',22)}<span><b>Ventas y facturas</b><small>${h.n} hoy · ${col(h.total)} · ver, enviar, devolver o anular</small></span></button>
+    ${BA&&BA.soportada()?`<button type="button" data-h="bascula">${ic('balanza',22)}<span><b>Báscula</b><small>${BA.estado().estado==='lista'?'Conectada · el peso entra solo':'Conectarla para no digitar el peso'}</small></span></button>`:''}
     <button type="button" data-h="fiados">${ic('libro',22)}<span><b>Fiados</b><small>Quién debe, cuánto, y recibir pagos</small></span></button>
     <button type="button" data-h="descuentos">${ic('precio',22)}<span><b>Descuentos</b><small>Cuánto se rebajó cada día y en cuáles ventas</small></span></button>
     <button type="button" data-h="caja">${ic('caja',22)}<span><b>La caja</b><small>${S.caja?`Turno de ${esc(S.caja.usuario||'')} · contar y cerrar`:'Sin abrir'}</small></span></button>
@@ -947,6 +993,7 @@ async function abrirMas(){
   if(r==='ventas'){await cargarVentas(hoyISO());ir('ventas');}
   if(r==='descuentos'){await cargarDescuentos(hoyISO());ir('descuentos');}
   if(r==='fiados'){await cargarFiados();ir('fiados');}
+  if(r==='bascula')menuBascula();
   if(r==='caja'){if(!S.caja)return;S.resumen=await window.db.caja.resumen(S.caja.id);ir('caja');}
   if(r==='suelto')productoSuelto();
   if(r==='completo'){guardar();location.href='index.html?suc='+encodeURIComponent(S.suc);}
@@ -1078,7 +1125,8 @@ const ACC={
   'venta-ver'(b){verVenta(+b.dataset.id);},
   'ped-aceptar'(b){aceptarPedido(b.dataset.id);},
   async 'fiado-ver'(b){if(await verFiado(b.dataset.k))ir('fiadoCli');},
-  'fiado-pagar':pagarFiado,'fiado-recordar':recordarFiado,
+  'fiado-pagar':pagarFiado,
+  bascula:conectarBascula,'fiado-recordar':recordarFiado,
   'fiado-pago'(b){verPagoFiado(+b.dataset.id);},
   quien(b){const c=S.cajeros.find(x=>x.id===+b.dataset.id);if(!c)return;S.apert.cajero=c;S.apert.paso='pin';S.apert.pin='';pintar('adelante');},
   'abrir-ok':abrirCaja,'cerrar-caja':cerrarCaja,
@@ -1199,10 +1247,11 @@ function callarAvisoViejo(){try{const pt=D.getElementById('pwToast');if(!pt)retu
     leerEstado();setInterval(leerEstado,700);
     if(!S.caja)pedirApertura();
     pintar();despierto();
+    if(BA&&BA.recordada())BA.reconectarSola().catch(()=>{});
     if(N){ // los pedidos de La Feria, en vivo (los mismos que ve el Mostrador)
       try{N.on(()=>{if(vista()==='venta'&&hojaEl.hidden){if(S.q)pintarPedidos();else repintarVenta();}});N.conectar().then(()=>{if(vista()==='venta')pintarPedidos();}).catch(()=>{});}catch{}
       const pid=new URLSearchParams(location.search).get('pedido');
-      if(pid&&S.caja&&!S.tk.some(t=>t.pedido&&t.pedido.id===pid)){setTimeout(()=>{if(N.get(pid))aceptarPedido(pid);},400);}
+      if(pid&&!S.tk.some(t=>t.pedido&&t.pedido.id===pid)){S.pedidoUrl=pid;if(S.caja)setTimeout(abrirPedidoUrl,400);}
       try{if(pid)history.replaceState(history.state,'',location.pathname+'?suc='+encodeURIComponent(S.suc));}catch{}
     }
     window.CobrarARAMO={S,buscar,calc,totalDe,tk,pintar,pedidos,facturaTxt,alDia}; // para las pruebas
