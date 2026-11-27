@@ -367,6 +367,8 @@ async function initDB() {
 
   // Migración — a quién le hicieron el SINPE (texto "Nombre · teléfono", NULL si no hubo SINPE)
   try { db.run('ALTER TABLE ventas ADD COLUMN sinpe_destino TEXT DEFAULT NULL'); } catch(e) {}
+  // Cobros que llegan del Mostrador: el id del cobro (pedido|fecha) evita registrar dos veces la misma venta
+  try { db.run('ALTER TABLE ventas ADD COLUMN origen_id TEXT DEFAULT NULL'); } catch(e) {}
 
   // Migración — catálogo de ARAMO: a qué producto de ARAMO corresponde y si lo agregó el catálogo
   try { db.run("ALTER TABLE productos ADD COLUMN catalogo_id TEXT DEFAULT ''"); } catch(e) {}
@@ -788,6 +790,11 @@ function prepararVenta(data) {
 ipcMain.handle('ventas:crear', (_, data) => {
   data = prepararVenta(data);
   const crearVenta = transaction((data) => {
+    // Un cobro del Mostrador que ya entró no se registra otra vez: se devuelve la venta que ya existe.
+    if (data.origen_id) {
+      const ya = prepare('SELECT * FROM ventas WHERE origen_id = ?').get([String(data.origen_id)]);
+      if (ya) { ya.items = prepare('SELECT * FROM venta_items WHERE venta_id = ?').all([ya.id]); ya.repetida = true; return ya; }
+    }
     const esDesecho = data.metodo_pago === 'desecho';
     const numero   = generarNumeroVenta(esDesecho ? 'DES' : 'VTA');
     const cajaRow  = prepare(`SELECT id, usuario FROM cajas WHERE estado='abierta' LIMIT 1`).get();
@@ -797,8 +804,8 @@ ipcMain.handle('ventas:crear', (_, data) => {
       INSERT INTO ventas
         (numero,subtotal,descuento_total,impuesto,total,metodo_pago,monto_recibido,cambio,
          caja_id,cliente_nombre,cliente_cedula,notas,pago_efectivo,pago_tarjeta,pago_sinpe,
-         desc_global_pct,desc_global_monto,sinpe_destino)
-      VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
+         desc_global_pct,desc_global_monto,sinpe_destino,origen_id)
+      VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
     `).run([
       numero, data.subtotal, data.descuento_total||0, data.impuesto||0, data.total,
       data.metodo_pago||'efectivo', data.monto_recibido||0, data.cambio||0,
@@ -806,6 +813,7 @@ ipcMain.handle('ventas:crear', (_, data) => {
       data.pago_efectivo||0, data.pago_tarjeta||0, data.pago_sinpe||0,
       data.desc_global_pct||0, data.desc_global_monto||0,
       ((data.pago_sinpe||0) > 0 && data.sinpe_destino) ? String(data.sinpe_destino).slice(0, 80) : null,
+      data.origen_id ? String(data.origen_id).slice(0, 120) : null,
     ]);
 
     const ventaId = r.lastInsertRowid;

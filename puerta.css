@@ -604,3 +604,17 @@ html[data-theme="dark"] .mo-cambio{background:#3a2d0c;color:#ffe9b5}
 .mo-uber-paso{margin-top:12px;padding:14px;border-radius:16px;background:var(--ar-sup-2);display:flex;flex-direction:column;gap:6px}
 .mo-uber-paso>b{font:800 16px/1.3 var(--fn)}
 .mo-uber-paso>small{font:600 14px/1.45 var(--fn);color:var(--m)}
+/* Cobro: a quién se le hizo el SINPE, pago mixto y la lista de Ajustes (2026-11-26) */
+.mo-metodos.c4{grid-template-columns:repeat(4,minmax(0,1fr))}
+.mo-sd-g{display:flex;flex-wrap:wrap;gap:8px;margin-top:6px}
+.mo-sd-b{flex:1 1 130px;min-height:56px;padding:8px 12px;border-radius:16px;border:2px solid var(--b);background:var(--card);color:var(--t);font:800 17px/1.15 var(--fn);text-align:center}
+.mo-sd-b small{display:block;margin-top:2px;font:700 13px var(--fn);color:var(--m)}
+.mo-sd-b.on{border-color:var(--g);background:var(--gd);color:var(--g)}
+.mo-sd-b:active{transform:scale(.98)}
+.mo-mx-g{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.mo-vuelto.mal{background:var(--ar-peligro-suave,#fde8e6)}
+.mo-vuelto.mal b{color:var(--ar-peligro-tinta,#a12a1f);font-size:17px}
+.mo-enpos{font-size:15px}
+.aj6-sd{display:grid;grid-template-columns:minmax(0,1.1fr) minmax(0,1fr) 52px;gap:8px;margin-top:8px}
+.aj6-sd .ui-campo-in{min-height:52px;width:100%;min-width:0}
+.aj6-sd-x{min-width:52px;min-height:52px;padding:0}

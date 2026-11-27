@@ -45,9 +45,27 @@ function partir(v){
   else r.otros=t;
   return r;
 }
+// A quién se le hizo el SINPE: la lista del POS (configuracion.sinpe_destinos, que se arma en Ajustes del Mostrador) y el nombre de cada tiquete
+function destinosConfig(POS){
+  try{
+    const f=POS.prepare("SELECT valor FROM configuracion WHERE clave = 'sinpe_destinos'").get(),a=JSON.parse((f&&f.valor)||'[]');
+    return Array.isArray(a)?a.map(x=>({nombre:String(x&&x.nombre||'').replace(/\s+/g,' ').trim(),tel:String(x&&x.tel||'').trim()})).filter(x=>x.nombre||x.tel):[];
+  }catch(e){return [];}
+}
+// `sinpe_destino` guarda «Nombre · número»; `sa` es SOLO el nombre, tal cual está en la lista. Sin destinatario escogido: el primero de la lista.
+function nombreDestino(label,lista){
+  const s=String(label||'').trim();
+  if(s){
+    const x=lista.find(d=>(d.tel?(d.nombre||'SINPE')+' · '+d.tel:d.nombre)===s);
+    if(x)return x.nombre||'SINPE';
+    const i=s.lastIndexOf(' · ');return (i>0?s.slice(0,i):s).trim()||'SINPE';
+  }
+  return lista.length?(lista[0].nombre||'SINPE'):'ARAMO';
+}
 function calcular(POS,tienda,fecha){
+  const lista=destinosConfig(POS);
   const vs=POS.prepare(`SELECT v.id,v.numero,v.fecha,v.total,v.descuento_total,v.metodo_pago,v.estado,v.cliente_nombre,v.caja_id,
-      v.pago_tarjeta,v.pago_sinpe,c.usuario AS cajero
+      v.pago_tarjeta,v.pago_sinpe,v.sinpe_destino,c.usuario AS cajero
     FROM ventas v LEFT JOIN cajas c ON c.id = v.caja_id WHERE substr(v.fecha,1,10) = ? ORDER BY v.fecha, v.id`).all([fecha]);
   const d={v:1,tienda,fecha,at:new Date().toISOString(),
     ventas:{efectivo:0,sinpe:0,tarjeta:0,fiado:0,otros:0,total:0,n:0},descuentos:0,anuladas:{n:0,total:0},desechos:0,tiquetes:[],fiados:[],cajas:[]};
@@ -58,6 +76,7 @@ function calcular(POS,tienda,fecha){
       d.ventas.total+=t;d.ventas.n++;d.descuentos+=ds;
       const tq={n:numeroCorto(v.numero),h:horaDe(v.fecha),t,m:m||'efectivo',d:ds,c:v.cajero||'',caja:v.caja_id,ef:p.efectivo};   // ef = lo que entró en efectivo
       if(m==='mixto')tq.p={efectivo:p.efectivo,sinpe:p.sinpe,tarjeta:p.tarjeta};                                                  // y el reparto del pago mixto
+      if(p.sinpe>0)tq.sa=nombreDestino(v.sinpe_destino,lista);                                                                     // a quién se le hizo el SINPE (solo el nombre; campo opcional)
       d.tiquetes.push(tq);
       if(m==='fiado')d.fiados.push({n:numeroCorto(v.numero),h:horaDe(v.fecha),cliente:v.cliente_nombre||'',t});
     }else if(v.estado==='anulada'&&v.metodo_pago!=='desecho'){d.anuladas.n++;d.anuladas.total+=rd(v.total);}
@@ -181,7 +200,7 @@ function limpiarLocal(tienda){
     for(let i=0;i<localStorage.length;i++)claves.push(localStorage.key(i));
     claves.forEach(k=>{if(/^aramo_pos_cotizacion_/.test(k)||/^aramo_pos_venta_/.test(k))localStorage.removeItem(k);});
   }catch(e){}
-  ['aramo_pos_feria_'+tienda,CLAVE_LOCAL,'aramo_pos_dia_pend_'+tienda,'pos_notas_precio_'+tienda].forEach(k=>LS.del(k));
+  ['aramo_pos_feria_'+tienda,CLAVE_LOCAL,'aramo_pos_dia_pend_'+tienda,'pos_notas_precio_'+tienda,'aramo_pos_pend_'+tienda,'aramo_pos_marcar_'+tienda].forEach(k=>LS.del(k));
   pend=new Set();ver=new Map();clearTimeout(tEspera);clearTimeout(tMax);tMax=0;
 }
 // Publica el resumen de esas fechas (cuando la base ya está en cero salen en cero). Sin tocar la copia local.
@@ -219,6 +238,6 @@ function iniciar(o){
   pend=new Set(LS.get(claveEspera(),[]));
   window.addEventListener('online',()=>{if(pend.size){falloRed=0;enviar();}});
 }
-return{iniciar,cambio,alIniciar,vaciar,enviar,calcular,partir,firma,hoyCR,fechasConDatos,reiniciarDatos,limpiarLocal,publicarFechas,costoCarrito,clientesFiado,
+return{iniciar,cambio,alIniciar,vaciar,enviar,calcular,partir,firma,destinosConfig,nombreDestino,hoyCR,fechasConDatos,reiniciarDatos,limpiarLocal,publicarFechas,costoCarrito,clientesFiado,
   get pendientes(){return[...pend];}};
 })();
