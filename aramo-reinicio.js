@@ -104,8 +104,10 @@ const DEFS={
     parciales:{aramo4:{pedidos:{}}}
   },
   mostrador:{
-    claves:[...ENCARGOS,'aramo_sin_abrir','aramo_cambios_sin_ver','aramo_borradores','aramo_reinicio_respaldo','aramo_pos_encargo'],
-    prefijos:['aramo_pos_feria_','aramo_pos_cotizacion_','aramo_pos_venta_'],
+    // aramo_pos_nube y aramo_pos_pend_*: cobros del Mostrador que esperan entrar al POS (cola) → movimiento.
+    // aramo_sinpe_ultimo_* (a quién se le hizo el último SINPE) es una preferencia: se queda.
+    claves:[...ENCARGOS,'aramo_sin_abrir','aramo_cambios_sin_ver','aramo_borradores','aramo_reinicio_respaldo','aramo_pos_encargo','aramo_pos_nube'],
+    prefijos:['aramo_pos_feria_','aramo_pos_cotizacion_','aramo_pos_venta_','aramo_pos_pend_'],
     parciales:{}
   },
   feria:{
