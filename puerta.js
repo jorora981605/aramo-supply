@@ -186,7 +186,7 @@ function surtidoResumen(){
   return{prods,provs:provs.size,sinEnviar:sinEnviar.size};
 }
 function costoHoy(nombre){
-  // Precio más bajo que ARAMO paga hoy por ese producto en Inventario.
+  // Precio más bajo que ARAMO paga hoy por ese producto en Surtido.
   try{
     const exacto=nrm(nombre),key=exacto.split(' ')[0];let best=null;
     Object.entries(getAllProviders()).forEach(([prov,d])=>{
@@ -200,7 +200,7 @@ function costoHoy(nombre){
   }catch{return null;}
 }
 const precioAuto=(costo,margen)=>Math.ceil(costo*(1+(+margen||0)/100)/25)*25;
-// Precio automático: si un producto está en 🤖, su precio sigue al costo de Inventario + margen.
+// Precio automático: si un producto está en 🤖, su precio sigue al costo de Surtido + margen.
 let _autoT=0;
 function autoPrecios(){
   clearTimeout(_autoT);
@@ -355,10 +355,11 @@ function datosInicio(sr,a,c){
       caja:`Caja de hoy ${$c(c.total)}`,
       lista:ultimos.length?ultimos.map(o=>`<div class="po6-ped"><b>${esc(o.ref)}</b><span>${esc(o.cliente?.nombre||'')}</span><em>${esc((est[o.estado]||(()=>''))(o))}</em></div>`).join(''):'<p class="po6-ped-vacio">Todavía no hay pedidos hoy.</p>',
     },
-     s6:{sub:'Pedido a proveedores',ins:(sr.sinEnviar?`<span class="ui-estado ui-estado--pendiente">${ICO('reloj',16)}${sr.sinEnviar} por enviar</span>`:'')+`<span class="ui-estado">${sr.prods?pl(sr.prods,'producto','productos'):'Pedido vacío'}</span>`},
+    s6:{sub:'Pedido a proveedores',
+       ins:(sr.sinEnviar?`<span class="ui-estado ui-estado--pendiente">${ICO('reloj',16)}${sr.sinEnviar} por enviar</span>`:'')+`<span class="ui-estado">${sr.prods?pl(sr.prods,'producto','productos'):'Pedido vacío'}</span>`},
     t6:{sub:'Tienda en línea de los clientes',ins:a.length?`<span class="ui-estado ui-estado--pendiente">${ICO('reloj',16)}${a.length} en curso</span>`:''},
-    p6:{sub:'Caja de '+zona},
-    c6:{sub:'Los Ángeles · cierres y gastos'},
+    p6:{sub:'Caja de '+zona},pos2:LOCAL==='angeles',
+    c6:{sub:'Cierres, personal y gastos'},
   };
 }
 let _portadaMontada=0,_fotoT=0;
@@ -391,7 +392,7 @@ function sugerencias(q){
   q=nrm(q);
   const L=[];
   const P=[
-    {r:/^(1|surt|pedir|provee|compra)/,e:'🚚',t:'Abrir Inventario',s:'Pedidos a proveedores',act:'surtido'},
+    {r:/^(1|surt|invent|pedir|provee|compra)/,e:'🚚',t:'Abrir Inventario',s:'Pedidos a proveedores',act:'surtido'},
     {r:/^(2|taller|client|canasta|tienda online)/,e:'🧺',t:'Abrir La Feria',s:'Lo que ven los clientes',act:'canasta'},
     {r:/^(3|pos|caja|vend|cobr|factur)/,e:'🧾',t:'Abrir ARAMO POS',s:'Ventas y caja del mostrador',act:'pos'},
     {r:/^(m$|mostr|pedidos|encarg|recib)/,e:'🛎️',t:'Abrir Mostrador y Caja',s:'Recibir, alistar, cobrar y entregar',act:'mostrador'},
@@ -406,11 +407,11 @@ function sugerencias(q){
   // pedidos por código o por nombre del cliente
   N.lista().filter(o=>!o.archivado&&(nrm(o.ref).replace('-','').includes(q.replace('-',''))||nrm(o.cliente?.nombre).includes(q))).slice(0,4)
     .forEach(o=>L.push({e:'🛎️',t:`${o.ref} · ${o.cliente.nombre}`,s:`${{nuevo:'Nuevo',alistando:'Alistando',listo:'Listo',entregado:'Entregado',cancelado:'Cancelado'}[o.estado]||''} · ${$c(N.totalDe(o))}`,act:'abrir',id:o.id}));
-  // productos: buscarlos en Inventario
+  // productos: buscarlos en Surtido
   if(q.length>=3){
     const prod=N.catalogo().find(p=>nrm(p.n).startsWith(q))||N.catalogo().find(p=>nrm(p.n).includes(q));
-    if(prod)L.push({e:prod.e,t:`Buscar «${prod.n}» en Inventario`,s:'Ver quién lo vende y pedirlo',act:'surtir',n:prod.n});
-    else L.push({e:'🔍',t:`Buscar «${q}» en Inventario`,s:'Entre todos los proveedores',act:'surtir',n:q});
+    if(prod)L.push({e:prod.e,t:`Buscar «${prod.n}» en Surtido`,s:'Ver quién lo vende y pedirlo',act:'surtir',n:prod.n});
+    else L.push({e:'🔍',t:`Buscar «${q}» en Surtido`,s:'Entre todos los proveedores',act:'surtir',n:q});
   }
   return L.slice(0,6);
 }
@@ -445,7 +446,7 @@ function abrirPuerta(){
   pintarPuerta();clonarSurtido();autoPrecios();
   requestAnimationFrame(escalarMinis);
 }
-// “Ambos” es un acceso directo al Inventario combinado. No muestra la portada,
+// “Ambos” es un acceso directo al Surtido combinado. No muestra la portada,
 // Mostrador ni POS porque esos módulos necesitan una sucursal específica.
 function abrirSurtidoAmbos(){
   cerrarHoja();
@@ -454,17 +455,18 @@ function abrirSurtidoAmbos(){
   $('puIn')?.replaceChildren();
   _portadaMontada=0;
   document.body.classList.remove('pu-lock');
-  try{switchView('proveedores');}catch(e){console.warn('No se pudo abrir Inventario combinado',e);}
-  toast('🧺 Inventario combinado · Moravia + Los Ángeles');
+  try{switchView('proveedores');}catch(e){console.warn('No se pudo abrir Surtido combinado',e);}
+  toast('🧺 Surtido combinado · Moravia + Los Ángeles');
 }
 // ARAMO POS en la nube: el POS del local elegido al entrar (Moravia o LASR), en cualquier dispositivo.
 // En la compu se abre en otra pestaña (así el Mostrador sigue avisando); en el celular, aquí mismo.
 function esCompu(){return /Windows|Macintosh|Linux/i.test(navigator.userAgent)&&!/Mobi|Android|iPhone|iPad/i.test(navigator.userAgent);}
-function abrirPOS(){
+// modo 'celular' = ARAMO POS celular; 'compu' = POS completo. Ambos usan la misma caja.
+function abrirPOS(modo){
   if(LOCAL==='todas'){toast('🧾 Para abrir el POS elegí Moravia o LASR en el selector de local');return;}
-  const k=LOCAL||'moravia',u='pos/index.html?suc='+encodeURIComponent(k);
-  toast('🧾 Abriendo el POS de '+localNom(k)+'…');
-  if(esCompu()){const w=window.open(u,'_blank');if(w)return;}
+  const k=LOCAL||'moravia',cel=modo==='celular',u=(cel?'pos/cobrar.html':'pos/index.html')+'?suc='+encodeURIComponent(k);
+  toast('🧾 Abriendo el POS '+(cel?'celular ':'')+'de '+localNom(k)+'…');
+  if(!cel&&esCompu()){const w=window.open(u,'_blank');if(w)return;}
   location.href=u;
 }
 function cerrarPuerta(){$('puerta').classList.remove('open','zoom');document.body.classList.remove('pu-lock');}
@@ -482,7 +484,8 @@ function volverAlMenu(){
 // teléfono (service-worker.js), así que abren al instante.
 function entrar(cara){
   buzz(12);
-  if(cara==='pos'){abrirPOS();return;}
+  if(cara==='pos'||cara==='pos-compu'){abrirPOS('compu');return;}
+  if(cara==='pos-celular'){abrirPOS('celular');return;}
   if(cara==='canasta'){
     // En la computadora el Taller abre en otra pestaña: ARAMO sigue escuchando pedidos y avisando.
     if(esCompu()){const w=window.open('canasta.html','aramo-taller');if(w)return;}
@@ -569,7 +572,7 @@ function pintarMostrador(){
 }
 function tarjeta(o){
   const s=suc(o.sucursal),{r,n}=avance(o),P=N.PAGOS[o.pago?.metodo]||{},fase=N.faseDe?.(o)||'enviado',tarde=minsA(o.retiro.at)<0&&o.estado!=='entregado';
-  const pago=o.cobro?`<span class="mo-pill g">🧾 Cobrado ${esc(N.PAGOS[o.cobro.metodo]?.n||'')}</span>`:o.pago?.estado==='verificado'?'<span class="mo-pill g">✓ Pagado</span>':o.pago?.estado==='reportado'?'<span class="mo-pill o">📲 Dice que pagó</span>':`<span class="mo-pill">${P.e||''} ${esc(P.n||'')}</span>`;
+  const pago=o.cobro?`<span class="mo-pill g">🧾 Cobrado ${esc(N.PAGOS[o.cobro.metodo]?.n||'')}</span>`:enCelular(o)?'<span class="mo-pill o">📱 En el POS celular</span>':o.pago?.estado==='verificado'?'<span class="mo-pill g">✓ Pagado</span>':o.pago?.estado==='reportado'?'<span class="mo-pill o">📲 Dice que pagó</span>':`<span class="mo-pill">${P.e||''} ${esc(P.n||'')}</span>`;
   const arrastrable=!['entregado','cancelado'].includes(o.estado);
   return `<button type="button" class="mo-card${urgente(o)?' urg':''}${sinAbrir.has(o.id)?' nuevo-flash':''}${M.marca?.id===o.id&&Date.now()<M.marca.hasta?' marcado':''}" data-mo="abrir" data-id="${o.id}" ${arrastrable?'draggable="true"':''}>
     <div class="mo-card-h"><span class="mo-ref">${esc(o.ref)}</span>${o.prueba?'<span class="mo-pill">🧪 prueba</span>':''}${sinAbrir.has(o.id)?'<span class="mo-pill o">NUEVO</span>':''}<span class="mo-when${tarde?' tarde':''}">${o.estado==='entregado'?'✓ '+fh(o.updated):o.estado==='cancelado'?'Cancelado':'🕐 '+fh(o.retiro.at)+' · '+falta(o.retiro.at)}</span></div>
@@ -603,6 +606,10 @@ function pintarCaja(){
   d.addEventListener('drop',e=>{e.preventDefault();d.classList.remove('sobre');const id=e.dataTransfer.getData('text/aramo-encargo');if(id)abrirCobro(id,{arrastre:true});});
   el.querySelectorAll('[data-arr]').forEach(b=>b.addEventListener('dragstart',e=>{e.dataTransfer.setData('text/aramo-encargo',b.dataset.arr);}));
 }
+
+// Un pedido que se está pesando y cobrando en el ARAMO POS celular:
+// aquí no se pesa ni se cobra para evitar cobros dobles.
+const enCelular=o=>!!(o&&o.enCaja&&!o.cobro&&!['entregado','cancelado'].includes(o.estado));
 
 // ══════════════ Hojas ══════════════
 function abrirHoja(html){
@@ -649,7 +656,7 @@ function pesoHtml(it,i,edit){
   const sub=it.estado==='nohay'?0:q*pr;
   return `<div class="mo-it ${cls}">
     <span class="e">${it.e}</span>
-    <span class="t"><strong>${esc(it.n)}</strong><small>Pidió ${esc(pidio(it))} · <button type="button" class="mo-precio" data-mo="precio-it" data-i="${i}" ${edit?'':'disabled'}>${$c(pr)}${kgU?'/kg':' c/u'}</button>${it.mad?' · '+esc(MAD[it.mad]||''):''}${it.nota?' · 📝 '+esc(it.nota):''}</small>${difTxt}${alerta}</span>
+    <span class="t"><strong>${esc(it.n)}</strong><small>Pidió ${esc(pidio(it))} · <button type="button" class="mo-precio" data-mo="precio-it" data-i="${i}" ${edit?'':'disabled'}>${+pr>0?$c(pr)+(kgU?'/kg':' c/u'):'⚠️ Poné el precio'}</button>${it.mad?' · '+esc(MAD[it.mad]||''):''}${it.nota?' · 📝 '+esc(it.nota):''}</small>${difTxt}${alerta}</span>
     ${edit?`<span class="mo-peso"><label><small>${kgU?'Pesó (kg)':'Cantidad'}</small><input type="number" inputmode="decimal" step="${kgU?'0.005':'1'}" min="0" value="${esc(pesado?q:'')}" placeholder="${esc(fq(it.q))}" data-mo-q="${i}" aria-label="${kgU?'Peso real':'Cantidad real'} de ${esc(it.n)}"></label><b>${it.estado==='nohay'?'—':$c(sub)}</b></span><button type="button" class="mo-ck${it.estado==='listo'?' on':''}" data-mo="it-ok" data-i="${i}" aria-label="Listo">✓</button><button type="button" class="mo-ck no${it.estado==='nohay'?' on':''}" data-mo="it-no" data-i="${i}" aria-label="No hay">✕</button>`
       :`<span class="mo-peso"><small>${it.estado==='nohay'?'No hubo':kgU&&pesado?'Pesó':'Lleva'}</small><b>${it.estado==='nohay'?'—':esc(kgU&&pesado?kg(q)+' kg':qtxt(q,it.u))}</b><em>${it.estado==='nohay'?'₡0':$c(sub)}</em></span>`}
     ${edit&&it.estado==='nohay'?`<input class="sub" type="text" placeholder="Cambio por… (opcional)" value="${esc(it.sub||'')}" data-mo-sub="${i}">`:''}
@@ -684,8 +691,10 @@ function pintarEncargo(){
   }
   if(o.estado==='entregado')acc=`<div class="mo-btns">${o.cobro?'<button type="button" class="mo-btn" data-mo="tiquete">🧾 Tiquete</button>':''}<button type="button" class="mo-btn" data-mo="wa">💬 Escribirle</button></div>`;
   if(o.estado==='cancelado')acc=`<button type="button" class="mo-btn w" data-mo="wa">💬 Escribirle</button>`;
+  const enCel=enCelular(o);
+  if(enCel)acc=`<div class="mo-acc-nota"><b>📱 Este pedido se está cobrando en el ARAMO POS celular</b><br>${esc(o.enCaja.n||'Un teléfono')} lo tomó a las ${fh(o.enCaja.at)}. Para no cobrarlo dos veces, aquí no se pesa ni se cobra.</div><div class="mo-btns"><button type="button" class="mo-btn" data-mo="soltar-celular">↩︎ Traerlo al Mostrador</button><button type="button" class="mo-btn" data-mo="wa">💬 Escribirle</button></div>`;
    abrirHoja(`<p class="mo-kick">Pedido · mesa de trabajo · ${esc(sucNom(o.sucursal))}</p><div class="mo-hrow"><div class="mo-h">${esc(o.ref)} ${o.prueba?'<span class="mo-pill">🧪 prueba</span>':''}</div><span class="mo-verd ${verd[1]}">${esc(verd[0])}</span></div><div class="mo-s">${estadoTxt} · sellado ${fdia(o.created)} ${fh(o.created)}</div>
-     ${posBox}${draftBox}<div class="mo-acc-top">${acc}</div>
+     ${enCel?'':posBox+draftBox}<div class="mo-acc-top">${acc}</div>
     <div class="mo-stage${o.estado==='alistando'?' run':''}"><span class="mo-tag">Lo que ve el cliente · en vivo</span><div class="mo-scan"></div><div class="mo-holo">${holo}</div></div>
     <div class="mo-metrics"><div><span>Revisados</span><b>${r}/${n}</b></div><div><span>Peso real</span><b>${pesoR?kg(pesoR)+' kg':'—'}</b></div><div><span>${N.esAprox(o)?'Total aprox.':'Total exacto'}</span><b>${$c(tot)}</b></div></div>
     <div class="mo-blk"><h4>Productos · pesá cada uno · si algo no hay: ${SUST[o.sust]||''}</h4>${o.items.map((it,i)=>pesoHtml(it,i,edit)).join('')}
@@ -812,6 +821,7 @@ function pintarPin(o){
 
 // ── Cobro (Caja) ──
 function abrirCobro(id,opc={}){
+  if(enCelular(N.get(id))){toast('📱 Este pedido se está cobrando en el POS celular');return;}
   const o=N.get(id);if(!o)return;
   if(N.faseDe?.(o)==='confirmacion'){toast('Primero esperá la confirmación del cliente');abrirEncargo(id);return;}
   if(o.estado==='nuevo'||o.estado==='alistando'){toast('Primero alistalo y pesalo: el cobro sale del peso real');abrirEncargo(id);return;}
@@ -921,9 +931,9 @@ function pintarVitrina(){
     <div class="mo-blk" style="padding:4px 12px">${L.map(p=>{
       const auto=!!(t.prods||{})[p.k]?.auto,c=auto||M.vq?costoHoy(p.n):null;
       return `<div class="mo-vi${p.oculto?' oculto':''}"><button type="button" class="e" data-mo="prod-edit" data-k="${p.k}" aria-label="Editar ${esc(p.n)}">${p.e}</button>
-        <button type="button" class="t" data-mo="prod-edit" data-k="${p.k}"><strong>${esc(p.n)}${p.propio?' <span class="mo-pill">nuevo</span>':''}</strong><small>${esc(p.d||'')}${p.d?' · ':''}por ${esc(UNI[p.u]||p.u)}${auto?` · 🤖 ${c?'costo '+$c(c.pr)+' + '+margen+'%':'sin costo en Inventario'}`:''}</small></button>
+        <button type="button" class="t" data-mo="prod-edit" data-k="${p.k}"><strong>${esc(p.n)}${p.propio?' <span class="mo-pill">nuevo</span>':''}</strong><small>${esc(p.d||'')}${p.d?' · ':''}por ${esc(UNI[p.u]||p.u)}${auto?` · 🤖 ${c?'costo '+$c(c.pr)+' + '+margen+'%':'sin costo en Surtido'}`:''}</small></button>
         <input type="number" inputmode="numeric" min="0" step="5" value="${p.p}" data-mo-pr="${p.k}" aria-label="Precio de ${esc(p.n)}" ${auto?'disabled':''}>
-        <button type="button" class="tg${auto?' on':''}" data-mo="auto" data-k="${p.k}" aria-label="Precio automático" title="Precio automático con el costo de Inventario">🤖</button>
+        <button type="button" class="tg${auto?' on':''}" data-mo="auto" data-k="${p.k}" aria-label="Precio automático" title="Precio automático con el costo de Surtido">🤖</button>
         <button type="button" class="tg${p.oculto?'':' on'}" data-mo="vis" data-k="${p.k}" aria-label="Mostrar">${p.oculto?'🙈':'👁'}</button>
         <button type="button" class="tg ag${p.agotado?' on':''}" data-mo="ago" data-k="${p.k}" aria-label="Agotado">🚫</button></div>`;}).join('')||'<div class="mo-vacio">Nada con ese nombre.</div>'}</div>`);
   const qi=$('moVitQ');qi.addEventListener('input',()=>{M.vq=qi.value;const pos=qi.selectionStart;repintar(pintarVitrina);const n=$('moVitQ');n.focus();n.setSelectionRange(pos,pos);});
@@ -950,8 +960,8 @@ function pintarProd(){
      <div class="mo-dos"><label class="mo-field">Pasillo<select id="peC">${CFG.pasillos.filter(p=>p.k!=='top').map(p=>`<option value="${p.k}"${e.c===p.k?' selected':''}>${p.e} ${esc(p.n)}</option>`).join('')}</select></label><label class="mo-field">Precio ₡ por ${esc(UNI[e.u]||e.u)}<input id="peP" type="number" inputmode="numeric" min="0" step="5" value="${+e.p||''}" ${e.auto?'disabled':''}></label></div>
      <label class="mo-field">Foto del producto<input id="peFoto" type="file" accept="image/jpeg,image/png,image/webp,image/heic"><small>JPG, PNG o WebP · máximo 5 MB. La foto se publica en el catálogo.</small></label>
      <label class="mo-field">URL de foto existente<input id="peFotoUrl" type="url" value="${esc(e.foto||'')}" placeholder="https://…"></label>
-    <label class="mo-sw">🤖 Precio automático (costo de Inventario + ${t.margen??35}%)<input type="checkbox" id="peA" ${e.auto?'checked':''}></label>
-    <div class="mo-s">${c?`Costo de hoy en Inventario: <b>${$c(c.pr)}</b> (${esc(c.prov)}) → precio automático <b>${$c(precioAuto(c.pr,t.margen??35))}</b>`:'No encontramos este producto en Inventario con ese nombre; el automático necesita un costo.'}</div>
+    <label class="mo-sw">🤖 Precio automático (costo de Surtido + ${t.margen??35}%)<input type="checkbox" id="peA" ${e.auto?'checked':''}></label>
+    <div class="mo-s">${c?`Costo de hoy en Surtido: <b>${$c(c.pr)}</b> (${esc(c.prov)}) → precio automático <b>${$c(precioAuto(c.pr,t.margen??35))}</b>`:'No encontramos este producto en Surtido con ese nombre; el automático necesita un costo.'}</div>
     <button type="button" class="mo-btn p w big" style="margin-top:12px" data-mo="prod-ok">Guardar · se ve al instante en La Feria</button>
     ${e.nuevo?'':'<button type="button" class="mo-btn w" style="margin-top:8px" data-mo="vitrina">‹ Volver a la vitrina</button>'}`);
   const u=$('peU');u.addEventListener('change',()=>{M.edit={...leerProd(),u:u.value,s:u.value==='kg'?.5:1};repintar(pintarProd);});
@@ -1174,7 +1184,7 @@ function pintarAjSec(sec){
   const guardar='<button type="button" class="ui-btn ui-btn--primario ui-btn--l aj6-guardar" data-mo="aj-ok">Guardar</button>';
   const S={
     tema:['Tema',`<div class="ui-opciones">${[['light','sol','Claro','Fondo claro, como el papel'],['dark','luna','Oscuro','Fondo oscuro, cansa menos de noche'],['auto','pantalla','Automático','Sigue al teléfono o la compu']].map(([v,i,n,d])=>`<button type="button" class="ui-opcion${ajTema()===v?' on':''}" data-mo="aj-tema-usar" data-v="${v}" aria-pressed="${ajTema()===v}">${ICO(i,22)}<span>${n}<small>${d}</small></span>${ajTema()===v?ICO('ok',20):''}</button>`).join('')}</div>`],
-    avisos:['Avisos de pedidos',`<p class="aj6-txt">${!N.avisos.soportado()?'Este navegador no permite notificaciones: queda el sonido y el WhatsApp de la tienda.':perm==='granted'?'Activados: te llegan estés en Inventario, La Feria o el POS.':perm==='denied'?'Están bloqueados: permitilos en la configuración del sitio del navegador.':'Activalos para que te avise en cualquier pantalla.'}</p>
+    avisos:['Avisos de pedidos',`<p class="aj6-txt">${!N.avisos.soportado()?'Este navegador no permite notificaciones: queda el sonido y el WhatsApp de la tienda.':perm==='granted'?'Activados: te llegan estés en Surtido, La Feria o el POS.':perm==='denied'?'Están bloqueados: permitilos en la configuración del sitio del navegador.':'Activalos para que te avise en cualquier pantalla.'}</p>
       ${N.avisos.soportado()&&perm!=='denied'?(perm==='granted'?`<button type="button" class="ui-btn ui-btn--secundario ui-btn--l" data-mo="probar-aviso">${ICO('probar',20)}Probar cómo suena</button>`:`<button type="button" class="ui-btn ui-btn--primario ui-btn--l" data-mo="avisos-on">${ICO('aviso',20)}Activar los avisos</button>`):''}
       ${ajSw('rSon','Sonido que se repite hasta abrir el pedido',R.sonido,'Solo suenan los pedidos nuevos')}`],
     clave:['Contraseña de entrada',`${ajSw('acSw','Pedir contraseña al abrir la app',a.activo,a.activo?'Activa: al abrir se pide la contraseña de la tienda.':'Apagada: se entra directo. La de fábrica es 12345.',' data-mo="acceso-sw"')}
@@ -1260,16 +1270,27 @@ function pedidoPrueba(){
 
 // ══════════════ Acciones ══════════════
 const ACT={
-  surtido(el){entrar('surtido',el);},canasta(el){entrar('canasta',el);},mostrador(el){entrar('mostrador',el);},pos(el){entrar('pos',el);},
+  surtido(el){entrar('surtido',el);},canasta(el){entrar('canasta',el);},mostrador(el){entrar('mostrador',el);},pos(el){entrar('pos',el);},'pos-compu'(el){entrar('pos-compu',el);},'pos-celular'(el){entrar('pos-celular',el);},
   puerta(){volverAlMenu();},
   // Control: la app de cierres del dueño, por tienda (control.html)
-  control(){buzz(12);location.href='control.html?suc=angeles';}, // por ahora el Control es solo de Los Ángeles (LASR)
+  control(){buzz(12);location.href='control.html?suc='+encodeURIComponent(LOCAL&&LOCAL!=='todas'?LOCAL:'moravia');},
   portada(){M.vista='portada';abrirHoja(window.AramoPortadas.selectorHtml());},
   'portada-usar'(el){window.AramoPortadas.elegir(+el.dataset.v);cerrarHoja();_portadaMontada=0;const r=$('puIn');if(r)r.dataset.v='';pintarPuerta();$('puerta').scrollTop=0;toast('🎨 Portada '+el.dataset.v+' · '+(window.AramoPortadas.LISTA.find(x=>x.n===+el.dataset.v)?.t||''));},
   compartir(){M.vista='compartir';pintarCompartir();},
   local(){pedirLocal(()=>LOCAL==='todas'?abrirSurtidoAmbos():abrirPuerta(),()=>abrirPuerta());},
   'reiniciar-app'(el){reiniciarApp(el);},
   'avisos-cerrar'(){LS.set('aramo_avisos_franja',hoyTxt());pintarPuerta();},
+  // Reiniciar el pedido de proveedores de las DOS tiendas de una vez, desde el Inicio (con Deshacer).
+  'reiniciar-pedido'(){
+    if(typeof window.xpReiniciarTodo!=='function'){toast('Abrí Surtido una vez y probá de nuevo');return;}
+    const sr=surtidoResumen();
+    AramoUI.confirmar({titulo:'¿Reiniciar el pedido?',texto:`Se borra el pedido de Moravia y de Los Ángeles (${sr.prods} producto${sr.prods===1?'':'s'} de ${sr.provs} proveedor${sr.provs===1?'':'es'}), en todos los teléfonos. Proveedores, precios e historial no se tocan.`,si:'Reiniciar',peligro:true}).then(async ok=>{
+      if(!ok)return;
+      const r=await window.xpReiniciarTodo();
+      pintarPuerta();
+      AramoUI.aviso(r.remoteOk?'Pedido reiniciado en las dos tiendas':'Pedido reiniciado en este teléfono; revisá la conexión',{tipo:r.remoteOk?'ok':'error',ms:10000,deshacer:()=>{window.xpDeshacerReinicio?.();setTimeout(pintarPuerta,50);}});
+    });
+  },
   'ajustes-app'(){M.vista='ajustes-app';pintarAjustesApp();},
   mas(el){const m=$('moMas');m.hidden=!m.hidden;el.setAttribute('aria-expanded',String(!m.hidden));el.querySelector('b').textContent=m.hidden?'⋯':'✕';},
   'acceso-sw'(){
@@ -1340,11 +1361,11 @@ const ACT={
     const k=el.dataset.k,t=T(),prods={...(t.prods||{})},on=!prods[k]?.auto;
     prods[k]={...(prods[k]||{}),auto:on};
     const precios={...(t.precios||{})};
-    if(on){const p=N.catalogo(M.suc==='todas'?null:M.suc).find(x=>x.k===k),c=p&&costoHoy(p.n);if(!c){toast('No hay costo de '+(p?.n||k)+' en Inventario; queda el precio manual');return;}precios[k]=precioAuto(c.pr,t.margen??35);}
+    if(on){const p=N.catalogo(M.suc==='todas'?null:M.suc).find(x=>x.k===k),c=p&&costoHoy(p.n);if(!c){toast('No hay costo de '+(p?.n||k)+' en Surtido; queda el precio manual');return;}precios[k]=precioAuto(c.pr,t.margen??35);}
     const sucursales=(t.sucursales||[]).map(s=>s.k===M.suc?{...s,precios:{...(s.precios||{}),...(on?{[k]:precios[k]}:{})}}:s);
-    N.guardarTienda({prods,precios,sucursales});toast(on?'🤖 Precio automático: sigue al costo de Inventario':'Precio manual');repintar(pintarVitrina);
+    N.guardarTienda({prods,precios,sucursales});toast(on?'🤖 Precio automático: sigue al costo de Surtido':'Precio manual');repintar(pintarVitrina);
   },
-  vis(el){const k=el.dataset.k,t=T();if(M.suc==='todas'){const ocultos=new Set(t.ocultos||[]);ocultos.has(k)?ocultos.delete(k):ocultos.add(k);N.guardarTienda({ocultos:[...ocultos]});}else{const branches=t.sucursales||[],base=branches.find(s=>s.k===M.suc)||{},global=new Set(t.ocultos||[]),ocultos=new Set(base.ocultos||[]),visibles=new Set(base.visibles||[]),estaOculto=(global.has(k)||ocultos.has(k))&&!visibles.has(k);if(estaOculto){if(global.has(k))visibles.add(k);else ocultos.delete(k);}else{if(global.has(k))visibles.delete(k);else ocultos.add(k);}const sucursales=branches.map(s=>s.k===M.suc?{...s,ocultos:[...ocultos],visibles:[...visibles]}:s);N.guardarTienda({sucursales});}repintar(pintarVitrina);},
+  vis(el){const k=el.dataset.k,t=T(),base=(t.sucursales||[]).find(s=>s.k===M.suc)||{},s=new Set(base.ocultos||t.ocultos||[]);s.has(k)?s.delete(k):s.add(k);const sucursales=(t.sucursales||[]).map(x=>x.k===M.suc?{...x,ocultos:[...s]}:x);N.guardarTienda({ocultos:[...s],sucursales});repintar(pintarVitrina);},
   ago(el){const k=el.dataset.k,t=T(),base=(t.sucursales||[]).find(s=>s.k===M.suc)||{},s=new Set(base.agotados||t.agotados||[]);s.has(k)?s.delete(k):s.add(k);const sucursales=(t.sucursales||[]).map(x=>x.k===M.suc?{...x,agotados:[...s]}:x);N.guardarTienda({agotados:[...s],sucursales});toast(s.has(k)?'🚫 Agotado hoy':'De vuelta en la vitrina');repintar(pintarVitrina);},
   'vit-ok'(){cerrarHoja();},
   recetario(){M.vista='recetario';pintarRecetario();},
@@ -1375,7 +1396,7 @@ const ACT={
     if(sec==='tienda'){cerrarHoja();ACT.local();return;}
     if(sec==='programa'){ACT.programa();return;}
     if(sec==='compartir'){ACT.compartir();return;}
-    if(sec==='actualizar'){AramoUI.confirmar({titulo:'¿Actualizar la app?',texto:'Baja otra vez lo último que se publicó. No borra pedidos, el Inventario ni los ajustes.',si:'Actualizar'}).then(ok=>{if(ok)reiniciarApp();});return;}
+    if(sec==='actualizar'){AramoUI.confirmar({titulo:'¿Actualizar la app?',texto:'Baja otra vez lo último que se publicó. No borra pedidos, el Surtido ni los ajustes.',si:'Actualizar'}).then(ok=>{if(ok)reiniciarApp();});return;}
     pintarAjSec(sec);
   },
   'aj-tema-usar'(el){
@@ -1392,7 +1413,7 @@ const ACT={
     primeraVez=false;document.getElementById('scopePicker')?.classList.remove('open');document.body.classList.remove('scope-picker-open');
     cerrarHoja();$('mostrador').classList.remove('open');cerrarPuerta();
     try{switchView('proveedores');const i=$('pvSearch');if(i){i.value=el.dataset.n;i.dispatchEvent(new Event('input',{bubbles:true}));i.dispatchEvent(new KeyboardEvent('keydown',{key:'Enter',bubbles:true}));}}catch{}
-    toast('🚚 Buscando '+el.dataset.n+' en Inventario');
+    toast('🚚 Buscando '+el.dataset.n+' en Surtido');
   },
   'pos-pedido'(){
     const o=N.get(M.abierto);if(!o)return;
@@ -1434,6 +1455,7 @@ const ACT={
        toast('✅ '+o.ref+' · cotización enviada a '+o.cliente.nombre.split(' ')[0]);
     });
   },
+  'soltar-celular'(){N.cambiar(M.abierto,x=>{delete x.enCaja;},'tienda','El pedido volvió al Mostrador (ya no se cobra en el POS celular)').then(()=>{pintarEncargo();pintarMostrador();toast('↩︎ El pedido volvió al Mostrador');});},
   'volver-alistar'(){N.cambiar(M.abierto,o=>{o.estado='alistando';o.fase='recibido';},'tienda').then(()=>{M.tab='alistando';pintarEncargo();pintarMostrador();});},
   pagado(){const o=N.get(M.abierto);if(!confirm(`¿Te entró el SINPE de ${$c(N.totalDe(o))} con la descripción ${o.ref}?`))return;N.cambiar(o.id,x=>{x.pago.estado='verificado';},'tienda','Pago SINPE confirmado').then(()=>{pintarEncargo();pintarMostrador();toast('📲 Pago confirmado');});},
   entregar(){M.vista='pin';M.pin='';pintarEncargo();},

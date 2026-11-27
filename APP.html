@@ -12,6 +12,7 @@
 <link rel="manifest" href="./manifest.json">
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.117.0"></script>
 <script src="catalogo-productos.js"></script>
+<script src="catalogo-aramo.js?v=20261125-catalogo1"></script>
 <script src="supplier-base.js"></script>
 <!-- Sistema de diseño ARAMO: tokens y letras locales. Va PRIMERO. -->
 <script>
@@ -886,7 +887,7 @@ html[data-theme="dark"] .today-money-card{background:linear-gradient(145deg,#125
   </div>
   <div class="wa-bar">
     <div class="pp-total"><small>Total</small><strong class="prov-total-quick" id="provTotalQuick">₡0</strong></div>
-<button class="wa-btn scope-both-only" id="btnWA" type="button"><span style="font-size:20px">💬</span> Enviar por WhatsApp</button>
+    <button class="wa-btn scope-both-only" id="btnWA" type="button"><span style="font-size:20px">💬</span> Enviar por WhatsApp</button>
     <button class="listo-prov" id="btnListoProv" type="button">✓ Listo · volver a proveedores</button>
   </div>
 </div>
@@ -981,6 +982,8 @@ html[data-theme="dark"] .today-money-card{background:linear-gradient(145deg,#125
           <div id="catalogImportStatus" class="excel-import-status" aria-live="polite"></div>
         </div>
       </div>
+
+      <div class="app-version">ARAMO · versión <b>2026-11-25 · Pedido diario</b> · se actualiza sola</div>
 
     </div>
   </div>
@@ -1405,6 +1408,15 @@ function getOtrosProducts(){
   (Array.isArray(window.ARAMO_XLSX_PRODUCTS)?window.ARAMO_XLSX_PRODUCTS:[]).forEach(add);
   const base=window.ARAMO_SUPPLIER_BASE?.providers||{};
   Object.values(base).forEach(data=>(data?.products||[]).forEach(add));
+  // ARAMO conectado (catalogo-aramo.js): los productos de La Feria y los que solo están en el POS de
+  // alguna tienda también se pueden pedir aquí. El mismo producto escrito distinto no se repite.
+  const CAT=window.ARAMO_CAT;
+  if(CAT){
+    const ids=new Set([...catalog.values()].map(p=>CAT.idDe(p.name)));
+    const sumar=(n,e,u)=>{const id=CAT.idDe(n);if(!n||ids.has(id)||CAT.fuera(n))return;ids.add(id);add({name:n,emoji:e||'🧺',unit:u==='kg'?'kg':'unidad'});};
+    CAT.todos().forEach(x=>sumar(x.n,x.e,x.u));
+    ['moravia','angeles'].forEach(suc=>Object.values(CAT.posDe(suc)).forEach(q=>q&&sumar(q.n,q.e,q.u)));
+  }
   return [...catalog.values()].sort((a,b)=>ORDEN_ES(a.name,b.name));
 }
 
@@ -1996,18 +2008,22 @@ function histPush(e){const h=histGet();h.unshift(e);LS.set('aramo_hist',h.slice(
 
 // ── HISTÓRICO DIARIO SINCRONIZADO (por sucursal, para comparar días) ──
 let historicoCache={};
-
+let _historicoCargado=false;
 function aramoLocalDate(date=new Date()){
-  const y=date.getFullYear(),m=String(date.getMonth()+1).padStart(2,'0'),d=String(date.getDate()).padStart(2,'0');
-  return `${y}-${m}-${d}`;
+  return date.getFullYear()+'-'+String(date.getMonth()+1).padStart(2,'0')+'-'+String(date.getDate()).padStart(2,'0');
 }
+
 async function loadHistoricoFromSupabase(){
   try{
-    // Sin el detalle de productos (pesa): ese solo se pide cuando se usa "Lo de siempre".
-    const{data,error}=await supa.from('historico_diario').select('*').order('fecha',{ascending:false}).limit(500);
+    let{data,error}=await supa.from('historico_diario').select('id,fecha,proveedor,total_moravia,total_angeles,total,enviado_moravia,enviado_angeles,detalle,updated_at').order('fecha',{ascending:false}).limit(200);
+    if(error&&/detalle|PGRST204|42703/.test((error.code||'')+' '+(error.message||''))){
+      _histDetalle=false;
+      ({data,error}=await supa.from('historico_diario').select('id,fecha,proveedor,total_moravia,total_angeles,total,enviado_moravia,enviado_angeles,updated_at').order('fecha',{ascending:false}).limit(200));
+    }else if(!error)_histDetalle=true;
     if(error){console.warn('Error cargando histórico:',error.message);return;}
     historicoCache={};
     (data||[]).forEach(row=>{historicoCache[row.id]=row;});
+    _historicoCargado=true;
     if(document.getElementById('view-resumen').classList.contains('active'))renderHistorico();
   }catch(e){console.warn('Error cargando histórico:',e?.message||e);}
 }
@@ -2024,45 +2040,48 @@ function initRealtimeHistorico(){
     .subscribe();
 }
 
-// Un solo registro por día+proveedor: siempre refleja el total VIGENTE de ese
-// día (sendWA ya calcula tM/tA sobre el pedido completo, no solo el lado
-// enviado), así que se reemplaza en cada envío. Los flags de "enviado" se
-// mergean contra lo que ya había para no revertir un lado ya enviado a false.
-function pushHistoricoToSupabase(prov,side,tM,tA,fecha=aramoLocalDate()){
+// Un registro por día+proveedor, con el detalle por tienda para revisar la mercadería.
+function pushHistoricoToSupabase(prov,side,tM,tA,{fecha=aramoLocalDate(),detalle=null,marcarEnviado=true}={}){
   const id=fecha+'_'+prov;
   const prev=historicoCache[id]||{};
+  const totalM=side==='both'||side==='moravia'?tM:(+prev.total_moravia||0);
+  const totalA=side==='both'||side==='angeles'?tA:(+prev.total_angeles||0);
+  const anterior=prev.detalle||{},nuevo=detalle||detalleDelPedido(prov,side==='both'?['moravia','angeles']:[side]);
+  const detalleFinal=side==='both'?nuevo:{...anterior,...nuevo,q:{...(anterior.q||{}),...(nuevo.q||{})},x:{...(anterior.x||{}),...(nuevo.x||{})},s:{...(anterior.s||{}),...(nuevo.s||{})}};
   const row={
     id,fecha,proveedor:prov,
-    total_moravia:tM,total_angeles:tA,total:tM+tA,
-    enviado_moravia:!!prev.enviado_moravia||side==='both'||side==='moravia',
-    enviado_angeles:!!prev.enviado_angeles||side==='both'||side==='angeles',
+    total_moravia:totalM,total_angeles:totalA,total:totalM+totalA,
+    enviado_moravia:!!prev.enviado_moravia||(marcarEnviado&&(side==='both'||side==='moravia')),
+    enviado_angeles:!!prev.enviado_angeles||(marcarEnviado&&(side==='both'||side==='angeles')),
     updated_at:new Date().toISOString(),
+    detalle:detalleFinal,
   };
   historicoCache[id]=row;
-  // Lo que se pidió de cada producto (para "Lo de siempre"): {v,t,q:{tienda:{producto:[cantidad,unidad]}},x:{tienda:[[nombre,cantidad,unidad]]}}.
-  // Necesita la columna historico_diario.detalle (supabase-historico-detalle.sql). Si todavía no existe, se guarda como antes.
-  const conDetalle=_histDetalle!==false?{...row,detalle:detalleDelPedido(prov)}:row;
-  historicoCache[id]=conDetalle;
-  supa.from('historico_diario').upsert(conDetalle,{onConflict:'id'}).then(({error})=>{
-    if(!error){if(conDetalle!==row)_histDetalle=true;return;}
-    if(conDetalle!==row&&/detalle|PGRST204|42703/.test((error.code||'')+' '+(error.message||''))){
+  const{detalle:detalleCol,...sinDetalle}=row;
+  const guardar=_histDetalle===false?sinDetalle:row;
+  return supa.from('historico_diario').upsert(guardar,{onConflict:'id'}).then(async({error})=>{
+    if(!error){if(guardar===row)_histDetalle=true;return true;}
+    if(guardar===row&&/detalle|PGRST204|42703/.test((error.code||'')+' '+(error.message||''))){
       _histDetalle=false;
-      supa.from('historico_diario').upsert(row,{onConflict:'id'}).then(({error:e2})=>{if(e2)console.warn('Error sincronizando histórico:',e2.message);});
-      return;
+      const fallback=await supa.from('historico_diario').upsert(sinDetalle,{onConflict:'id'});
+      if(fallback.error)console.warn('Error sincronizando histórico:',fallback.error.message);
+      return !fallback.error;
     }
     console.warn('Error sincronizando histórico:',error.message);
-  });
+    return false;
+  }).catch(e=>{console.warn('Error sincronizando histórico:',e?.message||e);return false;});
 }
 let _histDetalle=null;   // null = no se sabe aún · false = la nube no tiene la columna (se deja de mandar en esta sesión)
-function detalleDelPedido(prov){
+function detalleDelPedido(prov,sides=['moravia','angeles']){
   const p=S.pedidos[prov]||{},q={},x={};
-  ['moravia','angeles'].forEach(s=>{
+  sides.forEach(s=>{
     const o={};Object.entries(p.qtys?.[s]||{}).forEach(([pid,v])=>{if(+v?.qty>0)o[pid]=[+v.qty,v.unit||''];});
     if(Object.keys(o).length)q[s]=o;
     const a=(p.extras?.[s]||[]).filter(e=>+e?.qty>0).map(e=>[String(e.name||''),+e.qty,e.unit||'']);
     if(a.length)x[s]=a;
   });
-  return{v:2,t:Date.now(),q,x,sentAt:{moravia:+p.notes?.__sentAt_moravia||0,angeles:+p.notes?.__sentAt_angeles||0}};
+  const sent={};sides.forEach(s=>{sent[s]={at:+p.notes?.['__sentAt_'+s]||0,late:+p.notes?.['__lateSentAt_'+s]||0};});
+  return{v:1,t:Date.now(),q,x,s:sent};
 }
 
 const fmt=n=>Number(n||0).toLocaleString('es-CR');
@@ -2125,17 +2144,35 @@ function markUnsent(prov,side='both'){
   markProvDirty(prov);
   if(!p.sentByBranch)p.sentByBranch={moravia:!!p.sent,angeles:!!p.sent};
   if(!p.notes)p.notes={};
-  const changedSides=side==='both'?['moravia','angeles']:[side];
-  changedSides.forEach(s=>{
-    if(p.sentByBranch[s]||p.notes['__lateConfirmed_'+s]){p.notes['__late_'+s]=Date.now();delete p.notes['__lateConfirmed_'+s];}
-    p.sentByBranch[s]=false;
+  const ahora=Date.now(),hoy=aramoLocalDate(new Date(ahora)),sides=side==='both'?['moravia','angeles']:[side];
+  sides.forEach(s=>{
+    if(!p.notes['__dia_'+s])p.notes['__dia_'+s]=hoy;
+    const enviado=+p.notes['__sentAt_'+s]||0;
+    if(p.sentByBranch[s]&&enviado&&aramoLocalDate(new Date(enviado))===hoy){
+      // El envío original queda intacto; lo nuevo se marca para que el local lo avise aparte.
+      p.notes['__late_'+s]=ahora;
+    }else p.sentByBranch[s]=false;
   });
   p.sent=!!p.sentByBranch.moravia&&!!p.sentByBranch.angeles;
-  if(!p.notes)p.notes={};p.notes.__sentByBranch={...p.sentByBranch};
+  p.notes.__sentByBranch={...p.sentByBranch};
   // Hora en que se modificó por última vez el pedido de cada tienda a este proveedor. Viaja a la
   // nube dentro de notes (n|__upd_moravia), así todos los teléfonos la ven igual. Solo se llama
   // cuando el pedido cambia de verdad (abrir la app o un proveedor no la toca).
-  const ahora=Date.now();(side==='both'?['moravia','angeles']:[side]).forEach(s=>{p.notes['__upd_'+s]=ahora;});
+  sides.forEach(s=>{p.notes['__upd_'+s]=ahora;});
+}
+function marcarPedidoEnviado(p,sides=['moravia','angeles'],ahora=Date.now()){
+  if(!p.notes)p.notes={};
+  if(!p.sentByBranch)p.sentByBranch={moravia:!!p.sent,angeles:!!p.sent};
+  sides.forEach(s=>{
+    const notas={};Object.entries(p.notes).forEach(([k,v])=>{if(k.endsWith('__'+s)||k==='__note_'+s)notas[k]=v;});
+    p.notes['__dia_'+s]=aramoLocalDate(new Date(ahora));
+    p.notes['__sentAt_'+s]=ahora;
+    p.notes['__sentSnapshot_'+s]={qtys:JSON.parse(JSON.stringify(p.qtys?.[s]||{})),extras:JSON.parse(JSON.stringify(p.extras?.[s]||[])),notes:notas};
+    delete p.notes['__late_'+s];delete p.notes['__latePreparedAt_'+s];delete p.notes['__lateSentAt_'+s];
+    p.sentByBranch[s]=true;
+  });
+  p.sent=!!p.sentByBranch.moravia&&!!p.sentByBranch.angeles;
+  p.notes.__sentByBranch={...p.sentByBranch};
 }
 function pedidoTieneLado(p,side){return Object.values(p?.qtys?.[side]||{}).some(v=>+v?.qty>0)||(p?.extras?.[side]||[]).some(x=>+x?.qty>0);}
 
@@ -2193,7 +2230,7 @@ function combinedSurtidoData(){
   return{groups,rows,total:calcAllProvs()};
 }
 function combinedSurtidoText(){
-  const data=combinedSurtidoData(),lines=['📋 INVENTARIO COMBINADO ARAMO','Moravia + Los Ángeles',`Total estimado: ₡${fmt(data.total.total)}`,''];
+  const data=combinedSurtidoData(),lines=['📋 SURTIDO COMBINADO ARAMO','Moravia + Los Ángeles',`Total estimado: ₡${fmt(data.total.total)}`,''];
   if(!data.groups.length)return lines.concat(['No hay cantidades seleccionadas.']).join('\n');
   data.groups.forEach(group=>{
     const flags=sentFlags(group.p);
@@ -2221,7 +2258,7 @@ function renderCombinedSurtidoSummary(){
   box.hidden=false;
   box.innerHTML=`
     <div class="both-summary-head">
-      <div><div class="both-summary-title">🧺 Inventario de ambas tiendas</div><div class="both-summary-sub">Moravia + Los Ángeles · cantidades separadas.</div></div>
+      <div><div class="both-summary-title">🧺 Surtido de ambas tiendas</div><div class="both-summary-sub">Moravia + Los Ángeles · cantidades separadas.</div></div>
       <div class="both-summary-actions"><button type="button" class="both-summary-action primary" data-summary-send-all>📤 Enviar pendientes</button></div>
     </div>
     <div class="both-summary-totals"><div class="both-summary-total m"><small>Moravia</small><strong>₡${fmt(t.moravia)}</strong></div><div class="both-summary-total a"><small>Los Ángeles</small><strong>₡${fmt(t.angeles)}</strong></div><div class="both-summary-total"><small>Total combinado</small><strong>₡${fmt(t.total)}</strong></div></div>
@@ -2977,25 +3014,19 @@ function buildAllPendingOrdersMsg(providers){
 }
 
 function sendAllPendingWA(){
-  if(scopeSide()!=='both'){toast('El envío está disponible en la vista Ambos','err');return;}
+  if(scopeSide()!=='both'){toast('El envío se hace desde Ambos','err');return;}
   const side='both';
   const pending=getProvNames().filter(prov=>hasData(prov)&&!isSent(prov));
   const msg=buildAllPendingOrdersMsg(pending);
   if(!msg){toast('No hay pedidos pendientes por enviar','err');return;}
-  const sentAtAll=Date.now();
   const sentProviders=pending.filter(prov=>buildMsg(prov,side));
   sentProviders.forEach(prov=>{
     const p=getPedido(prov),tM=calcSide('moravia',prov),tA=calcSide('angeles',prov);
     markProvDirty(prov);
+    marcarPedidoEnviado(p,['moravia','angeles']);
     histPush({id:Date.now()+Math.random(),date:new Date().toISOString(),provider:prov,totalM:tM,totalA:tA,total:tM+tA,qtys:JSON.parse(JSON.stringify(p.qtys)),extras:JSON.parse(JSON.stringify(p.extras)),note:p.note||''});
     snapLastPrices(prov);
-    if(!p.sentByBranch)p.sentByBranch={moravia:!!p.sent,angeles:!!p.sent};
-    if(side==='both'){p.sentByBranch.moravia=true;p.sentByBranch.angeles=true;p.sent=true;}
-    else{p.sentByBranch[side]=true;p.sent=!!p.sentByBranch.moravia&&!!p.sentByBranch.angeles;}
-    if(!p.notes)p.notes={};
-    ['moravia','angeles'].forEach(s=>{p.notes['__sentAt_'+s]=sentAtAll;p.notes['__sentSnapshot_'+s]={qtys:JSON.parse(JSON.stringify(p.qtys?.[s]||{})),extras:JSON.parse(JSON.stringify(p.extras?.[s]||[])),at:sentAtAll};delete p.notes['__late_'+s];delete p.notes['__lateConfirmed_'+s];});
-    p.notes.__sentByBranch={...p.sentByBranch};
-    pushHistoricoToSupabase(prov,side,tM,tA);
+    pushHistoricoToSupabase(prov,side,tM,tA,{fecha:aramoLocalDate()});
   });
   renderHome();
   closeProvListModal();
@@ -3007,26 +3038,20 @@ function sendAllPendingWA(){
 
 // ── SEND ──
 function sendWA(side='both'){
+  if(scopeSide()!=='both'){toast('El envío se hace desde Ambos','err');return;}
+  side='both';
   const prov=S.currentProv;
-  if(scopeSide()!=='both'){toast('El envío está disponible en la vista Ambos','err');return;}
-  side=['moravia','angeles'].includes(side)?side:'both';
   const msg=buildMsg(prov,side);
   if(!msg){toast('El pedido está vacío','err');return;}
   const contacts=(S.waContacts[prov]||[]).map(normalizeCostaRicaPhone).filter(Boolean);
   const p=getPedido(prov);
   const tM=calcSide('moravia'),tA=calcSide('angeles');
+  marcarPedidoEnviado(p,['moravia','angeles']);
   const entry={id:Date.now(),date:new Date().toISOString(),provider:prov,totalM:tM,totalA:tA,total:tM+tA,qtys:JSON.parse(JSON.stringify(p.qtys)),extras:JSON.parse(JSON.stringify(p.extras)),note:p.note||''};
   histPush(entry);snapLastPrices(prov);
+  pushHistoricoToSupabase(prov,side,tM,tA,{fecha:aramoLocalDate()});
   const sentPedido=getPedido(prov);
   markProvDirty(prov);
-  if(!sentPedido.sentByBranch)sentPedido.sentByBranch={moravia:!!sentPedido.sent,angeles:!!sentPedido.sent};
-  if(side==='both'){sentPedido.sentByBranch.moravia=true;sentPedido.sentByBranch.angeles=true;sentPedido.sent=true;}
-  else{sentPedido.sentByBranch[side]=true;sentPedido.sent=!!sentPedido.sentByBranch.moravia&&!!sentPedido.sentByBranch.angeles;}
-  if(!sentPedido.notes)sentPedido.notes={};
-  const sentAt=Date.now();
-  (side==='both'?['moravia','angeles']:[side]).forEach(s=>{sentPedido.notes['__sentAt_'+s]=sentAt;sentPedido.notes['__sentSnapshot_'+s]={qtys:JSON.parse(JSON.stringify(sentPedido.qtys?.[s]||{})),extras:JSON.parse(JSON.stringify(sentPedido.extras?.[s]||[])),at:sentAt};delete sentPedido.notes['__late_'+s];delete sentPedido.notes['__lateConfirmed_'+s];});
-  sentPedido.notes.__sentByBranch={...sentPedido.sentByBranch};
-  pushHistoricoToSupabase(prov,side,tM,tA);
   renderProvStatus();renderHome();
   const urls=contacts.length
     ?contacts.map(raw=>`https://wa.me/${raw}?text=${encodeURIComponent(msg)}`)
@@ -3097,7 +3122,7 @@ function buildListaMsg(){
 
 // Enviar lista completa por WhatsApp (sin imprimir)
 function sendListaWA(){
-  if(scopeSide()!=='both'){toast('La lista a contactos está disponible en la vista Ambos','err');return;}
+  if(scopeSide()!=='both'){toast('La lista a contactos está disponible en Ambos','err');return;}
   const msg=buildListaMsg();
   if(!msg){toast('Sin pedidos para enviar','err');return;}
   const contacts=(S.pdfWa||[]).filter(c=>c.tel?.trim());
@@ -3258,12 +3283,14 @@ document.getElementById('catalogImportInput')?.addEventListener('change',e=>{
 });
 
 function renderConfig({catalog=true}={}){
-  // Los contactos de la lista completa viven dentro de Pedido y solo en Ambos.
+  // Contadores en los títulos — se ve el estado sin abrir nada
   const waSet=(S.pdfWa||[]).filter(c=>(c.tel||'').trim()).length;
   const elW=document.getElementById('accCountPdfWa');if(elW)elW.textContent=waSet+'/5';
+  const elPr=document.getElementById('accCountProvs');if(elPr)elPr.textContent=getProvNames().length;
 
   // PDF WhatsApp
-  document.getElementById('cfgPdfWa').innerHTML=S.pdfWa.map((c,i)=>`
+  const contacts=document.getElementById('cfgPdfWa');
+  if(contacts)contacts.innerHTML=S.pdfWa.map((c,i)=>`
     <div class="masivo-slot">
       <span class="masivo-slot-num">${i+1}</span>
       <input class="masivo-name" type="text" placeholder="Nombre" value="${c.name||''}" oninput="S.pdfWa[${i}].name=this.value;persist()">
@@ -3962,8 +3989,9 @@ document.getElementById('themeToggle').addEventListener('click',()=>{
     initRealtimePedidos();
     initRealtimeHistorico();
     markSyncLive();
-    window._aramoPedidoListo=true;window.xpDailyReady?.();
+    renderConfig({catalog:false});
     renderHome();
+    window.xpDailyRollover?.();
     if(S.currentProv){renderProdTable();updateProvTotals();updatePreview();renderProvStatus();}
   });
 })();
@@ -3998,7 +4026,6 @@ function openProviderProfilesModal(){
   document.getElementById('modalProvList').classList.add('open');
 }
 function openSendOrdersModal(){
-  if(scopeSide()!=='both'){toast('El envío de pedidos está disponible en la vista Ambos','err');return;}
   const body=document.getElementById('provListModalBody'),provs=getProvNames().filter(p=>hasData(p)&&!isSent(p));
   document.getElementById('provListModalTitle').textContent='Enviar pedidos';
   body.style.display='block';body.style.maxHeight='60vh';body.style.overflowY='auto';body.style.gridTemplateColumns='';body.style.gap='';
@@ -4096,9 +4123,9 @@ if(isIOS && !isInStandalone && !dismissed){
 <script src="express.js?v=20261125-diario1"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcode-generator/1.4.4/qrcode.min.js"></script>
 <script src="canasta-config.js?v=20261018-seguridad-1"></script>
-<script src="aramo-nube.js?v=20261020-circuito-6"></script>
+<script src="aramo-nube.js?v=20261125-catalogo1"></script>
 <script src="portadas.js?v=20261124-control"></script>
-<script src="puerta.js?v=20261124-control"></script>
+<script src="puerta.js?v=20261125-catalogo1"></script>
 <script>
   // El menú, Mostrador y Surtido se desplazan verticalmente; no usar gestos
   // horizontales como Atrás/Adelante del navegador en el teléfono.

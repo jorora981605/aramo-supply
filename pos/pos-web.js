@@ -39,13 +39,17 @@ const POS_CIERRE_KEY='aramo_pos_cierre_v1_';
 const ESCRIBE=new Set(['productos:crear','productos:actualizar','productos:eliminar','productos:ajustar_stock','productos:crear_lote',
   'promociones:crear','promociones:actualizar','promociones:eliminar','caja:abrir','caja:cerrar','ventas:crear','ventas:anular','ventas:devolver_item',
   'config:guardar','facturas:crear','facturas:actualizar_estado','cajeros:crear','cajeros:actualizar','cajeros:eliminar','cajeros:guardarPermisos',
-  'inventario:ajustar','inventario:entrada','backup:restaurar','backup:ejecutar']);
+  'inventario:ajustar','inventario:entrada','backup:restaurar','backup:ejecutar','fiados:abonar','fiados:anular_pago']);
 
 // ── Puente para las pantallas del POS (window.db llama aquí, como el preload de Windows) ──
 window.POSWEB={
   async invoke(c,...a){
     await listo;
     if(muerto)throw new Error('Este POS se abrió en otra pestaña.');
+    if(soloLectura&&ESCRIBE.has(c)&&COLA.lista&&!NO_COLA.has(c)){
+      const res=await colaEncargar(c,a);
+      return res;
+    }
     if(soloLectura&&ESCRIBE.has(c)){
       aviso('👀 Solo lectura: la caja de '+zona(SUC)+' está abierta en '+(info?.dueno_nombre||'otro dispositivo')+'. Tocá el estado de arriba y «Usar la caja aquí».');
       throw new Error('Solo lectura: la caja está abierta en '+(info?.dueno_nombre||'otro dispositivo')+'.');
@@ -53,7 +57,7 @@ window.POSWEB={
     const fn=HANDLERS[c];
     if(!fn)throw new Error('Esta función no está disponible en la web: '+c);
     const result=await fn({sender:null},...a);
-    if(c==='ventas:crear'||c==='ventas:anular'||c==='ventas:devolver_item'){
+    if(c==='ventas:crear'||c==='ventas:anular'||c==='ventas:devolver_item'||c==='fiados:abonar'||c==='fiados:anular_pago'){
       const fecha=result?.fecha?String(result.fecha).slice(0,10):posFechaISO();
       setTimeout(()=>{posPublicarResumen(fecha);},0);
     }
@@ -62,7 +66,9 @@ window.POSWEB={
   send(c){if(c==='app:force-close')salirYa();},
   on(c,cb){(ESCUCHAS[c]=ESCUCHAS[c]||[]).push(cb);},
   off(c){delete ESCUCHAS[c];},
-  estado:()=>({SUC,version,sucio,dueno,soloLectura,offline,info,DISP,NOMBRE}),
+  estado:()=>({SUC,version,sucio,dueno,soloLectura,offline,info,DISP,NOMBRE,compartida:COLA.lista&&!dueno,cola:COLA.lista}),
+  compartida:()=>COLA.lista&&!dueno,
+  refrescar:()=>latido(),
   subir:()=>subir(),
   latido:()=>latido(),
   listo,
@@ -155,10 +161,10 @@ const faltaNube=e=>e&&(e.codigo==='PGRST202'||e.codigo==='42883'||/Could not fin
 const vencido=i=>!i?.dueno||!i.dueno_visto||(Date.parse(i.ahora||new Date().toISOString())-Date.parse(i.dueno_visto))>VENCE;
 
 // ── Bajar y subir la base del local ──
-async function bajar(v,partes){
+async function bajar(v,partes,silencio){
   let t='';
   for(let n=0;n<partes;n++){
-    pintarCapa('cargando',`Bajando el POS de ${zona(SUC)}… ${Math.round(n/partes*100)}%`);
+    if(!silencio)pintarCapa('cargando',`Bajando el POS de ${zona(SUC)}… ${Math.round(n/partes*100)}%`);
     const r=await rpc('pos_bajar',{p_suc:SUC,p_clave:CLAVE,p_version:v,p_n:n});
     if(!r?.ok)throw Object.assign(new Error('No se pudo bajar la copia ('+(r?.motivo||'?')+')'),{motivo:r?.motivo});
     t+=r.datos;
@@ -214,6 +220,7 @@ function posResumenDia(fecha){
   });
   const bodegaDetalle=[...bodegaMap.values()].sort((a,b)=>b.total-a.total).slice(0,100);
   const resumen={v:1,sucursal:SUC,fecha,efectivo:completadas.reduce((t,v)=>t+v.efectivo,0),tarjeta:completadas.reduce((t,v)=>t+v.tarjeta,0),sinpe:completadas.reduce((t,v)=>t+v.sinpe,0),total:completadas.reduce((t,v)=>t+(+v.total||0),0),n:completadas.length,ventas,bodega:bodegaDetalle.reduce((t,v)=>t+v.total,0),bodegaDetalle,departamentos:[...departamentoMap.entries()].map(([nombre,total])=>({nombre,total})),generadoEn:new Date().toISOString()};
+  try{const fi=HANDLERS['fiados:del_dia']&&HANDLERS['fiados:del_dia']({sender:null},fecha);if(fi){resumen.fiado=fi.fiado;resumen.fiados=fi.ventas;resumen.fiadoCobrado=fi.cobrado;resumen.fiadoPagos=fi.pagos;}}catch(e){}
   resumen.huella=sha256hex(JSON.stringify({fecha,ventas,bodegaDetalle,departamentos:resumen.departamentos}));
   return resumen;
 }
@@ -231,8 +238,8 @@ async function guardarLocal(){
   try{await idbPut(SUC,{bytes:POS.exportar(),version,sucio,guardado:Date.now()});}catch(e){console.warn('[pos]',e);}
 }
 function programarSubida(){
-  clearTimeout(tSubir);tSubir=setTimeout(subir,5000);
-  if(!tMax)tMax=setTimeout(()=>{tMax=0;subir();},20000);
+  clearTimeout(tSubir);tSubir=setTimeout(subir,COLA.lista?400:5000);
+  if(!tMax)tMax=setTimeout(()=>{tMax=0;subir();},COLA.lista?4000:20000);
 }
 async function subir(){
   clearTimeout(tSubir);clearTimeout(tMax);tMax=0;
@@ -271,7 +278,9 @@ async function perderCaja(motivo){
     await guardarConflicto({bytes:POS.exportar(),version},motivo);
     sucio=false;
     alerta('⚠️ Otro dispositivo tomó la caja de '+zona(SUC)+'.','Los últimos cambios de este equipo no alcanzaron a subir: quedaron guardados aparte y se descargó una copia (.db). Esta pantalla pasa a solo lectura.');
-  }else aviso('👀 La caja de '+zona(SUC)+' ahora está en '+(info?.dueno_nombre||'otro dispositivo')+'. Este queda en solo lectura.');
+  }else if(COLA.lista)aviso('🔗 La caja de '+zona(SUC)+' ahora la lleva '+(info?.dueno_nombre||'otro aparato')+'. Aquí se sigue cobrando igual.');
+  else aviso('👀 La caja de '+zona(SUC)+' ahora está en '+(info?.dueno_nombre||'otro dispositivo')+'. Este queda en solo lectura.');
+  emitir();
   await idbPut(SUC,{bytes:POS.exportar(),version,sucio:false,guardado:Date.now()});
   pintarEstado();
 }
@@ -285,8 +294,135 @@ async function latido(){
   if(dueno&&r.dueno!==DISP)await perderCaja('otro_dueno');
   else if(dueno&&sucio)subir();
   nuevos=!dueno&&r.version>version;
+  if(nuevos)refrescarBase(r);
   pintarEstado();
 }
+
+// ══════════════ Caja compartida: la compu y el celular cobran al mismo tiempo (2026-11-27) ══════════════
+// La copia del POS sigue teniendo UN aparato que la guarda en la nube ("el que tiene la caja"). Los demás ya
+// no quedan solo mirando: lo que escriben (una venta, un pago de fiado, anular…) va a una fila en la nube
+// (pos_cola, supabase-pos-cola.sql); el que tiene la caja lo hace en su copia, la sube y devuelve el
+// resultado. Cada cosa se hace UNA vez: lo hecho queda anotado en la misma copia (pos_cola_hecho).
+// Si el que tiene la caja no da señales en 12 s, el aparato que espera la toma solo y lo hace él.
+// Sin la fila en la nube todo sigue como antes (un aparato cobra y los demás miran).
+const NO_COLA=new Set(['backup:restaurar','backup:ejecutar','inventario:ajustar','cajeros:crear','cajeros:actualizar','cajeros:eliminar','cajeros:guardarPermisos']);
+const COLA={lista:false,probada:false,procesando:false,refrescando:false,ultimoLatido:0};
+const QUIETO=12000;
+const dormir=ms=>new Promise(r=>setTimeout(r,ms));
+const sinDueno=i=>!i||!i.dueno||!i.dueno_visto||(Date.parse(i.ahora||new Date().toISOString())-Date.parse(i.dueno_visto))>QUIETO;
+function emitir(){try{window.dispatchEvent(new CustomEvent('pos-estado'));}catch{}}
+function emitirCambio(origen){try{window.dispatchEvent(new CustomEvent('pos-base-nueva',{detail:{origen:origen||''}}));}catch{}}
+async function colaProbar(){
+  COLA.lista=false;
+  if(supa&&CLAVE){try{const r=await rpc('pos_cola_ver',{p_suc:SUC,p_clave:CLAVE,p_ids:[]});COLA.lista=!!(r&&r.ok===true&&Array.isArray(r.filas));}catch(e){COLA.lista=false;}}
+  COLA.probada=true;pintarEstado();emitir();
+  return COLA.lista;
+}
+// Este aparato no tiene la caja: lo manda y espera el resultado
+async function colaEncargar(c,args){
+  const id='q'+nuevoId().slice(1)+Date.now().toString(36);
+  let r;
+  try{r=await rpc('pos_cola_poner',{p_suc:SUC,p_clave:CLAVE,p_disp:DISP,p_nombre:NOMBRE,p_id:id,p_c:c,p_args:JSON.parse(JSON.stringify(args||[]))});}
+  catch(e){throw new Error(e.red?'Sin internet: solo el aparato que tiene la caja puede cobrar sin conexión.':'No se pudo mandar a la caja: '+(e.message||e));}
+  if(!r||r.ok===false)throw new Error(r?.motivo==='clave'?'La contraseña del POS cambió.':'No se pudo mandar a la caja.');
+  if(r.estado)info={...(info||{}),...r.estado};
+  const t0=Date.now();
+  for(;;){
+    let v=null;try{v=await rpc('pos_cola_ver',{p_suc:SUC,p_clave:CLAVE,p_ids:[id]});}catch{}
+    if(v?.estado)info={...(info||{}),...v.estado};
+    const fila=Array.isArray(v?.filas)?v.filas[0]:null;
+    if(fila&&fila.estado==='hecho'){latidoPronto();return fila.res;}
+    if(fila&&fila.estado==='error')throw new Error(fila.res?.error||'La caja no pudo hacerlo.');
+    if(dueno){await colaProcesar();await dormir(150);continue;}       // la caja pasó a este aparato: lo hace él
+    if(sinDueno(info)&&Date.now()-t0>1200){await tomarSolo();continue;}
+    if(Date.now()-t0>45000){latidoPronto();return {pendiente:true,id};} // queda en la fila: se anota apenas haya caja
+    await dormir(800);
+  }
+}
+// Este aparato tiene la caja: hace lo que está en la fila
+async function colaProcesar(){
+  if(!dueno||!COLA.lista||COLA.procesando||muerto||!POS)return;
+  COLA.procesando=true;
+  try{
+    let r;try{r=await rpc('pos_cola_pendientes',{p_suc:SUC,p_clave:CLAVE,p_disp:DISP});}catch(e){offline=!!e.red||offline;return;}
+    if(r?.ok===false){if(r.motivo==='otro_dueno'){info=r.estado||info;await perderCaja('otro_dueno');}return;}
+    if(r?.estado)info={...(info||{}),...r.estado};
+    const filas=Array.isArray(r?.filas)?r.filas:[];
+    if(!filas.length)return;
+    const hechos=[];let fechas=new Set();
+    for(const fl of filas){
+      const ya=POS.prepare('SELECT estado,res FROM pos_cola_hecho WHERE id=?').get([fl.id]);
+      if(ya){let res=null;try{res=JSON.parse(ya.res||'null');}catch{}hechos.push({id:fl.id,estado:ya.estado,res});continue;}
+      let estado='hecho',res=null;
+      try{
+        if(NO_COLA.has(fl.c)||!ESCRIBE.has(fl.c)||!HANDLERS[fl.c])throw new Error('Eso solo se hace en el aparato que tiene la caja.');
+        res=await HANDLERS[fl.c]({sender:null},...(Array.isArray(fl.args)?fl.args:[]));
+        if(/^ventas:|^fiados:/.test(fl.c))fechas.add(res?.fecha?String(res.fecha).slice(0,10):posFechaISO());
+      }catch(e){estado='error';res={error:String(e?.message||e)};}
+      POS.prepare('INSERT OR REPLACE INTO pos_cola_hecho (id,c,estado,res,disp) VALUES (?,?,?,?,?)').run([fl.id,fl.c,estado,JSON.stringify(res??null),fl.disp||'']);
+      hechos.push({id:fl.id,estado,res});
+    }
+    const ok=await asegurarSubida(15000);
+    if(!ok)return; // se intenta otra vez en la próxima vuelta (no se repite: quedó en pos_cola_hecho)
+    for(const h of hechos){try{await rpc('pos_cola_listo',{p_suc:SUC,p_clave:CLAVE,p_disp:DISP,p_id:h.id,p_estado:h.estado,p_res:h.res??null});}catch{}}
+    fechas.forEach(fe=>posPublicarResumen(fe));
+    emitirCambio('cola');
+  }catch(e){console.warn('[pos] fila de la caja',e);}
+  finally{COLA.procesando=false;}
+}
+// Sube ya lo que falta (espera si ya se está subiendo)
+async function asegurarSubida(ms){
+  const fin=Date.now()+(ms||8000);
+  while(Date.now()<fin){
+    if(!sucio)return true;
+    if(!dueno||muerto)return false;
+    if(subiendo){await dormir(120);continue;}
+    const ok=await subir();
+    if(ok&&!sucio)return true;
+    if(!dueno)return false;
+    await dormir(400);
+  }
+  return !sucio;
+}
+// Nadie tiene la caja (o el que la tenía no responde): este aparato la toma solo
+async function tomarSolo(){
+  if(dueno||!supa||muerto)return dueno;
+  let t;try{t=await rpc('pos_tomar',{p_suc:SUC,p_clave:CLAVE,p_disp:DISP,p_nombre:NOMBRE});}catch{return false;}
+  if(!t||t.ok===false||t.dueno!==DISP)return false;
+  info=t;
+  if(+t.version>version&&!(await refrescarBase(t,true)))return false;
+  dueno=true;soloLectura=false;nuevos=false;LS.set('pos_dueno_'+SUC,true);
+  aviso('💳 La caja de '+zona(SUC)+' pasó a este aparato (el otro no respondía).');
+  pintarEstado();emitir();
+  return true;
+}
+// Trae la copia nueva de la nube sin recargar la página (para el que no tiene la caja)
+async function refrescarBase(r,forzar){
+  if(COLA.refrescando||!POS||!r||!(+r.version>version))return false;
+  if(dueno&&!forzar)return false;
+  if(sucio){if(!forzar)return false;await guardarConflicto({bytes:POS.exportar(),version},'antes de traer la copia nueva');}
+  COLA.refrescando=true;
+  try{
+    const bytes=await bajar(+r.version,+r.partes,true);
+    BYTES=bytes;iniciando=true;await POS.initDB();iniciando=false;
+    version=+r.version;sucio=false;nuevos=false;
+    await guardarLocal();
+    pintarEstado();emitirCambio('nube');
+    return true;
+  }catch(e){iniciando=false;console.warn('[pos] no se pudo traer la copia nueva',e);return false;}
+  finally{COLA.refrescando=false;}
+}
+let tPronto=0;
+function latidoPronto(){clearTimeout(tPronto);tPronto=setTimeout(latido,250);}
+// Cada 2 s: el que tiene la caja atiende la fila; el que no, se fija si hay algo nuevo (cada 4 s)
+function colaVuelta(){
+  if(muerto||!POS||!SUC)return;
+  if(dueno){colaProcesar();return;}
+  if(document.visibilityState!=='visible')return;
+  if(Date.now()-COLA.ultimoLatido<4000)return;
+  COLA.ultimoLatido=Date.now();latido();
+}
+window.POSWEB.colaProcesar=()=>colaProcesar();
 
 // ── Lo que en Windows usaba disco, impresora y ventanas ──
 function fechaNombre(iso){const d=new Date(iso||Date.now()),p=n=>String(n).padStart(2,'0');return `${d.getFullYear()}-${p(d.getMonth()+1)}-${p(d.getDate())}_${p(d.getHours())}${p(d.getMinutes())}`;}
@@ -445,8 +581,9 @@ async function abrir(r,local){
   montarPedidoWeb();
   pintarEstado();
   if(sucio&&dueno)programarSubida();
-  if(!dueno&&info?.dueno)aviso('👀 La caja de '+zona(SUC)+' está abierta en '+(info.dueno_nombre||'otro dispositivo')+'. Aquí podés mirar; para cobrar, tocá el estado y «Usar la caja aquí».');
+  colaProbar().then(si=>{if(!si&&!dueno&&info?.dueno)aviso('👀 La caja de '+zona(SUC)+' está abierta en '+(info.dueno_nombre||'otro dispositivo')+'. Aquí podés mirar; para cobrar, tocá el estado y «Usar la caja aquí».');});
   setInterval(latido,LATIDO);
+  setInterval(colaVuelta,2000);
   window.addEventListener('online',()=>{if(!supa)supa=crearSupa();latido();});
   document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='hidden'){guardarLocal();subir();}else latido();});
   window.addEventListener('pagehide',()=>{guardarLocal();subir();});
@@ -584,7 +721,7 @@ function pintarCapa(tipo,msg){
 function pintarEstado(){
   const p=document.getElementById('pwPill');if(!p||!SUC||!POS)return;
   p.hidden=false;
-  const [cls,ico,txt]=muerto?['mal','✖️','Cerrado']:soloLectura?['lee','👀','Solo lectura']:offline?['off','📴','Sin internet · guardado aquí']:subiendo?['sube','⏳','Guardando…']:sucio?['sube','⏳','Por subir']:['ok','☁️','Guardado'];
+  const [cls,ico,txt]=muerto?['mal','✖️','Cerrado']:soloLectura&&COLA.lista?['ok','🔗','Cobrando junto con '+(info?.dueno_nombre||'la caja')]:soloLectura?['lee','👀','Solo lectura']:offline?['off','📴','Sin internet · guardado aquí']:subiendo?['sube','⏳','Guardando…']:sucio?['sube','⏳','Por subir']:['ok','☁️','Guardado'];
   p.className='pw-pill '+cls+(nuevos?' nuevo':'');
   p.title=zona(SUC)+' · '+txt;
   p.innerHTML=`<b>${esc(zona(SUC))}</b><i>${ico}</i><span>${txt}</span>${nuevos?'<em>🔄 Hay datos nuevos</em>':''}`;

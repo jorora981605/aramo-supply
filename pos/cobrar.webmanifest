@@ -1,0 +1,26 @@
+{
+  "name": "ARAMO POS · Cobrar",
+  "short_name": "ARAMO POS",
+  "description": "Cobrar en ARAMO desde el teléfono: buscar, pesar y cobrar.",
+  "start_url": "./cobrar.html",
+  "scope": "../",
+  "display": "standalone",
+  "background_color": "#f8f7f2",
+  "theme_color": "#f8f7f2",
+  "orientation": "portrait",
+  "icons": [
+    {
+      "src": "../icon.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "../icon.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ],
+  "id": "./cobrar.html"
+}

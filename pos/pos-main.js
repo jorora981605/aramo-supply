@@ -165,6 +165,7 @@ async function initDB() {
   const SQL = await H.sql();
   dbFilePath = 'web';
   const buf = H.bytes();
+  if (db) { try { db.close(); } catch (_) {} } // web: al traer una copia nueva, la vieja se libera
   db = buf ? new SQL.Database(buf) : new SQL.Database();
 
   db.run('PRAGMA foreign_keys = ON');
@@ -364,6 +365,19 @@ async function initDB() {
 
   // Migración — permisos individuales por cajero
   try { db.run("ALTER TABLE cajeros ADD COLUMN permisos TEXT DEFAULT '{}'"); } catch(e) {}
+
+  // web · fiado: teléfono del cliente en la venta y los pagos que va haciendo
+  try { db.run('ALTER TABLE ventas ADD COLUMN cliente_tel TEXT DEFAULT ""'); } catch(e) {}
+  db.run(`CREATE TABLE IF NOT EXISTS fiado_pagos (
+    id INTEGER PRIMARY KEY AUTOINCREMENT, cliente TEXT NOT NULL, tel TEXT DEFAULT '', monto REAL NOT NULL,
+    metodo TEXT DEFAULT 'efectivo', sinpe_destino TEXT DEFAULT '', caja_id INTEGER, usuario TEXT DEFAULT '',
+    notas TEXT DEFAULT '', estado TEXT DEFAULT 'ok', fecha TEXT DEFAULT (datetime('now','localtime'))
+  )`);
+  // web · caja compartida: lo que ya se hizo de la fila (para no hacer nada dos veces)
+  db.run(`CREATE TABLE IF NOT EXISTS pos_cola_hecho (
+    id TEXT PRIMARY KEY, c TEXT DEFAULT '', estado TEXT DEFAULT 'hecho', res TEXT DEFAULT '', disp TEXT DEFAULT '',
+    fecha TEXT DEFAULT (datetime('now','localtime'))
+  )`);
 
   // Migración — a quién le hicieron el SINPE (texto "Nombre · teléfono", NULL si no hubo SINPE)
   try { db.run('ALTER TABLE ventas ADD COLUMN sinpe_destino TEXT DEFAULT NULL'); } catch(e) {}
@@ -630,6 +644,90 @@ function sinpePorDestino(where, params) {
 }
 
 // ──────────────────────────────────────────────
+// web · FIADO: ventas al fiado (metodo_pago = 'fiado') y los pagos que el cliente va haciendo
+// ──────────────────────────────────────────────
+function claveCliente(nombre, tel) {
+  const t = String(tel || '').replace(/\D/g, '').replace(/^506(?=\d{8}$)/, '');
+  if (t.length === 8) return 't' + t;
+  return 'n' + String(nombre || '').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/\s+/g, ' ').trim();
+}
+function abonosCaja(cajaId) {
+  const r = prepare(`SELECT COALESCE(SUM(CASE WHEN metodo='efectivo' THEN monto END),0) AS efectivo,
+      COALESCE(SUM(CASE WHEN metodo='sinpe' THEN monto END),0) AS sinpe,
+      COALESCE(SUM(CASE WHEN metodo='tarjeta' THEN monto END),0) AS tarjeta, COUNT(*) AS n
+    FROM fiado_pagos WHERE caja_id = ? AND estado = 'ok'`).get([cajaId]);
+  return { efectivo: +r?.efectivo || 0, sinpe: +r?.sinpe || 0, tarjeta: +r?.tarjeta || 0, n: +r?.n || 0 };
+}
+// En la caja: lo que se cobró de fiados entra con su forma de pago; lo vendido al fiado se muestra aparte
+function sumarFiado(v, cajaId) {
+  const ab = abonosCaja(cajaId);
+  const fi = prepare(`SELECT COALESCE(SUM(total),0) AS t, COUNT(*) AS n FROM ventas WHERE caja_id = ? AND estado = 'completada' AND metodo_pago = 'fiado'`).get([cajaId]);
+  v.abonos_efectivo = ab.efectivo; v.abonos_sinpe = ab.sinpe; v.abonos_tarjeta = ab.tarjeta; v.abonos_n = ab.n;
+  v.fiado = +fi?.t || 0; v.fiado_n = +fi?.n || 0;
+  v.efectivo = (+v.efectivo || 0) + ab.efectivo; v.sinpe = (+v.sinpe || 0) + ab.sinpe; v.tarjeta = (+v.tarjeta || 0) + ab.tarjeta;
+  return v;
+}
+function conFiado(filas) { return filas.map(f => sumarFiado(f, f.id)); }
+// Todos los clientes con fiado: lo que se llevó, lo que ha pagado y lo que debe (los pagos cubren primero lo más viejo)
+function fiadosTodo() {
+  const ventas = prepare(`SELECT v.id, v.numero, v.fecha, v.total, v.cliente_nombre, v.cliente_tel, v.notas, c.usuario AS cajero
+      FROM ventas v LEFT JOIN cajas c ON c.id = v.caja_id
+      WHERE v.metodo_pago = 'fiado' AND v.estado = 'completada' ORDER BY v.fecha, v.id`).all();
+  const pagos = prepare(`SELECT * FROM fiado_pagos WHERE estado = 'ok' ORDER BY fecha, id`).all();
+  const M = new Map();
+  const cli = (n, t) => {
+    const k = claveCliente(n, t);
+    if (!M.has(k)) M.set(k, { clave: k, cliente: '', tel: '', ventas: [], pagos: [], fiado: 0, pagado: 0, ultima: '' });
+    const c = M.get(k), tt = String(t || '').replace(/\D/g, '').slice(-8);
+    if (n && !c.cliente) c.cliente = String(n).trim();
+    if (tt.length === 8 && !c.tel) c.tel = tt;
+    return c;
+  };
+  ventas.forEach(v => { const c = cli(v.cliente_nombre, v.cliente_tel); c.ventas.push(v); c.fiado += +v.total || 0; if (v.fecha > c.ultima) c.ultima = v.fecha; });
+  pagos.forEach(p => { const c = cli(p.cliente, p.tel); c.pagos.push(p); c.pagado += +p.monto || 0; if (p.fecha > c.ultima) c.ultima = p.fecha; });
+  M.forEach(c => {
+    let resto = c.pagado;
+    c.ventas.forEach(v => { const a = Math.min(Math.max(resto, 0), +v.total || 0); v.abonado = a; v.pagada = a >= (+v.total || 0) - 0.5; resto -= a; });
+    c.debe = Math.max(0, Math.round(c.fiado - c.pagado)); c.aFavor = Math.max(0, Math.round(c.pagado - c.fiado));
+  });
+  return [...M.values()];
+}
+ipcMain.handle('fiados:clientes', () =>
+  fiadosTodo().map(c => ({ clave: c.clave, cliente: c.cliente, tel: c.tel, debe: c.debe, aFavor: c.aFavor, fiado: c.fiado, pagado: c.pagado, n: c.ventas.length, ultima: c.ultima }))
+    .sort((a, b) => (b.debe > 0) - (a.debe > 0) || b.debe - a.debe || String(b.ultima).localeCompare(String(a.ultima)))
+);
+ipcMain.handle('fiados:cliente', (_, clave) => fiadosTodo().find(c => c.clave === clave) || null);
+ipcMain.handle('fiados:debe', (_, nombre, tel) => { const c = fiadosTodo().find(x => x.clave === claveCliente(nombre, tel)); return c ? c.debe : 0; });
+ipcMain.handle('fiados:abonar', (_, d) => {
+  const monto = Math.round(+d?.monto || 0);
+  if (!(monto > 0)) return { ok: false, error: 'El pago tiene que ser mayor que cero.' };
+  if (!String(d?.cliente || '').trim()) return { ok: false, error: 'Falta el nombre del cliente.' };
+  const caja = prepare(`SELECT id, usuario FROM cajas WHERE estado = 'abierta' ORDER BY id DESC LIMIT 1`).get();
+  const metodo = ['efectivo', 'sinpe', 'tarjeta'].includes(d.metodo) ? d.metodo : 'efectivo';
+  const r = prepare(`INSERT INTO fiado_pagos (cliente, tel, monto, metodo, sinpe_destino, caja_id, usuario, notas) VALUES (?,?,?,?,?,?,?,?)`)
+    .run([String(d.cliente).trim().slice(0, 60), String(d.tel || '').replace(/\D/g, '').slice(-8), monto, metodo,
+      metodo === 'sinpe' ? String(d.sinpe_destino || '').slice(0, 80) : '', caja ? caja.id : null, d.usuario || caja?.usuario || '', String(d.notas || '').slice(0, 120)]);
+  const c = fiadosTodo().find(x => x.clave === claveCliente(d.cliente, d.tel));
+  return { ok: true, id: r.lastInsertRowid, monto, metodo, debe: c ? c.debe : 0, aFavor: c ? c.aFavor : 0, caja_id: caja ? caja.id : null, fecha: prepare('SELECT fecha FROM fiado_pagos WHERE id = ?').get([r.lastInsertRowid])?.fecha };
+});
+ipcMain.handle('fiados:anular_pago', (_, id, d) => {
+  const p = prepare('SELECT * FROM fiado_pagos WHERE id = ?').get([id]);
+  if (!p || p.estado !== 'ok') return { ok: false, error: 'Ese pago ya no está.' };
+  prepare(`UPDATE fiado_pagos SET estado = 'anulado', notas = ? WHERE id = ?`).run([(String(p.notas || '') + ' · anulado: ' + String(d?.motivo || '') + (d?.quien ? ' (' + d.quien + ')' : '')).slice(0, 200), id]);
+  return { ok: true };
+});
+// Para el resumen del día (Control): lo vendido al fiado ese día y lo que se cobró de fiados
+ipcMain.handle('fiados:del_dia', (_, fecha) => {
+  const todo = fiadosTodo(), ventas = [], pagos = [];
+  todo.forEach(c => {
+    c.ventas.forEach(v => { if (String(v.fecha).slice(0, 10) === fecha) ventas.push({ id: v.id, numero: v.numero, fecha: v.fecha, cliente: c.cliente, tel: c.tel, monto: +v.total || 0, abonado: Math.round(v.abonado || 0), pagada: !!v.pagada, cajero: v.cajero || '' }); });
+    c.pagos.forEach(p => { if (String(p.fecha).slice(0, 10) === fecha) pagos.push({ id: p.id, fecha: p.fecha, cliente: c.cliente, monto: +p.monto || 0, metodo: p.metodo, usuario: p.usuario || '' }); });
+  });
+  const suma = m => pagos.filter(p => p.metodo === m).reduce((t, p) => t + p.monto, 0);
+  return { fiado: ventas.reduce((t, v) => t + v.monto, 0), ventas, pagos, cobrado: { efectivo: suma('efectivo'), sinpe: suma('sinpe'), tarjeta: suma('tarjeta'), total: pagos.reduce((t, p) => t + p.monto, 0) } };
+});
+
+// ──────────────────────────────────────────────
 // IPC — CAJA
 // ──────────────────────────────────────────────
 ipcMain.handle('caja:actual', () =>
@@ -637,7 +735,7 @@ ipcMain.handle('caja:actual', () =>
 );
 
 ipcMain.handle('caja:historial', () =>
-  prepare(`
+  conFiado(prepare(`
     SELECT c.*,
       COALESCE(v.num_ventas,   0) AS num_ventas,
       COALESCE(v.total_ventas, 0) AS total_ventas,
@@ -667,7 +765,7 @@ ipcMain.handle('caja:historial', () =>
       GROUP BY caja_id
     ) v ON v.caja_id = c.id
     ORDER BY c.id DESC LIMIT 50
-  `).all()
+  `).all())
 );
 
 ipcMain.handle('caja:abrir', (_, d) => {
@@ -691,12 +789,15 @@ ipcMain.handle('caja:abrir', (_, d) => {
 });
 
 ipcMain.handle('caja:cerrar', (_, id, d) => {
+  // web: el efectivo de las ventas en dos partes también cuenta, y los pagos de fiado en efectivo entran al cajón
   const tv = prepare(`
-    SELECT COALESCE(SUM(total),0) AS total FROM ventas
-    WHERE caja_id = ? AND estado = 'completada' AND metodo_pago = 'efectivo'
+    SELECT COALESCE(SUM(CASE WHEN (pago_efectivo+pago_tarjeta+pago_sinpe)>0 THEN pago_efectivo
+                             WHEN metodo_pago='efectivo' THEN total ELSE 0 END),0) AS total FROM ventas
+    WHERE caja_id = ? AND estado = 'completada'
   `).get([id]);
+  const ab = abonosCaja(id);
 
-  const calculado = (d.monto_apertura||0) + (tv?.total||0);
+  const calculado = (d.monto_apertura||0) + (tv?.total||0) + ab.efectivo;
   const diferencia = (d.monto_cierre_real||0) - calculado;
 
   prepare(`
@@ -750,6 +851,7 @@ ipcMain.handle('caja:resumen', (_, id) => {
     FROM ventas WHERE caja_id = ? AND estado = 'completada'
   `).get([id]);
   ventas.sinpe_destinos = sinpePorDestino('caja_id = ?', [id]);
+  sumarFiado(ventas, id);
   const denominaciones = prepare(
     'SELECT * FROM arqueo_detalle WHERE caja_id = ? ORDER BY tipo, tipo_denominacion DESC, denominacion DESC'
   ).all([id]);
@@ -768,13 +870,13 @@ ipcMain.handle('ventas:crear', (_, data) => {
     const r = prepare(`
       INSERT INTO ventas
         (numero,subtotal,descuento_total,impuesto,total,metodo_pago,monto_recibido,cambio,
-         caja_id,cliente_nombre,cliente_cedula,notas,pago_efectivo,pago_tarjeta,pago_sinpe,
+         caja_id,cliente_nombre,cliente_cedula,cliente_tel,notas,pago_efectivo,pago_tarjeta,pago_sinpe,
          desc_global_pct,desc_global_monto,sinpe_destino)
-      VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
+      VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
     `).run([
       numero, data.subtotal, data.descuento_total||0, data.impuesto||0, data.total,
       data.metodo_pago||'efectivo', data.monto_recibido||0, data.cambio||0,
-      cajaId, data.cliente_nombre||'', data.cliente_cedula||'', data.notas||'',
+      cajaId, data.cliente_nombre||'', data.cliente_cedula||'', String(data.cliente_tel||'').replace(/\D/g,'').slice(-8), data.notas||'',
       data.pago_efectivo||0, data.pago_tarjeta||0, data.pago_sinpe||0,
       data.desc_global_pct||0, data.desc_global_monto||0,
       ((data.pago_sinpe||0) > 0 && data.sinpe_destino) ? String(data.sinpe_destino).slice(0, 80) : null,
@@ -1400,6 +1502,7 @@ ipcMain.handle('tiquete:guardar', (_, texto, numero) => {
   return {
     initDB,
     exportar: () => db.export(),
+    claveCliente,
     prepare,
     pinHash,
   };
