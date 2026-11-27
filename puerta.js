@@ -412,8 +412,9 @@ function pintarPuerta(){
   }
   const raiz=$('puIn');if(!raiz||!window.AramoPortadas)return;
   const v=window.AramoPortadas.pintar(raiz,datosPuerta());
-  // El Control por ahora es solo de Los Ángeles: en un aparato de Moravia su puerta no sale.
-  const sinControl=LOCAL==='moravia';
+  // El Control es SOLO de Los Ángeles (LASR): su puerta sale únicamente si la tienda de este aparato es Los Ángeles
+  // (en Moravia, o sin tienda escogida —que cuenta como Moravia—, no sale).
+  const sinControl=localK()!=='angeles';
   raiz.querySelectorAll('[data-pu="control"]').forEach(b=>{b.hidden=sinControl;});
   raiz.querySelector('.po6-puertas')?.classList.toggle('sin-control',sinControl);
   if(v!==_portadaMontada){
@@ -1516,7 +1517,7 @@ function pintarAjSec(sec){
       ${ajCampo('ajEspecial','Horario especial',Object.entries(t.horariosEspeciales||{}).map(([d,x])=>`${d} | ${x.cerrada?'cerrado':`${x.abre||''}-${x.cierra||''}`}`).join('\n'),{area:3,ph:'2026-12-24 | 07:00-15:00\n2026-12-25 | cerrado',ayuda:'Un día por renglón: fecha | hora-hora, o fecha | cerrado.'})}${guardar}`],
     pagos:['Pagos y SINPE',`<div class="aj6-dos">${ajCampo('ajSinpe','SINPE Móvil · número',fmtTel(sp.numero),{tipo:'tel',modo:'tel',ph:'8888-8888'})}${ajCampo('ajSinpeN','A nombre de',sp.nombre,{ph:'Ej.: ARAMO S.A.'})}</div>
       <h3 class="ui-grupo-tit">¿A quién se le hace el SINPE?</h3>
-      <p class="aj6-txt">Al cobrar con SINPE salen estos nombres para tocar. El POS usa la misma lista y el Control los suma por nombre.</p>
+      <p class="aj6-txt">Al cobrar con SINPE salen estos nombres para tocar. El POS usa la misma lista${localK()==='angeles'?' y el Control de Los Ángeles los suma por nombre':''}.</p>
       <div id="ajSdLista">${sdL.map((d,i)=>`<div class="aj6-sd"><input class="ui-campo-in" id="ajSdN${i}" value="${esc(d.nombre)}" placeholder="Nombre (Roger, Joseph…)" maxlength="30" aria-label="Nombre"><input class="ui-campo-in" id="ajSdT${i}" type="tel" inputmode="tel" value="${esc(fmtTel(d.numero))}" placeholder="Número" aria-label="Número"><button type="button" class="ui-btn ui-btn--secundario aj6-sd-x" data-mo="sd-del" data-i="${i}" aria-label="Quitar a ${esc(d.nombre)}">✕</button></div>`).join('')}</div>
       <button type="button" class="ui-btn ui-btn--secundario ui-btn--l" data-mo="sd-add">+ Agregar a alguien</button>
       ${ajCampo('ajLink','Link de pago con tarjeta (opcional)',t.linkTarjeta,{tipo:'url',ph:'https://…',ayuda:'Preparado para más adelante: por ahora La Feria cobra solo por SINPE Móvil. Vale para las dos tiendas.'})}${guardar}`],
@@ -1992,7 +1993,7 @@ document.addEventListener('keydown',e=>{
   if(!$('puerta')?.classList.contains('open')||$('moSheet')?.classList.contains('open'))return;
   if(e.ctrlKey||e.metaKey||e.altKey||e.target.matches?.('input,textarea,select'))return;
   const mapa={'1':'surtido','2':'canasta','3':'pos','4':'control',m:'mostrador',M:'mostrador'};
-  if(mapa[e.key]==='control'&&LOCAL==='moravia')return; // en Moravia no hay Control por ahora
+  if(mapa[e.key]==='control'&&localK()!=='angeles')return; // el Control es solo de Los Ángeles
   if(mapa[e.key]){e.preventDefault();const el=document.querySelector(`#puIn [data-pu="${mapa[e.key]}"]`);ACT[mapa[e.key]](el);}
   else if(e.key==='/'&&$('poCmdQ')){e.preventDefault();$('poCmdQ').focus();}
 });

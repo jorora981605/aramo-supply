@@ -109,7 +109,11 @@ function guardarLocal(d){
 }
 const claveEspera=()=>'aramo_pos_dia_pend_'+ctx.suc();
 function guardarEspera(){LS.set(claveEspera(),[...pend]);}
-const activa=()=>!!(ctx&&ctx.puede());
+// El Control es SOLO de Los Ángeles (LASR): el resumen del día lo publica únicamente el POS de esas tiendas.
+// (Las pruebas pueden poner window.ARAMO_CONTROL_TIENDAS para revisar el cálculo en otra tienda.)
+const tiendasControl=()=>Array.isArray(window.ARAMO_CONTROL_TIENDAS)?window.ARAMO_CONTROL_TIENDAS:['angeles'];
+const paraControl=()=>!!(ctx&&tiendasControl().includes(ctx.suc()));
+const activa=()=>!!(ctx&&ctx.puede()&&paraControl());
 function marcar(fechas){
   if(!activa())return;
   fechas.forEach(f=>{if(/^\d{4}-\d\d-\d\d$/.test(f)){pend.add(f);ver.set(f,(ver.get(f)||0)+1);}});
@@ -205,7 +209,7 @@ function limpiarLocal(tienda){
 }
 // Publica el resumen de esas fechas (cuando la base ya está en cero salen en cero). Sin tocar la copia local.
 async function publicarFechas(fechas){
-  if(!ctx||!fechas.length)return false;
+  if(!ctx||!fechas.length||!paraControl())return false;
   const tienda=ctx.suc(),POS=ctx.POS();
   try{await post(fechas.map(f=>({tienda,fecha:f,datos:calcular(POS,tienda,f),updated_at:new Date().toISOString()})));return true;}
   catch(e){return false;}
