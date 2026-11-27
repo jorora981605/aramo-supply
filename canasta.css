@@ -568,13 +568,10 @@ button:disabled{cursor:default}
 .sellado small{margin-top:4px;font-size:14px;font-weight:700;color:var(--muted);animation:subeT .5s var(--suave) .42s both}
 @keyframes subeT{from{opacity:0;transform:translateY(12px)}}
 
-/* Pantallas que se deslizan y secciones en cascada */
-.mesa.adelante{animation:desdeDer .5s var(--suave)}
-.mesa.atras{animation:desdeIzq .5s var(--suave)}
-.mesa.adelante>*,.mesa.atras>*,.mesa.fade>*{animation:subeT .55s var(--suave) both}
-.mesa>:nth-child(2){animation-delay:40ms}.mesa>:nth-child(3){animation-delay:80ms}.mesa>:nth-child(4){animation-delay:120ms}
-.mesa>:nth-child(5){animation-delay:160ms}.mesa>:nth-child(6){animation-delay:200ms}.mesa>:nth-child(7){animation-delay:240ms}
-.mesa>:nth-child(8){animation-delay:280ms}.mesa>:nth-child(n+9){animation-delay:320ms}
+/* Pantallas que se deslizan, rápido y completas: nada entra "en cascada" (antes cada bloque aparecía por
+   turnos durante casi un segundo y la pantalla parecía cargar a medias). "Tu canasta" no se anima. */
+.mesa.adelante{animation:desdeDer .2s var(--suave)}
+.mesa.atras{animation:desdeIzq .2s var(--suave)}
 @keyframes desdeDer{from{opacity:.4;transform:translateX(34px)}}
 @keyframes desdeIzq{from{opacity:.4;transform:translateX(-34px)}}
 

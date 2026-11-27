@@ -17,29 +17,33 @@
 <link rel="apple-touch-icon" href="./icon.png">
 <link rel="icon" href="./icon.png">
 <script>
-// Letras de la marca. PRIMERA visita: esperan a que la app termine de abrir (no le quitan internet a lo
-// importante) y mientras tanto se ve la letra del aparato. Desde la segunda ya están guardadas y salen de una vez.
+// Letras de la marca. Se piden junto con la página (las 4: la del ₡ también) y la pantalla espera a tenerlas
+// (hasta 0,7 s si ya estaban guardadas; hasta 2 s la primera vez). Así nada cambia de forma ni de lugar
+// después de pintar: antes se veía la letra del aparato y 1 a 3 segundos después todo "se acomodaba".
 (function(d){var h=d.documentElement,ya=false;try{ya=localStorage.getItem('aramo_letras')==='1';}catch(e){}
-  if(ya){['jakarta-latin','fraunces-latin'].forEach(function(f){var l=d.createElement('link');l.rel='preload';l.as='font';l.type='font/woff2';l.crossOrigin='anonymous';l.href='fuentes/'+f+'.woff2';d.head.appendChild(l);});return;}
+  ['jakarta-latin','jakarta-latin-ext','fraunces-latin','fraunces-latin-ext'].forEach(function(f){var l=d.createElement('link');l.rel='preload';l.as='font';l.type='font/woff2';l.crossOrigin='anonymous';l.href='fuentes/'+f+'.woff2';d.head.appendChild(l);});
   h.classList.add('espera-letras');
-  // al terminar de abrir: se piden las letras y, cuando ya están guardadas, se anota para la próxima vez
-  addEventListener('load',function(){setTimeout(function(){h.classList.remove('espera-letras');
-    var ok=function(){try{localStorage.setItem('aramo_letras','1');}catch(e){}};
-    try{d.fonts.load('600 16px "Plus Jakarta Sans"').then(ok,function(){});}catch(e){ok();}},60);});
+  var fin=function(){if(!h.classList.contains('espera-letras'))return;h.classList.remove('espera-letras');};
+  setTimeout(fin,ya?700:2000);
+  d.addEventListener('DOMContentLoaded',function(){
+    var ok=function(){try{localStorage.setItem('aramo_letras','1');}catch(e){}fin();};
+    try{Promise.all([d.fonts.load('600 16px "Plus Jakarta Sans"','₡ñ'),d.fonts.load('700 16px "Fraunces"','₡ñ')]).then(ok,fin);}catch(e){fin();}
+  });
 })(document);
 </script>
+<style>html.espera-letras body{opacity:0}</style>
 <link rel="stylesheet" href="aramo-ui.css?v=20261123-fase2">
-<link rel="stylesheet" href="canasta.css?v=20261126-cuadros">
-<link rel="stylesheet" href="feria.css?v=20261126-cuadros">
+<link rel="stylesheet" href="canasta.css?v=20261126-flujo">
+<link rel="stylesheet" href="feria.css?v=20261126-flujo">
 <script>try{var t=localStorage.getItem('cn_theme')||'light';if(t==='auto')t=matchMedia('(prefers-color-scheme: dark)').matches?'dark':'light';document.documentElement.dataset.theme=t;if(/[?&]mini=1/.test(location.search)){document.documentElement.classList.add('mini');var m=location.search.match(/[?&]tema=(light|dark)/);if(m)document.documentElement.dataset.theme=m[1];}}catch(e){}</script>
 <script src="canasta-config.js?v=20261018-seguridad-1"></script>
 <script src="catalogo-aramo.js?v=20261125-catalogo1"></script>
-<script src="aramo-nube.js?v=20261125-catalogo1"></script>
+<script src="aramo-nube.js?v=20261126-flujo"></script>
 <script src="canasta-fotos.js?v=20261013-perfil-1"></script>
-<script defer src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.117.0"></script>
-<script defer src="https://cdnjs.cloudflare.com/ajax/libs/qrcode-generator/1.4.4/qrcode.min.js"></script>
+<script async src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.117.0"></script>
+<script async src="https://cdnjs.cloudflare.com/ajax/libs/qrcode-generator/1.4.4/qrcode.min.js"></script>
 <script defer src="aramo-ui.js?v=20261123-fase2"></script>
-<script defer src="canasta.js?v=20261126-cuadros"></script>
+<script defer src="canasta.js?v=20261126-flujo"></script>
 </head>
 <body>
 <div class="fondo" aria-hidden="true"><i></i><i></i><i></i></div>

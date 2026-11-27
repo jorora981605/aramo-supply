@@ -13,14 +13,14 @@
 const SUPA_URL='https://gtzkrdefkcbrjzwoehth.supabase.co';
 const SUPA_KEY='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imd0emtyZGVma2Nicmp6d29laHRoIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzk5OTUxMzMsImV4cCI6MjA5NTU3MTEzM30.S32-f2m32VR-oAQaeOLi0XjZZqlBlotJFMQxsOuQh48';
 const TABLE='encargos',TIENDA_ID='__tienda__';
-const LKEY='aramo_encargos_v1',PKEY='aramo_encargos_pend',CKEY='aramo_encargos_changes',TKEY='aramo_tienda_v1';
+const LKEY='aramo_encargos_v1',PKEY='aramo_encargos_pend',CKEY='aramo_encargos_changes',TKEY='aramo_tienda_v1',NKEY='aramo_tienda_nube_v1';
 
 const read=(k,d)=>{try{const v=JSON.parse(localStorage.getItem(k));return v??d;}catch{return d;}};
 const write=(k,v)=>{try{localStorage.setItem(k,JSON.stringify(v));}catch{}};
 const clone=o=>JSON.parse(JSON.stringify(o));
 const now=()=>new Date().toISOString();
 
-let store=read(LKEY,{}),pend=new Set(read(PKEY,[])),pendCambios=new Set(read(CKEY,[])),tiendaLocal=read(TKEY,null),tiendaNube=null;
+let store=read(LKEY,{}),pend=new Set(read(PKEY,[])),pendCambios=new Set(read(CKEY,[])),tiendaLocal=read(TKEY,null),tiendaNube=read(NKEY,null); // la ficha de la nube de la vez anterior: así La Feria abre con los precios, el envío y el SINPE de siempre y no "se acomoda" cuando la nube contesta
 let supa=null,modo='local',motivo='conectando…',solo=null,canal=null,reintento=0,conectando=null;
 const envios=new Map();
 let authUser=null,authSession=null,authHook=false,authCambio=0,authPersonal=false;
@@ -134,7 +134,14 @@ async function subirCambio(o){
     const r=await timeout(supa.rpc('aramo_cambiar_encargo',{p_id:o.id,p_data:o}),9000);
     if(r.error)throw new Error(r.error.message);
     pend.delete(o.id);pendCambios.delete(o.id);persist();return true;
-  }catch(e){pend.add(o.id);pendCambios.add(o.id);persist();console.warn('[nube] no se pudo enviar el cambio',o.id,e.message||e);return false;}
+  }catch(e){ultimoError=String(e.message||e);pend.add(o.id);pendCambios.add(o.id);persist();console.warn('[nube] no se pudo enviar el cambio',o.id,e.message||e);return false;}
+}
+// Si la nube rechazó un cambio del cliente (ya pagó, el pedido ya avanzó…) se suelta el cambio y se vuelve a lo que dice la nube
+let ultimoError='';
+async function restaurarDeNube(id){
+  pend.delete(id);pendCambios.delete(id);persist();
+  const o=await leerUno(id);if(o){store[id]=o;persist();emit('encargo',id);}
+  return store[id]||null;
 }
 async function leerUno(id){
   if(modo!=='nube'||!supa)return null;
@@ -155,10 +162,15 @@ async function refrescarPedido(id){
   if(o){take(o);emit('encargo',id);return o;}
   return store[id]||null;
 }
+// La ficha de la tienda que llegó de la nube se guarda en este teléfono (cuando cambia de verdad)
+function guardarNube(d){if(!d)return;tiendaNube=d;const {acceso,...sinClaves}=d,nuevo=JSON.stringify(sinClaves); // las claves de acceso del Mostrador nunca se guardan aparte en el teléfono
+  try{if(localStorage.getItem(NKEY)!==nuevo)localStorage.setItem(NKEY,nuevo);}catch{}}
+// Si la librería de la nube todavía está bajando (se pide sin frenar la pantalla), se espera un poco en vez de rendirse
+function esperarLib(ms){return new Promise(r=>{const t0=Date.now();(function p(){if(window.supabase?.createClient||Date.now()-t0>ms)return r();setTimeout(p,60);})();});}
 function onRealtime(p){
   const row=p.new&&p.new.id?p.new:null;
   if(!row)return;
-  if(row.id===TIENDA_ID){tiendaNube=row.data;emit('tienda');return;}
+  if(row.id===TIENDA_ID){guardarNube(row.data);emit('tienda');return;}
   if(!authUser||!authSession)return;
   if(authUser&&!authPersonal&&row.owner_id&&row.owner_id!==authUser.id)return;
   if(authUser&&!authPersonal&&!row.owner_id)return;
@@ -177,6 +189,7 @@ function conectar(opts){
   if(conectando)return conectando;
   conectando=(async()=>{
     try{
+      if(!window.supabase?.createClient)await esperarLib(12000);
       if(!window.supabase?.createClient)throw new Error('sin librería de nube');
       supa=supa||window.supabase.createClient(SUPA_URL,SUPA_KEY,{auth:{persistSession:true,autoRefreshToken:true,storageKey:'aramo-nube-auth'}});
       if(!authHook){
@@ -194,7 +207,7 @@ function conectar(opts){
       if(r.error)throw new Error(r.error.message);
       modo='nube';motivo='';
       medirHora();
-      (r.data||[]).forEach(row=>{if(row.id===TIENDA_ID)tiendaNube=row.data;else take(row.data,true);});
+      (r.data||[]).forEach(row=>{if(row.id===TIENDA_ID)guardarNube(row.data);else take(row.data,true);});
       persist();
       for(const id of [...pend])if(store[id])await (pendCambios.has(id)?subirCambio(store[id]):subir(store[id]));
       if(tiendaLocal&&(!tiendaNube||ts(tiendaLocal)>ts(tiendaNube)))await subirTienda(tiendaLocal);
@@ -391,6 +404,13 @@ function repartoEnvio(productos,uber,c=envioCfg()){
   const cliente=Math.min(uber,sube5(uber*pct/100)); // se redondea hacia arriba: ARAMO nunca pone de más
   return{uber,cliente,tienda:uber-cliente,pct,bajo,min};
 }
+// El envío se pacta ANTES de pagar: el cliente ve un rango (el Uber puede salir 15 % más barato o 30 % más caro que el estimado)
+// y la tienda confirma el monto exacto junto con el total. rango = lo que pagaría el cliente en cada extremo, a la centena.
+function rangoEnvio(e,productos,c=envioCfg()){
+  const bajo=Math.max(+c.uberMinimo||0,sube100(e.uber*.85)),alto=sube100(e.uber*1.3);
+  const a=repartoEnvio(productos,bajo,c).cliente,b=repartoEnvio(productos,alto,c).cliente;
+  return{min:Math.min(Math.floor(a/100)*100,e.cliente),max:Math.max(Math.ceil(b/100)*100,e.cliente)};
+}
 function estimarEnvio(s,u,productos){
   const c=envioCfg(),a=ubiSuc(s),km=a.lat==null?null:distKm(a,u),ap=tarifaKmAprendida(c);
   const fuera=km!=null&&+c.radioKm>0&&km>+c.radioKm,kmCalle=km==null?null:km*Math.max(1,+c.factorCalle||1);
@@ -406,11 +426,16 @@ async function costoRealUber(id,costo){
   const o0=store[id];if(!o0?.retiro?.envio)return null;
   const c=envioCfg(),e0=o0.retiro.envio,s=(tienda().sucursales||[]).find(x=>x.k===o0.sucursal);
   const km=esNum(e0.km)?+e0.km:distKm(ubiSuc(s),e0);
+  // Después de que el cliente confirmó el total (o pagó) el envío ya no cambia: si el Uber sale distinto al pedirlo,
+  // la diferencia la pone la tienda y solo se anota (difTienda: positivo = la tienda pone de más).
+  const frozen=!!(o0.confirmacion?.at||o0.comprobante||o0.cobro||['reportado','verificado'].includes(o0.pago?.estado));
   const r=await cambiar(id,x=>{
-    const e=x.retiro.envio,rp=repartoEnvio(productosDe(x),costo,c);
+    const e=x.retiro.envio;
+    if(frozen){const pactado=+e.costoUber||+e.uberEst||0;e.uberPedido=costo;e.difTienda=costo-pactado;x._ev={tipo:'uber-real',monto:costo};return;}
+    const rp=repartoEnvio(productosDe(x),costo,c);
     e.costoUber=costo;e.costo=rp.cliente;e.tienda=rp.tienda;e.pct=rp.pct;e.estimado=false;
     if(km!=null&&!esNum(e.km))e.km=+km.toFixed(2);
-  },'tienda','Uber real: ₡'+costo);
+  },'tienda',frozen?'Uber pedido: ₡'+costo+' (el total del cliente ya estaba confirmado: la diferencia la pone la tienda)':'Uber real: ₡'+costo);
   if(costo>0&&km!=null&&km>=.3){
     const hist=(c.historial||[]).filter(h=>h.id!==id);
     hist.push({id,km:+(+km).toFixed(2),costo,t:now(),s:o0.sucursal});
@@ -418,6 +443,46 @@ async function costoRealUber(id,costo){
   }
   return r;
 }
+
+// ── El cliente cambia un pedido ya enviado: el MISMO pedido, el MISMO Uber ──
+// Reglas (las mismas que aplica la nube en aramo_aplicar_cambio_cliente): solo en Nuevo o Alistando y antes de pagar;
+// lo que no cambió guarda su peso; lo cambiado se vuelve a pesar; la cotización o confirmación anterior queda sin efecto;
+// si hay envío, la parte del cliente se recalcula con la regla de siempre (menos de ₡10.000 todo el cliente, desde ahí mitad).
+const puedeCambiar=o=>!!o&&!o.borrado&&['nuevo','alistando'].includes(o.estado)&&!o.comprobante&&!o.cobro&&!['reportado','verificado'].includes(o.pago?.estado);
+function qTxtCamb(it){const q=it.pide?+it.pide.q:+it.q,u=it.pide?it.pide.u:it.u,n=Number.isInteger(q)?String(q):String(+q.toFixed(2)).replace('.',',');return n+(u==='kg'?' kg':'');}
+const mismaQ=(a,b)=>Math.abs((+a.q||0)-(+b.q||0))<1e-9&&(a.u||'')===(b.u||'')&&JSON.stringify(a.pide||null)===JSON.stringify(b.pide||null);
+// Aplica el cambio a x (una copia del pedido). Devuelve {hay, txt, lineas}; si no hay diferencias no toca nada.
+function aplicarCambioCliente(x,nuevos){
+  const viejos=x.items||[],mapV=new Map(viejos.map(i=>[i.k,i])),ks=new Set(nuevos.map(i=>i.k));
+  const quito=[],cambio=[],agrego=[],items=[];
+  nuevos.forEach(n=>{
+    const v=mapV.get(n.k);
+    if(!v){items.push({...n,cambio:'nuevo'});agrego.push('agregó '+n.n+' '+qTxtCamb(n));return;}
+    if(mismaQ(v,n)){items.push(v);return;}
+    const nv={...v,q:n.q,u:n.u||v.u,mad:n.mad||'',nota:n.nota||'',cambio:v.cambio==='nuevo'?'nuevo':'cant'};
+    if(v.cambio!=='nuevo')nv.qAntes=+v.q;
+    if(n.pide)nv.pide=n.pide;else delete nv.pide;
+    ['qr','pr','estado','q0','p0','subPropuesta','subAceptada','subRechazada','sub'].forEach(k=>delete nv[k]);
+    cambio.push(v.n+' '+qTxtCamb(v)+' → '+qTxtCamb(n));items.push(nv);
+  });
+  viejos.forEach(v=>{if(!ks.has(v.k))quito.push('quitó '+v.n);});
+  const lineas=[...quito,...cambio,...agrego];
+  if(!lineas.length)return{hay:false,txt:'',lineas:[]};
+  const totalAntes=totalDe(x),envioAntes=+x.retiro?.envio?.costo||0;
+  x.items=items;
+  if(x.estado==='alistando'&&(x.fase==='confirmacion'||x.fase==='alistando'||x.cotizacion||x.confirmacion))x.fase='recibido';
+  ['cotizacion','confirmacion','totalFinal'].forEach(k=>delete x[k]);
+  const e=x.retiro?.envio;
+  if(e){const uber=+e.costoUber>0?+e.costoUber:+e.uberEst||0;if(uber>0){const prod=redondear5(items.reduce((t,i)=>t+(i.estado==='nohay'?0:(+i.q||0)*(+i.p||0)),0)),rp=repartoEnvio(prod,uber);e.costo=rp.cliente;e.tienda=rp.tienda;e.pct=rp.pct;}}
+  const nombre=String(x.cliente?.nombre||'').split(' ')[0],hora=new Date().toLocaleTimeString('es-CR',{hour:'numeric',minute:'2-digit',timeZone:'America/Costa_Rica'});
+  const txt='Cambios de '+nombre+' ('+hora+'): '+lineas.join(' · ');
+  x.totalEst=totalDe(x);
+  const reg={at:now(),por:'cliente',txt,lineas,totalAntes,total:totalDe(x),envioAntes,envio:+e?.costo||0};
+  x.cambiosCliente=[...(x.cambiosCliente||[]),reg].slice(-10);x.ultimoCambio=reg;
+  return{hay:true,txt,lineas};
+}
+// Vista previa para el cliente (no toca el pedido): qué dice el resumen, cuánto queda el total y el envío
+function simularCambio(o,nuevos){const y=clone(o),r=aplicarCambioCliente(y,nuevos);return{...r,total:totalDe(y),totalAntes:totalDe(o),envio:+y.retiro?.envio?.costo||0,envioAntes:+o.retiro?.envio?.costo||0};}
 
 // ── Avisos en el teléfono (notificación del sistema) ──
 const avisos={
@@ -715,7 +780,7 @@ window.AramoNube={
   on:f=>{subs.add(f);return()=>subs.delete(f);},
   tienda,guardarTienda,catalogo,recetas,waDe,sinpeDe,avisos,
   pack,unpack,enlace,
-  envioCfg,estimarEnvio,repartoEnvio,costoRealUber,productosDe,ubiSuc,tarifaKmAprendida,distKm,
+  envioCfg,estimarEnvio,rangoEnvio,repartoEnvio,costoRealUber,puedeCambiar,aplicarCambioCliente,simularCambio,restaurarDeNube,get ultimoError(){return ultimoError;},productosDe,ubiSuc,tarifaKmAprendida,distKm,
   nuevoId,nuevoRef,nuevoPin,colones,redondear5,qtyItem,totalDe,esAprox,telCR,wa,
   ESTADOS,FASES,faseDe,PAGOS,NIVELES,lealtad,hojasDe,cuentaCliente,historial,telDe,
   FASES4:PASOS4,paso4De,definitivo,cambiosDe,totalAntesDe,sincronizar,enviarComprobante,DEV,setQuien:f=>{quienFn=f;},
