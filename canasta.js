@@ -28,6 +28,18 @@ window.addEventListener('appinstalled',()=>{_installPrompt=null;window.__aramoIn
 const LS={get(k,d){try{const v=JSON.parse(localStorage.getItem(k));return v??d;}catch{return d;}},set(k,v){try{localStorage.setItem(k,JSON.stringify(v));}catch{}}};
 const ANON_ID=LS.get('aramo_anon_id',null)||('a'+Date.now().toString(36)+Math.random().toString(36).slice(2,9));LS.set('aramo_anon_id',ANON_ID);
 const track=(tipo,data={})=>{try{N.registrarEvento?.(tipo,data,ANON_ID);}catch{}};
+// Adquisición medible: cada cliente puede compartir una invitación con un código corto.
+const REF_PARAM=String(new URLSearchParams(location.search).get('ref')||'').replace(/[^a-z0-9_-]/gi,'').slice(0,32);
+const REF_CODE=LS.get('cn_ref_code','')||('AR'+ANON_ID.slice(-6).toUpperCase());LS.set('cn_ref_code',REF_CODE);
+const REF_SAVED=LS.get('cn_ref_from',null),REF_FROM=REF_SAVED&&typeof REF_SAVED==='object'?((Date.now()-(+REF_SAVED.at||0)<30*864e5)?String(REF_SAVED.code||''): ''):String(REF_SAVED||REF_PARAM);
+if(REF_PARAM&&REF_PARAM!==REF_CODE){LS.set('cn_ref_from',REF_PARAM);setTimeout(()=>track('referral_visit',{ref:REF_PARAM}),0);}
+function linkInvitacion(){const u=new URL(location.href);u.searchParams.delete('ref');u.searchParams.set('ref',REF_CODE);u.hash='';return u.toString();}
+async function compartirARAMO(){
+  const url=linkInvitacion(),text='Estoy pidiendo frutas y verduras en ARAMO 🧺. Probá La Feria desde el celular:';
+  track('referral_share',{code:REF_CODE});
+  if(navigator.share){try{await navigator.share({title:'La Feria de ARAMO',text,url});return;}catch(e){if(e?.name==='AbortError')return;}}
+  abrir(N.wa('',text+' '+url));
+}
 window.addEventListener('error',e=>track('client_error',{message:String(e.message||'Error').slice(0,240),file:String(e.filename||'').slice(-120),line:e.lineno||0}));
 window.addEventListener('unhandledrejection',e=>track('client_error',{message:String(e.reason?.message||e.reason||'Promise rechazada').slice(0,240)}));
 const $c=N.colones;
@@ -105,7 +117,9 @@ const SUST={avisar:{e:'📞',n:'Avisame'},similar:{e:'🔁',n:'Algo parecido'},q
 const limpiaQ=(q,u)=>{q=+q||0;if(q<=0)return 0;q=Math.min(q,999);return u==='kg'?Math.max(.05,Math.round(q*100)/100):Math.max(1,Math.round(q));};
 function unidadesDe(p){const L=[p.u];if(+p.pu>0&&(p.u==='kg'||p.u==='unid'))L.push(p.u==='kg'?'unid':'kg');return L;}
 const unidadDe=(p,u)=>unidadesDe(p).includes(u)?u:p.u;
-const pasoU=(p,u)=>u===p.u?p.s:(u==='kg'?.5:1);
+// Todo producto debe abrir con un paso utilizable, incluso si llega del POS sin
+// paso guardado. Así un toque en «Agregar» no deja una cantidad vacía.
+const pasoU=(p,u)=>u===p.u?(+p.s|| (u==='kg'?.5:1)):(u==='kg'?.5:1);
 function aBase(p,q,u){if(!u||u===p.u||!(+p.pu>0))return q;return limpiaQ(p.u==='kg'?q*p.pu:q/p.pu,p.u);}
 function deBase(p,qb,u){if(!u||u===p.u||!(+p.pu>0))return qb;return limpiaQ(u==='unid'?qb/p.pu:qb*p.pu,u);}
 function linea(k){const p=prod(k),v=C.cesta[k];if(!p||!v)return null;const u=unidadDe(p,v.u),q=limpiaQ(v.q,u);return q>0?{k,p,...v,u,q,qb:aBase(p,q,u)}:null;}
@@ -528,6 +542,7 @@ function mesaArmar(){
     <nav class="cuadros" id="tlPasillos" aria-label="Categorías">${cuadros()}</nav>
     ${u&&!n&&!a&&!C.cambio?`<button type="button" class="renglon repetir" data-act="repetir" data-id="${u.id}" data-express="1"><span class="rg-e">${emojis(u.items,3)}</span><span class="t"><b>Repetir mi último pedido</b><small>${u.items.length} ${u.items.length===1?'producto':'productos'} · ${$c(N.totalDe(u))}</small></span><span class="go" aria-hidden="true">›</span></button>`:''}
   </div>
+  ${!MINI?`<section class="referir-card" aria-label="Compartir ARAMO"><span class="referir-e" aria-hidden="true">🤝</span><span class="referir-t"><b>Invitá a alguien a La Feria</b><small>Compartí ARAMO en un toque y ayudanos a llevar frescura a más casas.</small></span><button type="button" class="referir-btn" data-act="compartir">Compartir</button></section>`:''}
   <div class="buscar" id="tlBuscar">
     <form class="ask" id="tlAsk" autocomplete="off" role="search"><svg class="lupa" viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg><input id="tlQ" type="search" enterkeyhint="search" placeholder="Buscá o escribí tu lista" value="${esc(C.q)}" aria-label="Buscar un producto o escribir tu lista"><button type="button" class="limpiar" id="tlLimpiar" data-act="limpiar-q" aria-label="Borrar"${C.q?'':' hidden'}>✕</button></form>
   </div>
@@ -540,7 +555,8 @@ function mesaArmar(){
 // ── Categoría: banda de su color (← vuelve al Inicio) y los productos en mosaicos grandes ──
 function mesaCat(){
   if(C.pasillo!=='recetas'&&!ORDEN_CATS.includes(C.pasillo))C.pasillo='frutas';
-  return `<div class="cat-pant">${C.cambio?franjaCambio():''}<header class="cat-banda qd-${C.pasillo}" id="tlGridTit"></header><div class="prods" id="tlGrid"></div></div>`;
+  const nav=ORDEN_CATS.map(k=>`<button type="button" class="cat-switch-btn${C.pasillo===k?' on':''}" data-act="pasillo" data-k="${k}"><span>${CHIP[k]||'🧺'}</span><small>${esc(nomCat(k))}</small></button>`).join('');
+  return `<div class="cat-pant">${C.cambio?franjaCambio():''}<header class="cat-banda qd-${C.pasillo}" id="tlGridTit"></header><nav class="cat-switch" aria-label="Cambiar categoría">${nav}</nav><div class="prods" id="tlGrid"></div></div>`;
 }
 function parseHtml(){
   const P=C.parse;if(!P)return '';
@@ -622,6 +638,7 @@ function mesaCanasta(){
     ${bloque('entrega','#178276',svgI(env?'camion':'casa'),'Entrega',unirA?(unirA.retiro?.envio?'Va con tu pedido '+esc(unirA.ref)+' · mismo Uber':'Lo recogés con tu pedido '+esc(unirA.ref)):entSub,unirA?'<span class="bq-m gratis">'+(unirA.retiro?.envio?'Mismo Uber':'Junto')+'</span>':entDer,'entrega',!unirA&&!!fR&&fR.p!=='canasta')}
     ${bloque('datos','#c9621a',svgI('persona'),'Tus datos',datSub,datDer,'datos',!!fD)}
   </div>
+  ${it.length?`<div class="grupo cesta canasta-preview" aria-label="Productos en la canasta">${it.map(lineaHtml).join('')}</div>`:''}
   ${unirHtml}<section class="bq-hondo" id="tlPagar"><small>${unirA?'Se suma a tu pedido (aprox.)':'Total aproximado'}</small><b class="bq-tot" id="tlTotal">≈ ${$c(unirA?tot:totalPagar())}</b><p class="bq-nota">${unirA?'Sin otro envío. La tienda pesa y te confirma el total nuevo de '+esc(unirA.ref)+'.':'La tienda pesa y te confirma el total. Pagás por SINPE después.'}</p>${eP&&!unirA?`<p class="bq-nota">Envío Uber: entre <b>${$c(eP.rango.min)}</b> y <b>${$c(eP.rango.max)}</b> (te confirmamos el monto exacto con el total)</p>`:''}<button type="button" class="bq-pagar" id="tlSellar" data-act="pedir">${unirA?'Agregar a mi pedido '+esc(unirA.ref):'Enviar pedido'}</button>${fl?`<p class="bq-aviso" role="status">${esc(fl.b||fl.m)}</p>`:''}</section>
   <div class="resumen quieto"><div><span>Productos</span><b>${$c(tot)}</b></div>${env?`<div><span>Envío con Uber · tu parte</span><b>${eP?'≈ '+$c(eP.costo):ee?'fuera de zona':'elegí ubicación'}</b></div>${eP?`<p class="reparte-r">${reparteTxt(eP)}</p>`:''}`:''}${pr?`<div class="desc"><span>🎁 ${esc(pr.n)}</span><b>−${$c(pr.valor)}</b></div>`:''}${L.activa&&c?`<div class="gana"><span>🍃 Con este pedido ganás</span><b>~${hojasEstimadas()} ${hojasEstimadas()===1?'hoja':'hojas'}${L.dobles?' 🔥':''}</b></div>`:''}<p>${sp?`${sp} ${sp===1?'producto va':'productos van'} con precio al pesar. `:''}Es un monto aproximado: la tienda pesa, ve qué hay y qué no hay, y te confirma el total antes de que pagués.</p></div>
   ${sinpeInfo(s)}`;
@@ -1115,7 +1132,7 @@ function abrirProd(k){
   track('product_view',{k,nombre:prod(k)?.n||k});
   const p=prod(k);if(!p)return;
   const c=C.cesta[k];if(p.agotado&&!c){toast(p.n+' está agotado hoy');return;}
-  const u=unidadDe(p,c?.u);abrirHoja({tipo:'prod',k,u,q:c?limpiaQ(c.q,u)||p.s:p.s,mad:c?.mad||'',nota:c?.nota||''});
+  const u=unidadDe(p,c?.u),paso=pasoU(p,u);abrirHoja({tipo:'prod',k,u,q:c?limpiaQ(c.q,u)||paso:paso,mad:c?.mad||'',nota:c?.nota||''});
 }
 const numTxt=q=>+q>0?String(+(+q).toFixed(2)).replace('.',','):'';
 function convTxt(p,u,q){
@@ -1161,7 +1178,9 @@ async function hacerPedido(){
     items:itemData,
     premio:pr?{k:pr.k,n:pr.n,hojas:+pr.hojas,valor:+pr.valor}:null,hojasX:L.activa&&L.dobles?2:1,
     totalEst:totalPagar(),canal:N.modo(),
+    marketing:{source:REF_FROM?'referral':'direct',referrer:REF_FROM||'',refCode:REF_CODE},
   });
+  if(REF_FROM)track('referral_order',{ref:REF_FROM,sucursal:s.k,total:+totalPagar()||0});
   if(!C.perfil.desde)C.perfil.desde=o.created;
   C.mis=[o.id,...C.mis.filter(x=>x!==o.id)];C.cesta={};C.nota='';C.premio=null;C.paso='armar';C.aparte=false;guardar();
   try{navigator.storage?.persist?.();}catch{} // que el navegador no borre solo el perfil y los pedidos
@@ -1433,6 +1452,7 @@ const ACT={
   con(el){C.pago.conCuanto=+el.dataset.v;guardar();render();},
   'edit-perfil'(){abrirHoja({tipo:'perfil',editar:true});setTimeout(()=>$('tlPNom')?.focus(),60);},
   pedir(){hacerPedido();},
+  compartir(){compartirARAMO();},
   'wa-tienda'(){const o=pedidoVisto();abrir(N.wa(N.waDe(o?.sucursal),`Hola, sobre mi pedido ${o?.ref||''} de ARAMO: `));},
   'ya-pague'(){N.cambiar(C.actual,o=>{o.pago.estado='reportado';o.pago.reportado=new Date().toISOString();o._ev={tipo:'sinpe-reportado',monto:N.totalDe(o),metodo:(N.PAGOS[o.pago.metodo]||{}).n||''};},'cliente','El cliente avisó que pagó').then(()=>{toast('¡Gracias! La tienda lo confirma al entregarte');render();});},
   'actualizar-pedido'(){
