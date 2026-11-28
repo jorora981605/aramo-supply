@@ -34,12 +34,19 @@ function comprasDe(dia,tienda){
   return r;
 }
 // Cobros del Mostrador (pedidos de clientes ya cobrados). Los pedidos de prueba no cuentan.
+// Un cobro del Mostrador que ya entró al POS como venta (pos-mostrador.js lo registra con origen_id = cobro.aPOS) se cuenta
+// una sola vez: con las ventas del POS. Si el resumen del POS todavía no lo trae, se cuenta como cobro del Mostrador.
+function yaEnPOS(o,dia,tienda){
+  const a=o&&o.cobro&&o.cobro.aPOS;if(!a)return false;
+  const ps=posDia(dia,tienda);
+  return !!(ps&&Array.isArray(ps.tiquetes)&&ps.tiquetes.some(t=>t&&t.o===a));
+}
 function cobrosDe(dia,tienda){
   const r={efectivo:0,tarjeta:0,sinpe:0,n:0},N=window.AramoNube;
   if(!N||typeof N.lista!=='function')return r;
   let L=[];try{L=N.lista();}catch(e){}
   L.forEach(o=>{
-    if(!o||!o.cobro||o.cobro.porPOS||o.prueba||o.sucursal!==tienda||diaDe(o.cobro.fecha)!==dia)return;
+    if(!o||!o.cobro||o.cobro.porPOS||o.prueba||o.sucursal!==tienda||diaDe(o.cobro.fecha)!==dia||yaEnPOS(o,dia,tienda))return;
     const k=o.cobro.metodo==='efectivo'?'efectivo':o.cobro.metodo==='sinpe'?'sinpe':'tarjeta';
     r[k]+=+o.cobro.total||0;r.n++;
   });
@@ -124,7 +131,7 @@ function lineas(fecha,tienda){
   const N=window.AramoNube;let L=[];
   try{if(N&&typeof N.lista==='function')L=N.lista()||[];}catch(e){}
   L.forEach(o=>{
-    if(!o||!o.cobro||o.cobro.porPOS||o.prueba||o.sucursal!==tienda||diaDe(o.cobro.fecha)!==fecha)return;
+    if(!o||!o.cobro||o.cobro.porPOS||o.prueba||o.sucursal!==tienda||diaDe(o.cobro.fecha)!==fecha||yaEnPOS(o,fecha,tienda))return;
     const monto=+o.cobro.total||0;if(!monto)return;
     const pago=o.cobro.metodo==='efectivo'?'efectivo':o.cobro.metodo==='sinpe'?'sinpe':'tarjeta';
     out.push({id:'v:'+o.id,campo:CAMPO_VENTA[pago],monto,titulo:(o.cliente&&o.cliente.nombre)||'Pedido de La Feria',origen:'Cobro del Mostrador',hora:Date.parse(o.cobro.fecha)||0,firma:'',items:[]});
