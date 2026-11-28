@@ -201,7 +201,7 @@ function conectar(opts){
       let q=supa.from(TABLE).select('id,data,owner_id');
       if(solo&&solo.size)q=q.in('id',[...solo,TIENDA_ID]);
       else if(authUser&&authSession&&!authPersonal)q=q.eq('owner_id',authUser.id);
-      else if(authUser&&authSession)q=q.neq('id',TIENDA_ID);
+      else if(authUser&&authSession)q=q.neq('id',TIENDA_ID).gte('updated_at',new Date(Date.now()-45*864e5).toISOString());   // el personal: los de los últimos 45 días (lo de antes no se guarda en el aparato igual, ver prune)
       else q=q.eq('id',TIENDA_ID);
       const r=await timeout(q,9000);
       if(r.error)throw new Error(r.error.message);
@@ -228,15 +228,20 @@ window.addEventListener('online',()=>{if(modo!=='nube'){conectando=null;conectar
 document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='visible'&&modo==='nube'&&solo)solo.forEach(async id=>{const o=await leerUno(id);if(o)take(o);});});
 // Pedidos en vivo para todos: además del canal en vivo (que el cliente sin cuenta no tiene), cada pocos
 // segundos se revisa lo que cambió. El Mostrador lee los últimos pedidos; el cliente, solo los suyos que siguen en curso.
-let _sync=0;
+let _sync=0,_ultAct=null,_completa=0;
 async function sincronizar(forzar){
   if(modo!=='nube'||!supa||document.visibilityState!=='visible')return;
   if(!forzar&&Date.now()-_sync<8000)return;
   _sync=Date.now();
   try{
     if(authUser&&authSession&&authPersonal){
-      const r=await timeout(supa.from(TABLE).select('id,data').neq('id',TIENDA_ID).order('updated_at',{ascending:false}).limit(80),9000);
-      (r.data||[]).forEach(x=>{if(x.data?.id)take(x.data);});
+      // Solo lo que cambió desde la última vuelta (antes bajaba los últimos 80 pedidos COMPLETOS, con la foto del
+      // comprobante, cada 12 s). Cada 10 min, o si se pide, una vuelta completa por si algo se escapó.
+      if(forzar||!_ultAct||Date.now()-_completa>10*60e3){_ultAct=null;_completa=Date.now();}
+      let q=supa.from(TABLE).select('id,data,updated_at').neq('id',TIENDA_ID);
+      if(_ultAct)q=q.gte('updated_at',_ultAct);
+      const r=await timeout(q.order('updated_at',{ascending:false}).limit(80),9000);
+      (r.data||[]).forEach(x=>{if(x.updated_at&&(!_ultAct||Date.parse(x.updated_at)>Date.parse(_ultAct)))_ultAct=x.updated_at;if(x.data?.id)take(x.data);});
     }else{
       const ids=Object.values(store).filter(o=>!o.borrado&&!['entregado','cancelado'].includes(o.estado)&&(!solo||solo.has(o.id))).slice(0,6).map(o=>o.id);
       for(const id of ids){const o=await leerUno(id);if(o)take(o);}
@@ -597,7 +602,8 @@ function nuevoId(){return 'e'+Date.now().toString(36)+rnd(2).map(x=>x.toString(3
 // 5 letras: 7,9 millones de números posibles (con 4 se repetían a los ~680 pedidos). La nube igual revisa que no se repita.
 function nuevoRef(){return 'A-'+rnd(5).map(x=>ALFA[x%ALFA.length]).join('');}
 function nuevoPin(){return rnd(4).map(x=>x%10).join('');}
-function colones(n){return '₡'+Math.round(+n||0).toLocaleString('es-CR').replace(/[\s  ,]/g,'.');}
+const _nfCR=new Intl.NumberFormat('es-CR');   // uno solo (antes uno por monto)
+function colones(n){return '₡'+_nfCR.format(Math.round(+n||0)).replace(/[\s  ,]/g,'.');}
 function redondear5(n){return Math.round((+n||0)/5)*5;}
 function qtyItem(it){return it.estado==='nohay'?0:(it.qr!=null&&it.qr!==''?+it.qr:+it.q||0);}
 // El premio canjeado con hojas 🍃 se descuenta del total (nunca baja de cero).

@@ -172,8 +172,9 @@
   function alturaDeAbajo(){
     // Cuánto ocupa lo que está pegado abajo (navegación o barra de acción) para que el aviso salga encima
     let alto = 0; const H = window.innerHeight, W = window.innerWidth;
-    document.querySelectorAll('.ui-nav,.ui-pie,.nav-bottom,.bar,[data-ui-abajo]').forEach(n => {
+    document.querySelectorAll('.ui-nav,.ui-hoja.open .ui-pie,.nav-bottom,body > .bar,#tlBar,[data-ui-abajo]').forEach(n => {
       if (n.closest('.ui-hoja:not(.open)')) return;
+      if (n.offsetParent === null && getComputedStyle(n).position !== 'fixed') return;   // escondida: no se mide
       const cs = getComputedStyle(n); if (cs.visibility === 'hidden' || cs.display === 'none') return;
       // Si es una barra fija se mide dónde VA a quedar (sin su animación de entrada); si no, dónde está
       let r = n.getBoundingClientRect();
@@ -183,7 +184,10 @@
     });
     return alto;
   }
-  function ubicarAviso(){ if (zona) zona.style.setProperty('--ui-aviso-abajo', (alturaDeAbajo() + 12) + 'px'); }
+  // Se mide en el próximo cuadro (cuando el navegador igual va a acomodar la pantalla), no en medio de un cambio:
+  // así no se recalcula toda la pantalla de más. Varias llamadas seguidas cuentan como una.
+  let _ubT = 0;
+  function ubicarAviso(){ if (!zona || _ubT) return; _ubT = requestAnimationFrame(() => setTimeout(() => { _ubT = 0; zona.style.setProperty('--ui-aviso-abajo', (alturaDeAbajo() + 12) + 'px'); }, 0)); }   // después de dibujar: medir sale gratis
   function aviso(texto, op){
     if (texto && typeof texto === 'object'){ op = texto; texto = op.texto; }
     op = op || {};
@@ -211,7 +215,7 @@
     a.addEventListener('pointerenter', () => clearTimeout(t)); a.addEventListener('pointerleave', armar);
     zona.appendChild(a); actual = yo; armar();
     // Por si la barra de abajo aparece un instante después que el aviso (la canasta del Taller)
-    setTimeout(ubicarAviso, 120); setTimeout(ubicarAviso, 500); setTimeout(ubicarAviso, 1200);
+    setTimeout(ubicarAviso, 450);   // una sola vez más, por si la barra de abajo estaba entrando
     return yo;
   }
 

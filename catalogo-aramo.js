@@ -17,7 +17,12 @@ const CAT_NOMBRE={frutas:'Frutas',verduras:'Verduras',hierbas:'Hierbas',despensa
 // ── Nombre → clave: minúsculas, sin tildes, sin "de/en/la", tamaños parejos y sin plural ──
 const NUM={un:'1',una:'1',uno:'1',dos:'2',tres:'3',cuatro:'4',cinco:'5',seis:'6',diez:'10',doce:'12',quince:'15',treinta:'30'};
 const STOP=new Set(['de','del','en','la','el','los','las','y','con','para','a','al']);
+const _normMemo=new Map();
 function norm(s){
+  const k=String(s||'');let v=_normMemo.get(k);if(v!==undefined)return v;
+  v=normCalc(k);if(_normMemo.size>10000)_normMemo.clear();_normMemo.set(k,v);return v;
+}
+function normCalc(s){
   let t=String(s||'').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'');
   t=t.replace(/medio\s+kilo/g,'500g').replace(/1\s*\/\s*2\s*(kg|kilo)s?\b/g,'500g').replace(/\b0[.,]5\s*(kg|kilo)s?\b/g,'500g')
      .replace(/(\d)[.,](\d)/g,'$1_$2')

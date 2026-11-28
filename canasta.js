@@ -106,7 +106,7 @@ const UNI={kg:['kg','kg'],unid:['unid.','unid.'],rollo:['rollo','rollos'],paquet
 const fu=(u,q)=>(UNI[u]||[u,u])[q===1?0:1];
 const qtxt=(q,u)=>fq(q)+' '+fu(u,q);
 const porU=p=>+p.p>0?$c(p.p)+(p.u==='kg'?'/kg':p.u==='unid'?' c/u':'/'+fu(p.u,1)):'Precio al pesar'; // sin precio todavía: la tienda lo pone al alistar
-const kg=n=>(Math.round((+n||0)*100)/100).toLocaleString('es-CR',{maximumFractionDigits:2});
+const _nfKg=new Intl.NumberFormat('es-CR',{maximumFractionDigits:2});const kg=n=>_nfKg.format(Math.round((+n||0)*100)/100);
 const MAD={hoy:'Para comer hoy',semana:'Para la semana',verde:'Bien verde'};
 const SUST={avisar:{e:'📞',n:'Avisame'},similar:{e:'🔁',n:'Algo parecido'},quitar:{e:'✖️',n:'Quitalo'}};
 
@@ -174,7 +174,7 @@ function envioEstimado(s,u,prod){
   const e=N.estimarEnvio(s,u,prod==null?cestaTotal():prod);
   return{...N.envioCfg(),...e,costo:Math.max(0,+e.cliente||0)};
 }
-const kmTxt=k=>(Math.round((+k||0)*10)/10).toLocaleString('es-CR');
+const _nfKm=new Intl.NumberFormat('es-CR');const kmTxt=k=>_nfKm.format(Math.round((+k||0)*10)/10);
 const cumpleMinimo=()=>{const m=+T().envioConfig?.minimo||0;return cestaTotal()>=m;};
 
 // ══════════════ Horarios ══════════════
@@ -954,7 +954,9 @@ function pintarMesa(anim,red){
   document.body.dataset.cat=vista==='cat'?C.pasillo:'';
   if(anim&&!MINI&&vista!=='canasta'){ // "Tu canasta" sale completa y quieta al instante
     const dir=_pos<0||pos===_pos?'fade':pos>_pos?'adelante':'atras';
-    m.classList.remove('adelante','atras','fade');void m.offsetWidth;m.classList.add(dir);
+    // reiniciar la animación obliga a acomodar toda la pantalla (void offsetWidth): solo si la anterior seguía puesta
+    const seguia=m.classList.contains('adelante')||m.classList.contains('atras')||m.classList.contains('fade');
+    m.classList.remove('adelante','atras','fade');if(seguia)void m.offsetWidth;m.classList.add(dir);
     clearTimeout(_mt);_mt=setTimeout(()=>m.classList.remove(dir),900);
   }
   _pos=pos;
