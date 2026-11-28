@@ -507,3 +507,51 @@ html[data-theme="dark"] .po6{--ar-p-control:#3b7fd4}
   .po6-door--mitad .po6-door-sub{flex-basis:100%}
   .po6-mitad-n b{font-size:26px}
 }
+
+/* Inicio en la compu, sin letras cortadas (2026-11-27, el dueño: «que no queden las letras como en Inventario, donde casi no se ven»).
+   Cada puerta mide por lo menos lo que trae adentro (nombre, texto y cuadritos). Si sobra espacio, las puertas lo reparten como antes;
+   si la ventana es baja, primero se achican (más abajo) y, si aun así no cabe, la página baja con la rueda en vez de cortar. */
+@media (min-width:1024px){
+  .pu-in.po6{height:auto;min-height:100dvh}
+  .po6-grid{flex:1 0 auto}
+  .po6-puertas,.po6-puertas.sin-control{grid-template-rows:none;grid-auto-rows:minmax(min-content,1fr)}
+  .po6-door,.po6-pos2{min-height:min-content}
+  .po6-door-tx{min-width:0}
+  .po6-door-ins{row-gap:4px}
+  /* el Mostrador no estira la pantalla: con muchos pedidos su lista baja con la rueda adentro de la tarjeta */
+  .po6-mos{height:0;min-height:100%}
+  .po6-mos-lista{overflow-y:auto;overscroll-behavior:contain}
+}
+/* Ventana baja (laptop o ventana a media pantalla): todo un poco más chico y el texto con sus cuadritos en una sola línea */
+@media (min-width:1024px) and (max-height:760px){
+  .pu-in.po6{gap:var(--ar-e2)}
+  .po6-cab{min-height:56px}
+  .po6-avisos .ui-aviso,.po6-avisos > *{margin-block:0}
+  .po6-grid,.po6-puertas{gap:var(--ar-e2)}
+  .po6-door{padding:var(--ar-e2) var(--ar-e5);gap:var(--ar-e3)}
+  .po6-door .ui-cuadro--l{width:36px;height:36px}
+  .po6-door .ui-cuadro--l .ic{width:20px;height:20px}
+  .po6-door-nom{gap:var(--ar-e2)}
+  .po6-door-nom b{font-size:22px}
+  .po6-door-tx{flex-direction:row;flex-wrap:wrap;align-items:center;gap:4px var(--ar-e2)}
+  .po6-door-nom{flex-basis:100%}
+  .po6-door-sub{font-size:14px;line-height:1.3}
+  .po6-door .ui-estado{min-height:24px;font-size:13px}
+  .po6-door .po6-collage{width:96px;height:72px}
+  .po6-door .po6-collage img:nth-child(1){width:52px;height:52px;top:18px}
+  .po6-door .po6-collage img:nth-child(2){width:48px;height:48px}
+  .po6-door .po6-collage img:nth-child(3){width:44px;height:44px}
+  .po6-collage--ico .ic{width:44px;height:44px}
+  .po6-pos2.dos .po6-door--mitad{padding:var(--ar-e2) var(--ar-e4)}
+  .po6-door--mitad .po6-door-tx{gap:2px var(--ar-e2)}
+  .po6-mitad-n{gap:1px}
+  .po6-mitad-n small{font-size:11px}
+  .po6-mitad-n b{font-size:20px}
+  .po6-mos{padding:var(--ar-e3) var(--ar-e5);gap:var(--ar-e2)}
+  .po6-mos-tx b,.po6-mos[data-tono="urg"] .po6-mos-tx b{font-size:22px}
+  .po6-mos .ui-cuadro--l{width:36px;height:36px}
+  .po6-ped{min-height:44px;font-size:15px}
+  .po6-mos-pie{gap:var(--ar-e2)}
+  .po6-mos-btn.ui-btn--l{min-height:48px}
+  .po6-pie{padding-top:0}
+}
