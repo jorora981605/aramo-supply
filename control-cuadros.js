@@ -57,6 +57,7 @@ const COM=[
 const GRUPO={ing:{campos:ING,nombre:'ingreso',titulo:'Ingresos'},com:{campos:COM,nombre:'compra',titulo:'Compras'}};
 const campoDe=k=>ING.concat(COM).find(c=>c.k===k)||{k,t:k,ic:'nota'};
 const VISTAS=['inicio','caja','bolsa','ingresos','compras','fijos','resultado','admin','ganancia','mas'];
+const cadaT=p=>(window.Colones&&window.Colones.CADA&&window.Colones.CADA[p])||(p==='mes'?'al mes':'por semana');
 // 2026-11-28 · Control total: las pantallas nuevas viven en sus propios archivos (control-gastos.js, control-compras.js,
 // control-productos.js, control-cierre.js). Cada uno se apunta en window.CX_MODULOS y aquí se monta (ver "módulos" abajo).
 const CUADROS=[];                        // cuadros del Inicio que pone un módulo: {id,orden,vista,tono,icono,nombre,dato()}
@@ -674,7 +675,7 @@ function vGanancia(){
     <h2><i class="menos" aria-hidden="true">−</i>Salió<b>${fmt(entro-gan)}</b></h2>
     ${fila('Compras',S(d=>d.comprasTotal),'compras',porQuien)}
     ${fila('Desechos',S(d=>d.manual.desechos),'ingresos')}
-    ${W.fixedMonthly.map(f=>fila(f.label,f.daily*n,'fijos',`${fmt(f.raw)} ${f.period==='mes'?'al mes':'por semana'} · ${n} día${n===1?'':'s'}`,'sub')).join('')}
+    ${W.fixedMonthly.map(f=>fila(f.label,f.daily*n,'fijos',`${fmt(f.raw)} ${cadaT(f.period)} · ${n} día${n===1?'':'s'}`,'sub')).join('')}
     ${Object.entries(gente).map(([nm,g])=>fila('Salario · '+esc(nm),g.p,'fijos',hoursLabel(g.h),'sub')).join('')}
     ${fila('Retiros de caja',S(d=>d.cajaRetirosTotal),'caja')}
     ${fila('Abonos de cuentas por pagar',S(d=>d.cuentaXpagarTotal))}
@@ -937,7 +938,7 @@ function guardarSobre(){
 /* ---------- Bolsa: la plata de los tres ---------- */
 const regla=(icn,t,d)=>`<article class="cx-regla"><span class="cx-ico" aria-hidden="true">${ic(icn,20)}</span><div><b>${t}</b><small>${d}</small></div></article>`;
 const GASTOS=[{k:'rent',t:'Alquiler'},{k:'electricity',t:'Luz'},{k:'terminal',t:'Datáfono'},{k:'taxes',t:'Impuesto'},{k:'insurance',t:'Seguro'},{k:'wifi',t:'Wifi'},{k:'salario',t:'Salario'},{k:'otro',t:'Otro'}];
-const gastoT=k=>(GASTOS.find(g=>g.k===k)||{t:'Gasto'}).t;
+const gastoT=k=>window.Gastos&&window.Gastos.nombre?(window.Gastos.nombre(k)||'Gasto'):(GASTOS.find(g=>g.k===k)||{t:'Gasto'}).t;
 function vBolsa(){
   const c=PL&&PL.cfg(),h=hoy();
   if(!PL)return barra()+cabeza('La plata de los tres','Bolsa',null,'No se pudo cargar esta parte. Recargá la página.','bol');
@@ -1126,7 +1127,7 @@ function vFijos(){
   <div class="cx-lista">
     ${W.fixedMonthly.map(f=>`<button type="button" class="cx-fijo" data-cx="fijo" data-k="${f.key}">
       <span class="cx-ico" aria-hidden="true">${ic(ICO[f.key]||'recibo',20)}</span>
-      <span class="cx-fijo-t"><b>${esc(f.label)}</b><small>${fmt(f.raw)} ${f.period==='mes'?'al mes':'por semana'}</small></span>
+      <span class="cx-fijo-t"><b>${esc(f.label)}</b><small>${fmt(f.raw)} ${cadaT(f.period)}</small></span>
       <span class="cx-fijo-m"><b>${fmt(f.daily*7)}</b><small>esta semana</small></span>
       <span class="cx-lapiz" aria-hidden="true">${ic('editar',16)}</span>
     </button>`).join('')}
@@ -1155,7 +1156,7 @@ function vFijos(){
 async function cambiarFijo(k){
   const f=W.fixedMonthly.find(x=>x.key===k);if(!f)return;
   const r=await pedirMonto({titulo:f.label,sub:f.period==='mes'?'Cuánto se paga al mes':'Cuánto se aparta por semana',etiqueta:f.period==='mes'?'Monto del mes':'Monto de la semana',valor:f.raw});
-  if(!r||r.monto==null)return;data.settings[k]=r.monto;save();aviso(`${f.label}: ${fmt(r.monto)} ${f.period==='mes'?'al mes':'por semana'}.`);
+  if(!r||r.monto==null)return;data.settings[k]=r.monto;save();aviso(`${f.label}: ${fmt(r.monto)} ${cadaT(f.period)}.`);
 }
 async function cambiarComision(){
   const v=await AramoUI.pedir({titulo:'Comisión del datáfono',texto:'El porcentaje que cobra el banco por cada pago con tarjeta.',etiqueta:'Porcentaje',valor:String(num(data.settings.cardFee)).replace('.',','),tipo:'decimal',
