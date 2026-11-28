@@ -1,0 +1,82 @@
+/* control-productos.css — Productos y Desechos del Control total (control-productos.js). 2026-11-28.
+   Rosa para Productos, pizarra para Desechos. Clases con el prefijo cp-. */
+.cx{
+  --cx-pro:#b0286a; --cx-pro-s:#fbe8f1;
+  --cx-des:#475a78; --cx-des-s:#e9edf5;
+}
+.cx-t-pro{--t:var(--cx-pro);--ts:var(--cx-pro-s)}
+.cx-t-des{--t:var(--cx-des);--ts:var(--cx-des-s)}
+.cx[data-vista="productos"]{--t:var(--cx-pro);--ts:var(--cx-pro-s)}
+.cx[data-vista="desechos"]{--t:var(--cx-des);--ts:var(--cx-des-s)}
+
+/* avisos */
+.cp-aviso{margin:10px 0;padding:12px 14px;border-radius:var(--ar-r-md);background:var(--ar-nota-fondo);border:1px solid var(--ar-nota-borde);color:var(--ar-nota-tinta);font:600 14px/1.45 var(--ar-f-ui)}
+.cp-aviso b{font-weight:800}
+.cp-aviso .cx-enlace{color:var(--ar-nota-tinta);min-height:44px}
+.cp-regla{margin:0 2px 14px}
+.cp-prom{margin-top:0;margin-bottom:6px}
+.cp-rojo{color:var(--ar-peligro-tinta)}
+.cp-ambar{color:var(--ar-ambar700)}
+
+/* el puente: compraste → se vendió / se botó / quedó */
+.cp-puente h2 i.mas{background:var(--cx-pro-s);color:var(--cx-pro)}
+.cp-puente .cx-res-f.cp-quedo{background:var(--ar-ambar50);margin:4px -16px 0;width:calc(100% + 32px);padding:10px 16px;border-top:1px solid var(--ar-ambar300);color:var(--ar-ambar700)}
+.cp-puente .cx-res-f.cp-quedo small{color:var(--ar-ambar700)}
+.cp-puente .cx-res-f.cp-quedo b{color:var(--ar-ambar700)}
+.cp-puente .cx-res-f.cp-quedo.menos{background:var(--ar-hundido);border-top-color:var(--ar-borde);color:var(--ar-tinta-2)}
+.cp-puente .cx-res-f.cp-quedo.menos small,.cp-puente .cx-res-f.cp-quedo.menos b{color:var(--ar-tinta-2)}
+.cp-puente .cx-enlace{margin:6px 0 4px}
+.cp-porque{margin:4px 0 8px;font:500 14px/1.45 var(--ar-f-ui);color:var(--ar-tinta-2)}
+.cp-porque p{margin:0 0 6px}
+
+/* lista de productos */
+.cp-orden{margin-bottom:12px}
+.cp-fila .cx-renglon-b{display:flex;align-items:center;gap:12px;width:100%;min-height:72px;padding:12px 14px}
+.cp-fila .cx-ico{background:var(--cx-pro-s);color:var(--cx-pro)}
+.cp-fila.perdida{border-color:var(--ar-rojo100);background:linear-gradient(180deg,#fff5f3,#fff)}
+.cp-fila.perdida .cx-ico{background:var(--ar-rojo100);color:var(--ar-rojo700)}
+.cp-falta{border-color:var(--ar-ambar300)}
+.cp-falta .cx-ico{background:var(--ar-ambar100);color:var(--ar-ambar700)}
+.cx-renglon-m small{font:600 12px/1.2 var(--ar-f-ui);color:var(--ar-tinta-3)}
+.cp-barra{display:block;height:8px;margin-top:8px;border-radius:var(--ar-r-full);background:var(--ar-hundido);overflow:hidden}
+.cp-barra i{display:block;height:100%;border-radius:var(--ar-r-full);background:var(--cx-pro)}
+.cp-barra.mal i{background:var(--ar-rojo600)}
+.cp-barra.des i{background:var(--cx-des)}
+.cp-barra.ojo i{background:var(--ar-ambar700)}
+.cp-sinboton{display:flex;align-items:center;gap:12px;padding:12px 14px;min-height:64px}
+.cp-des .cx-renglon-b small+.cx-marca{margin-top:4px}
+.cp-dia{display:flex;justify-content:space-between;gap:12px;margin:18px 2px 8px;font:800 15px/1.3 var(--ar-f-ui);color:var(--ar-tinta-2)}
+.cp-dia::first-letter{text-transform:uppercase}
+.cp-dia b{font:800 15px/1.3 var(--ar-f-ui);font-variant-numeric:tabular-nums;color:var(--ar-tinta)}
+
+/* "Cada colón de…" */
+.cp-cascada{margin:0 0 20px}
+.cp-cascada h3{margin:0 0 4px;font:800 17px/1.3 var(--ar-f-ui)}
+.cp-sub{margin:0 0 10px;font:500 13.5px/1.45 var(--ar-f-ui);color:var(--ar-tinta-2)}
+.cp-resumen{padding:10px 12px;border-radius:var(--ar-r-md);background:var(--ar-sup-2)}
+.cp-apilada{display:flex;height:22px;margin:6px 0 14px;border-radius:var(--ar-r-full);overflow:hidden;background:var(--ar-hundido)}
+.cp-apilada i{display:block;height:100%;min-width:2px}
+.cp-parte{display:flex;align-items:flex-start;gap:10px;padding:10px 0;border-top:1px solid var(--ar-borde)}
+.cp-punto{flex:none;width:14px;height:14px;margin-top:4px;border-radius:50%}
+.cp-parte-t{flex:1;min-width:0}
+.cp-parte-t b{display:block;font:800 15.5px/1.3 var(--ar-f-ui)}
+.cp-parte-t small{display:block;font:500 13px/1.35 var(--ar-f-ui);color:var(--ar-tinta-3)}
+.cp-parte-m{flex:none;font:800 16.5px/1.3 var(--ar-f-ui);font-variant-numeric:tabular-nums;white-space:nowrap}
+.cp-total{display:flex;justify-content:space-between;padding:10px 0 0;border-top:2px solid var(--ar-borde-2);font:800 15px/1.3 var(--ar-f-ui)}
+.cp-socios{margin-top:10px}
+.cp-socios b{color:var(--ar-tinta)}
+/* un color por parte (el punto, la barra apilada y la barrita de cada fila) */
+.cp-k-costo{background:#8a7a6a}.cp-k-desecho{background:#c8341f}.cp-k-transporte{background:#e07a1f}
+.cp-k-comision{background:#2b6fc7}.cp-k-fijos{background:#b8860b}.cp-k-salarios{background:#7a4fc0}
+.cp-k-otros{background:#475a78}.cp-k-ganancia{background:#1c7a3f}
+.cp-barra i.cp-k-costo,.cp-parte .cp-barra.cp-k-costo i{background:#8a7a6a}
+.cp-parte .cp-barra{background:var(--ar-hundido)}
+.cp-parte .cp-barra.cp-k-costo,.cp-parte .cp-barra.cp-k-desecho,.cp-parte .cp-barra.cp-k-transporte,.cp-parte .cp-barra.cp-k-comision,
+.cp-parte .cp-barra.cp-k-fijos,.cp-parte .cp-barra.cp-k-salarios,.cp-parte .cp-barra.cp-k-otros,.cp-parte .cp-barra.cp-k-ganancia{background:var(--ar-hundido)}
+.cp-parte .cp-barra.cp-k-desecho i{background:#c8341f}.cp-parte .cp-barra.cp-k-transporte i{background:#e07a1f}
+.cp-parte .cp-barra.cp-k-comision i{background:#2b6fc7}.cp-parte .cp-barra.cp-k-fijos i{background:#b8860b}
+.cp-parte .cp-barra.cp-k-salarios i{background:#7a4fc0}.cp-parte .cp-barra.cp-k-otros i{background:#475a78}
+.cp-parte .cp-barra.cp-k-ganancia i{background:#1c7a3f}
+
+/* el cuadro de Productos: "Falta el costo de 2" cabe entero (en el Inicio nunca se corta un texto) */
+.cx-cuadro[data-v="productos"] .cx-num b{white-space:normal;font-size:clamp(16px,4.8vw,21px);line-height:1.2;overflow-wrap:anywhere}

@@ -388,6 +388,9 @@ async function initDB() {
   try { db.run("ALTER TABLE productos ADD COLUMN catalogo_id TEXT DEFAULT ''"); } catch(e) {}
   try { db.run("ALTER TABLE productos ADD COLUMN origen TEXT DEFAULT ''"); } catch(e) {}
 
+  // Migración — el costo del producto en el momento de la venta (Control total: cuánto costó lo que se vendió, aunque el costo cambie después)
+  try { db.run('ALTER TABLE venta_items ADD COLUMN costo_unitario REAL DEFAULT NULL'); } catch(e) {}
+
   // Admin por defecto si no existe ningún administrador
   const adminCnt = prepare(`SELECT COUNT(*) AS n FROM cajeros WHERE rol = 'administrador'`).get();
   if (!adminCnt || adminCnt.n === 0) {
@@ -888,6 +891,15 @@ function prepararVenta(data) {
   return data;
 }
 
+// El costo que tiene el producto AHORA: queda guardado en la línea de la venta, así el costo de lo vendido no cambia
+// si el costo sube o baja después. Sin producto o sin costo puesto: NULL (el resumen del día lo marca «falta el costo»).
+function costoDelMomento(productoId) {
+  if (!productoId) return null;
+  const p = prepare('SELECT costo FROM productos WHERE id = ?').get([productoId]);
+  const c = +(p && p.costo);
+  return c > 0 ? c : null;
+}
+
 ipcMain.handle('ventas:crear', (_, data) => {
   data = prepararVenta(data);
   const crearVenta = transaction((data) => {
@@ -925,8 +937,8 @@ ipcMain.handle('ventas:crear', (_, data) => {
         INSERT INTO venta_items
           (venta_id,producto_id,nombre,precio_unitario,cantidad,unidad,tasa_impuesto,
            descuento,subtotal,promocion_id,promocion_descripcion,desc_manual_pct,
-           cabys_codigo,producto_generico)
-        VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)
+           cabys_codigo,producto_generico,costo_unitario)
+        VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
       `).run([
         ventaId, item.producto_id || null, item.nombre, item.precio_unitario,
         item.cantidad, item.unidad, item.tasa_impuesto||0,
@@ -935,6 +947,7 @@ ipcMain.handle('ventas:crear', (_, data) => {
         item.desc_manual_pct||0,
         item.cabys_codigo||'',
         item.producto_generico ? 1 : 0,
+        costoDelMomento(item.producto_id),
       ]);
       // Solo descontar stock si es producto del inventario
       if (item.producto_id) {

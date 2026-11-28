@@ -102,7 +102,80 @@ function calcular(POS,tienda,fecha){
     POS.prepare(`SELECT id,cliente,monto,metodo,fecha,usuario,caja_id FROM fiado_pagos WHERE estado = 'ok' AND substr(fecha,1,10) = ? ORDER BY fecha,id`).all([fecha])
       .forEach(p=>{(d.fiadoPagos=d.fiadoPagos||[]).push({h:horaDe(p.fecha),cliente:p.cliente||'',t:rd(p.monto),m:p.metodo||'efectivo',c:p.usuario||'',caja:p.caja_id});});
   }catch(e){}
+  // 2026-11-28 · Control total: lo vendido y lo desechado, producto por producto (claves nuevas; las de arriba no cambian)
+  try{const x=detalle(POS,fecha,vs);d.productos=x.productos;d.desechosDet=x.desechosDet;d.iva=x.iva;}
+  catch(e){console.warn('[pos] detalle por producto',e);d.productos=[];d.desechosDet=[];d.iva=0;}
   return d;
+}
+
+// ── 1b) Detalle por producto (Control total, 2026-11-28) ──
+// Reparte un total entero entre unas partes según sus pesos, sin perder ni un colón (mayor residuo; los empates, en orden).
+function repartir(total,pesos){
+  const T=Math.max(0,rd(total)),P=pesos.map(p=>Math.max(0,+p||0)),S=P.reduce((a,b)=>a+b,0),n=P.length;
+  if(!n)return [];
+  const Q=S>0?P:P.map(()=>1),QS=S>0?S:n;
+  const b=Q.map((p,i)=>{const x=T*p/QS,v=Math.floor(x+1e-9);return{i,v,r:x-v};});
+  let resto=T-b.reduce((a,x)=>a+x.v,0);
+  b.slice().sort((x,y)=>y.r-x.r||x.i-y.i).forEach(x=>{if(resto>0){x.v++;resto--;}});
+  return b.map(x=>x.v);
+}
+// Devolver un ítem NO toca venta_items: solo baja el total de la venta y deja «[DEV] nombre xCantidad» en las notas.
+// Devuelve los renglones que SIGUEN vendidos (cada devolución quita un renglón con ese nombre y esa cantidad).
+function sinDevueltos(items,notas){
+  const dev=[];
+  String(notas||'').split('\n').forEach(l=>{const m=l.match(/^\[DEV\]\s+(.*)\s+x(-?[\d.]+)\s*$/);if(m)dev.push({n:m[1].trim(),q:+m[2]});});
+  if(!dev.length)return items;
+  const quitar=new Set();
+  dev.forEach(x=>{const it=items.find(i=>!quitar.has(i.iid)&&String(i.nombre).trim()===x.n&&Math.abs((+i.cantidad||0)-x.q)<1e-9);if(it)quitar.add(it.iid);});
+  return items.filter(i=>!quitar.has(i.iid));
+}
+// El mismo id que usa el catálogo de ARAMO; sin catálogo, 'p'+id del producto; un producto suelto («Envío Uber») no tiene id: 'g:'+nombre
+const idProducto=it=>{
+  if(it.producto_id){const c=String(it.catalogo_id||'').trim();return c||('p'+it.producto_id);}
+  return 'g:'+String(it.nombre||'').trim().toLowerCase();
+};
+function agregar(m,x){
+  const k=x.id+'|'+x.u,g=m.get(k)||{id:x.id,n:x.n,u:x.u,q:0,t:0,d:0,c:0,sc:false};
+  g.q+=x.q;g.t+=x.t;g.d+=x.d;g.c+=x.c;if(x.sc)g.sc=true;m.set(k,g);
+}
+// productos: lo vendido ese día por producto (t = lo cobrado con el descuento global y las devoluciones ya repartidos: Σ t = ventas.total)
+// desechosDet: cada línea desechada al costo (Σ c = desechos) · iva: Σ impuesto de las ventas completadas
+function detalle(POS,fecha,vs){
+  const filas=sql=>POS.prepare(sql).all([fecha]);
+  const base=`SELECT vi.id AS iid, vi.venta_id, vi.producto_id, vi.nombre, vi.cantidad, vi.unidad, vi.precio_unitario, vi.subtotal,
+      p.catalogo_id, %COSTO% AS costo_mom
+    FROM venta_items vi JOIN ventas v ON v.id = vi.venta_id LEFT JOIN productos p ON p.id = vi.producto_id
+    WHERE substr(v.fecha,1,10) = ? AND v.estado IN ('completada','desecho') ORDER BY vi.venta_id, vi.id`;
+  let its;
+  // el costo del momento (venta_items.costo_unitario); en las ventas viejas, el costo que tiene hoy el producto
+  try{its=filas(base.replace('%COSTO%','COALESCE(vi.costo_unitario, p.costo)'));}catch(e){its=filas(base.replace('%COSTO%','p.costo'));}
+  // notas (devoluciones) e impuesto de cada venta: consulta aparte, para no tocar el SELECT de las ventas
+  const extra=new Map();
+  try{filas('SELECT id,notas,impuesto FROM ventas WHERE substr(fecha,1,10) = ?').forEach(x=>extra.set(x.id,x));}catch(e){}
+  const porVenta=new Map();
+  its.forEach(i=>{if(!porVenta.has(i.venta_id))porVenta.set(i.venta_id,[]);porVenta.get(i.venta_id).push(i);});
+  const grupos=new Map(),desechosDet=[];let iva=0;
+  vs.forEach(v=>{
+    const T=rd(v.total),todos=porVenta.get(v.id)||[];
+    if(v.estado==='completada'){
+      const ex=extra.get(v.id)||{};iva+=rd(ex.impuesto);
+      const L=sinDevueltos(todos,ex.notas);
+      if(!L.length){if(T>0)agregar(grupos,{id:'sd',n:'Sin detalle',u:'',q:0,t:T,d:0,c:0,sc:true});return;}
+      const t=repartir(T,L.map(i=>Math.max(0,+i.subtotal||0)));
+      L.forEach((i,k)=>{
+        const q=+i.cantidad||0,cu=i.costo_mom==null?0:+i.costo_mom,sc=!(cu>0);
+        agregar(grupos,{id:idProducto(i),n:i.nombre||'',u:i.unidad||'',q,t:t[k],d:Math.max(0,rd((+i.precio_unitario||0)*q)-t[k]),c:sc?0:q*cu,sc});
+      });
+    }else if(v.estado==='desecho'){
+      if(!todos.length){if(T>0)desechosDet.push({n:v.numero,h:horaDe(v.fecha),id:'sd',nom:'Sin detalle',u:'',q:0,cu:0,c:T,cajero:v.cajero||''});return;}
+      const c=repartir(T,todos.map(i=>Math.max(0,+i.subtotal||0)));
+      todos.forEach((i,k)=>desechosDet.push({n:v.numero,h:horaDe(v.fecha),id:idProducto(i),nom:i.nombre||'',u:i.unidad||'',q:Math.round((+i.cantidad||0)*1000)/1000,
+        cu:Math.round((+i.precio_unitario||0)*100)/100,c:c[k],cajero:v.cajero||''}));
+    }
+  });
+  const productos=[...grupos.values()].map(g=>{const o={id:g.id,n:g.n,u:g.u,q:Math.round(g.q*1000)/1000,t:g.t,d:g.d,c:rd(g.c)};if(g.sc)o.sc=1;return o;})
+    .sort((a,b)=>b.t-a.t||(a.id<b.id?-1:1));
+  return{productos,desechosDet,iva};
 }
 const firma=d=>{const {at,...r}=d||{};return JSON.stringify(r);};
 const vacio=d=>!d.ventas.n&&!d.anuladas.n&&!d.desechos&&!d.cajas.length;
@@ -249,6 +322,6 @@ function iniciar(o){
   pend=new Set(LS.get(claveEspera(),[]));
   window.addEventListener('online',()=>{if(pend.size){falloRed=0;enviar();}});
 }
-return{iniciar,cambio,alIniciar,vaciar,enviar,calcular,partir,firma,destinosConfig,nombreDestino,hoyCR,fechasConDatos,reiniciarDatos,limpiarLocal,publicarFechas,costoCarrito,clientesFiado,
+return{iniciar,cambio,alIniciar,vaciar,enviar,calcular,detalle,partir,firma,destinosConfig,nombreDestino,hoyCR,fechasConDatos,reiniciarDatos,limpiarLocal,publicarFechas,costoCarrito,clientesFiado,
   get pendientes(){return[...pend];}};
 })();

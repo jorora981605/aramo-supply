@@ -1,0 +1,51 @@
+/* control-gastos.css — la pantalla de Gastos del Control total (control-gastos.js). 2026-11-28.
+   Un color propio (rosa magenta) para que no se confunda con Compras (naranja) ni con Cierre (morado).
+   Lo demás sale de las clases .cx-* de control-cuadros.css y de los tokens --ar-* de aramo-ui.css. */
+.cx{--cx-gas:#a8286b;--cx-gas-s:#fbeaf3}
+.cx-t-gas{--t:var(--cx-gas);--ts:var(--cx-gas-s)}
+.cx.cx[data-vista="gastos"],.cx.cx[data-vista="fijos"]{--t:var(--cx-gas);--ts:var(--cx-gas-s)}
+
+/* el estado de cada gasto en su período: "Noviembre: pagado" */
+.cx .cg-est{display:block;margin-top:3px;font:700 13px/1.3 var(--ar-f-ui);color:var(--ar-tinta-3)}
+.cg-est.bien{color:var(--ar-v800)}
+.cg-est.ojo{color:var(--ar-ambar700)}
+.cg-est.mal{color:var(--ar-peligro-tinta)}
+.cg-est.info{color:var(--ar-tinta-3)}
+
+/* el nombre de cada tipo de gasto, que se cierra y se abre */
+.cx .cg-cat{display:flex;align-items:center;gap:10px;width:100%;min-height:48px;margin:14px 0 8px;padding:4px 6px 4px 2px;border-radius:14px}
+.cg-cat .cx-ico{width:32px;height:32px;border-radius:10px}
+.cg-cat>b{flex:1;min-width:0;font:800 15.5px/1.25 var(--ar-f-ui);color:var(--ar-tinta-2)}
+.cg-cat-m{font:800 15px/1 var(--ar-f-ui);color:var(--ar-tinta-3);font-variant-numeric:tabular-nums;white-space:nowrap}
+.cg-chev{display:grid;place-items:center;flex:none;color:var(--ar-tinta-3);transition:transform .15s ease}
+.cg-chev.on{transform:rotate(90deg)}
+.cx .cg-sec{min-height:64px}
+.cg-abierta{margin:2px 0 6px}
+.cx .cg-ajuste{cursor:default}
+.cx .cg-ajuste>b{color:var(--ar-ambar700)}
+
+/* ventanitas */
+.cg-hoja .cg-info{margin:0 0 14px;padding:12px 14px;border-radius:var(--ar-r-md);background:var(--ar-sup-2);font:500 14.5px/1.45 var(--ar-f-ui);color:var(--ar-tinta-2)}
+.cg-hoja .cg-info[hidden]{display:none}
+.cg-hoja .cg-info b{color:var(--ar-tinta)}
+.cg-hoja .cg-usar{display:inline-flex;margin-left:4px}
+.cg-hoja .cg-cuenta{margin:0 0 14px;padding:14px;border-radius:var(--ar-r-md);background:var(--ar-sup-2);border:1.5px solid var(--ar-borde-2);font:500 15px/1.5 var(--ar-f-ui);color:var(--ar-tinta-2)}
+.cg-cuenta.bien{background:var(--ar-v50);border-color:var(--ar-v200)}
+.cg-cuenta.mal{background:var(--ar-rojo50);border-color:var(--ar-rojo100);color:var(--ar-peligro-tinta);font-weight:700}
+.cg-cuenta b{color:var(--ar-tinta);font-weight:800}
+.cg-cuenta small{display:block;margin-top:4px;font:500 13.5px/1.4 var(--ar-f-ui);color:var(--ar-tinta-3)}
+.cg-hoja .cg-aviso{margin:0 0 14px;padding:12px 14px;border-radius:var(--ar-r-md);background:var(--ar-ambar50);border:1px solid var(--ar-ambar100);font:500 14.5px/1.45 var(--ar-f-ui);color:var(--ar-tinta-2)}
+.cg-aviso b{color:var(--ar-ambar700)}
+.cg-aviso .cx-segundo{margin-top:10px;min-height:48px;font-size:14.5px}
+.cg-hoja .cg-aviso-cambio{margin:6px 0 0}
+.cg-hoja .cg-sel{appearance:auto;padding-right:10px;background:var(--ar-sup)}
+.cg-hoja .cg-sub{margin:18px 0 8px;font:800 16px/1.25 var(--ar-f-ui);color:var(--ar-tinta)}
+.cg-ruta{display:flex;align-items:center;gap:10px;min-height:56px;padding:6px 6px 6px 14px;border-radius:var(--ar-r-md);background:var(--ar-sup-2)}
+.cg-ruta>span{flex:1;min-width:0}
+.cg-ruta b{display:block;font:800 15px/1.25 var(--ar-f-ui);overflow-wrap:anywhere}
+.cg-ruta small{display:block;font:500 13.5px/1.3 var(--ar-f-ui);color:var(--ar-tinta-3)}
+.cg-ruta-nueva{display:grid;grid-template-columns:minmax(0,1fr) 84px auto;gap:8px;align-items:center;margin-top:10px}
+.cg-ruta-nueva .cx-segundo{min-height:48px;padding:0 16px}
+.cg-hoja #cgRE{margin-top:6px}
+.cg-hoja [hidden]{display:none!important}
+.cg-hoja .cg-info .cg-usar{display:inline-flex;align-items:center;margin:8px 0 0;padding:0 16px;min-height:44px;border:1.5px solid var(--ar-borde-2);border-radius:12px;background:var(--ar-sup);color:var(--ar-v800);text-decoration:none;font:800 15px/1 var(--ar-f-ui)}

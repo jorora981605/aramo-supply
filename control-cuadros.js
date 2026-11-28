@@ -215,6 +215,7 @@ function proveedores(){
   const s=new Set(),h=hoy();
   for(let i=0;i<21;i++)clAutoLineas(clDateAdd(h,-i)).forEach(l=>{if(/^c:/.test(l.id)&&l.titulo)s.add(l.titulo);});
   (data.movs||[]).slice(-200).forEach(m=>{if(m&&/^compras/.test(m.campo)&&m.nota){const t=m.nota.split(/[·\-–,:]/)[0].trim();if(t&&t.length<=24)s.add(t);}});
+  (data.provEntrega||[]).forEach(p=>{if(p&&p.n)s.add(p.n);});
   return[...s].slice(0,30);
 }
 
@@ -601,8 +602,9 @@ function vInicio(){
     <span class="cx-sobre">Ganancia ${hoyEs?'de hoy':'del '+esc(diaBonito(D.date))}</span>
     <span class="cx-heroe-cifra${D.ganancia<0?' neg':''}">${col(D.ganancia)}</span>
     <span class="cx-heroe-2">
-      <span><small>Entró</small><b>${col(D.ingresoReal)}</b></span>
-      <span><small>Salió</small><b>${col(D.ingresoReal-D.ganancia)}</b></span>
+      ${(()=>{let lb=null;try{lb=window.Cierres&&window.Cierres.libro?window.Cierres.libro([D]):null;}catch(e){}
+        const entro=lb?lb.entroTotal:D.ingresoReal,seFue=lb?lb.seFueTotal:D.ingresoReal-D.ganancia;
+        return `<span><small>Entró</small><b>${col(entro)}</b></span><span><small>Se fue</small><b>${col(seFue)}</b></span>`;})()}
     </span>
     <span class="cx-heroe-ver">Ver el detalle del día${ic('siguiente',16)}</span>
   </button>
@@ -632,7 +634,33 @@ function vInicio(){
 }
 
 /* ---------- Ganancia de la semana, con todo el detalle ---------- */
+// el recibo de varios días con los mismos números de "Cada colón" (control-cierre.js)
+// el detalle de una fila grande, en colones enteros que suman exacto esa fila
+const partesExactas=(total,L)=>{const P=window.Colones?window.Colones.partir(total,L.map(x=>Math.max(0,num(x.v)))):L.map(x=>Math.round(num(x.v)));return L.map((x,i)=>({...x,monto:P[i]})).filter(x=>x.monto);};
+function detalleSemana(V,lb){
+  const fila=k=>(lb.seFue.find(x=>x.k===k)||{monto:0}).monto,fij=new Map(),gente=new Map();
+  V.forEach(d=>{
+    const it=d.gastosDet&&d.gastosDet.items;
+    if(it)it.forEach(x=>{const o=fij.get(x.id)||{t:x.label,v:0};o.v+=num(x.monto);fij.set(x.id,o);});
+    // los salarios de un día cerrado son los de cuando se cerró (no los del horario de hoy)
+    let sd=null;try{const z=window.Cierres&&window.Cierres.dia?window.Cierres.dia(d.date):null;sd=z&&z.salDet&&Object.keys(z.salDet).length?z.salDet:null;}catch(e){}
+    Object.values(sd||clHourlyDetailForDay(d.dayName)||{}).forEach(x=>{const o=gente.get(x.name)||{t:'Salario · '+x.name,v:0,h:0};o.v+=num(x.pay);o.h+=num(x.hours);gente.set(x.name,o);});
+  });
+  let F=[...fij.values()];
+  if(!F.length)F=W.fixedMonthly.map(f=>({t:f.label,v:num(f.daily)*V.length}));
+  return{fijos:partesExactas(fila('fijos'),F),salarios:partesExactas(fila('salarios'),[...gente.values()]).map(x=>({...x,sub:hoursLabel(x.h)}))};
+}
+const reciboLibro=(lb,det)=>{
+  const chico=x=>`<div class="cx-res-f sub"><span>${esc(x.t)}${x.sub?`<small>${esc(x.sub)}</small>`:''}</span><b>${fmt(x.monto)}</b></div>`;
+  const fl0=x=>`<${x.ir?`button type="button" data-cx="ir" data-v="${x.ir}"`:'div'} class="cx-res-f"><span>${esc(x.t)}</span><b>${fmt(x.monto)}</b>${x.ir?ic('siguiente',16):''}</${x.ir?'button':'div'}>`;
+  const fl=x=>fl0(x)+(det&&det[x.k]&&det[x.k].length>1?det[x.k].map(chico).join(''):'');
+  return `<section class="cx-res"><h2><i class="mas" aria-hidden="true">+</i>Entró<b>${fmt(lb.entroTotal)}</b></h2>${lb.entro.map(fl).join('')||'<p class="cx-vacio">Todavía no entró nada.</p>'}</section>
+  <section class="cx-res"><h2><i class="menos" aria-hidden="true">−</i>Se fue<b>${fmt(lb.seFueTotal)}</b></h2>${lb.seFue.map(fl).join('')}</section>
+  <section class="cx-res cx-res-fin ${lb.quedo<0?'neg':''}"><h2><i aria-hidden="true">=</i>${lb.quedo<0?'Pérdida':'Quedó'}<b>${col(lb.quedo)}</b></h2></section>
+  ${lb.cuadra?`<p class="cz-cuadra bien">${ic('ok',20)}<span>Cuadra: no falta ni un colón</span></p>`:`<p class="cz-cuadra mal">${ic('alerta',20)}<span>Hay ${fmt(Math.abs(lb.sinExplicar))} sin explicar</span></p>`}`;
+};
 function vGanancia(){
+  let lb=null;try{lb=window.Cierres&&window.Cierres.libro?window.Cierres.libro(vividos()):null;}catch(e){console.error(e);}
   const V=vividos(),n=V.length,S=f=>sumar(V,f),gan=S(d=>d.ganancia),entro=S(d=>d.ingresoReal),ventas=S(d=>d.ventas),h=hoy();
   const prev=clComputeWeek(clDateAdd(W.inicio,-7)).perDay.slice(0,Math.max(1,n)),ganPrev=sumar(prev,d=>d.ganancia),dif=gan-ganPrev;
   const maxi=Math.max(1,...W.perDay.filter(d=>d.date<=h).map(d=>Math.abs(d.ganancia)));
@@ -661,7 +689,7 @@ function vGanancia(){
     <div class="cx-barras">${barras}</div>
     <p class="cx-comparo">La semana pasada, en esos mismos ${n} día${n===1?'':'s'}: <b>${col(ganPrev)}</b> <span class="cx-marca ${dif>=0?'bien':'mal'}">${dif>=0?'+':'−'}${fmt(Math.abs(dif))}</span></p>
   </section>
-  <section class="cx-res">
+  ${lb?reciboLibro(lb,detalleSemana(V,lb)):`<section class="cx-res">
     <h2><i class="mas" aria-hidden="true">+</i>Entró<b>${fmt(entro)}</b></h2>
     ${fila('Efectivo',S(d=>d.manual.cash),'ingresos')}
     ${fila('SINPE',S(d=>d.manual.sinpe),'ingresos')}
@@ -680,7 +708,7 @@ function vGanancia(){
     ${fila('Retiros de caja',S(d=>d.cajaRetirosTotal),'caja')}
     ${fila('Abonos de cuentas por pagar',S(d=>d.cuentaXpagarTotal))}
   </section>
-  <section class="cx-res cx-res-fin ${gan<0?'neg':''}"><h2><i aria-hidden="true">=</i>${gan<0?'Pérdida':'Ganancia'}<b>${col(gan)}</b></h2></section>
+  <section class="cx-res cx-res-fin ${gan<0?'neg':''}"><h2><i aria-hidden="true">=</i>${gan<0?'Pérdida':'Ganancia'}<b>${col(gan)}</b></h2></section>`}
   <h2 class="cx-h2">Cómo se reparte</h2>
   <button type="button" class="cx-reparto-mini" data-cx="ir" data-v="admin">
     ${PL?PL.SOCIOS.map(s=>`<span><small>${s.n} · ${s.pct}%</small><b class="${rep[s.id]<0?'cx-rojo':''}">${col(rep[s.id])}</b></span>`).join(''):''}
@@ -980,6 +1008,7 @@ function vBolsa(){
     else if(m.t==='paso'){icn='pasar';t=`${N(m.de)} le pasó ${aQ(m.a)}`;edita=!m.sem;}
     else if(m.t==='devuelve'){icn='bolsa';t=`La bolsa le devolvió ${aQ(m.a)}`;signo='−';edita=!m.sem;}
     else if(m.t==='repone'){icn='fecha';t=m.para==='fijos'?'Se apartó para gastos fijos y salarios':'Se repuso la bolsa con las ventas';signo='+';}
+    else if(m.t==='abono'){icn='recibo';t=`Se pagó una compra que se debía${m.de==='bolsa'?' con la bolsa':m.de==='caja'?' con la caja':` · lo pagó ${N(m.de)}`}`;signo=m.de==='bolsa'?'−':'';}
     else if(m.t==='gasto'){icn='recibo';t=`Se pagó ${gastoT(m.concepto).toLowerCase()}${m.de==='bolsa'?' con la bolsa':` · lo pagó ${N(m.de)}`}`;signo=m.de==='bolsa'?'−':'';edita=true;accion='gasto';
       if(m.de!=='bolsa')marca=st.debeBolsa[m.de]>0?'<span class="cx-marca ojo">Se le devuelve</span>':'<span class="cx-marca bien">Devuelto</span>';}
     if(m.como==='sinpe')sub.push('SINPE');else if(m.como==='efectivo')sub.push('Efectivo');else if(m.como==='ganancia')sub.push('Con su parte de la ganancia');
@@ -1139,7 +1168,7 @@ function vFijos(){
     </button>
     <button type="button" class="cx-fijo" data-cx="comision">
       <span class="cx-ico" aria-hidden="true">${ic('tarjeta',20)}</span>
-      <span class="cx-fijo-t"><b>Comisión del datáfono</b><small>${W.cardFeePct}% de lo cobrado con tarjeta<br>Ya viene rebajada de la tarjeta en Ingresos</small></span>
+      <span class="cx-fijo-t"><b>Comisión del datáfono</b><small>${W.cardFeePct}% de lo cobrado con tarjeta<br>La tarjeta entra completa y esto va en lo que se fue</small></span>
       <span class="cx-fijo-m"><b>${fmt(comision)}</b><small>esta semana</small></span>
       <span class="cx-lapiz" aria-hidden="true">${ic('editar',16)}</span>
     </button>
@@ -1204,7 +1233,7 @@ function vAdmin(){
   const V=vividos(),gan=sumar(V,d=>d.ganancia),reb=sumar(V,d=>num(d.manual.rebajoJoseph));
   const socios=[['Jefes','20%',.2,false,false,'Sobre la ganancia antes de pagar salarios'],['Roger','40%',.4,true,false,'Menos la mitad de los salarios'],['Joseph','40%',.4,true,true,'Menos la mitad de los salarios'+(reb?' y el rebajo de antes':'')]];
   const total=sumar(socios,s=>sumar(V,d=>parteViejo(d,s[2],s[3],s[4])));
-  return barra()+tiraDias()+cabeza(`Semana ${clWeekNumber(W.inicio)}${enCurso()?' · hasta hoy':''}`,'Administración',col(gan),'La ganancia de la semana y cómo se reparte','adm')+`
+  return barra()+tiraDias()+cabeza(`Semana ${clWeekNumber(W.inicio)}${enCurso()?' · hasta hoy':''}`,'Cierre',col(gan),'La ganancia de la semana y cómo se reparte','adm')+`
   <div class="cx-lista">${socios.map(s=>{const v=sumar(V,d=>parteViejo(d,s[2],s[3],s[4]));
     return `<article class="cx-socio"><span class="cx-pct">${s[1]}</span><div><b>${s[0]}</b><small>${s[5]}</small><small>${D.date===hoy()?'Hoy':diaCorto(D.date)}: ${col(parteViejo(D,s[2],s[3],s[4]))}</small></div><b class="cx-socio-m${v<0?' cx-rojo':''}">${col(v)}</b></article>`;}).join('')}
   </div>
@@ -1234,7 +1263,7 @@ function vAdminPlata(c){
     if(a.falta>0)det[a.de].push(`Todavía le ${deb(a.de)} ${fmt(a.falta)} ${aQ(a.para)}: no le alcanzó su parte`);});
   const suma=PL.IDS.reduce((t,id)=>t+p.final[id],0),dif=Math.round(p.ganancia)-suma;
   const a=PL.ahorroGuardado();
-  return barra()+tiraDias()+cabeza(`Semana ${n}${enCurso()?' · hasta hoy':''}`,'Administración',col(p.ganancia),cerrada?(hecho?`Repartida el ${diaBonito(clDateISO(new Date(hecho.at)))}`:'La semana cerró: lista para repartir'):`Así va el reparto. Se reparte el lunes ${fecha(lunes).getDate()}.`,'adm')+`
+  return barra()+tiraDias()+cabeza(`Semana ${n}${enCurso()?' · hasta hoy':''}`,'Cierre',col(p.ganancia),cerrada?(hecho?`Repartida el ${diaBonito(clDateISO(new Date(hecho.at)))}`:'La semana cerró: lista para repartir'):`Así va el reparto. Se reparte el lunes ${fecha(lunes).getDate()}.`,'adm')+`
   ${hecho?`<section class="cx-calma"><span aria-hidden="true">${ic('listo',22)}</span><div><b>Semana repartida</b><small>La bolsa quedó repuesta y nadie le debe a nadie por esta semana.</small></div></section>`:''}
   <section class="cx-pasos" aria-label="El reparto del lunes">
     <h2 class="cx-tarjeta-t">El reparto del lunes, en orden</h2>
@@ -1431,7 +1460,10 @@ raiz.addEventListener('click',async e=>{
   const f=ACC[b.dataset.cx];if(!f)return;
   e.preventDefault();
   // una guarda puede frenar la acción (p. ej. cambiar algo de un día que ya se cerró pide el motivo)
-  for(const g of GUARDAS){let r;try{r=g(b.dataset.cx,b.dataset);if(r&&typeof r.then==='function')r=await r;}catch(err){console.error(err);}if(r===false)return;}
+  // "Lo que falta" lleva adentro otra acción (contar la caja, guardar el sobre…): la guarda mira esa
+  let nombre=b.dataset.cx,datos=b.dataset;
+  if(nombre==='pend'){const p=todoPendiente()[Number(b.dataset.i)];if(p&&!p.mod){nombre=p.a;datos={k:p.k,g:p.g,i:b.dataset.i};}}
+  for(const g of GUARDAS){let r;try{r=g(nombre,datos);if(r&&typeof r.then==='function')r=await r;}catch(err){console.error(err);}if(r===false)return;}
   f(b.dataset);
 });
 

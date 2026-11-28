@@ -1,0 +1,71 @@
+/* control-cierre.css — el cierre, el candado y "Cada colón" (control-cierre.js). 2026-11-28.
+   Usa los colores del Control (--cx-*) y de aramo-ui.css (--ar-*). Clases con el prefijo cz-. Sin modo oscuro. */
+
+/* ── "Cada colón": la marca de que cuadra ── */
+.cz-cuadra{display:flex;align-items:center;flex-wrap:wrap;gap:4px 10px;margin:0 0 14px;padding:12px 16px;border-radius:var(--ar-r-lg);
+  font:800 16px/1.3 var(--ar-f-ui)}
+.cz-cuadra small{flex:1 1 100%;font:500 13.5px/1.4 var(--ar-f-ui)}
+.cz-cuadra.bien{background:var(--ar-v50);border:1px solid var(--ar-v200);color:var(--ar-v800)}
+.cz-cuadra.mal{background:var(--ar-rojo50);border:1px solid var(--ar-rojo100);color:var(--ar-rojo700)}
+.cz-fin-sub{margin:-6px 0 8px;padding:0 0 8px 40px;font:500 13.5px/1.4 var(--ar-f-ui);color:rgba(255,255,255,.82)}
+
+/* ── para quién queda ── */
+.cz-partes{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px;width:100%;padding:12px;border-radius:var(--ar-r-lg);
+  background:var(--ar-sup);border:1px solid rgba(20,26,22,.06);box-shadow:var(--ar-s1)}
+.cz-parte{display:grid;gap:4px;justify-items:center;min-width:0;text-align:center}
+.cz-parte small{font:600 13px/1.2 var(--ar-f-ui);color:var(--ar-tinta-3)}
+.cz-parte b{font:800 17px/1.1 var(--ar-f-ui);font-variant-numeric:tabular-nums;overflow-wrap:anywhere}
+
+/* ── dónde está la plata de este día ── */
+.cz-lugares{display:grid;gap:10px}
+.cz-lugar{display:flex;align-items:flex-start;gap:12px;padding:14px 16px;border-radius:var(--ar-r-lg);background:var(--ar-sup);
+  border:1px solid rgba(20,26,22,.06);box-shadow:var(--ar-s1)}
+.cz-lugar>.cx-ico{display:grid;place-items:center;flex:none;width:40px;height:40px;border-radius:12px;background:var(--ts);color:var(--t)}
+.cz-lugar-t{flex:1;min-width:0}
+.cz-lugar-t b{display:block;font:800 16.5px/1.25 var(--ar-f-ui)}
+.cz-lugar-t small{display:block;margin-top:2px;font:500 13.5px/1.4 var(--ar-f-ui);color:var(--ar-tinta-2)}
+.cz-lugar-t .cx-marca{margin-top:6px}
+.cz-lugar-m{flex:none;font:800 18px/1.2 var(--ar-f-ui);font-variant-numeric:tabular-nums;white-space:nowrap}
+
+/* ── el aviso de día cerrado ── */
+.cz-banner{align-items:flex-start;margin-bottom:12px}
+.cz-banner>div{min-width:0}
+.cz-banner small{margin-top:3px}
+.cz-banner .cz-cambio-t{margin-top:8px;font-weight:800}
+.cz-banner.ojo,.cz-estado.ojo{background:var(--ar-ambar50);border-color:var(--ar-ambar300)}
+.cz-banner.ojo>span,.cz-estado.ojo>span{background:var(--ar-ambar700)}
+.cz-banner.ojo b,.cz-banner.ojo small,.cz-estado.ojo b,.cz-estado.ojo small{color:var(--ar-ambar700)}
+.cz-nota-dia{margin:0 2px 12px}
+
+/* ── la pantalla Cierre: estado, días y cambios ── */
+.cz-estado{margin-bottom:12px;align-items:flex-start}
+.cz-estado>div{min-width:0}
+.cz-estado small{margin-top:3px}
+.cz-dias{display:grid;gap:8px;margin-bottom:6px}
+.cx .cz-dia{display:flex;align-items:center;gap:12px;width:100%;min-height:60px;padding:8px 14px;border-radius:var(--ar-r-lg);
+  background:var(--ar-sup);border:1px solid rgba(20,26,22,.06);box-shadow:var(--ar-s1)}
+.cz-dia-f{display:grid;justify-items:center;flex:none;width:56px}
+.cz-dia-f b{font:800 14px/1.2 var(--ar-f-ui);text-transform:capitalize}
+.cz-dia-f small{font:800 20px/1.1 var(--ar-f-ui);color:var(--ar-tinta-2)}
+.cz-dia-m{display:grid;gap:4px;justify-items:start;flex:1;min-width:0}
+.cz-dia-m small{font:500 13px/1.3 var(--ar-f-ui);color:var(--ar-tinta-3)}
+.cz-dia>.ic{flex:none;color:var(--ar-tinta-3)}
+.cz-pend{margin:0 0 6px;padding:12px 16px 12px 32px;border-radius:var(--ar-r-lg);background:var(--ar-ambar50);border:1px solid var(--ar-ambar300);
+  color:var(--ar-ambar700);font:500 14.5px/1.45 var(--ar-f-ui)}
+.cz-pend li+li{margin-top:6px}
+.cz-cambios{display:grid;gap:10px}
+.cz-cambio{display:grid;gap:4px;justify-items:start;padding:14px 16px;border-radius:var(--ar-r-lg);background:var(--ar-sup);
+  border:1px solid var(--ar-ambar300);box-shadow:var(--ar-s1)}
+.cz-cambio.visto{border-color:rgba(20,26,22,.06)}
+.cz-cambio b{font:800 16px/1.25 var(--ar-f-ui)}
+.cz-cambio b::first-letter{text-transform:uppercase}
+.cz-cambio p{margin:0;font:600 15px/1.4 var(--ar-f-ui)}
+.cz-cambio small{font:500 13.5px/1.4 var(--ar-f-ui);color:var(--ar-tinta-2)}
+.cx .cz-cambio .cx-enlace,.cx .cz-cambios>.cx-enlace{min-height:48px}
+
+@media (max-width:420px){
+  .cz-partes{padding:10px 8px}
+  .cz-parte b{font-size:15px}
+  .cz-lugar{padding:12px}
+  .cz-lugar-m{font-size:16px}
+}
