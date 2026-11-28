@@ -64,6 +64,7 @@ const RANURAS={};                        // trozos que un módulo le agrega a un
 const PEND=[];                           // "lo que falta" según cada módulo: fn(D) → [{a,q,d,b,…}]
 const GUARDAS=[];                        // antes de una acción: fn(nombre,datos) → false para no hacerla
 const TODOS=new Set(['inicio','caja']);  // las pantallas que también ve quien no es socio
+const REINICIOS=[];                      // al dejar todo en cero, cada módulo borra sus movimientos (sus ajustes se quedan)
 const ranura=n=>(RANURAS[n]||[]).map(fn=>{try{return fn()||'';}catch(e){console.error(e);return'';}}).join('');
 
 /* ---------- estado ---------- */
@@ -1288,6 +1289,7 @@ function dejarEnCero(marca){
   ['movs','plata','cajaCambios','closurePayables','daily','expenses'].forEach(k=>{if(k in data||k==='movs'||k==='plata')data[k]=[];});
   data.closureJosephRebate={amount:0,mode:'weekly-even',enabled:false};
   if(data.socios){data.socios.activo=false;data.socios.repartidas={};delete data.socios.deuda;}
+  REINICIOS.forEach(fn=>{try{fn();}catch(e){console.error(e);}});   // lo de los módulos (entregas, desechos, cierres…)
   try{localStorage.removeItem(CLOSURES_KEY);localStorage.setItem(LSR,marca);}catch(e){}
   save();
   return true;
@@ -1461,6 +1463,7 @@ const API={
   ranura(nombre,fn){(RANURAS[nombre]||(RANURAS[nombre]=[])).push(fn);},
   pendiente(fn){PEND.push(fn);},
   guarda(fn){GUARDAS.push(fn);},
+  alReiniciar(fn){REINICIOS.push(fn);},
 };
 (window.CX_MODULOS||[]).forEach(m=>{try{m(API);}catch(e){console.error(e);}});
 
