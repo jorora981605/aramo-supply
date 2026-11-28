@@ -26,7 +26,7 @@ const PUERTAS=[
 const LISTA=[
   {n:1,t:'Ventanas vivas',d:'Cada app adentro de su ventana, vista de lejos: ves cómo está antes de entrar.'},
   {n:2,t:'Puestos del mercado',d:'Tres puestos gigantes con su toldo. Un toque y entrás: la más rápida con una mano.',rec:true},
-  {n:3,t:'Mostrador grande',d:'El Mostrador en grande arriba (naranja si hay pedidos nuevos); las 3 puertas quedan abajo, al alcance del pulgar.'},
+  {n:3,t:'Pedidos grande',d:'Pedidos en grande arriba (naranja si hay pedidos nuevos); las 3 puertas quedan abajo, al alcance del pulgar.'},
   {n:4,t:'Pizarra de la verdu',d:'Como la pizarra de precios: madera, tiza y la lista del día con sus números.'},
   {n:5,t:'Consola de taller',d:'Escribí lo que buscás (tomate, A-7KQ3, caja…) o usá 1·2·3. Para ir volando.'},
 ];
@@ -129,7 +129,7 @@ function v5(){
   <button type="button" class="po5-ahora" data-ahora><span class="po5-verd" data-d="ahora.k"></span><span><strong data-d="ahora.t"></strong><em data-d="ahora.s"></em></span><span class="po5-go" data-d="ahora.cta"></span></button>
   <div class="po5-tiles">${PUERTAS.map(p=>`<button type="button" class="po5-tile c-${p.c}" data-pu="${p.k}" aria-label="${p.tecla} · Abrir ${esc(p.n)}"><span class="po5-kick">0${p.tecla} · ${esc(p.n.toUpperCase())}</span><b>${p.e}</b><strong>${esc(p.n)}</strong><small>${esc(p.d)}</small><span class="po5-dato" data-d="${p.dato}.chip"></span>${badge(p.dato+'.alerta')}<kbd>${p.tecla}</kbd></button>`).join('')}</div>
   <section class="po5-bit"><p class="po5-kick">Bitácora de hoy</p><div data-dh="bit"></div></section>
-  <p class="po5-teclas"><kbd>1</kbd> Inventario <kbd>2</kbd> La Feria <kbd>3</kbd> POS <kbd>M</kbd> Mostrador <kbd>/</kbd> buscar</p>`;
+  <p class="po5-teclas"><kbd>1</kbd> Inventario <kbd>2</kbd> La Feria <kbd>3</kbd> POS <kbd>M</kbd> Pedidos <kbd>/</kbd> buscar</p>`;
 }
 // ── 6 · Inicio del rediseño (2026-11-23): la portada definitiva, la única que se usa (decisión D2) ──
 // Tarjetas blancas; el color de cada puerta va en su cuadrito y en un lavado suave a la derecha.
@@ -156,13 +156,13 @@ function v6(){
   <div class="po6-avisos" data-dh="avisos6"></div>
   <div class="po6-grid">
     <section class="po6-mos" data-ahora-tono>
-      <button type="button" class="po6-mos-cab" data-pu="mostrador" aria-label="M · Entrar al Mostrador">
+      <button type="button" class="po6-mos-cab" data-pu="mostrador" aria-label="M · Entrar a Pedidos">
         <span class="ui-cuadro ui-cuadro--l ui-cuadro--mostrador">${ic('aviso',24)}</span>
         <span class="po6-mos-tx"><b data-d="mo6.tit"></b><small data-d="mo6.sub"></small></span>
         <span class="po6-mos-ir" aria-hidden="true"><span class="po6-abrir">Abrir</span>${ic('siguiente',22)}</span>
       </button>
       <div class="po6-mos-lista" data-dh="mo6.lista"></div>
-      <div class="po6-mos-pie"><p data-d="mo6.caja"></p><button type="button" class="ui-btn ui-btn--l po6-mos-btn" data-pu="mostrador">Entrar al Mostrador<kbd>M</kbd></button></div>
+      <div class="po6-mos-pie"><p data-d="mo6.caja"></p><button type="button" class="ui-btn ui-btn--l po6-mos-btn" data-pu="mostrador">Entrar a Pedidos<kbd>M</kbd></button></div>
     </section>
     <div class="po6-puertas">${PUERTAS6.map(p=>`${p.k==='pos'?'<div class="po6-pos2" data-pos2>':''}<button type="button" class="po6-door po6-door--${p.c}${p.k==='pos'?' po6-door--entera':''}" data-pu="${p.k}" aria-label="${p.tecla} · Abrir ${esc(p.n)}">
       <span class="po6-door-tx"><span class="po6-door-nom"><span class="ui-cuadro ui-cuadro--l ui-cuadro--${p.c}">${ic(p.i,24)}</span><b>${esc(p.n)}</b><kbd>${p.tecla}</kbd></span>
