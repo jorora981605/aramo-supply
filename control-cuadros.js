@@ -858,7 +858,7 @@ function vCaja(){
       <button type="button" class="cx-enlace cx-cobro" data-cx="ir" data-v="${deDonde(r).v}">${deDonde(r).b}</button></article>`:`<article class="cx-renglon resta"><button type="button" class="cx-renglon-b" data-cx="retiro" data-id="${esc(r.id)}"><span class="cx-ico" aria-hidden="true">${ic('efectivo',20)}</span><span class="cx-renglon-t"><b>${esc(r.concept)}</b><small>Salió del cajón${r.at?' · '+esc(r.at):''}</small></span><span class="cx-renglon-m"><b>−${fmt(r.amount)}</b></span></button>
       ${r.foto?miniFoto(r.id):''}</article>`).join(''):'';
   const quedo=D.cajaEsperada?D.cajaEsperada-(en?num(en.monto):0):0;
-  return barra()+tiraDias()+cabeza(diaLargo(D.date),socio?'Caja':'Mi caja',socio?(D.cajaEsperada?col(quedo):'—'):null,socio?`${en?`En el cajón, después del sobre de ${fmt(en.monto)}`:toc?'Solo entran ventas, no sale nada':'Lo que debe haber en el cajón'} · <b class="cx-marca ${ec.c}">${ec.t}</b>`:(segs.length?'':'Hoy no tenés turno de caja.'),'caja')+`
+  return barra()+tiraDias()+cabeza(diaLargo(D.date),socio?'Caja':'Mi caja',socio?(D.cajaEsperada?col(quedo):'—'):null,socio?`${en?`En el cajón, después del sobre de ${fmt(en.monto)}`:toc?(Math.round(D.cajaRetirosTotal)?`Entran las ventas · ${cuando(D.date)==='hoy'?'hoy':'ese día'} el cajón pagó ${fmt(D.cajaRetirosTotal)}`:'Solo entran ventas, no sale nada'):'Lo que debe haber en el cajón'} · <b class="cx-marca ${ec.c}">${ec.t}</b>`:(segs.length?'':'Hoy no tenés turno de caja.'),'caja')+`
   <div class="cx-lista">${segs.map(tarjeta).join('')}</div>
   ${socio&&todos.length>1?`<p class="cx-nota">${exacto?'Las ventas en efectivo de cada turno vienen del POS, con la hora de cada tiquete.':`El efectivo vendido${toc?'':' y lo comprado en efectivo'} se reparte entre los turnos según las horas de cada uno. Es un cálculo: cuando el POS mande cada venta con su hora, sale exacto.`}</p>`:''}
   ${deben.length?`<h2 class="cx-h2">Quién debe plata <span>${fmt(sumar(deben.filter(x=>!x.pagado),x=>x.monto))}</span></h2><div class="cx-lista">
@@ -869,7 +869,7 @@ function vCaja(){
   ${rev.length?`<h2 class="cx-h2">Para revisar <span>${rev.length}</span></h2><div class="cx-lista">
     ${rev.map(x=>`<article class="cx-debe revisar"><div class="cx-debe-t"><b>${esc(x.t)}</b></div><p>${esc(x.d)}</p><button type="button" class="cx-segundo ancho" data-cx="revisado" data-id="${esc(x.id)}">${ic('ok',18)} Revisado</button></article>`).join('')}
   </div>`:''}
-  ${!socio?'':toc?`<section class="cx-regla"><span class="cx-ico" aria-hidden="true">${ic('candado',20)}</span><div><b>La caja no se toca</b><small>Ni para compras, ni para mandados. Lo que haya que pagar sale de la bolsa, o se anota "Lo pagué yo" y la bolsa lo devuelve.</small></div></section>
+  ${!socio?'':toc?`<section class="cx-regla"><span class="cx-ico" aria-hidden="true">${ic('candado',20)}</span><div><b>La caja no se toca</b><small>Ni para compras, ni para mandados. Lo que haya que pagar sale de la bolsa, o se anota "Lo pagué yo" y la bolsa lo devuelve. Si un día igual hubo que pagar algo con el cajón (una entrega, por ejemplo), se anota en Compras o en Gastos como pagado «con la caja»: así la caja sigue cuadrando.</small></div></section>
     ${ret.length?`<h2 class="cx-h2">Salió del cajón <span>${fmt(D.cajaRetirosTotal)}</span></h2>
       ${ret.some(r=>r.enlace)?'<p class="cx-nota arriba">Lo que dice "Ya está anotado" pagó una entrega o un gasto: baja lo que debe haber en el cajón, y no se resta otra vez de la ganancia.</p>':''}
       <div class="cx-lista">${listaRetiros}</div>`:''}`
