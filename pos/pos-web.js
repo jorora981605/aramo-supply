@@ -707,6 +707,7 @@ async function abrir(r,local){
   try{if(window.PosDia)window.PosDia.alIniciar();}catch(e){}
   posPublicarResumen(posFechaISO());
   montarPedidoWeb();
+  if(window.PosPedidos&&!document.getElementById('cb')){try{window.PosPedidos.iniciar({boton:true,conectar:true});}catch(e){console.warn('[pos] pedidos',e);}}
   conectarCatalogo().catch(e=>console.warn('[pos] catálogo',e)).finally(avisoReinicio);
   pintarEstado();
   if(sucio&&dueno)programarSubida();
@@ -979,14 +980,14 @@ function feriaPanel(forzar){
   const falta=E.some(e=>e.st==='mandar')?' · falta mandar el total':E.some(e=>e.st==='esperando')?' · esperando al cliente':'';
   if(FP.chico){box.innerHTML=`<button type="button" class="pw-feria-pill" data-fr="abrir">🧺 ${ids.length===1?'1 pedido':ids.length+' pedidos'} de La Feria${falta}</button>`;return;}
   box.innerHTML=`<div class="pw-feria-cab"><b>🧺 Pedidos de La Feria en este POS</b><button type="button" data-fr="chico" aria-label="Achicar este cuadro">–</button></div>`
-    +E.map(feriaFila).join('')+`<button type="button" class="pw-feria-volver" data-fr="volver">⌂ Volver al Mostrador</button>`;
+    +E.map(feriaFila).join('')+`<button type="button" class="pw-feria-volver" data-fr="volver">🧺 Abrir Pedidos</button>`;
 }
 function feriaFila(e){
   const n=NUBE(),C=COTZ(),o=e.o,col=v=>n?n.colones(v):'₡'+Math.round(+v||0);
   const nom=esc(o&&o.cliente&&o.cliente.nombre||'Cliente'),uno=esc(String(o&&o.cliente&&o.cliente.nombre||'el cliente').trim().split(' ')[0]),ref=esc(o&&o.ref||'');
   let tx='',bt='';
   if(e.st==='sin')tx='Cargando el pedido…';
-  else if(e.st==='cobrado')tx=`Este pedido ya se cobró${o.cobro&&o.cobro.porPOS?' en el POS':' en el Mostrador'}. Descartá este tiquete para no cobrarlo dos veces.`;
+  else if(e.st==='cobrado')tx=`Este pedido ya se cobró${o.cobro&&o.cobro.porPOS?' en el POS':' en Pedidos'}. Descartá este tiquete para no cobrarlo dos veces.`;
   else if(e.st==='cancelado')tx=o.rechazo&&o.rechazo.por==='cliente'?`<b>${uno} no aceptó el total nuevo</b>${o.rechazo.motivo?' («'+esc(o.rechazo.motivo)+'»)':''}. No lo cobrés como pedido.`:'<b>El pedido se canceló.</b> No lo cobrés como pedido.';
   else if(e.st==='mandar'){
     const tot=C.totalCon(o,e.L),dif=C.diferencias(o,e.L);
@@ -1008,7 +1009,7 @@ async function feriaClick(ev){
   const a=b.dataset.fr,id=b.dataset.id,n=NUBE(),C=COTZ();
   if(a==='chico'){FP.chico=true;return feriaPanel(true);}
   if(a==='abrir'){FP.chico=false;return feriaPanel(true);}
-  if(a==='volver'){try{window.close();}catch(e){}setTimeout(()=>{if(!document.hidden)location.href='../APP.html';},500);return;}
+  if(a==='volver'){if(window.PosPedidos&&window.PosPedidos.abrir())return;try{window.close();}catch(e){}setTimeout(()=>{if(!document.hidden)location.href='../APP.html';},500);return;}
   if(!n||!C||!id)return;
   if(a==='wa'){const o=n.get(id);if(o&&o.cliente&&o.cliente.tel)window.open(n.wa(o.cliente.tel,C.waTexto(o)),'_blank');return;}
   FP.ocupado=true;b.disabled=true;

@@ -151,7 +151,7 @@ async function registrar(f){
     at:new Date().toISOString(),cliente:d.cliente||''});
   quitarLocal(f.id);
   await marcarNube(f.id,numero);
-  if(estado==='ok')ctx.aviso('🧺 Cobro del Mostrador '+(d.ref||'')+' entró al POS · venta '+String(numero).replace(/^.*-/,''));
+  if(estado==='ok')ctx.aviso('🧺 Cobro de Pedidos '+(d.ref||'')+' entró al POS · venta '+String(numero).replace(/^.*-/,''));
   return estado;
 }
 async function revisar(){
@@ -168,7 +168,7 @@ async function revisar(){
       if(r==='sin-caja'){esperando=filas.length-filas.indexOf(f);break;}
     }
     if(esperando&&Date.now()-avisoCaja>10*60000){avisoCaja=Date.now();
-      ctx.aviso('🧺 '+(esperando===1?'Hay 1 cobro':'Hay '+esperando+' cobros')+' del Mostrador esperando: abrí la caja y entran solos al POS.');}
+      ctx.aviso('🧺 '+(esperando===1?'Hay 1 cobro':'Hay '+esperando+' cobros')+' de Pedidos esperando: abrí la caja y entran solos al POS.');}
     await reintentarMarcas();
   }catch(e){console.warn('[pos] cobros del Mostrador',e);}
   finally{ocupado=false;}
