@@ -385,7 +385,7 @@ function sinpeDestinosDe(k){
 //   Uber aprox.  = máx(uberMinimo, tarifaBase + km por calle × tarifaKm), redondeado hacia arriba a ₡100
 //   tarifaKm     = se mezcla con el promedio real de los últimos Ubers anotados (historial): con 5 o más, manda el real
 //   Reparto      = pedido < repartoMin → el cliente paga todo el envío; si no, el cliente paga repartoPct % y ARAMO el resto
-const envioCfg=()=>tienda().envioConfig;
+const envioCfg=()=>tienda().envioConfig||{...ENVIO_DEF}; // sin la tienda cargada (p. ej. el POS) valen las reglas de fábrica
 const esNum=v=>v!==null&&v!==''&&v!==undefined&&Number.isFinite(+v);
 function distKm(a,b){
   if(!a||!b||!esNum(a.lat)||!esNum(a.lng)||!esNum(b.lat)||!esNum(b.lng))return null;
@@ -798,6 +798,15 @@ function cambiosDe(o){
   return out;
 }
 function totalAntesDe(o){return redondear5(Math.max(0,(o?.items||[]).reduce((t,it)=>t+q0De(it)*p0De(it),0)+(+o?.retiro?.envio?.costo||0)-(+o?.premio?.valor||0)));}
+// ¿Hay que pedirle al cliente que confirme el total antes de cobrar? (regla del dueño, 2026-11-27: «si le modifico el peso
+// o el precio, se le reenvía la contraoferta al cliente antes de confirmar el monto total»). Vale para el Mostrador y los dos POS.
+// Sí: si está esperando su confirmación; si ya confirmó pero después cambió el total; o si nunca confirmó y algo cambió.
+function porConfirmar(o){
+  if(!o||o.cobro||o.estado==='cancelado'||o.estado==='entregado')return false;
+  if(faseDe(o)==='confirmacion')return true;
+  if(o.confirmacion&&o.confirmacion.at)return Math.abs(totalDe(o)-(+o.confirmacion.total||0))>=1;
+  return cambiosDe(o).length>0;
+}
 function faseDe(o){
   if(o?.estado==='entregado')return 'entregado';
   const f=String(o?.fase||'');
@@ -829,7 +838,7 @@ window.AramoNube={
   envioCfg,estimarEnvio,rangoEnvio,repartoEnvio,costoRealUber,puedeCambiar,aplicarCambioCliente,simularCambio,restaurarDeNube,get ultimoError(){return ultimoError;},productosDe,ubiSuc,tarifaKmAprendida,distKm,
   nuevoId,nuevoRef,nuevoPin,colones,redondear5,qtyItem,totalDe,esAprox,telCR,wa,
   ESTADOS,FASES,faseDe,PAGOS,NIVELES,lealtad,hojasDe,cuentaCliente,historial,telDe,
-  FASES4:PASOS4,paso4De,definitivo,cambiosDe,totalAntesDe,sincronizar,enviarComprobante,DEV,setQuien:f=>{quienFn=f;},
+  FASES4:PASOS4,paso4De,definitivo,cambiosDe,totalAntesDe,porConfirmar,sincronizar,enviarComprobante,DEV,setQuien:f=>{quienFn=f;},
   authEstado,actualizarCuenta:refrescarAuth,registrarCorreo,entrarCorreo,recuperarCorreo,enviarCodigo,verificarCodigo,salir,direcciones,guardarDireccion,borrarDireccion,
   registrarEvento,metricas,guardarSuscripcion,cupoHorario,subirComprobante,comprobanteUrl,subirFoto,
 };

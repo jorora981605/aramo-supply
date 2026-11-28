@@ -625,8 +625,10 @@ function siguiente(o){
   if(o.estado==='alistando'){
     if(r<n)return{acc:'pesar',txt:r?'Seguir pesando':'Pesar el pedido'};
     if(fase==='recibido')return sinUber(o)?{acc:'costo-uber',txt:'Poné el costo del Uber'}:{acc:'listo',txt:'Enviar cotización a '+nom};
+    if(N.porConfirmar?.(o))return{acc:'listo',txt:'Mandarle el total nuevo a '+nom};
     return{acc:'marcar-listo',txt:'Lista · avisar a '+nom};
   }
+  if(o.estado==='listo'&&!o.cobro&&N.porConfirmar?.(o))return{acc:'listo',txt:'Mandarle el total nuevo a '+nom};
   if(o.estado==='listo'){
     if(env){
       if(o.recibidoCliente?.ok)return{acc:'confirmar-entrega',txt:'Confirmar entrega'};
@@ -733,7 +735,7 @@ function resumenCaja(){
 }
 function pintarCaja(){
   const el=$('moCaja');if(!el)return;
-  const {L,t,total}=resumenCaja(),listos=filtrar(activos()).filter(o=>o.estado==='listo'&&!o.cobro&&N.faseDe?.(o)!=='confirmacion');
+  const {L,t,total}=resumenCaja(),listos=filtrar(activos()).filter(o=>o.estado==='listo'&&!o.cobro&&N.faseDe?.(o)!=='confirmacion'&&!N.porConfirmar?.(o));
   el.innerHTML=`<p class="mo-kick">Caja · ${esc(receptorNom())}${POS?' · conectada a ARAMO POS':''}</p>
     <div class="mo-drop" id="moDrop"><b>🧾</b><strong>Arrastrá un pedido aquí</strong><small>para cobrarlo con el peso real y entregarlo</small></div>
     ${listos.length?`<div class="mo-kick" style="margin-top:12px">Listos para cobrar</div>${listos.map(o=>`<button type="button" class="mo-cobrable" data-mo="cobrar" data-id="${o.id}" draggable="true" data-arr="${o.id}"><span><b>${esc(o.ref)}</b> ${esc(o.cliente.nombre)}</span><span>${$c(N.totalDe(o))}</span></button>`).join('')}`:''}
@@ -915,7 +917,7 @@ function pintarEncargo(){
   if(M.vista==='cobro')return pintarCobro(o);
   if(M.vista==='tiquete')return pintarTiquete(o);
   if(M.vista==='pesar')return pintarPesar(o);
-  const s=suc(o.sucursal),{r,n}=avance(o),P=N.PAGOS[o.pago?.metodo]||{},tot=N.totalDe(o),edit=o.estado==='alistando',fase=N.faseDe?.(o)||'enviado';
+  const s=suc(o.sucursal),{r,n}=avance(o),P=N.PAGOS[o.pago?.metodo]||{},tot=N.totalDe(o),edit=o.estado==='alistando'&&N.faseDe?.(o)!=='confirmacion',fase=N.faseDe?.(o)||'enviado';
   const listoE=o.estado==='listo'&&fase!=='confirmacion';
   const verd=o.estado==='cancelado'?[o.rechazo?.por==='cliente'?'Lo rechazó el cliente':'Cancelado','bad']:listoE?[o.cobro?'Cobrado':'Listo','ok']:({enviado:['Enviado','run'],recibido:['Recibido · pesar','run'],confirmacion:['Confirmación del cliente','run'],alistando:[`Alistando ${r}/${n}`,'run'],entregado:['Entregado','ok']}[fase]||({nuevo:[o.avisado?'Pendiente de aceptación':'Nuevo','run'],alistando:[`Alistando ${r}/${n}`,'run'],listo:[o.cobro?'Cobrado':'Listo','ok'],entregado:['Entregado','ok'],cancelado:['Cancelado','bad']}[o.estado]||['','']));
   const pesoR=o.items.reduce((t,i)=>t+(i.u==='kg'&&i.estado==='listo'?qReal(i):0),0);
@@ -924,8 +926,8 @@ function pintarEncargo(){
   const env=o.retiro.envio,nom1=o.cliente.nombre.split(' ')[0],F=faltas(o),sg=siguiente(o),activo=['nuevo','alistando','listo'].includes(o.estado);
   // ── Pedazos de la hoja ──
   const posDraft=LS.get('aramo_pos_cotizacion_'+o.id,null);
-  const celBox=!cobrado(o)&&['nuevo','alistando','listo'].includes(o.estado)?`<div class="mo-pos-link"><button type="button" class="mo-btn w" data-mo="pedido-celular">📱 Pesarlo y cobrarlo en el POS celular</button><small>Se abre en el POS celular como una cuenta con el nombre del cliente. Queda apartado aquí para no cobrarlo dos veces.</small></div>`:'';
-  const posBox=celBox+`<div class="mo-pos-link"><button type="button" class="mo-btn w" data-mo="pos-pedido">🧾 Abrir este pedido en POS</button><small>Entra al POS como tiquete. Al «Guardar y volver», la cotización le llega sola al cliente.</small></div>`;
+  const celBox=!cobrado(o)&&['nuevo','alistando','listo'].includes(o.estado)?`<div class="mo-pos-link"><button type="button" class="mo-btn w" data-mo="pedido-celular">📱 Pesarlo y cobrarlo en el POS celular</button><small>Se abre en el POS celular como una cuenta con el nombre del cliente. Si cambia el peso o el precio, el cliente confirma el total nuevo antes de cobrar.</small></div>`:'';
+  const posBox=celBox+`<div class="mo-pos-link"><button type="button" class="mo-btn w" data-mo="pos-pedido">🧾 Abrir este pedido en POS</button><small>Entra al POS como tiquete. Si cambiás un peso o un precio, desde ahí le mandás el total nuevo al cliente y se cobra cuando lo confirme.</small></div>`;
   const draftBox=posDraft?.items?.length?`<div class="mo-pos-link"><b>🧾 Hay una cotización devuelta desde POS</b><small>Revisá los cambios antes de enviarlos al cliente.</small><button type="button" class="mo-btn o w" data-mo="aplicar-pos">Aplicar cotización del POS</button></div>`:'';
   const recBox=o.recibidoCliente?(o.recibidoCliente.ok?`<div class="mo-acc-nota ok"><b>✅ El cliente dice que ya lo recibió</b><br>${esc(fh(o.recibidoCliente.at))} · confirmá la entrega o tocá «No, revisar».</div>`:`<div class="mo-acc-nota mal"><b>⚠️ El cliente dice que NO lo recibió</b><br>${esc(fh(o.recibidoCliente.at))} · escribile o llamalo ya.</div>`):'';
   const sinpeBox=o.pago?.metodo==='sinpe'&&!cobrado(o)&&(o.estado==='listo'||(o.estado==='alistando'&&N.definitivo(o)))&&fase!=='confirmacion'
@@ -948,7 +950,8 @@ function pintarEncargo(){
     pie=gran(sg.acc,esc(sg.txt));qs=r<n?quiet('todo-y-listo','✓ Todo como lo pidió · enviar cotización'):'';
   }
   if(o.estado==='alistando'&&fase==='alistando'){
-    notas=`<div class="mo-acc-nota ok"><b>✅ El cliente confirmó la cotización</b><br>Total definitivo ${$c(tot)}${o.confirmacion?.at?' · '+esc(fh(o.confirmacion.at)):''}. Terminá de alistar y avisale.</div>${sinpeBox}`;
+    notas=N.porConfirmar?.(o)?`<div class="mo-acc-nota"><b>⚠️ Cambió el total después de que ${esc(nom1)} confirmó</b><br>Confirmó ${$c(+o.confirmacion?.total||0)} y ahora es ${$c(tot)}. Mandale el total nuevo: se cobra cuando lo confirme.</div>`
+      :`<div class="mo-acc-nota ok"><b>✅ El cliente confirmó la cotización</b><br>Total definitivo ${$c(tot)}${o.confirmacion?.at?' · '+esc(fh(o.confirmacion.at)):''}. Terminá de alistar y avisale.</div>${sinpeBox}`;
     pie=gran(sg.acc,esc(sg.txt));
     mas=`<button type="button" class="mo-btn w" data-mo="corregir-cot">↩︎ Corregir y reenviar</button>`;
   }
@@ -1134,6 +1137,7 @@ function abrirCobro(id,opc={}){
   if(enCelular(N.get(id))){toast('📱 Este pedido se está cobrando en el POS celular');return;}
   const o=N.get(id);if(!o)return;
   if(N.faseDe?.(o)==='confirmacion'){toast('Primero esperá la confirmación del cliente');abrirEncargo(id);return;}
+  if(N.porConfirmar?.(o)){toast('Cambió el total: mandale el total nuevo al cliente y se cobra cuando lo confirme');abrirEncargo(id);return;}
   if(o.estado==='nuevo'||o.estado==='alistando'){toast('Primero alistalo y pesalo: el cobro sale del peso real');abrirEncargo(id);return;}
   if(o.estado==='cancelado'){toast('Ese pedido está cancelado');return;}
   M.abierto=id;
@@ -1166,6 +1170,7 @@ function pintarCobro(o){
 async function cobrar(){
   const o=N.get(M.abierto),c=M.cobro;if(!o||!c)return;
   if(N.faseDe?.(o)==='confirmacion'){toast('Esperá a que el cliente confirme la cotización');return;}
+  if(N.porConfirmar?.(o)){toast('Cambió el total: el cliente tiene que confirmarlo antes de cobrar');M.vista='encargo';pintarEncargo();return;}
   const tot=N.totalDe(o);
   if(c.metodo==='efectivo'&&c.recibido&&+c.recibido<tot){toast('Lo recibido es menos que el total');return;}
   if(c.codigo&&c.codigo.length===4&&c.codigo!==o.pin){toast('Ese código no coincide con el del pedido');buzz([60,40,60]);return;}
@@ -1796,6 +1801,7 @@ const ACT={
   },
   'corregir-cot'(){N.cambiar(M.abierto,o=>{o.estado='alistando';o.fase='recibido';delete o.confirmacion;},'tienda','Volvió a pesar: se corrige la cotización').then(()=>{M.tab='alistando';pintarEncargo();pintarMostrador();});},
   'marcar-listo'(){
+    if(N.porConfirmar?.(N.get(M.abierto))){toast('Cambió el total: primero se le manda al cliente para que lo confirme');return ACT.listo();}
     N.cambiar(M.abierto,o=>{if(o.estado!=='alistando')return;o.estado='listo';o.totalFinal=N.totalDe(o);o._ev={tipo:'listo',monto:o.totalFinal};},'tienda','Pedido listo para entregar').then(o=>{
       if(!o)return;M.tab='listo';pintarEncargo();pintarMostrador();
       toast('✅ '+o.ref+' lista · '+o.cliente.nombre.split(' ')[0]+' lo ve en La Feria');

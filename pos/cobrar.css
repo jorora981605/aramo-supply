@@ -179,6 +179,19 @@ html[data-theme="dark"] .cb-body{
 .cb-alerta-b.gris,.cb-ped-alerta .cb-alerta-b.gris{background:var(--ar-sup);color:var(--ar-tinta);box-shadow:var(--ar-s1)}
 .cb-ped-info{display:flex;gap:10px;margin:0 0 10px;padding:12px 14px;border-radius:16px;background:var(--cb-o-s);color:var(--cb-o);font:600 14px/1.4 var(--ar-f-ui)}
 .cb-ped-info b{font-weight:800}
+/* el total nuevo de un pedido: el cliente lo confirma antes de cobrar (pos-cotizacion.js) */
+.cb-ped-info.cot-mandar{background:var(--cb-am-s);color:var(--cb-am)}
+.cb-ped-info.cot-esperando{background:var(--cb-a-s);color:var(--cb-a)}
+.cb-b-mandar{background:linear-gradient(160deg,#e08a1e,#b4620c 58%,#7a3f05);box-shadow:0 10px 24px rgba(180,98,12,.32),inset 0 1px 0 rgba(255,255,255,.2)}
+.cb-b-mandar>i{color:#b4620c}
+.cb-b-espera{background:linear-gradient(160deg,#3d7fd0,#1f5fae 58%,#123e78);box-shadow:0 10px 24px rgba(31,95,174,.3),inset 0 1px 0 rgba(255,255,255,.2)}
+.cb-b-espera>i{color:#1f5fae}
+.cb-cambios{margin:0;padding:12px 14px 12px 32px;border-radius:16px;background:var(--ar-sup-2,#f3f1ec);font:600 15px/1.45 var(--ar-f-ui);color:var(--ar-tinta)}
+.cb-cambios li+li{margin-top:4px}
+.cb-cot-tot{display:flex;align-items:baseline;justify-content:space-between;gap:12px;padding:2px 4px;font:600 15px/1.2 var(--ar-f-ui);color:var(--ar-tinta-2)}
+.cb-cot-tot s{opacity:.8}
+.cb-cot-tot b{font:800 26px/1 var(--ar-f-ui);color:var(--ar-tinta);font-variant-numeric:tabular-nums}
+.cb-wa{color:#128c4a}
 
 /* ── Abajo: cobrar ── */
 .cb-dock{flex:none;padding:8px 16px calc(12px + env(safe-area-inset-bottom,0px))}

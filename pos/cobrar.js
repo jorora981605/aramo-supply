@@ -301,15 +301,18 @@ function cabeceraCuenta(t,T){
   const p=t.pedido;
   return `<div class="cb-cab"><button type="button" class="cb-cab-n" data-a="cliente"><b>${esc(nombreTk(t))}</b>${t.tel?`<small>${telTxt(t.tel)}</small>`:''}${ic('editar',15)}</button>
     <span class="cb-cab-c">${T.n} ${T.n===1?'producto':'productos'}</span>${T.n||t.pedido||t.n?`<button type="button" class="cb-cab-v" data-a="vaciar" aria-label="Vaciar esta cuenta">${ic('borrar',18)}</button>`:''}</div>`+
-    (p&&estadoPedido(t)?`<div class="cb-ped-alerta"><div><b>${AVISO_PED[estadoPedido(t)][0]}</b><small>${AVISO_PED[estadoPedido(t)][1]}</small></div><div class="cb-ped-alerta-b">${estadoPedido(t)==='otro'?'<button type="button" class="cb-alerta-b" data-a="retomar">Traerlo aquí</button>':''}<button type="button" class="cb-alerta-b gris" data-a="vaciar">Quitar</button></div></div>`:'')+
-    (p?`<div class="cb-ped-info">${ic('canasta',18)}<span>Pedido de La Feria <b>${esc(p.ref||'')}</b>${p.envio?' · a domicilio':p.cuando?' · recoge '+hora(p.cuando):''}${p.pago&&METODOS[p.pago]?' · paga con '+METODOS[p.pago].n.toLowerCase():''}. Pesá cada producto y cobrá.</span></div>`:'');
+    (p&&estadoPedido(t)?`<div class="cb-ped-alerta"><div><b>${avisoPed(t)[0]}</b><small>${avisoPed(t)[1]}</small></div><div class="cb-ped-alerta-b">${estadoPedido(t)==='otro'?'<button type="button" class="cb-alerta-b" data-a="retomar">Traerlo aquí</button>':''}<button type="button" class="cb-alerta-b gris" data-a="vaciar">Quitar</button></div></div>`:'')+
+    (p?`<div class="cb-ped-info${!estadoPedido(t)?' cot-'+cotEstado(t):''}">${ic('canasta',18)}<span>Pedido de La Feria <b>${esc(p.ref||'')}</b>${p.envio?' · a domicilio':p.cuando?' · recoge '+hora(p.cuando):''}${p.pago&&METODOS[p.pago]?' · paga con '+METODOS[p.pago].n.toLowerCase():''}${estadoPedido(t)?'.':cotNota(t)}</span></div>`:'');
 }
 function pintarDock(){
   const el=D.getElementById('cbDock');if(!el)return;
   const T=totalDe(tk());
-  el.innerHTML=T.n?`<button type="button" class="cb-principal cb-b-cobrar" data-a="cobrar"><span class="cb-pila"><small>Cobrar · ${T.n} ${T.n===1?'producto':'productos'}</small><b>${col(T.total)}</b></span><i>${ic('flecha',20)}</i></button>`:'';
+  const t=tk(),st=t.pedido&&!estadoPedido(t)?cotEstado(t):'cobrar',nom=esc(String(nombreTk(t)).split(' ')[0]);
+  el.innerHTML=!T.n?'':st==='mandar'?`<button type="button" class="cb-principal cb-b-cobrar cb-b-mandar" data-a="cot-mandar"><span class="cb-pila"><small>Mandarle el total nuevo a ${nom}</small><b>${col(T.total)}</b></span><i>${ic('flecha',20)}</i></button>`
+    :st==='esperando'?`<button type="button" class="cb-principal cb-b-cobrar cb-b-espera" data-a="cot-espera"><span class="cb-pila"><small>Esperando que ${nom} confirme</small><b>${col(T.total)}</b></span><i>${ic('reloj',20)}</i></button>`
+    :`<button type="button" class="cb-principal cb-b-cobrar" data-a="cobrar"><span class="cb-pila"><small>Cobrar · ${T.n} ${T.n===1?'producto':'productos'}</small><b>${col(T.total)}</b></span><i>${ic('flecha',20)}</i></button>`;
 }
-function repintarVenta(){if(vista()!=='venta')return;pintarPedidos();pintarCuentas();pintarRes();pintarDock();}
+function repintarVenta(){if(vista()!=='venta')return;const t=tk();if(t&&t.pedido&&!estadoPedido(t)&&sincEnvio(t))guardar();pintarPedidos();pintarCuentas();pintarRes();pintarDock();}
 
 // ── Pedidos de La Feria que llegan al Mostrador: un toque los acepta y arma la cuenta con el nombre ──
 function pedidos(){
@@ -342,11 +345,12 @@ function cuentaDePedido(o){
     if(it.estado==='nohay')continue;
     const q=Math.round((+(it.qr!=null&&it.qr!==''?it.qr:it.q)||0)*1000)/1000;if(!(q>0))continue;
     const u=it.u==='kg'?'kg':/^unid/i.test(it.u||'')?'unidad':(it.u||'unidad');
-    // manda el precio del POS de la tienda; si el POS no lo tiene (o lo vende en otra unidad), el del pedido
-    const p=S.prods.find(x=>x._n===norm(it.n)&&x.unidad===u&&+x.precio>0)||null,pr=p?precioDe(p):null;
-    const pc=p?pr.pf:+(it.pr!=null&&it.pr!==''?it.pr:it.p)||0;
+    // el precio es el que vio el cliente en La Feria (si se cambia, el cliente confirma el total nuevo antes de cobrar);
+    // el del POS solo si el pedido no trae precio. El producto del POS igual queda unido (inventario y CABYS).
+    const p=S.prods.find(x=>x._n===norm(it.n)&&x.unidad===u&&+x.precio>0)||null,pOrd=+(it.pr!=null&&it.pr!==''?it.pr:it.p)||0,pr=p&&!(pOrd>0)?precioDe(p):null;
+    const pc=pOrd>0?pOrd:(pr?pr.pf:0);
     const pp=p||preparar({id:null,nombre:it.n||'Producto',precio:pc,unidad:u,emoji:it.e||'',categoria_color:'#9E9E9E'});
-    t.items.push({id:idNuevo(),pid:p?p.id:null,n:pp.nombre,e:pp._e,f:pp._f,col:pp._col,u,ti:+(p&&p.tasa_impuesto)||0,pu:p?+p.precio:pc,pf:pc,pc,q,sub:Math.round(pc*q),
+    t.items.push({id:idNuevo(),pid:p?p.id:null,n:pp.nombre,e:pp._e,f:pp._f,col:pp._col,u,ti:+(p&&p.tasa_impuesto)||0,pu:pr?+p.precio:pc,pf:pc,pc,q,sub:Math.round(pc*q),
       promo_id:pr?pr.id:null,promo_txt:pr?pr.txt:'',gen:p?0:1,cabys:'',ped:it.k||it.n});
   }
   const envio=+(o.retiro&&o.retiro.envio&&o.retiro.envio.costo)||0;
@@ -387,6 +391,43 @@ const AVISO_PED={cobrado:['Este pedido ya se cobró en el Mostrador','Quitá est
   entregado:['Este pedido ya se entregó','Quitá esta cuenta: así no se cobra dos veces.'],
   cancelado:['El cliente canceló este pedido','Podés quitar la cuenta o cobrarla como una venta normal.'],
   otro:['El Mostrador se trajo este pedido','Ahora se cobra allá. Si lo vas a cobrar aquí, traelo de vuelta.']};
+function avisoPed(t){
+  const e=estadoPedido(t),o=N&&t.pedido?N.get(t.pedido.id):null;
+  if(e==='cancelado'&&o&&o.rechazo&&o.rechazo.por==='cliente')return ['El cliente no aceptó el total nuevo',(o.rechazo.motivo?'Dijo: «'+o.rechazo.motivo+'». ':'')+'Quitá la cuenta, o cobrala como venta normal si te dice que sí.'];
+  return AVISO_PED[e];
+}
+// ── El total nuevo de un pedido (pos-cotizacion.js): si cambió el peso, el precio o algún producto, el cliente lo confirma antes de cobrar ──
+const COT=window.PosCotizacion||null;
+const lineasDe=t=>t.items.filter(i=>i.ped!=='__envio').map(i=>({k:i.ped||'',n:i.n,q:i.q,p:i.pc,u:i.u==='kg'?'kg':'unid',pid:i.pid,e:i.e,_i:i}));
+function cotEstado(t){
+  if(!COT||!N||!t||!t.pedido)return 'cobrar';
+  const o=N.get(t.pedido.id);if(!o)return 'cobrar';
+  return COT.estado(o,lineasDe(t));
+}
+// el envío del pedido (el costo del Uber puede llegar después) va igual en la cuenta
+function sincEnvio(t){
+  if(!N||!t||!t.pedido)return false;
+  const o=N.get(t.pedido.id);if(!o)return false;
+  const c=Math.round(+(o.retiro&&o.retiro.envio&&o.retiro.envio.costo)||0),l=t.items.find(i=>i.ped==='__envio');
+  if(l&&c>0&&l.pc!==c){l.pu=l.pf=l.pc=c;l.sub=c;return true;}
+  if(!l&&c>0){t.items.push({id:idNuevo(),pid:null,n:'Envío',e:'🛵',f:'',col:'#9E9E9E',u:'unidad',ti:0,pu:c,pf:c,pc:c,q:1,sub:c,promo_id:null,promo_txt:'',gen:1,cabys:'',ped:'__envio'});return true;}
+  return false;
+}
+function cotNota(t){
+  const st=cotEstado(t),o=N&&t.pedido?N.get(t.pedido.id):null,c=COT&&o?COT.confirmado(o):null;
+  if(st==='mandar')return '. <b>Cambió lo que pidió:</b> mandale el total nuevo y se cobra cuando lo confirme.';
+  if(st==='esperando')return '. Le mandamos el total nuevo: se cobra cuando lo confirme en La Feria o te diga que sí.';
+  if(c)return `. <b>${c.por==='cliente'?'Confirmó':'Te dijo que sí a'} ${col(c.total)}</b>: ya se puede cobrar.`;
+  return '. Pesá cada producto. Si cambia el peso o el precio, el cliente confirma el total antes de cobrar.';
+}
+// cuando el cliente confirma (en La Feria), el teléfono lo dice
+function avisoConfirmados(){
+  if(!COT||!N)return;S.cotUlt=S.cotUlt||{};
+  for(const t of S.tk){
+    if(!t.pedido)continue;const st=cotEstado(t),antes=S.cotUlt[t.id];S.cotUlt[t.id]=st;
+    if(antes==='esperando'&&st==='cobrar'){const c=COT.confirmado(N.get(t.pedido.id));if(c){vib([40,60,40,60,80]);aviso(`✅ ${nombreTk(t)} confirmó ${col(c.total)}: ya se puede cobrar`,6000);}}
+  }
+}
 // Justo antes de cobrar: el pedido tiene que seguir libre (nadie lo cobró en otro lado)
 async function pedidoLibre(t){
   if(!N||!t.pedido)return true;
@@ -593,7 +634,7 @@ function destinos(){
 function abrirCobro(){
   const t=tk(),T=totalDe(t);if(!T.n)return;
   if(S.est.k==='lee'){pedirCaja();return;}
-  if(t.pedido){pedidoLibre(t).then(ok=>{if(ok)abrirCobroYa();});return;}
+  if(t.pedido){pedidoLibre(t).then(ok=>{if(!ok)return;const st=cotEstado(t);if(st==='mandar')return ACC['cot-mandar']();if(st==='esperando')return ACC['cot-espera']();abrirCobroYa();});return;}
   abrirCobroYa();
 }
 function abrirCobroYa(){
@@ -744,7 +785,8 @@ async function pedirCaja(){
 }
 async function pagar(){
   const t=tk(),T=totalDe(t),P=S.pago;if(!T.n||!P||S.pagando)return;
-  if(t.pedido){S.pagando=true;const ok=await pedidoLibre(t).finally(()=>{S.pagando=false;});if(!ok){if(estadoPedido(t)){pila.length=1;pintar('atras');}return;}}
+  if(t.pedido){S.pagando=true;const ok=await pedidoLibre(t).finally(()=>{S.pagando=false;});if(!ok){if(estadoPedido(t)){pila.length=1;pintar('atras');}return;}
+    const st=cotEstado(t);if(st==='mandar'||st==='esperando'){pila.length=1;pintar('atras');return ACC[st==='mandar'?'cot-mandar':'cot-espera']();}}
   if((P.parte?P.parte.otro==='sinpe':P.metodo==='sinpe')&&!P.destino){aviso('Falta a quién le hicieron el SINPE');destinoNuevo();return;}
   if(P.metodo==='fiado'&&!P.parte&&!t.n){aviso('Para fiar hace falta el nombre del cliente');await ponerCliente();pintar();return;}
   let d={metodo_pago:P.metodo,monto_recibido:T.total,cambio:0,pago_efectivo:0,pago_tarjeta:0,pago_sinpe:0,sinpe_destino:''};
@@ -1093,6 +1135,52 @@ window.addEventListener('popstate',()=>{if(volver()){try{history.pushState({cb:1
 
 const ACC={
   salir,volver,mas:abrirMas,tomar:tomarCaja,suelto:productoSuelto,cobrar:abrirCobro,pagar,partes:dosPartes,
+  // Mandarle el total nuevo al cliente: queda «Esperando tu confirmación» en La Feria y aquí no se cobra hasta que diga que sí
+  async 'cot-mandar'(){
+    const t=tk();if(!t.pedido||!N||!COT)return;
+    await N.refrescarPedido(t.pedido.id).catch(()=>null);
+    if(estadoPedido(t)){repintarVenta();return;}
+    let o=N.get(t.pedido.id);if(!o)return aviso('No encuentro ese pedido');
+    const L=lineasDe(t),dif=COT.diferencias(o,L);
+    if(!dif.length){repintarVenta();return cotEstado(t)==='esperando'?ACC['cot-espera']():abrirCobroYa();}
+    const uber=COT.necesitaUber(o),nom=esc(String(nombreTk(t)).split(' ')[0]),antes=N.totalDe(o),ahora=COT.totalCon(o,L);
+    const r=await abrirHoja(`<h2 class="cb-hoja-t">Mandarle el total nuevo a ${nom}</h2>
+      <p class="cb-hoja-s">Le llega a La Feria para que lo revise. Se cobra cuando lo confirme (o cuando te diga que sí).</p>
+      <ul class="cb-cambios">${dif.map(c=>`<li>${esc(COT.cambioTxt(c,col))}</li>`).join('')}</ul>
+      <div class="cb-cot-tot"><span>Antes <s>${col(antes)}</s></span><b>${uber?'Sin el Uber ':''}${col(ahora)}</b></div>
+      ${uber?`<label class="cb-etq">Costo del Uber (miralo en la app de Uber)<input class="cb-campo" id="cbUber" type="text" inputmode="numeric" placeholder="₡ 0" autocomplete="off"></label>`:''}
+      <button type="button" class="cb-principal" data-h="ok"><span>Mandárselo</span></button>
+      <button type="button" class="cb-segundo" data-h="sigo"><span>Seguir pesando</span></button>`,{
+      click(a){if(a==='sigo')return cerrarHoja();if(a!=='ok')return;
+        if(uber){const v=Math.round(+String(hojaEl.querySelector('#cbUber').value).replace(/[^0-9]/g,''));if(!(v>0)){aviso('Falta el costo del Uber');hojaEl.querySelector('#cbUber').focus();return;}return cerrarHoja({uber:v});}
+        cerrarHoja({});}});
+    if(!r)return;
+    try{
+      if(r.uber)await N.costoRealUber(o.id,r.uber);
+      o=await COT.mandar(o.id,L,'ARAMO POS celular',S.cajero&&S.cajero.nombre||miNombre());
+    }catch(e){console.warn(e);return aviso('No se pudo mandar. Revisá el internet y probá otra vez.',5000);}
+    L.forEach(l=>{if(l.k&&!l._i.ped)l._i.ped=l.k;}); // lo agregado queda unido a su producto nuevo del pedido
+    sincEnvio(t);guardar();vib([20,40,20]);repintarVenta();
+    if(!o||N.faseDe(o)!=='confirmacion')return aviso('El pedido cambió en otro lado: revisalo.',5000);
+    ACC['cot-espera']({mandado:true});
+  },
+  // Esperando que confirme: avisarle por WhatsApp, o «Ya me dijo que sí» si lo dijo en persona o por teléfono
+  async 'cot-espera'(op){
+    const t=tk();if(!t.pedido||!N||!COT)return;
+    const o=N.get(t.pedido.id);if(!o)return;
+    if(cotEstado(t)!=='esperando'){repintarVenta();return;}
+    const nom=esc(String(nombreTk(t)).split(' ')[0]),tel=t.tel||(o.cliente&&o.cliente.tel)||'';
+    const r=await abrirHoja(`<h2 class="cb-hoja-t">${op&&op.mandado?'Listo: le llegó a '+nom:'Esperando que '+nom+' confirme'}</h2>
+      <p class="cb-hoja-s">El total nuevo es <b>${col(N.totalDe(o))}</b>. Apenas lo confirme en La Feria, aquí se puede cobrar.</p>
+      <div class="cb-hoja-bot">${tel?`<button type="button" class="cb-segundo cb-wa" data-h="wa"><span>Avisarle por WhatsApp</span></button>`:''}
+      <button type="button" class="cb-segundo" data-h="si"><span>Ya me dijo que sí · cobrar</span></button>
+      <button type="button" class="cb-segundo" data-h="no"><span>Seguir pesando</span></button></div>`,{
+      click(a){if(a==='wa'){try{window.open(N.wa(tel,COT.waTexto(N.get(o.id)||o)),'_blank');}catch(e){}return;}if(a==='si'||a==='no')cerrarHoja(a);}});
+    if(r!=='si')return;
+    try{await COT.confirmarTienda(o.id,S.cajero&&S.cajero.nombre||miNombre(),'ARAMO POS celular');}catch(e){return aviso('No se pudo guardar. Revisá el internet y probá otra vez.',5000);}
+    repintarVenta();
+    if(cotEstado(t)==='cobrar')abrirCobroYa();
+  },
   limpiar(){S.q='';const i=D.getElementById('cbQ');if(i){i.value='';i.focus();}pintarRes();},
   voz:escuchar,
   prod(b){const p=S.porId.get(+b.dataset.id);if(p)elegir(p);},
@@ -1249,7 +1337,7 @@ function callarAvisoViejo(){try{const pt=D.getElementById('pwToast');if(!pt)retu
     pintar();despierto();
     if(BA&&BA.recordada())BA.reconectarSola().catch(()=>{});
     if(N){ // los pedidos de La Feria, en vivo (los mismos que ve el Mostrador)
-      try{N.on(()=>{if(vista()==='venta'&&hojaEl.hidden){if(S.q)pintarPedidos();else repintarVenta();}});N.conectar().then(()=>{if(vista()==='venta')pintarPedidos();}).catch(()=>{});}catch{}
+      try{N.on(()=>{avisoConfirmados();if(vista()==='venta'&&hojaEl.hidden){if(S.q)pintarPedidos();else repintarVenta();}});N.conectar().then(()=>{if(vista()==='venta')pintarPedidos();}).catch(()=>{});}catch{}
       const pid=new URLSearchParams(location.search).get('pedido');
       if(pid&&!S.tk.some(t=>t.pedido&&t.pedido.id===pid)){S.pedidoUrl=pid;if(S.caja)setTimeout(abrirPedidoUrl,400);}
       try{if(pid)history.replaceState(history.state,'',location.pathname+'?suc='+encodeURIComponent(S.suc));}catch{}
