@@ -14,6 +14,7 @@
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.117.0"></script>
 <script src="catalogo-productos.js"></script>
 <script src="catalogo-aramo.js?v=20261126-productos3"></script>
+<script src="precios-venta.js?v=20261127-venta1"></script>
 <script src="supplier-base.js"></script>
 <!-- Sistema de diseño ARAMO: tokens y letras locales. Va PRIMERO. -->
 <script>
@@ -490,6 +491,23 @@ body{background:linear-gradient(180deg,var(--gd),transparent 260px),var(--bg);fo
 .price-result-name{font-size:13px;font-weight:800;line-height:1.2;overflow:hidden;text-overflow:ellipsis;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical}
 .price-result-meta{font-size:11px;color:var(--m)}
 .price-result strong{font-size:13px;margin-top:2px}
+.price-result .pr-costo{font-size:11.5px;font-weight:700;color:var(--m)}
+.pv-ventas{display:grid;gap:4px;width:100%;margin-top:4px}
+.pv-venta{display:grid;grid-template-columns:1fr auto;align-items:center;column-gap:4px;padding:5px 9px;border-radius:10px;background:var(--gd);color:var(--g);font-size:11px;line-height:1.2;text-align:left}
+.pv-venta small{grid-column:1/-1}.pv-venta b{grid-column:1}.pv-venta i{grid-column:2;grid-row:2}
+.pv-venta.angeles{background:var(--od);color:var(--o)}
+.pv-venta small{font-size:11px;font-weight:700;opacity:.9}.pv-venta b{font-size:13px;font-weight:800;color:inherit;font-variant-numeric:tabular-nums}.pv-venta i{font-style:normal}
+#priceModalVenta{display:grid;gap:10px;margin:0 0 6px}
+.pmv-fila{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:10px 12px;border-radius:14px;border:1px solid var(--b);border-left:5px solid var(--g);background:var(--card)}
+.pmv-fila.angeles{border-left-color:var(--o)}
+.pmv-tienda{display:grid;gap:2px;min-width:0}.pmv-tienda b{font-size:15px}.pmv-tienda small{font-size:12px;color:var(--m)}
+.pmv-in{display:flex;align-items:center;gap:6px;font-weight:800}
+.pmv-in input{width:110px;min-height:44px;padding:0 10px;border-radius:12px;border:1px solid var(--b2);background:var(--card);color:var(--t);font-size:17px;font-weight:800;text-align:right;font-variant-numeric:tabular-nums}
+.pmv-in em{font-style:normal;font-size:11px;font-weight:600;color:var(--m)}
+.pmv-sug{margin:0;font-size:13px;color:var(--m)}.pmv-sug b{color:var(--t)}
+.pmv-link{min-height:40px;padding:0 4px;border:0;background:none;color:var(--g);font-size:13px;font-weight:700;text-decoration:underline;cursor:pointer;justify-self:start}
+.pmv-guardar{margin-top:2px}
+.pmv-aviso{margin:0;padding:10px 12px;border-radius:12px;background:#fff7e6;color:#7a4b00;font-size:12.5px}
 
 #prodCardList{display:grid;grid-template-columns:1fr;gap:7px}
 .compare-row{display:grid;grid-template-columns:1fr 115px;gap:10px;align-items:center;padding:12px 0;border-bottom:1px solid var(--b)}
@@ -1018,9 +1036,12 @@ html[data-theme="dark"] .today-money-card{background:linear-gradient(145deg,#125
   <div class="modal">
     <div class="modal-handle"></div>
     <div class="modal-title" id="priceModalTitle">Producto</div>
-    <div style="font-size:14px;color:var(--m);margin:-6px 0 12px">Cambiá el nombre, el ícono, la unidad, los proveedores y los precios. Los precios se guardan solos.</div>
+    <div style="font-size:14px;color:var(--m);margin:-6px 0 12px">El precio de venta de cada tienda, el costo de cada proveedor y los datos del producto.</div>
+    <div class="pm-sub" id="pmVentaT">Precio de venta</div>
+    <div id="priceModalVenta" role="group" aria-labelledby="pmVentaT"></div>
+    <div class="pm-sub">Datos del producto</div>
     <div id="priceModalEdit"></div>
-    <div class="pm-sub">Precio por proveedor</div>
+    <div class="pm-sub">Costo por proveedor (se guarda solo)</div>
     <div id="priceCompareList"></div>
     <div id="priceModalExtra"></div>
     <button class="btn btn-g btn-full" type="button" onclick="closePriceModal()">Listo</button>
@@ -2311,7 +2332,7 @@ function switchView(name){
   if(name!=='home'){const inp=document.getElementById('globalSearch');if(inp)inp.value='';const res=document.getElementById('globalSearchResults');if(res)res.style.display='none';}
   if(name==='home')renderHome();
   if(name==='proveedores')renderProveedoresNav();
-  if(name==='productos')renderProductos();
+  if(name==='productos'){renderProductos();window.AramoVenta?.cargar();}
   if(name==='resumen'){renderResumen();renderHistorico();updateHomeDinero();}
   if(name==='config')scheduleConfigRender();
 }
@@ -3804,12 +3825,53 @@ function renderProductos(){
       <span style="font-size:22px">${item.emoji}</span>
       <span class="price-result-name">${item.name}</span>
       <span class="price-result-meta">${item.offers.length?item.offers.length+' prov.':'Sin proveedor'}</span>
-      <strong>${best?'₡'+fmt(getPrice(best.prov,best.product.id)):'Editar'}</strong>
+      <strong class="pr-costo">${best?'Costo ₡'+fmt(getPrice(best.prov,best.product.id)):'Sin costo'}</strong>
+      ${ventaFilaHtml(item)}
     </button>`;
   }).join('')||'<div class="empty-state"><div class="empty-ico">🔍</div>No encontré ese producto</div>';
   wrap.querySelectorAll('[data-price-key]').forEach(btn=>btn.addEventListener('click',()=>openPriceModal(btn.dataset.priceKey)));
 }
 const renderPriceSearch=renderProductos;   // nombre de antes
+
+// ── Precio de VENTA de cada tienda (precios-venta.js): en Ambos las dos, en una tienda solo la suya ──
+const ventaUnidad=item=>normUnit(item.unit||item.offers?.[0]?.product?.unit)==='kg'?'kg':'unid';
+const ventaPrecioTxt=(v,u)=>'₡'+fmt(v.p)+(u==='kg'?'/kg':'');
+function ventaFilaHtml(item){
+  const V=window.AramoVenta;if(!V)return '';
+  const u=ventaUnidad(item),ts=V.visibles();
+  return `<span class="pv-ventas">${ts.map(t=>{const v=V.precio(t,item.name);
+    return `<span class="pv-venta ${t}"><small>${ts.length>1?V.NOMBRE[t]:'Venta'}</small><b>${v?ventaPrecioTxt(v,u):'sin precio'}</b>${v&&v.pend?'<i title="Llega a la caja en un minuto">⏳</i>':''}</span>`;}).join('')}</span>`;
+}
+// El costo más bajo que hay hoy (para sugerir el precio con 40 %)
+function ventaCosto(item){const c=(item.offers||[]).map(o=>+getPrice(o.prov,o.product.id)).filter(x=>x>0);return c.length?Math.min(...c):0;}
+function ventaModalHtml(item){
+  const V=window.AramoVenta;if(!V)return '';
+  const u=ventaUnidad(item),ts=V.visibles(),sug=V.sugerido(ventaCosto(item));
+  const filas=ts.map(t=>{const v=V.precio(t,item.name);return `<label class="pmv-fila ${t}"><span class="pmv-tienda"><b>${V.NOMBRE[t]}</b><small>${v?(v.pend?'⏳ Llega a la caja en un minuto':v.origen==='pos'?'Lo que cobra su caja hoy':'Puesto desde Inventario'):'Todavía sin precio'}</small></span>
+    <span class="pmv-in"><span aria-hidden="true">₡</span><input type="number" inputmode="decimal" min="0" step="25" data-venta="${t}" value="${v?v.p:''}" placeholder="${sug||''}" aria-label="Precio de venta en ${V.NOMBRE[t]}${u==='kg'?' por kilo':''}"><em>${u==='kg'?'por kilo':'c/u'}</em></span></label>`;}).join('');
+  return `${filas}
+    ${sug?`<p class="pmv-sug">Con el costo de hoy y 40 % de ganancia: <b>₡${fmt(sug)}</b> <button type="button" class="pmv-link" data-pm="venta-sug" data-v="${sug}">Usar</button></p>`:''}
+    ${ts.length>1?'<button type="button" class="pmv-link" data-pm="venta-igual">Poner el de Moravia también en Los Ángeles</button>':''}
+    <button class="btn btn-g btn-full pmv-guardar" type="button" data-pm="venta-guardar" data-key="${escA(item.key)}">Guardar precio de venta</button>
+    ${V.sinTabla?'<p class="pmv-aviso">Falta pegar en Supabase el SQL «precio de venta por tienda» para que llegue a la caja.</p>':''}`;
+}
+function pintarVentaModal(item){const box=document.getElementById('priceModalVenta');if(box)box.innerHTML=ventaModalHtml(item);}
+async function guardarVentaModal(key){
+  const item=getProductosLista().find(r=>r.key===key),V=window.AramoVenta;if(!item||!V)return;
+  const u=ventaUnidad(item);let n=0,mal=null;
+  for(const inp of document.querySelectorAll('#priceModalVenta [data-venta]')){
+    const t=inp.dataset.venta,val=+String(inp.value).replace(',','.');if(!(val>0))continue;
+    const ya=V.precio(t,item.name);if(ya&&Math.abs(ya.p-val)<0.005)continue;
+    const r=await V.poner(t,item.name,val,u);n++;if(!r.ok)mal=r.motivo;
+  }
+  if(!n){toast('No cambiaste ningún precio de venta');return;}
+  pintarVentaModal(item);renderProductos();
+  if(mal==='sql')toast('Guardado en este teléfono. Falta pegar el SQL del precio de venta para que llegue a la caja','err');
+  else if(mal)toast('Guardado en este teléfono; se manda a la caja cuando vuelva el internet','err');
+  else toast(`✓ Precio de venta guardado · llega a ${n>1?'las cajas':'la caja'} en un minuto`,'ok');
+}
+window.addEventListener('aramo-precio-venta',()=>{if(document.getElementById('view-productos')?.classList.contains('active'))renderProductos();});
+window.addEventListener('aramo-catalogo',()=>{if(document.getElementById('view-productos')?.classList.contains('active'))renderProductos();});
 
 const escA=s=>String(s??'').replace(/&/g,'&amp;').replace(/"/g,'&quot;').replace(/</g,'&lt;');
 
@@ -3875,7 +3937,9 @@ function openPriceModal(key){
     <button class="btn btn-o btn-full" type="button" data-pm="asignar" data-key="${escA(item.key)}">＋ Agregar a un proveedor</button>
     <button class="btn btn-o btn-full pm-del" type="button" data-pm="borrar" data-key="${escA(item.key)}" aria-label="Borrar ${escA(item.name)} de todo">🗑️ Borrar de todo</button>
   </div>`;
+  pintarVentaModal(item);
   document.getElementById('modalPriceCompare').classList.add('open');
+  window.AramoVenta?.cargar().then(()=>{if(document.getElementById('modalPriceCompare').classList.contains('open'))pintarVentaModal(item);});
 }
 
 // Cambia el nombre, el ícono y la unidad de un producto en TODOS los proveedores que lo venden (y en la
@@ -3920,6 +3984,10 @@ function closePriceModal(){
 
 // Dentro de la ventana de un producto: agregarlo a un proveedor o borrarlo de todo.
 async function priceModalAccion(btn){
+  const pmv=btn.dataset.pm;
+  if(pmv==='venta-guardar'){btn.disabled=true;try{await guardarVentaModal(btn.dataset.key);}finally{btn.disabled=false;}return;}
+  if(pmv==='venta-sug'){document.querySelectorAll('#priceModalVenta [data-venta]').forEach(i=>{i.value=btn.dataset.v;});return;}
+  if(pmv==='venta-igual'){const m=document.querySelector('#priceModalVenta [data-venta="moravia"]'),a=document.querySelector('#priceModalVenta [data-venta="angeles"]');if(m&&a&&+m.value>0)a.value=m.value;return;}
   const key=btn.dataset.key,prod=getKnownProductCatalog().find(p=>p.key===key);if(!prod)return;
   if(btn.dataset.pm==='asignar'){openCatalogoAssign(key);return;}
   if(btn.dataset.pm==='guardar'){

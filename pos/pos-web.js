@@ -179,6 +179,7 @@ function iniciarPrecios(){
       url:SUPA_URL,key:SUPA_KEY,POS:()=>POS,suc:()=>SUC,
       puede:()=>!!(POS&&dueno&&!soloLectura&&!muerto&&!iniciando),
       recargar:()=>{try{if(window.posRecargarProductos)window.posRecargarProductos();}catch(e){}},
+      marcar:()=>{try{marcarCambio();}catch(e){}},   // guardar y subir: así el catálogo nuevo llega a La Feria y a Inventario
       aviso,
     });
   }catch(e){console.warn('[pos] precios',e);}

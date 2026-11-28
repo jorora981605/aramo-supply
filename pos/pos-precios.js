@@ -112,7 +112,7 @@ function vigentes(){
     const pr=+p.precio||0;
     if(n.tipo==='bajo'&&!(pr>n.sugerido))return;
     if(n.tipo==='revisar'&&!(pr<n.sugerido))return;
-    if(n.tipo==='subio'&&Date.now()-Date.parse(n.t)>dia)return;
+    if((n.tipo==='subio'||n.tipo==='inventario')&&Date.now()-Date.parse(n.t)>dia)return;
     out.push({...n,hoy:pr,nombre:p.nombre||n.nombre});
   });
   if(out.length!==todas.length)guardarNotas(out.map(({hoy,...r})=>r));
@@ -138,7 +138,8 @@ function pintarFranja(){
   if(!L.length){b.hidden=true;b.innerHTML='';if(!document.getElementById('pwNotasHoja')?.hidden)pintarLista();return;}
   const rev=L.filter(n=>n.tipo==='revisar'||n.tipo==='bajo').length;
   b.hidden=false;
-  b.innerHTML=`<span class="pw-n-t"><b>💲 ${L.length===1?'1 precio cambió':L.length+' precios cambiaron'}</b><span class="pw-n-resto"> por el cierre${rev?` · <em>${rev===1?'1 para revisar':rev+' para revisar'}</em>`:''}</span></span><button type="button" data-pn="ver">Ver</button>`;
+  const inv=L.filter(n=>n.tipo==='inventario').length,origen=inv===L.length?' desde Inventario':inv?' por el cierre y desde Inventario':' por el cierre';
+  b.innerHTML=`<span class="pw-n-t"><b>💲 ${L.length===1?'1 precio cambió':L.length+' precios cambiaron'}</b><span class="pw-n-resto">${origen}${rev?` · <em>${rev===1?'1 para revisar':rev+' para revisar'}</em>`:''}</span></span><button type="button" data-pn="ver">Ver</button>`;
   if(!document.getElementById('pwNotasHoja')?.hidden)pintarLista();
 }
 function hoja(){
@@ -159,6 +160,7 @@ function hoja(){
   return h;
 }
 function textoNota(n){
+  if(n.tipo==='inventario')return`<b>Lo cambiaron desde Inventario${n.por==='ambos'?' (Ambos)':''}:</b> ${dinero(n.antes)} → ${dinero(n.ahora)}`;
   if(n.tipo==='subio')return`<b>Subió solo:</b> ${dinero(n.antes)} → ${dinero(n.ahora)} <span>(costo ${dinero(n.costo)})</span>`;
   if(n.tipo==='bajo')return`<b>El costo bajó</b> a ${dinero(n.costo)}: podés bajarlo a ${dinero(n.sugerido)} <span>(hoy ${dinero(n.hoy)})</span>`;
   return`<b>Revisalo:</b> el costo subió a ${dinero(n.costo)} y el precio de ${dinero(n.hoy)} queda corto. Con 40 % serían ${dinero(n.sugerido)}`;
@@ -169,9 +171,9 @@ function pintarLista(){
       ${n.tipo==='bajo'?`<button type="button" class="pw-nb prim" data-pn="precio" data-pid="${n.pid}" data-v="${n.sugerido}">Bajar a ${dinero(n.sugerido)}</button>`:''}
       ${n.tipo==='revisar'?`<button type="button" class="pw-nb prim" data-pn="precio" data-pid="${n.pid}" data-v="${n.sugerido}">Subir a ${dinero(n.sugerido)}</button>`:''}
       ${n.tipo==='subio'?`<button type="button" class="pw-nb" data-pn="precio" data-pid="${n.pid}" data-v="${n.antes}">Dejar en ${dinero(n.antes)}</button>`:''}
-      <button type="button" class="pw-nb${n.tipo==='subio'?' prim':''}" data-pn="ok" data-pid="${n.pid}">Entendido</button></div></li>`).join('');
-  h.innerHTML=`<div class="pw-nh-c" role="dialog" aria-modal="true" aria-labelledby="pwNhT"><div class="pw-nh-cab"><h2 id="pwNhT">💲 Precios que cambiaron por el cierre</h2><button type="button" class="pw-nb" data-pn="cerrar">Cerrar</button></div>
-    <p class="pw-nh-s">El costo sale del Cierre de compras. El precio nunca baja solo: si el costo bajó, vos decidís.</p>
+      <button type="button" class="pw-nb${n.tipo==='subio'||n.tipo==='inventario'?' prim':''}" data-pn="ok" data-pid="${n.pid}">Entendido</button></div></li>`).join('');
+  h.innerHTML=`<div class="pw-nh-c" role="dialog" aria-modal="true" aria-labelledby="pwNhT"><div class="pw-nh-cab"><h2 id="pwNhT">💲 Precios que cambiaron</h2><button type="button" class="pw-nb" data-pn="cerrar">Cerrar</button></div>
+    <p class="pw-nh-s">El costo sale del Cierre de compras y el precio nunca baja solo: si el costo bajó, vos decidís. Los que dicen «desde Inventario» los puso alguien en «Productos y precios».</p>
     ${L.length?`<ul class="pw-nl">${filas}</ul><div class="pw-nh-pie"><button type="button" class="pw-nb" data-pn="todas">Entendido todas</button></div>`:'<p class="pw-nh-vacio">No hay nada pendiente. ✔️</p>'}</div>`;
 }
 function abrirLista(){const h=hoja();pintarLista();h.hidden=false;const b=h.querySelector('button.prim,button');if(b)b.focus();}
@@ -211,17 +213,60 @@ function aplicarFilas(filas,cp,base){
   const u=unir(filas,cp,base),notas=leerNotas(),res=aplicar(POS,u.porId,{notas,margen:C().MARGEN_MIN});
   res.sinNombre=u.sinNombre.length;res.filas=(filas||[]).length;
   diag={t:new Date().toISOString(),...res};LS.set('pos_precios_diag_'+ctx.suc(),diag);
-  if(res.costos){guardarNotas(notas);if(ctx.recargar)ctx.recargar();}
+  if(res.costos){guardarNotas(notas);if(ctx.marcar)ctx.marcar();if(ctx.recargar)ctx.recargar();}
   pintarFranja();
   return res;
+}
+// ── 6) Precio de venta puesto desde Inventario («Productos y precios»): tabla aramo_precio_venta ──
+// Una fila por tienda y producto de ARAMO (id = catalogo_id). Si es más nueva que lo que ya se puso (aplicado_at),
+// el POS pone ese precio, deja una nota y la marca como puesta. Si el producto no está en este POS, queda para después.
+function aplicarVenta(POS,filas,notas){
+  const res={puestos:0,marcar:[]};
+  (filas||[]).forEach(f=>{
+    if(!f||!f.id||!(+f.precio>0))return;
+    if(f.aplicado_at&&Date.parse(f.aplicado_at)>=Date.parse(f.at))return;      // ya está puesto
+    let p=null;try{p=POS.prepare("SELECT id,nombre,precio FROM productos WHERE activo = 1 AND catalogo_id = ? ORDER BY (precio > 0) DESC, id LIMIT 1").get([f.id]);}catch(e){}
+    if(!p)return;
+    const antes=+p.precio||0,ahora=Math.round(+f.precio*100)/100;
+    if(Math.abs(antes-ahora)>=0.005){
+      POS.prepare("UPDATE productos SET precio = ?, fecha_modificacion = datetime('now','localtime') WHERE id = ?").run([ahora,p.id]);
+      const i=notas.findIndex(n=>n.pid===p.id);if(i>=0)notas.splice(i,1);
+      notas.push({pid:p.id,cid:f.id,nombre:p.nombre,tipo:'inventario',antes,ahora,por:f.por||'',t:new Date().toISOString()});
+      res.puestos++;
+    }
+    res.marcar.push(f.id);
+  });
+  return res;
+}
+let _venta=false;
+async function revisarVenta(){
+  if(!ctx||_venta||!ctx.puede())return null;
+  const POS=ctx.POS();if(!POS)return null;
+  _venta=true;
+  try{
+    const suc=ctx.suc(),filas=await leer('aramo_precio_venta?select=*&tienda=eq.'+encodeURIComponent(suc));
+    if(!Array.isArray(filas)||!filas.length)return{puestos:0};
+    const notas=leerNotas(),r=aplicarVenta(POS,filas,notas);
+    if(r.puestos){guardarNotas(notas);if(ctx.marcar)ctx.marcar();if(ctx.recargar)ctx.recargar();pintarFranja();
+      if(ctx.aviso)ctx.aviso('💲 '+(r.puestos===1?'Un precio llegó':r.puestos+' precios llegaron')+' desde Inventario');}
+    const ahora=new Date().toISOString();
+    for(const id of r.marcar){
+      try{await fetch(ctx.url+'/rest/v1/aramo_precio_venta?tienda=eq.'+encodeURIComponent(suc)+'&id=eq.'+encodeURIComponent(id),{method:'PATCH',
+        headers:{apikey:ctx.key,Authorization:'Bearer '+ctx.key,'Content-Type':'application/json',Prefer:'return=minimal'},body:JSON.stringify({aplicado_at:ahora})});}catch(e){}
+    }
+    return r;
+  }catch(e){return null;}   // sin la tabla todavía (falta el SQL) o sin internet: se intenta en la próxima vuelta
+  finally{_venta=false;}
 }
 function iniciar(o){
   ctx=o;
   window.addEventListener('online',()=>setTimeout(()=>revisar(),1500));
   document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='visible')revisar();});
   clearInterval(timer);timer=setInterval(()=>revisar(),CADA);
+  setInterval(()=>revisarVenta(),60000);                      // lo de Inventario llega en un minuto
+  document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='visible')revisarVenta();});
   pintarFranja();
-  return revisar(true);
+  return revisar(true).then(r=>{revisarVenta();return r;});
 }
-return{iniciar,revisar,unir,costoPara,decidir,aplicar,aplicarFilas,listaDe,vigentes,pintarFranja,abrirLista,dinero,unidadInv,get diag(){return diag;}};
+return{iniciar,revisar,revisarVenta,aplicarVenta,unir,costoPara,decidir,aplicar,aplicarFilas,listaDe,vigentes,pintarFranja,abrirLista,dinero,unidadInv,get diag(){return diag;}};
 })();
