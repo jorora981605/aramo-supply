@@ -805,7 +805,7 @@ function xpSugClick(e){
 // tienda) y abajo una tarjeta por proveedor con sus productos en mosaicos chicos. Cada mosaico
 // muestra las dos cantidades con el color de su tienda (verde Moravia, naranja Los Ángeles).
 // Tocar un mosaico abre el producto para cambiar la cantidad; los botones hacen lo de siempre.
-let _pdFiltro='todos',_pdEntrar=true,_pdNums={},_pdT=0;
+let _pdFiltro='todos',_pdTienda='todas',_pdEntrar=true,_pdNums={},_pdT=0;
 const capital=s=>String(s||'').charAt(0).toUpperCase()+String(s||'').slice(1);
 const plural=(n,a,b)=>n+' '+(n===1?a:b);
 // Íconos dibujados (se ven nítidos en cualquier teléfono, a diferencia de los emojis en botones).
@@ -866,32 +866,45 @@ function sxDos(d){
   return `<div class="sx-dos"><button type="button" class="sx-env sx-dos-env${gs.length?' hecho':''}" data-pd="send" data-prov="${esc(d.prov)}" aria-label="${reenv} el pedido a ${esc(d.prov)}${gs.length?'. Ya se envió':''}" title="${reenv} por WhatsApp">${gs.length?'':ico('enviar')}${izq}</button>
     <button type="button" class="sx-dos-leido ${cls}" data-pd="leido" data-prov="${esc(d.prov)}"${gs.length?'':' disabled'} aria-label="${esc(aria)}"><span class="sx-dos-t">${der}</span></button></div>`;
 }
-function sxTarjeta(d,i,sides,modo){
+// Una parte de la tarjeta: lo de UNA tienda para este proveedor (sus productos, su estado, su hora).
+// Moravia va en verde y Los Ángeles en naranja; nunca se mezclan los productos de una con los de la otra.
+function pdHora(t,side,prov){
+  if(!t)return'';
+  const cuando=sxCuando(t);
+  return `<time class="sx-hora ${side}" datetime="${new Date(t).toISOString()}" title="Pedido de ${SIDE_NAME[side]} a ${esc(prov)} modificado: ${cuando}" aria-label="${SIDE_NAME[side]}: modificado ${cuando}">${ico('reloj')}${esc(cuando)}</time>`;
+}
+function pdLado(d,side,modo){
   const p=S.pedidos[d.prov]||{};
-  const cant=(q,s)=>`<b class="${s}${q>0?'':' cero'}">${q>0?fmtQ(q):'·'}</b>`;
-  const notasProducto=sides.flatMap(s=>d.lines.filter(l=>l.q[s]>0).map(l=>{
-    const nota=getProductNote(p,l.prod.id,s);
-    return nota?{side:s,producto:niceName(l.prod.name),nota}:null;
-  }).filter(Boolean));
-  const notasProductoHTML=notasProducto.length
-    ?`<div class="sx-prod-notas">${notasProducto.map(x=>`<p class="sx-nota sx-prod-nota"><b>${SIDE_NAME[x.side]} · ${esc(x.producto)}:</b> ${esc(x.nota)}</p>`).join('')}</div>`
-    :'';
-  const notas=sides.map(s=>{const n=String(p.notes?.['__note_'+s]||(s==='moravia'?p.note:'')||'').trim();return n?`<p class="sx-nota"><b>${SIDE_NAME[s]}:</b> ${esc(n)}</p>`:'';}).join('');
-  const horas=sides.map(s=>sxHoraTag(sxHora(p,s),`Pedido de ${SIDE_NAME[s]} a ${d.prov} modificado`,'sx-hora '+s,SIDE_NAME[s]+' · ')).join('');
-  return `<article class="sx-card${d.sent?' enviado':''}" data-sx-drop="${esc(d.prov)}" style="--i:${i};--c:${sxColor(d.prov)}">
-    <header class="sx-card-h">
-      <button type="button" class="sx-card-id" data-pd="open" data-prov="${esc(d.prov)}" title="Abrir ${esc(d.prov)}"><span class="sx-av">${esc(d.prov.charAt(0).toUpperCase())}</span><span class="sx-card-t"><b>${esc(d.prov)}</b><small><i></i>${d.sent?'Enviado':'Por enviar'} · ${plural(d.n,'producto','productos')}</small></span></button>
-      ${d.tot?`<span class="sx-card-tot">₡${fmt(d.tot)}</span>`:''}
-      ${modo==='pedido'&&scopeSide()==='both'?sxDos(d):''}
+  const lines=d.lines.filter(l=>l.q[side]>0),extras=d.extras.filter(x=>x.side===side);
+  const sent=!!sentFlags(p)[side],at=+p.notes?.['__sentAt_'+side]||0,tot=calcSide(side,d.prov),n=lines.length+extras.length;
+  const hEnv=at?new Date(at).toLocaleTimeString('es-CR',{hour:'numeric',minute:'2-digit'}).replace(/\s/g,' '):'';
+  const nota=String(p.notes?.['__note_'+side]||(side==='moravia'?p.note:'')||'').trim();
+  const items=lines.map(l=>{
+    const barato=Object.entries(sxPreciosDe(d.prov,l.prod).por).find(([,x])=>x.barato),pn=getProductNote(p,l.prod.id,side),nom=niceName(l.prod.name);
+    return `<div class="pd2-it"><div class="sx-order-line pd2-line"><button type="button" class="sx-chip ${side}" data-pd="line" data-prov="${esc(d.prov)}" data-pid="${esc(l.prod.id)}" data-lado="${side}" aria-label="${esc(nom)}: ${fmtQ(l.q[side])} ${esc(l.unit)} para ${SIDE_NAME[side]}. Tocá para editar."><span class="sx-e">${smartEmoji(l.prod)}</span><span class="sx-n">${esc(nom)}</span><span class="sx-q"><b class="${side}">${fmtQ(l.q[side])}</b><small>${esc(uniCorta(l.unit))}</small></span></button><button type="button" class="sx-line-del ${side}" data-pd="remove-line" data-prov="${esc(d.prov)}" data-pid="${esc(l.prod.id)}" data-side="${side}" aria-label="Quitar ${esc(nom)} del pedido de ${SIDE_NAME[side]}" title="Quitar de ${SIDE_NAME[side]}">${ico('borrar')}</button></div>${pn?`<p class="pd2-nota">${ico('nota')}${esc(pn)}</p>`:''}${barato?`<small class="sx-best-price">Más barato en <b>${esc(barato[0])}</b> · ₡${fmt(barato[1].precio)}/${esc(barato[1].u)}</small>`:''}</div>`;
+  }).join('')+extras.map(x=>`<div class="pd2-it"><div class="sx-order-line pd2-line"><span class="sx-chip extra ${side}"><span class="sx-e">➕</span><span class="sx-n">${esc(x.name||'Extra')}</span><span class="sx-q"><b class="${side}">${fmtQ(+x.qty)}</b><small>${esc(uniCorta(x.unit||'kg'))}</small></span></span></div></div>`).join('');
+  return `<section class="pd2-lado ${side}${sent?' enviado':''}" data-lado="${side}" aria-label="${SIDE_NAME[side]}: ${plural(n,'producto','productos')}, ${sent?'enviado':'por enviar'}">
+    <header class="pd2-lado-h"><span class="pd2-lado-i">${ico(side)}</span><b>${SIDE_NAME[side]}</b><span class="pd2-lado-n">${plural(n,'producto','productos')}</span>${tot?`<span class="pd2-lado-tot">₡${fmt(tot)}</span>`:''}</header>
+    <div class="pd2-lado-s"><span class="pd2-estado ${sent?'ok':'pend'}">${sent?ico('ok')+'Enviado'+(hEnv?' · '+esc(hEnv):''):'<i></i>Por enviar'}</span>${pdHora(sxHora(p,side),side,d.prov)}</div>
+    <div class="pd2-items">${items}</div>
+    ${nota?`<p class="sx-nota pd2-lado-nota"><b>Nota:</b> ${esc(nota)}</p>`:''}
+    ${modo==='pedido'?xpLateHtml(d.prov,[side]):''}
+  </section>`;
+}
+function sxTarjeta(d,i,sides,modo,solo){
+  const lados=(solo?sides.filter(s=>s===solo):sides).filter(s=>d.lados?d.lados[s].n>0:true);
+  const otros=solo?sides.filter(s=>s!==solo&&d.lados[s].n>0):[];
+  const pend=sides.filter(s=>d.lados[s].n>0&&!d.lados[s].sent);
+  const estado=d.sent?'Enviado':(pend.length&&pend.length<sides.filter(s=>d.lados[s].n>0).length&&sides.length>1?'Falta enviar: '+pend.map(s=>SIDE_NAME[s]).join(' y '):'Por enviar');
+  const tot=solo?calcSide(solo,d.prov):d.tot,n=solo?d.lados[solo].n:d.n,envio=modo==='pedido'&&scopeSide()==='both';
+  return `<article class="sx-card${d.sent?' enviado':''}${!d.sent&&pend.length<sides.filter(s=>d.lados[s].n>0).length?' parcial':''}" data-sx-drop="${esc(d.prov)}" style="--i:${i};--c:${sxColor(d.prov)}">
+    <header class="sx-card-h${envio?' con-dos':''}">
+      <button type="button" class="sx-card-id" data-pd="open" data-prov="${esc(d.prov)}" title="Abrir ${esc(d.prov)}"><span class="sx-av">${esc(d.prov.charAt(0).toUpperCase())}</span><span class="sx-card-t"><b>${esc(d.prov)}</b><small><i></i>${esc(estado)} · ${plural(n,'producto','productos')}</small></span></button>
+      ${tot&&lados.length>1?`<span class="sx-card-tot">₡${fmt(tot)}</span>`:''}
+      ${envio?sxDos(d):''}
     </header>
-    <div class="sx-chips">
-      ${d.lines.map(l=>{const barato=Object.entries(sxPreciosDe(d.prov,l.prod).por).find(([,x])=>x.barato);return `<div class="sx-order-line"><button type="button" class="sx-chip" data-pd="line" data-prov="${esc(d.prov)}" data-pid="${esc(l.prod.id)}" aria-label="${esc(niceName(l.prod.name))}: ${sides.map(s=>SIDE_NAME[s]+' '+(l.q[s]||0)).join(', ')} ${esc(l.unit)}. Tocá para editar."><span class="sx-e">${smartEmoji(l.prod)}</span><span class="sx-n">${esc(niceName(l.prod.name))}</span><span class="sx-q">${sides.map(s=>cant(l.q[s],s)).join('')}<small>${esc(uniCorta(l.unit))}</small></span></button>${sides.filter(s=>l.q[s]>0).map(s=>`<button type="button" class="sx-line-del ${s}" data-pd="remove-line" data-prov="${esc(d.prov)}" data-pid="${esc(l.prod.id)}" data-side="${s}" aria-label="Quitar ${esc(niceName(l.prod.name))} del pedido de ${SIDE_NAME[s]}" title="Quitar de ${SIDE_NAME[s]}">×</button>`).join('')}${barato?`<small class="sx-best-price">Más barato en <b>${esc(barato[0])}</b> · ₡${fmt(barato[1].precio)}/${esc(barato[1].u)}</small>`:''}</div>`;}).join('')}
-      ${d.extras.map(x=>`<span class="sx-chip extra"><span class="sx-e">➕</span><span class="sx-n">${esc(x.name||'Extra')}</span><span class="sx-q">${sides.map(s=>cant(s===x.side?+x.qty:0,s)).join('')}<small>${esc(uniCorta(x.unit||'kg'))}</small></span></span>`).join('')}
-    </div>
-    ${notasProductoHTML}
-    ${modo==='pedido'?xpLateHtml(d.prov,sides):''}
-    ${horas?`<div class="sx-horas">${horas}</div>`:''}
-    ${notas}
+    <div class="pd2-lados n${lados.length}">${lados.map(s=>pdLado(d,s,modo)).join('')}</div>
+    ${otros.length?`<p class="pd2-otro">${ico('info')}El envío incluye también ${otros.map(s=>SIDE_NAME[s]).join(' y ')}.</p>`:''}
   </article>`;
 }
 function sxDatos(){
@@ -1800,34 +1813,45 @@ function xpRenderPedido(){
   const body=$('pedidoBody');if(!body)return;
   const sides=activeOrderSides(),dos=sides.length>1;
   const t=xpTotals(),all=calcScopedAllProvs();
-  const provs=t.provs.slice().sort((a,b)=>(isSent(a)-isSent(b))||ORDEN_ES(a,b));
   const fecha=capital(new Date().toLocaleDateString('es-CR',{weekday:'long',day:'numeric',month:'long'}).replace(',',''));
-  const datos=provs.map(prov=>{const {lines,extras}=xpProvLines(prov);return{prov,lines,extras,sent:isSent(prov),tot:sideTotal(prov),n:lines.length+extras.length};});
+  // Cada proveedor con lo de cada tienda por separado: cuántos productos, si ya se envió y a qué hora.
+  const datos=t.provs.map(prov=>{
+    const {lines,extras}=xpProvLines(prov),p=S.pedidos[prov]||{},lados={};
+    sides.forEach(s=>{lados[s]={n:lines.filter(l=>l.q[s]>0).length+extras.filter(x=>x.side===s).length,sent:!!sentFlags(p)[s]};});
+    const usados=sides.filter(s=>lados[s].n>0);
+    return{prov,lines,extras,lados,sent:usados.length?usados.every(s=>lados[s].sent):isSent(prov),tot:sideTotal(prov),n:lines.length+extras.length};
+  }).sort((a,b)=>(a.sent-b.sent)||ORDEN_ES(a.prov,b.prov));
   const enviados=datos.filter(d=>d.sent).length,porEnviar=datos.length-enviados;
-  const nSide=s=>datos.reduce((k,d)=>k+d.lines.filter(l=>l.q[s]>0).length+d.extras.filter(x=>x.side===s).length,0);
+  const nSide=s=>datos.reduce((k,d)=>k+d.lados[s].n,0);
+  // Por tienda: a cuántos proveedores le falta enviar a cada una.
+  const pendS=Object.fromEntries(sides.map(s=>[s,datos.filter(d=>d.lados[s].n>0&&!d.lados[s].sent).length]));
+  const provS=Object.fromEntries(sides.map(s=>[s,datos.filter(d=>d.lados[s].n>0).length]));
   const lastSent=xpLatestSent(sides);
-  if((_pdFiltro==='pend'&&!porEnviar)||(_pdFiltro==='env'&&!enviados))_pdFiltro='todos';
+  // Filtro por tienda (solo en Ambos) y por estado. Con una tienda escogida, "por enviar" es de esa tienda.
+  if(!dos||(_pdTienda!=='todas'&&!provS[_pdTienda]))_pdTienda='todas';
+  const solo=_pdTienda==='todas'?'':_pdTienda;
+  const baseT=datos.filter(d=>!solo||d.lados[solo].n>0),envD=d=>solo?d.lados[solo].sent:d.sent;
+  const cEnv=baseT.filter(envD).length,cPend=baseT.length-cEnv;
+  if((_pdFiltro==='pend'&&!cPend)||(_pdFiltro==='env'&&!cEnv))_pdFiltro='todos';
+  const hSent=lastSent?new Date(lastSent.at).toLocaleTimeString('es-CR',{hour:'numeric',minute:'2-digit'}).replace(/\s/g,' '):'';
   let html=`<section class="pdx-hero${t.items?'':' vacio'}">
-    <p class="pdx-kick">${ico('canasta')}Pedido de mañana</p>
-    <h2 class="pdx-fecha">${esc(fecha)}</h2>
-    <div class="pd-sent-time"><span>Último envío del pedido</span><strong>${lastSent?esc(new Date(lastSent.at).toLocaleTimeString('es-CR',{hour:'numeric',minute:'2-digit'})):'Aún no enviado'}</strong><small>${lastSent?`${esc(SIDE_NAME[lastSent.side])} · ${esc(new Date(lastSent.at).toLocaleDateString('es-CR',{day:'numeric',month:'short'}))}`:'La hora queda guardada y se comparte entre tiendas'}</small></div>`;
+    <div class="pdx-top"><div class="pdx-tit"><p class="pdx-kick">${ico('canasta')}Pedido de mañana</p><h2 class="pdx-fecha">${esc(fecha)}</h2></div>${t.items?`<div class="pdx-total"><strong data-pdx-num="total" data-v="${all.total}">₡${fmt(all.total)}</strong><span>${dos?'las dos tiendas':'total'}</span></div>`:''}</div>
+    <p class="pd-sent-time">${lastSent?`Último envío <strong>${esc(hSent)}</strong> · ${esc(SIDE_NAME[lastSent.side])} · ${esc(new Date(lastSent.at).toLocaleDateString('es-CR',{day:'numeric',month:'short'}))}`:'Aún no se ha enviado nada'}</p>`;
   if(!t.items){
     html+=`<div class="pdx-vacio"><b>Todavía no hay nada pedido</b><small>Entrá a un proveedor y tocá sus productos.</small><button type="button" class="pdx-cta" data-pd="go"><span class="pdx-cta-i">${ico('canasta')}</span><span class="pdx-cta-t"><b>Ir a proveedores</b></span><span class="pdx-cta-f">${ico('flecha')}</span></button></div></section>`;
   }else{
+    const pendChip=dos
+      ?`<div class="pdx-chip pend ${porEnviar?'urg':'ok'}" role="group" aria-label="Por enviar: ${sides.map(s=>SIDE_NAME[s]+' '+pendS[s]).join(', ')}"><span class="pdx-chip-l">${porEnviar?'Por enviar':'Todo enviado'}</span><div class="pdx-st">${sides.map(s=>`<span class="${s}"><i></i>${SIDE_NAME[s]}<b data-pdx-num="pend_${s}" data-v="${pendS[s]}">${pendS[s]}</b></span>`).join('')}</div></div>`
+      :`<div class="pdx-chip ${porEnviar?'urg':'ok'}"><b data-pdx-num="pend" data-v="${porEnviar}">${porEnviar}</b><span>${porEnviar?'por enviar':'todo enviado'}</span></div>`;
     html+=`<div class="pdx-cuerpo">
       <div class="pdx-col">
-        <div class="pdx-total"><strong data-pdx-num="total" data-v="${all.total}">₡${fmt(all.total)}</strong><span>${dos?'total de las dos tiendas':'total del pedido'}</span></div>
-        ${dos?`${xpPartes(sides,all)}<div class="pdx-ley">${sides.map(s=>`<div class="${s}"><span><i></i>${SIDE_NAME[s]}</span>${sxActualizado(s)}<b data-pdx-num="${s}" data-v="${all[s]}">₡${fmt(all[s])}</b><small>${plural(nSide(s),'producto','productos')}</small></div>`).join('')}</div>`:''}
+        ${dos?`${xpPartes(sides,all)}<div class="pdx-ley">${sides.map(s=>`<div class="${s}"><span><i></i>${SIDE_NAME[s]}<small>${plural(nSide(s),'producto','productos')}</small></span><b data-pdx-num="${s}" data-v="${all[s]}">₡${fmt(all[s])}</b>${sxActualizado(s)}</div>`).join('')}</div>`:''}
       </div>
       <div class="pdx-col">
-        <div class="pdx-chips">
+        <div class="pdx-chips${dos?'':' uno'}">
           <div class="pdx-chip"><b data-pdx-num="items" data-v="${t.items}">${t.items}</b><span>${t.items===1?'producto':'productos'}</span></div>
-          <div class="pdx-chip ${porEnviar?'urg':'ok'}"><b data-pdx-num="pend" data-v="${porEnviar}">${porEnviar}</b><span>${porEnviar?'por enviar':'todo enviado'}</span></div>
-          <div class="pdx-chip"><b>${datos.length}</b><span>${datos.length===1?'proveedor':'proveedores'}</span></div>
-        </div>
-        <div class="pdx-envios" role="progressbar" aria-valuemin="0" aria-valuemax="${datos.length}" aria-valuenow="${enviados}" aria-label="Proveedores enviados">
-          <span class="pdx-dots">${datos.map(d=>`<i class="${d.sent?'on':''}" title="${esc(d.prov)}"></i>`).join('')}</span>
-          <small><b>${enviados}</b> de ${datos.length} enviados</small>
+          ${pendChip}
+          <div class="pdx-chip" role="progressbar" aria-valuemin="0" aria-valuemax="${datos.length}" aria-valuenow="${enviados}" aria-label="Proveedores enviados"><b>${enviados}<em>/${datos.length}</em></b><span>enviados</span><u style="--w:${datos.length?Math.round(enviados/datos.length*100):0}%"></u></div>
         </div>
         ${scopeSide()==='both'?(porEnviar?`<button type="button" class="pdx-cta" data-pd="chain"><span class="pdx-cta-i">${ico('enviar')}</span><span class="pdx-cta-t"><b>Enviar uno por uno</b><small>${plural(porEnviar,'proveedor','proveedores')} · te guío paso a paso</small></span><span class="pdx-cta-f">${ico('flecha')}</span></button>
           <div class="pdx-acc2"><button type="button" data-pd="allone">${ico('mensaje')}Todo en 1 mensaje</button><button type="button" data-pd="lista">${ico('lista')}Lista a contactos</button></div>`
@@ -1840,8 +1864,13 @@ function xpRenderPedido(){
   html+=auBoton(!t.items);
   if(t.items)html+=`<button type="button" class="sx-pdf-btn" data-sx-pdf><span class="sx-pdf-i">${ico('hoja')}</span><span class="sx-pdf-t"><b>PDF del pedido</b><small>${dos?'Lista completa para revisar o compartir':'Se abre para verlo · el envío se hace desde Ambos'}</small></span><span class="sx-pdf-f" aria-hidden="true">›</span></button>`;
   if(t.items){
-    html+=`<div class="pdx-barra-f"><h3>Proveedores</h3><div class="pdx-filtros" role="group" aria-label="Qué proveedores ver">${[['todos','Todos',datos.length],['pend','Por enviar',porEnviar],['env','Enviados',enviados]].map(([k,n,c])=>`<button type="button" class="${_pdFiltro===k?'on':''}" data-pdx-f="${k}"${c||k==='todos'?'':' disabled'} aria-pressed="${_pdFiltro===k}">${n} <b>${c}</b></button>`).join('')}</div></div>`;
-    html+=`<div class="sx-grid">${datos.filter(d=>_pdFiltro==='todos'||(_pdFiltro==='pend'?!d.sent:d.sent)).map((d,i)=>sxTarjeta(d,i,sides,'pedido')).join('')}</div>`;
+    const fEstado=[['todos','Todos',baseT.length],['pend','Por enviar',cPend],['env','Enviados',cEnv]];
+    const fTienda=[['todas','Las dos',datos.length],...sides.map(s=>[s,SIDE_NAME[s],provS[s]])];
+    html+=`<div class="pdx-barra-f"><h3>Proveedores</h3><div class="pdx-fil-g">
+      ${dos?`<div class="pdx-filtros tienda" role="group" aria-label="Qué tienda ver">${fTienda.map(([k,n,c])=>`<button type="button" class="${k}${_pdTienda===k?' on':''}" data-pdx-t="${k}"${c||k==='todas'?'':' disabled'} aria-pressed="${_pdTienda===k}">${k==='todas'?'':'<i></i>'}${n} <b>${c}</b></button>`).join('')}</div>`:''}
+      <div class="pdx-filtros" role="group" aria-label="Qué proveedores ver">${fEstado.map(([k,n,c])=>`<button type="button" class="${_pdFiltro===k?'on':''}" data-pdx-f="${k}"${c||k==='todos'?'':' disabled'} aria-pressed="${_pdFiltro===k}">${n} <b>${c}</b></button>`).join('')}</div></div></div>`;
+    const vis=baseT.filter(d=>_pdFiltro==='todos'||(_pdFiltro==='pend'?!envD(d):envD(d)));
+    html+=`<div class="sx-grid">${vis.map((d,i)=>sxTarjeta(d,i,sides,'pedido',solo)).join('')||'<p class="pd2-nada">No hay proveedores con esos filtros.</p>'}</div>`;
   }
   html+='<div id="resSemana" class="au-sem-w"></div>';   // esta semana contra la pasada (renderSemana, APP.html)
   // La entrada animada solo al abrir la pestaña (si no, cada cambio en vivo la repetiría).
@@ -2429,7 +2458,7 @@ $('pedidoBody')?.addEventListener('click',e=>{if(e.target.closest('[data-sx-pdf]
 $('sxTablero')?.addEventListener('click',xpPedidoClick);
 $('ciTop')?.addEventListener('click',e=>{if(e.target.closest('[data-sx-cierre]'))ciAbrir();});
 $('sxProvBar')?.addEventListener('click',()=>{const b=$('sxProvBar'),w=b.closest('.pv-wrap'),ab=!w.classList.contains('sx-abierto');w.classList.toggle('sx-abierto',ab);b.setAttribute('aria-expanded',String(ab));if(ab)setTimeout(()=>b.scrollIntoView({behavior:'smooth',block:'start'}),60);});
-$('pedidoBody')?.addEventListener('click',e=>{const f=e.target.closest('[data-pdx-f]');if(!f||f.disabled)return;_pdFiltro=f.dataset.pdxF;xpRenderPedido();});
+$('pedidoBody')?.addEventListener('click',e=>{const t=e.target.closest('[data-pdx-t]');if(t&&!t.disabled){_pdTienda=t.dataset.pdxT;xpRenderPedido();return;}const f=e.target.closest('[data-pdx-f]');if(!f||f.disabled)return;_pdFiltro=f.dataset.pdxF;xpRenderPedido();});
 
 // Arranque
 xpBuildOverlays();
