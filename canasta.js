@@ -1185,7 +1185,7 @@ function msgTienda(o){
     `Si algo no hay: ${SUST[o.sust]?.n.toLowerCase()}`,
     o.nota?`📝 ${o.nota}`:'',
     '',
-    `Abrir en Mostrador 👉 ${enlaceTienda}`,
+    `Abrir en Pedidos 👉 ${enlaceTienda}`,
   ].filter((l,i,a)=>l!==''||a[i-1]!=='').join('\n');
 }
 function abrir(url){const w=window.open(url,'_blank','noopener');if(!w)location.href=url;}

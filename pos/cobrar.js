@@ -326,12 +326,13 @@ function pedidos(){
 }
 function pintarPedidos(){
   const el=D.getElementById('cbPedidos');if(!el)return;
-  const l=pedidos();
-  el.innerHTML=l.slice(0,4).map(o=>{
+  const PP=window.PosPedidos,l=PP?pedidos().filter(o=>o.estado==='nuevo'):pedidos(),nv=l.filter(o=>o.estado==='nuevo').length;
+  // «Pedidos» (antes Mostrador) vive dentro del POS: ahí se aceptan, se pesan, el cliente confirma y se cobran
+  el.innerHTML=(PP?`<button type="button" class="cb-pedidos-bar${nv?' hay':''}" data-a="pedidos"><span class="cb-pedidos-ic">${ic('canasta',20)}</span><span class="cb-pedidos-t">Pedidos</span><b>${nv?(nv===1?'1 nuevo':nv+' nuevos'):'Abrir'}</b>${ic('siguiente',18)}</button>`:'')+l.slice(0,PP?3:4).map(o=>{
     const nuevo=o.estado==='nuevo',n=(o.items||[]).filter(i=>i.estado!=='nohay').length,tot=N.totalDe?N.totalDe(o):0;
     return `<div class="cb-ped${nuevo?' nuevo':''}"><span class="cb-ped-ic">${ic('canasta',22)}</span><div class="cb-ped-t"><b>${nuevo?'Pedido nuevo':'Pedido'} de ${esc(o.cliente&&o.cliente.nombre||'un cliente')}</b>
       <small>La Feria ${esc(o.ref||'')} · ${n} ${n===1?'producto':'productos'}${tot?' · '+col(tot):''}${o.retiro&&o.retiro.envio?' · a domicilio':o.retiro&&o.retiro.at?' · recoge '+hora(o.retiro.at):''}</small></div>
-      <button type="button" class="cb-ped-b" data-a="ped-aceptar" data-id="${esc(o.id)}">${nuevo?'Aceptar':'Abrir'}</button></div>`;
+      <button type="button" class="cb-ped-b" data-a="${PP?'ped-abrir':'ped-aceptar'}" data-id="${esc(o.id)}">${PP?'Ver y aceptar':nuevo?'Aceptar':'Abrir'}</button></div>`;
   }).join('');
   const nuevos=l.filter(o=>o.estado==='nuevo').length;
   if(nuevos>S.nPedidos)vib([30,60,30,60,60]);
@@ -388,7 +389,7 @@ const marcaCaja=()=>({donde:'POS celular',disp:miDisp(),n:miNombre(),at:new Date
 async function aceptarPedido(id){
   if(!N)return;
   let o=(await N.refrescarPedido(id).catch(()=>null))||N.get(id);if(!o)return;
-  if(o.cobro){aviso('Ese pedido ya se cobró en el Mostrador');pintarPedidos();return;}
+  if(o.cobro){aviso('Ese pedido ya se cobró en Pedidos');pintarPedidos();return;}
   if(o.estado==='cancelado'||o.estado==='entregado'){aviso('Ese pedido ya no está pendiente');pintarPedidos();return;}
   if(o.enCaja&&o.enCaja.disp&&o.enCaja.disp!==miDisp()){
     const si=await preguntar({titulo:'Ese pedido ya lo tiene otro aparato',texto:`Lo tomó ${o.enCaja.n||'otro aparato'} a las ${hora(o.enCaja.at)}. Si lo pasás aquí, allá ya no se cobra.`,opciones:[{n:'Pasarlo a este teléfono',v:true},{n:'Dejarlo allá',v:false}]});
@@ -411,10 +412,10 @@ function estadoPedido(t){
   if(!o.enCaja||o.enCaja.disp!==miDisp())return 'otro';
   return null;
 }
-const AVISO_PED={cobrado:['Este pedido ya se cobró en el Mostrador','Quitá esta cuenta: así no se cobra dos veces.'],
+const AVISO_PED={cobrado:['Este pedido ya se cobró en Pedidos','Quitá esta cuenta: así no se cobra dos veces.'],
   entregado:['Este pedido ya se entregó','Quitá esta cuenta: así no se cobra dos veces.'],
   cancelado:['El cliente canceló este pedido','Podés quitar la cuenta o cobrarla como una venta normal.'],
-  otro:['El Mostrador se trajo este pedido','Ahora se cobra allá. Si lo vas a cobrar aquí, traelo de vuelta.']};
+  otro:['Este pedido ahora se atiende en Pedidos','Ahora se cobra allá. Si lo vas a cobrar aquí, traelo de vuelta.']};
 function avisoPed(t){
   const e=estadoPedido(t),o=N&&t.pedido?N.get(t.pedido.id):null;
   if(e==='cancelado'&&o&&o.rechazo&&o.rechazo.por==='cliente')return ['El cliente no aceptó el total nuevo',(o.rechazo.motivo?'Dijo: «'+o.rechazo.motivo+'». ':'')+'Quitá la cuenta, o cobrala como venta normal si te dice que sí.'];
@@ -472,7 +473,7 @@ async function pedidoLibre(t){
 async function soltarPedido(t,nota){
   if(!N||!t||!t.pedido)return;
   const yo=miDisp();
-  await N.cambiar(t.pedido.id,x=>{if(x.enCaja&&x.enCaja.disp===yo)delete x.enCaja;},'tienda',nota||'Volvió al Mostrador').catch(()=>null);
+  await N.cambiar(t.pedido.id,x=>{if(x.enCaja&&x.enCaja.disp===yo)delete x.enCaja;},'tienda',nota||'Volvió a Pedidos').catch(()=>null);
 }
 // Un pedido que se abrió desde el Mostrador («Pesarlo y cobrarlo en el POS celular»)
 function abrirPedidoUrl(){const id=S.pedidoUrl;S.pedidoUrl=null;if(!id||!N)return;if(S.tk.some(t=>t.pedido&&t.pedido.id===id)){const t=S.tk.find(x=>x.pedido&&x.pedido.id===id);S.act=t.id;guardar();repintarVenta();return;}if(N.get(id))aceptarPedido(id);else aviso('Ese pedido no está en este aparato');}
@@ -1218,7 +1219,7 @@ const ACC={
   quitar(){const c=S.cant;if(!c||!c.it)return;const t=tk(),it=c.it;t.items=t.items.filter(x=>x!==it);guardar();S.cant=null;volver();aviso(it.n+' quitado de la cuenta');},
   item(b){const it=tk().items.find(i=>i.id===b.dataset.id);if(!it)return;const p=S.porId.get(it.pid)||preparar({id:null,nombre:it.n,precio:it.pu,unidad:it.u,gen:it.gen,categoria_color:it.col,emoji:it.e});abrirCant(p,it);},
   async vaciar(){const t=tk();const si=await preguntar({titulo:`¿Vaciar la cuenta de ${nombreTk(t)}?`,texto:t.pedido?(estadoPedido(t)?'Se quita de este teléfono.':'Se quita de aquí y el pedido vuelve al Mostrador, sin cobrar.'):'Se quitan todos los productos de esta cuenta.',opciones:[{n:t.pedido?'Sí, quitarla':'Sí, vaciar',v:true,mal:true},{n:'No',v:false}]});if(!si)return;
-    if(t.pedido&&!estadoPedido(t))soltarPedido(t,'Se quitó del ARAMO POS celular: volvió al Mostrador');
+    if(t.pedido&&!estadoPedido(t))soltarPedido(t,'Se quitó del ARAMO POS celular: volvió a Pedidos');
     S.tk=S.tk.filter(x=>x!==t);if(!S.tk.length)cuentaNueva();S.act=S.tk[0].id;guardar();pila.length=1;pintar();},
   async cliente(){await ponerCliente();pintar();},
   async retomar(){const t=tk();if(!t.pedido)return;await N.cambiar(t.pedido.id,x=>{x.enCaja=marcaCaja();},'tienda','Volvió al ARAMO POS celular para cobrarlo').catch(()=>null);repintarVenta();aviso('El pedido volvió a este teléfono');},
@@ -1238,6 +1239,8 @@ const ACC={
   async 'desc-dia'(b){await cargarDescuentos(b.dataset.d);pintar();},
   'venta-ver'(b){verVenta(+b.dataset.id);},
   'ped-aceptar'(b){aceptarPedido(b.dataset.id);},
+  pedidos(){if(window.PosPedidos)window.PosPedidos.abrir();},
+  'ped-abrir'(b){if(window.PosPedidos)window.PosPedidos.abrir(b.dataset.id);},
   async 'fiado-ver'(b){if(await verFiado(b.dataset.k))ir('fiadoCli');},
   'fiado-pagar':pagarFiado,
   bascula:conectarBascula,'fiado-recordar':recordarFiado,
@@ -1363,12 +1366,13 @@ function callarAvisoViejo(){try{const pt=D.getElementById('pwToast');if(!pt)retu
     pintar();despierto();
     if(BA&&BA.recordada())BA.reconectarSola().catch(()=>{});
     if(N){ // los pedidos de La Feria, en vivo (los mismos que ve el Mostrador)
+      try{if(window.PosPedidos){window.PosPedidos.iniciar({});window.PosPedidos.on(()=>{if(vista()==='venta'&&hojaEl.hidden)pintarPedidos();});}}catch(e){}
       try{N.on(()=>{sincCambiosCliente();avisoConfirmados();if(vista()==='venta'&&hojaEl.hidden){if(S.q)pintarPedidos();else repintarVenta();}});N.conectar().then(()=>{if(vista()==='venta')pintarPedidos();}).catch(()=>{});}catch{}
       const pid=new URLSearchParams(location.search).get('pedido');
       if(pid&&!S.tk.some(t=>t.pedido&&t.pedido.id===pid)){S.pedidoUrl=pid;if(S.caja)setTimeout(abrirPedidoUrl,400);}
       try{if(pid)history.replaceState(history.state,'',location.pathname+'?suc='+encodeURIComponent(S.suc));}catch{}
     }
-    window.CobrarARAMO={S,buscar,calc,totalDe,tk,pintar,pedidos,facturaTxt,alDia}; // para las pruebas
+    window.CobrarARAMO={S,buscar,calc,totalDe,tk,pintar,pedidos,facturaTxt,alDia,aceptarPedido}; // para las pruebas
   }catch(e){
     console.error(e);
     raiz.innerHTML=`<section class="cb-vista"><div class="cb-cuerpo"><h1 class="cb-h1">No se pudo abrir</h1><p class="cb-vacio">${esc(e&&e.message||e)}</p><button type="button" class="cb-principal" onclick="location.reload()"><span>Probar otra vez</span></button></div></section>`;

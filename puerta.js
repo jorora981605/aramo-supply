@@ -25,14 +25,19 @@ const nrm=s=>String(s||'').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g,'')
 const buzz=p=>{try{if(navigator.userActivation?.hasBeenActive!==false)navigator.vibrate&&navigator.vibrate(p);}catch{}};
 const LS={get(k,d){try{const v=JSON.parse(localStorage.getItem(k));return v??d;}catch{return d;}},set(k,v){try{localStorage.setItem(k,JSON.stringify(v));}catch{}}};
 const POS=window.aramoPOS||null;           // presente solo dentro de ARAMO POS
-const MODO_POS=POS||/[?&]pos=1/.test(location.search);
+// Pedidos dentro del ARAMO POS (computadora y celular): APP.html?solo=pedidos&suc=moravia|angeles[&volver=<página>]
+// Abre directo en Pedidos de esa tienda, nunca el menú; «Cerrar» le avisa al POS (postMessage 'aramo-pedidos-cerrar')
+// o, si no está dentro de otra página, vuelve a `volver` (o atrás).
+const QS=new URLSearchParams(location.search);
+const SOLO_PEDIDOS=QS.get('solo')==='pedidos';
+const MODO_POS=POS||/[?&]pos=1/.test(location.search)||SOLO_PEDIDOS;
 const $c=N.colones;
 const T=()=>N.tienda();
 const suc=k=>(T().sucursales||[]).find(s=>s.k===k);
 const sucNom=k=>{const s=suc(k);return s?`${s.n} · ${s.zona}`:'';};
 // Quién atiende en este equipo (para la bitácora de cada colón): ya no se pide. Sale solo de la cuenta de personal con la que entró;
 // si no hay, queda «Mostrador <zona>». (Pronto será automático por usuario.)
-const quienAtiende=()=>{const a=N.authEstado?.()||{},zona=suc(localK())?.zona||'';const who=a.personal&&a.email?String(a.email).split('@')[0]:'';return who?`${who} · ${zona}`:`Mostrador ${zona}`.trim();};
+const quienAtiende=()=>{const a=N.authEstado?.()||{},zona=suc(localK())?.zona||'';const who=a.personal&&a.email?String(a.email).split('@')[0]:'';return who?`${who} · ${zona}`:`Pedidos ${zona}`.trim();};
 N.setQuien?.(()=>quienAtiende());
 const fh=d=>new Date(d).toLocaleTimeString('es-CR',{hour:'numeric',minute:'2-digit'});
 function fdia(d){const a=new Date();a.setHours(0,0,0,0);const b=new Date(d);b.setHours(0,0,0,0);const n=Math.round((b-a)/864e5);return n===0?'hoy':n===1?'mañana':n===-1?'ayer':b.toLocaleDateString('es-CR',{weekday:'short',day:'numeric',month:'short'});}
@@ -98,6 +103,7 @@ document.addEventListener('visibilitychange',()=>{if(document.visibilityState===
 const CLAVE_FABRICA='12345';
 let LOCAL=null;
 try{LOCAL=sessionStorage.getItem('aramo_local_sesion');}catch{}
+if(SOLO_PEDIDOS&&['moravia','angeles'].includes(QS.get('suc'))){LOCAL=QS.get('suc');try{sessionStorage.setItem('aramo_local_sesion',LOCAL);}catch{}}
 const localK=()=>LOCAL&&LOCAL!=='todas'?LOCAL:'moravia';
 async function huella(t){const b=await crypto.subtle.digest('SHA-256',new TextEncoder().encode('aramo:'+t));return [...new Uint8Array(b)].map(x=>x.toString(16).padStart(2,'0')).join('');}
 const acceso=()=>({activo:false,claves:{},...(T().acceso||{})});
@@ -295,7 +301,8 @@ function montar(){
   document.body.appendChild(pu);
 
   const mo=document.createElement('div');
-  mo.className='mo';mo.id='mostrador';mo.setAttribute('role','dialog');mo.setAttribute('aria-label','Mostrador');
+  if(SOLO_PEDIDOS)document.body.classList.add('solo-pedidos');
+  mo.className='mo';mo.id='mostrador';mo.setAttribute('role','dialog');mo.setAttribute('aria-label','Pedidos');
   mo.innerHTML=`<div class="mo-top"><button type="button" class="bk" data-mo="puerta" aria-label="Volver al menú principal" title="Volver al menú principal"><b aria-hidden="true">⌂</b> <span>Menú</span></button><button type="button" class="mo-lugar" id="moLugar" data-mo="receptor" aria-label="Elegir qué tienda recibe los pedidos en este equipo"></button><button type="button" class="pu-nube" id="moNube" data-mo="compartir"><i></i><span></span></button></div>
     <div class="mo-in"><div class="mo-cols"><div class="mo-main">
       <div id="moAlarma"></div><div id="moAvisos"></div><div class="mo-tabs" id="moTabs"></div><div id="moHoy"></div><div id="moAhora"></div><div class="mo-lista" id="moLista"></div><div id="moFaltan"></div>
@@ -317,6 +324,7 @@ function montar(){
   const extraTools=$('moMas');if(extraTools)extraTools.insertAdjacentHTML('beforeend','<button type="button" data-mo="promos"><b>✨</b>Ofertas y link</button><button type="button" data-mo="analitica"><b>📊</b>Métricas</button><button type="button" data-mo="personal"><b>🔐</b>Cuenta de personal</button>');
 
   const bg=document.createElement('div');bg.className='mo-bg';bg.id='moBg';document.body.appendChild(bg);
+  if(SOLO_PEDIDOS){const b=mo.querySelector('[data-mo="puerta"]');if(b){b.innerHTML='<b aria-hidden="true">✕</b> <span>Cerrar</span>';b.setAttribute('aria-label','Cerrar Pedidos y volver al POS');b.title='Volver al POS';}setInterval(avisarPOS,4000);setTimeout(avisarPOS,1500);}
   const sh=document.createElement('div');sh.className='mo-sheet';sh.id='moSheet';sh.setAttribute('role','dialog');sh.setAttribute('aria-modal','true');document.body.appendChild(sh);
   const pr=document.createElement('div');pr.id='moPrint';pr.setAttribute('aria-hidden','true');document.body.appendChild(pr);
   bg.addEventListener('click',cerrarHoja);
@@ -346,7 +354,7 @@ function alarmaHtml(){
 // Se pone naranja cuando hay pedidos nuevos.
 function ahoraMostrador(a){
   const nuevos=a.filter(o=>o.estado==='nuevo').length;
-  return{e:'🛎️',k:'',t:'Mostrador',s:'',cta:'Entrar',act:'mostrador',tono:nuevos?'urg':a.length?'ok':'calma'};
+  return{e:'🛎️',k:'',t:'Pedidos',s:'',cta:'Entrar',act:'mostrador',tono:nuevos?'urg':a.length?'ok':'calma'};
 }
 function bitacoraHoy(){
   const ev=[];
@@ -363,7 +371,7 @@ function datosPuerta(){
   const a=activos().filter(paraMi),nuevos=a.filter(o=>o.estado==='nuevo').length,alist=a.filter(o=>o.estado==='alistando').length,listos=a.filter(o=>o.estado==='listo').length;
   const cob=N.lista().filter(o=>o.cobro&&esHoy(o.cobro.fecha)&&paraMi(o)),total=cob.reduce((t,o)=>t+(+o.cobro.total||0),0);
   const fd=new Date().toLocaleDateString('es-CR',{weekday:'long',day:'numeric',month:'long'});
-  const pasos=[['🏪','Proveedores',sr.provs||'—'],['🚚','Inventario',sr.prods?sr.prods+' prod.':'—'],['🏷️','Vitrina',N.catalogo().filter(p=>!p.oculto).length+' prod.'],['🧺','La Feria',a.length+' en curso'],['🛎️','Mostrador',listos+' listos'],['🧾','Caja',cob.length?$c(total):'₡0 hoy']];
+  const pasos=[['🏪','Proveedores',sr.provs||'—'],['🚚','Inventario',sr.prods?sr.prods+' prod.':'—'],['🏷️','Vitrina',N.catalogo().filter(p=>!p.oculto).length+' prod.'],['🧺','La Feria',a.length+' en curso'],['🛎️','Pedidos',listos+' listos'],['🧾','Caja',cob.length?$c(total):'₡0 hoy']];
   return{
     saludo:h<12?'Buenos días':h<18?'Buenas tardes':'Buenas noches',
     fecha:fd.charAt(0).toUpperCase()+fd.slice(1),hora:fh(new Date()),
@@ -399,8 +407,8 @@ function datosInicio(sr,a,c){
     tienda6:`<button type="button" class="ui-tienda ui-tienda--filtro ui-tienda--${k}" data-pu="local" aria-label="Tienda: ${esc(zona)}. Tocá para cambiar">${esc(zona)}${ICO('bajar',16)}</button>`,
     avisos6:pedirAvisos?`<div class="ui-franja">${ICO('aviso',18)}<span>Activá los avisos para oír los pedidos nuevos</span><button type="button" class="ui-btn ui-btn--s ui-btn--secundario" data-pu="avisos-on">Activar</button><button type="button" class="ui-btn-ico" data-pu="avisos-cerrar" aria-label="Ahora no" title="Ahora no">${ICO('cerrar',18)}</button></div>`:'',
     mo6:{
-      tit:c.nuevos?pl(c.nuevos,'pedido nuevo','pedidos nuevos'):'Mostrador',
-      sub:c.nuevos?`Mostrador · ${c.alist} alistando`:`${c.nuevos} nuevos · ${c.alist} alistando · Caja ${$c(c.total)}`,
+      tit:c.nuevos?pl(c.nuevos,'pedido nuevo','pedidos nuevos'):'Pedidos',
+      sub:c.nuevos?`Pedidos · ${c.alist} alistando`:`${c.nuevos} nuevos · ${c.alist} alistando · Caja ${$c(c.total)}`,
       caja:`Caja de hoy ${$c(c.total)}`,
       lista:ultimos.length?ultimos.map(o=>`<div class="po6-ped"><b>${esc(o.ref)}</b><span>${esc(o.cliente?.nombre||'')}</span><em>${esc((est[o.estado]||(()=>''))(o))}</em></div>`).join(''):'<p class="po6-ped-vacio">Todavía no hay pedidos hoy.</p>',
     },
@@ -452,13 +460,13 @@ function sugerencias(q){
     {r:/^(1|surt|invent|pedir|provee|compra)/,e:'🚚',t:'Abrir Inventario',s:'Pedidos a proveedores',act:'surtido'},
     {r:/^(2|taller|client|canasta|tienda online)/,e:'🧺',t:'Abrir La Feria',s:'Lo que ven los clientes',act:'canasta'},
     {r:/^(3|pos|caja|vend|cobr|factur)/,e:'🧾',t:'Abrir ARAMO POS',s:'Ventas y caja del mostrador',act:'pos'},
-    {r:/^(m$|mostr|pedidos|encarg|recib)/,e:'🛎️',t:'Abrir Mostrador y Caja',s:'Recibir, alistar, cobrar y entregar',act:'mostrador'},
+    {r:/^(m$|mostr|pedidos|encarg|recib)/,e:'🛎️',t:'Abrir Pedidos y Caja',s:'Recibir, alistar, cobrar y entregar',act:'mostrador'},
     {r:/^(prec|vitrin|product)/,e:'🏷️',t:'Precios y productos',s:'Cambiar precio, unidad o nombre',act:'vitrina'},
     {r:/^(recet)/,e:'📖',t:'Recetario',s:'Recetas de La Feria',act:'recetario'},
     {r:/^(ajust|sinpe|horari|whats)/,e:'⚙️',t:'Pagos y horarios',s:'SINPE, WhatsApp de cada tienda, horarios',act:'ajustes'},
     {r:/^(cierre|hoy|cobrad)/,e:'🧾',t:'Caja de hoy',s:'Cobros del día por método',act:'caja'},
   ];
-  if(!q)return[{e:'🚚',t:'1 · Inventario',s:'Pedidos a proveedores',act:'surtido'},{e:'🧺',t:'2 · La Feria',s:'Lo que ven los clientes',act:'canasta'},{e:'🧾',t:'3 · ARAMO POS',s:'Ventas y caja',act:'pos'},{e:'🛎️',t:'M · Mostrador',s:'Pedidos de clientes',act:'mostrador'}];
+  if(!q)return[{e:'🚚',t:'1 · Inventario',s:'Pedidos a proveedores',act:'surtido'},{e:'🧺',t:'2 · La Feria',s:'Lo que ven los clientes',act:'canasta'},{e:'🧾',t:'3 · ARAMO POS',s:'Ventas y caja',act:'pos'},{e:'🛎️',t:'M · Pedidos',s:'Pedidos de clientes',act:'mostrador'}];
   P.forEach(x=>{if(x.r.test(q))L.push(x);});
   // pedidos por código o por nombre del cliente
   N.lista().filter(o=>!o.archivado&&(nrm(o.ref).replace('-','').includes(q.replace('-',''))||nrm(o.cliente?.nombre).includes(q))).slice(0,4)
@@ -494,7 +502,20 @@ function escalarMinis(){
     const f=v.querySelector('iframe');if(f){f.style.width=vw+'px';f.style.height=vh+'px';}
   });
 }
+function cerrarSolo(){
+  try{if(window.parent&&window.parent!==window){window.parent.postMessage({tipo:'aramo-pedidos-cerrar'},location.origin);return;}}catch{}
+  const v=QS.get('volver')||'';
+  if(v&&!/^[a-z]+:|^\/\//i.test(v)){location.href=v;return;}            // solo páginas de ARAMO
+  if(history.length>1)history.back();else location.href='pos/index.html?suc='+encodeURIComponent(localK());
+}
+// Cuántos pedidos hay, para que el POS ponga el numerito en su pestaña «Pedidos»
+function avisarPOS(){
+  if(!SOLO_PEDIDOS||window.parent===window)return;
+  try{const L=N.lista().filter(o=>o.sucursal===localK()&&!o.borrado);
+    window.parent.postMessage({tipo:'aramo-pedidos-estado',nuevos:L.filter(o=>o.estado==='nuevo').length,alistando:L.filter(o=>o.estado==='alistando').length,listos:L.filter(o=>o.estado==='listo').length},location.origin);}catch{}
+}
 function abrirPuerta(){
+  if(SOLO_PEDIDOS){abrirMostrador();return;}   // dentro del POS no hay menú: siempre Pedidos
   cerrarHoja();
   $('mostrador').classList.remove('open');
   $('puerta').classList.remove('zoom');$('puerta').classList.add('open');document.body.classList.add('pu-lock');
@@ -657,7 +678,7 @@ function urgeHtml(o){
 function pintarMostrador(){limpiarTiquetesPOS();
   if(!$('mostrador')?.classList.contains('open'))return;
   pintarNube();
-  const lg=$('moLugar');if(lg)lg.textContent='Mostrador · '+(R.suc==='todas'?'Ambas tiendas':(suc(R.suc)?.zona||suc(R.suc)?.n||''));
+  const lg=$('moLugar');if(lg)lg.textContent='Pedidos · '+(R.suc==='todas'?'Ambas tiendas':(suc(R.suc)?.zona||suc(R.suc)?.n||''));
   const A=filtrar(activos()),H=filtrar(cerradosHoy());
   const grupos={nuevo:A.filter(o=>o.estado==='nuevo'),alistando:A.filter(o=>o.estado==='alistando'),listo:A.filter(o=>o.estado==='listo'),hecho:H};
   Object.values(grupos).forEach(L=>L.sort((a,b)=>Date.parse(a.retiro.at)-Date.parse(b.retiro.at)));
@@ -926,8 +947,9 @@ function pintarEncargo(){
   const env=o.retiro.envio,nom1=o.cliente.nombre.split(' ')[0],F=faltas(o),sg=siguiente(o),activo=['nuevo','alistando','listo'].includes(o.estado);
   // ── Pedazos de la hoja ──
   const posDraft=LS.get('aramo_pos_cotizacion_'+o.id,null);
-  const celBox=!cobrado(o)&&['nuevo','alistando','listo'].includes(o.estado)?`<div class="mo-pos-link"><button type="button" class="mo-btn w" data-mo="pedido-celular">📱 Pesarlo y cobrarlo en el POS celular</button><small>Se abre en el POS celular como una cuenta con el nombre del cliente. Si cambia el peso o el precio, el cliente confirma el total nuevo antes de cobrar.</small></div>`:'';
-  const posBox=celBox+`<div class="mo-pos-link"><button type="button" class="mo-btn w" data-mo="pos-pedido">🧾 Abrir este pedido en POS</button><small>Entra al POS como tiquete. Si cambiás un peso o un precio, desde ahí le mandás el total nuevo al cliente y se cobra cuando lo confirme.</small></div>`;
+  // (dueño, 2026-11-28) Los pedidos se atienden SIEMPRE aquí, en Pedidos: se pesan, se cotizan, el cliente confirma y se cobran aquí.
+  // La venta entra sola al ARAMO POS de la tienda (aramo_pos_pendientes). Ya no se abren como tiquete en el POS ni en el POS celular.
+  const posBox='';
   const draftBox=posDraft?.items?.length?`<div class="mo-pos-link"><b>🧾 Hay una cotización devuelta desde POS</b><small>Revisá los cambios antes de enviarlos al cliente.</small><button type="button" class="mo-btn o w" data-mo="aplicar-pos">Aplicar cotización del POS</button></div>`:'';
   const recBox=o.recibidoCliente?(o.recibidoCliente.ok?`<div class="mo-acc-nota ok"><b>✅ El cliente dice que ya lo recibió</b><br>${esc(fh(o.recibidoCliente.at))} · confirmá la entrega o tocá «No, revisar».</div>`:`<div class="mo-acc-nota mal"><b>⚠️ El cliente dice que NO lo recibió</b><br>${esc(fh(o.recibidoCliente.at))} · escribile o llamalo ya.</div>`):'';
   const sinpeBox=o.pago?.metodo==='sinpe'&&!cobrado(o)&&(o.estado==='listo'||(o.estado==='alistando'&&N.definitivo(o)))&&fase!=='confirmacion'
@@ -975,7 +997,7 @@ function pintarEncargo(){
   const enCel=enCelular(o);
   if(enCel){
     notas=`<div class="mo-acc-nota"><b>📱 Este pedido se está cobrando en el ARAMO POS celular</b><br>${esc(o.enCaja.n||'Un teléfono')} lo tomó a las ${fh(o.enCaja.at)}. Para no cobrarlo dos veces, aquí no se pesa ni se cobra.</div>`;
-    pie=gran('soltar-celular','↩︎ Traerlo al Mostrador');qs='';mas=`<button type="button" class="mo-btn w" data-mo="wa">💬 Escribirle</button>`;
+    pie=gran('soltar-celular','↩︎ Traerlo a Pedidos');qs='';mas=`<button type="button" class="mo-btn w" data-mo="wa">💬 Escribirle</button>`;
   }
   qs+=quiet('cerrar','Cerrar');
   const masD=`<details class="mo-mas-d"${M.masD?' open':''}><summary>Más</summary><div class="mo-mas-in">
@@ -1622,7 +1644,7 @@ function pedidoPrueba(){
 // ══════════════ Acciones ══════════════
 const ACT={
   surtido(el){entrar('surtido',el);},canasta(el){entrar('canasta',el);},mostrador(el){entrar('mostrador',el);},pos(el){entrar('pos',el);},'pos-compu'(el){entrar('pos-compu',el);},'pos-celular'(el){entrar('pos-celular',el);},
-  puerta(){volverAlMenu();},
+  puerta(){if(SOLO_PEDIDOS){cerrarSolo();return;}volverAlMenu();},
   // Control: la app de cierres del dueño, por tienda (control.html)
   control(){buzz(12);location.href='control.html?suc=angeles';}, // por ahora el Control es solo de Los Ángeles (LASR)
   portada(){M.vista='portada';abrirHoja(window.AramoPortadas.selectorHtml());},
@@ -1779,7 +1801,7 @@ const ACT={
   // Enviar el pedido a la otra tienda: le aparece en su Mostrador y el cliente ve la tienda nueva
   'enviar-a'(el){
     const o=N.get(M.abierto),k=el.dataset.k,s=suc(k);if(!o||!s||o.estado!=='nuevo'||k===o.sucursal)return;
-    if(!confirm(`¿Enviar ${o.ref} a ${s.n} ${s.zona}?\n\nLe va a aparecer en su Mostrador y el cliente va a ver la tienda nueva.`))return;
+    if(!confirm(`¿Enviar ${o.ref} a ${s.n} ${s.zona}?\n\nLe va a aparecer en Pedidos de esa tienda y el cliente va a ver la tienda nueva.`))return;
     N.cambiar(o.id,x=>{const de=x.sucursal;x.sucursal=k;x.traspaso={de,a:k,at:new Date().toISOString(),por:quienAtiende()};x._ev={tipo:'traspaso',de,a:k};},'tienda',`Enviado de ${sucNom(o.sucursal)} a ${sucNom(k)}`).then(x=>{
       if(!x)return;
       sinAbrir.delete(x.id);guardarSinAbrir();cerrarHoja();pintarMostrador();pintarPuerta();
@@ -1841,7 +1863,7 @@ const ACT={
     toast('📱 Abriendo '+o.ref+' en el POS celular…');
     if(esCompu())abrir(u);else location.href=u;
   },
-  'soltar-celular'(){N.cambiar(M.abierto,x=>{delete x.enCaja;},'tienda','El pedido volvió al Mostrador (ya no se cobra en el POS celular)').then(()=>{pintarEncargo();pintarMostrador();toast('↩︎ El pedido volvió al Mostrador');});},
+  'soltar-celular'(){N.cambiar(M.abierto,x=>{delete x.enCaja;},'tienda','El pedido volvió a Pedidos (ya no se cobra en el POS celular)').then(()=>{pintarEncargo();pintarMostrador();toast('↩︎ El pedido volvió a Pedidos');});},
   entregar(){M.vista='pin';M.pin='';pintarEncargo();},
   pin(el){
     const o=N.get(M.abierto),k=el.dataset.k;

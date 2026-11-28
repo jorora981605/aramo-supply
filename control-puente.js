@@ -41,9 +41,25 @@ function comprasDe(dia,tienda){
   return r;
 }
 // Cobros del Mostrador (pedidos de clientes ya cobrados). Los pedidos de prueba no cuentan.
-// 2026-11-28 · Un cobro cuenta aquí solo si NO pasó por el POS. Los que el POS registró (lo cobró el POS, se le mandó
-// al POS, o ya tiene número de venta) llegan dentro de las ventas del POS: contarlos aquí también era sumarlos dos veces.
-const pasoPorPOS=o=>!!(o.cobro.porPOS||o.cobro.aPOS||o.cobro.venta||o.posVenta);
+// 2026-11-28 · Un cobro de Pedidos (antes "Mostrador") que ya entró al POS como venta se cuenta UNA sola vez: con las
+// ventas del POS.
+//  · Lo cobró el POS mismo (cobro.porPOS): nunca se cuenta aquí.
+//  · Se le mandó al POS (cobro.aPOS: pos-mostrador.js lo registra con origen_id = cobro.aPOS y el tiquete del resumen lo
+//    trae en "o"), o ya tiene número de venta del POS (cobro.venta / posVenta.numero): deja de contarse aquí cuando el
+//    resumen del POS ya lo trae. Mientras no lo traiga, se cuenta como cobro de Pedidos (así no se pierde).
+//    El POS lo puede registrar otro día (cuando abren la caja): por eso se busca también en los días de al lado.
+const corto=n=>String(n||'').replace(/^.*-/,'');
+const masDias=(d,n)=>diaDe(new Date(d+'T12:00:00').getTime()+n*864e5);
+function yaEnPOS(o,dia,tienda){
+  const c=o&&o.cobro;if(!c)return false;
+  const nums=[c.venta,o.posVenta&&o.posVenta.numero].filter(Boolean).map(corto);
+  if(!c.aPOS&&!nums.length)return false;
+  for(let i=-1;i<=3;i++){
+    const ps=posDia(masDias(dia,i),tienda),tq=ps&&Array.isArray(ps.tiquetes)?ps.tiquetes:null;
+    if(tq&&tq.some(x=>x&&((c.aPOS&&x.o===c.aPOS)||(i===0&&nums.includes(String(x.n))))))return true;
+  }
+  return false;
+}
 // un cobro mixto se parte en lo que de verdad entró por cada lado (antes iba todo a "tarjeta")
 function partesCobro(c){
   const T=+c.total||0,p=c.pagos;
@@ -53,7 +69,7 @@ function partesCobro(c){
 function cobrosLista(dia,tienda){
   const N=window.AramoNube;let L=[];
   try{if(N&&typeof N.lista==='function')L=N.lista()||[];}catch(e){}
-  return L.filter(o=>o&&o.cobro&&!o.prueba&&o.sucursal===tienda&&diaDe(o.cobro.fecha)===dia&&!pasoPorPOS(o)&&(+o.cobro.total||0));
+  return L.filter(o=>o&&o.cobro&&!o.cobro.porPOS&&!o.prueba&&o.sucursal===tienda&&diaDe(o.cobro.fecha)===dia&&(+o.cobro.total||0)&&!yaEnPOS(o,dia,tienda));
 }
 function cobrosDe(dia,tienda){
   const r={efectivo:0,tarjeta:0,sinpe:0,n:0};
@@ -154,7 +170,7 @@ function lineas(fecha,tienda){
   });
   cobrosLista(fecha,tienda).forEach(o=>{
     const p=partesCobro(o.cobro),usados=['efectivo','sinpe','tarjeta'].filter(k=>p[k]>0);
-    usados.forEach(k=>out.push({id:'v:'+o.id+(usados.length>1?':'+k:''),campo:CAMPO_VENTA[k],monto:p[k],titulo:(o.cliente&&o.cliente.nombre)||'Pedido de La Feria',origen:'Cobro del Mostrador'+(usados.length>1?' (pago mixto)':''),hora:Date.parse(o.cobro.fecha)||0,firma:'',items:[]}));
+    usados.forEach(k=>out.push({id:'v:'+o.id+(usados.length>1?':'+k:''),campo:CAMPO_VENTA[k],monto:p[k],titulo:(o.cliente&&o.cliente.nombre)||'Pedido de La Feria',origen:'Cobro de Pedidos'+(usados.length>1?' (pago mixto)':''),hora:Date.parse(o.cobro.fecha)||0,firma:'',items:[]}));
   });
   // las ventas del POS: un renglón por forma de pago (el detalle de cada tiquete vive en el POS)
   const ps=posDia(fecha,tienda);
@@ -177,7 +193,7 @@ function dia(fecha,tienda){
 function resumen(tienda){
   tienda=tienda||P.tienda;const hace=Date.now()-30*864e5;
   const nc=cierres().filter(c=>+c.inicio>hace&&c.tiendas&&c.tiendas[tienda]&&(+c.tiendas[tienda].total||0)>0).length;
-  let nv=0;try{nv=(window.AramoNube?.lista()||[]).filter(o=>o.cobro&&!pasoPorPOS(o)&&!o.prueba&&o.sucursal===tienda&&Date.parse(o.cobro.fecha)>hace).length;}catch(e){}
+  let nv=0;try{nv=(window.AramoNube?.lista()||[]).filter(o=>o.cobro&&!o.cobro.porPOS&&!o.prueba&&o.sucursal===tienda&&Date.parse(o.cobro.fecha)>hace&&!yaEnPOS(o,diaDe(o.cobro.fecha),tienda)).length;}catch(e){}
   return{cierres:nc,cobros:nv,sinTabla:P.sinTabla,cargado:P.cargado};
 }
 async function cargarNube(){
@@ -203,9 +219,9 @@ async function cargarNube(){
 function pintarAviso(){
   const el=document.getElementById('ctlPuente');if(!el)return;
   const r=resumen();
-  const partes=[r.cierres?`${r.cierres} cierre${r.cierres===1?'':'s'} de compras`:'',r.cobros?`${r.cobros} cobro${r.cobros===1?'':'s'} del Mostrador`:''].filter(Boolean);
+  const partes=[r.cierres?`${r.cierres} cierre${r.cierres===1?'':'s'} de compras`:'',r.cobros?`${r.cobros} cobro${r.cobros===1?'':'s'} de Pedidos`:''].filter(Boolean);
   el.hidden=false;
-  el.innerHTML=`<b>Conectado con ARAMO.</b> ${partes.length?'De los últimos 30 días '+(r.cierres+r.cobros===1?'llegó solo ':'llegaron solos ')+partes.join(' y ')+'. Se ven en las casillas moradas.':'Cuando haya un Cierre de compras o un cobro del Mostrador, sus montos llegan solos a esta hoja.'} Si escribís un número a mano, manda el tuyo.${r.sinTabla?' <span class="ctl-falta">Las compras hechas en otro teléfono todavía no llegan: falta un pegado en Supabase.</span>':''}`;
+  el.innerHTML=`<b>Conectado con ARAMO.</b> ${partes.length?'De los últimos 30 días '+(r.cierres+r.cobros===1?'llegó solo ':'llegaron solos ')+partes.join(' y ')+'. Se ven en las casillas moradas.':'Cuando haya un Cierre de compras o un cobro de Pedidos, sus montos llegan solos a esta hoja.'} Si escribís un número a mano, manda el tuyo.${r.sinTabla?' <span class="ctl-falta">Las compras hechas en otro teléfono todavía no llegan: falta un pegado en Supabase.</span>':''}`;
 }
 function empezar(tienda){
   P.tienda=tienda;
