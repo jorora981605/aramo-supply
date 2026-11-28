@@ -106,6 +106,12 @@ function fiadosTodos(tienda){
   [...P.pos.keys()].concat(Object.keys(leer('aramo_pos_dia',{})||{})).forEach(k=>{if(k.startsWith(tienda+'|'))fechas.add(k.slice(tienda.length+1));});
   return[...fechas].sort().flatMap(f=>fiados(f,tienda));
 }
+// los pagos de fiado de todos los días que se conocen (para saber quién ya pagó)
+function fiadoPagosTodos(tienda){
+  tienda=tienda||P.tienda;const fechas=new Set();
+  [...P.pos.keys()].concat(Object.keys(leer('aramo_pos_dia',{})||{})).forEach(k=>{if(k.startsWith(tienda+'|'))fechas.add(k.slice(tienda.length+1));});
+  return[...fechas].sort().flatMap(f=>fiadoPagos(f,tienda).map(x=>({...x,date:f})));
+}
 // ¿ya llegó algo del POS alguna vez? (para dejar de pedir las ventas a mano)
 function posConectado(tienda){
   tienda=tienda||P.tienda;
@@ -210,5 +216,5 @@ function empezar(tienda){
   setInterval(cargarNube,5*60e3);
   cargarNube();pintarAviso();
 }
-window.AramoPuente={dia,lineas,resumen,empezar,cargarNube,comprasDe,cobrosDe,pos,posDia,posConectado,cajaMovs,fiados,fiadosTodos,fiadoPagos,cierresDia,cierres,sinPos:()=>P.sinPos,reinicio:()=>P.reinicio};
+window.AramoPuente={dia,lineas,resumen,empezar,cargarNube,comprasDe,cobrosDe,pos,posDia,posConectado,cajaMovs,fiados,fiadosTodos,fiadoPagos,fiadoPagosTodos,cierresDia,cierres,sinPos:()=>P.sinPos,reinicio:()=>P.reinicio};
 })();

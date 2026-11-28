@@ -74,7 +74,7 @@ let W=null,D=null,_falt=null;   // la semana y el día calculados (se rehacen en
 const diaActual=()=>D;
 function calcular(){
   const ini=clMonday(E.dia);
-  W=clComputeWeek(ini);W.inicio=ini;_falt=null;
+  W=clComputeWeek(ini);W.inicio=ini;_falt=null;_fia=null;
   D=W.perDay.find(x=>x.date===E.dia)||W.perDay[0];
   // la app de siempre trabaja con la misma semana (Guardar cierre, CSV y la hoja completa)
   const inp=document.getElementById('clWeekStart');
@@ -171,11 +171,27 @@ function renglones(f,grupo){
   (data.movs||[]).forEach(m=>{if(m&&m.date===f&&es.has(m.campo))out.push({tipo:'mov',id:m.id,campo:m.campo,monto:num(m.monto),nota:m.nota||'',foto:!!m.foto,at:m.at,pago:m.pago});});
   if(grupo==='ing'){
     clReceivablesFor(f).forEach(r=>out.push({tipo:'fiado',id:r.id,campo:'fiado',monto:num(r.amount),nota:r.concept||'',foto:!!r.foto,cobrado:!!r.collected,vence:r.dueDate||'',at:r.at||0}));
-    clAutoFiados(f).forEach(r=>out.push({tipo:'fiadoPos',id:r.id,campo:'fiado',monto:num(r.amount),nota:r.concept||'Cliente',cobrado:!!(data.fiadoCobrado||{})[r.id],at:0}));
+    clAutoFiados(f).forEach(r=>out.push({tipo:'fiadoPos',id:r.id,campo:'fiado',monto:num(r.amount),nota:r.concept||'Cliente',cobrado:fiadoPagado(r.id),abonado:(fiadosPos()[r.id]||{}).abonado||0,solo:!(data.fiadoCobrado||{})[r.id]&&fiadoPagado(r.id),at:0}));
   }
   return out;
 }
 const valorDe=(d,k)=>k==='fiado'?d.cuentasPorCobrarTotal:num(d.manual[k]);
+// 2026-11-28 · Los fiados del POS: lo que cada cliente ya pagó (según los pagos que anotó el POS) se le rebaja solo a
+// lo más viejo que debe. Devuelve {idFiado:{debe,abonado}}. Lo marcado a mano ("ya pagó") sigue valiendo.
+let _fia=null;
+function fiadosPos(){
+  if(_fia)return _fia;
+  const o={},fuera=data.autoFuera||{},clave=n=>String(n||'').trim().toLowerCase().replace(/\s+/g,' '),pagado={};
+  if(PU&&PU.fiadoPagosTodos)PU.fiadoPagosTodos(TIENDA).forEach(x=>{const k=clave(x.cliente);pagado[k]=(pagado[k]||0)+num(x.monto);});
+  if(PU&&PU.fiadosTodos)PU.fiadosTodos(TIENDA).forEach(r=>{       // vienen del más viejo al más nuevo
+    if(fuera[r.id])return;
+    const k=clave(r.concept),total=num(r.amount),usa=Math.min(total,pagado[k]||0);
+    if(usa>0)pagado[k]-=usa;
+    o[r.id]={debe:total-usa,abonado:usa};
+  });
+  return(_fia=o);
+}
+const fiadoPagado=id=>!!(data.fiadoCobrado||{})[id]||((fiadosPos()[id]||{debe:1}).debe<=0);
 
 function quitarRenglon(f,r){
   if(r.tipo==='mov')data.movs=(data.movs||[]).filter(m=>m.id!==r.id);
@@ -511,8 +527,8 @@ function pendientes(d){
   if(plataActiva(D.date)&&u&&(u.turno||{}).cierre!==undefined&&!entregaDe(D.date))
     out.push({a:'sobre',q:`Guardar el sobre ${D.date===h?'de hoy':'del '+diaCorto(D.date)}`,d:`Sacá ${fmt(sobreSugerido(D))} en un sobre y dejá ${fmt(sencillo())} de sencillo en el cajón.`,b:'Guardar el sobre'});
   if(!D.ventas&&(pasado||min>=12*60)){
-    if(PU&&PU.posConectado&&PU.posConectado(TIENDA))out.push({a:'ir-ingresos',q:`No han llegado las ventas del POS ${cuando(D.date)==='hoy'?'de hoy':'del '+diaCorto(D.date)}`,d:'Llegan solas cuando el POS de la tienda tiene internet.',b:'Ver Ingresos'});
-    else out.push({a:'anotar',g:'ing',q:`¿Cuánto se vendió ${cuando(D.date)}?`,d:'Cuando el POS esté conectado llega solo. Mientras tanto se anota aquí.',b:'Anotar ingresos'});
+    if(PU&&PU.posConectado&&PU.posConectado(TIENDA))out.push({a:'ir-ingresos',q:`No han llegado las ventas del POS ${cuando(D.date)==='hoy'?'de hoy':'del '+diaCorto(D.date)}`,d:'Llegan solas cuando el POS de la tienda tiene internet.',b:'Ver Ventas'});
+    else out.push({a:'anotar',g:'ing',q:`¿Cuánto se vendió ${cuando(D.date)}?`,d:'Cuando el POS esté conectado llega solo. Mientras tanto se anota aquí.',b:'Anotar ventas'});
   }
   return out;
 }
@@ -676,7 +692,7 @@ function tarjetaRenglon(r,grupo){
   const c=campoDe(r.campo),abierta=E.abiertos.has(r.id),esFiado=r.tipo==='fiado'||r.tipo==='fiadoPos';
   const marca=r.tipo==='auto'?`<span class="cx-marca auto">${r.pos?'Del POS':'Llegó solo'}</span>`:r.tipo==='hoja'?'<span class="cx-marca">De la hoja</span>':esFiado?`<span class="cx-marca ${r.cobrado?'bien':'ojo'}">${r.cobrado?'Ya pagó':'Debe'}</span>`:'';
   const titulo=r.tipo==='auto'?r.titulo:r.tipo==='hoja'?r.titulo:(r.nota||c.t);
-  const meta=[r.tipo==='mov'&&!r.nota?'':c.t,r.tipo==='auto'?r.origen:'',r.tipo==='fiadoPos'?'Del POS':'',hora(r.at),r.firma?'compró '+r.firma:''].filter(Boolean).join(' · ')||'Sin mensaje';
+  const meta=[r.tipo==='mov'&&!r.nota?'':c.t,r.tipo==='auto'?r.origen:'',r.tipo==='fiadoPos'?'Del POS':'',r.tipo==='fiadoPos'&&r.abonado&&!r.cobrado?'ya abonó '+fmt(r.abonado):'',hora(r.at),r.firma?'compró '+r.firma:''].filter(Boolean).join(' · ')||'Sin mensaje';
   const apagada=r.tipo==='auto'&&(r.fuera||r.tapado);
   const detalle=r.tipo==='auto'&&abierta?`<div class="cx-detalle">
       ${r.items.length?`<table><thead><tr><th>Producto</th><th>Cantidad</th><th>Precio</th><th>Monto</th></tr></thead><tbody>${r.items.map(i=>`<tr><td>${esc(i.t)}</td><td>${(Math.round(i.q*100)/100).toLocaleString('es-CR')}${i.u?' '+esc(i.u):''}</td><td>${fmt(i.precio)}</td><td>${fmt(i.monto)}</td></tr>`).join('')}</tbody></table>`:`<p>${r.pos?'Es la suma de las ventas del POS con esta forma de pago. Cada tiquete se ve en el POS.':'Este renglón llegó sin lista de productos.'}</p>`}
@@ -695,7 +711,7 @@ function tarjetaRenglon(r,grupo){
     ${r.tipo==='fiadoPos'?`<div class="cx-renglon-b">${cuerpo}</div>`:`<button type="button" class="cx-renglon-b" data-cx="renglon" data-g="${grupo}" data-id="${esc(r.id)}" ${r.tipo==='auto'?`aria-expanded="${abierta}"`:''}>${cuerpo}</button>`}
     ${r.foto?miniFoto(r.id):''}
     ${pago}
-    ${esFiado?`<button type="button" class="cx-enlace cx-cobro" data-cx="fiado-cobro" data-id="${esc(r.id)}" data-f="${D.date}">${r.cobrado?'Marcar que todavía debe':'Marcar que ya pagó'}</button>`:''}
+    ${esFiado&&r.solo?'<p class="cx-nota cx-cobro-solo">El POS anotó que ya lo pagó.</p>':esFiado?`<button type="button" class="cx-enlace cx-cobro" data-cx="fiado-cobro" data-id="${esc(r.id)}" data-f="${D.date}">${r.cobrado?'Marcar que todavía debe':'Marcar que ya pagó'}</button>`:''}
     ${detalle}
   </article>`;
 }
@@ -704,6 +720,8 @@ function vGrupo(grupo){
   const total=esIng?D.ventas:D.comprasTotal,sem=sumar(W.perDay,d=>esIng?d.ventas:d.comprasTotal);
   const viejas=!esIng?D.compras+num(D.manual.grupoInversion)+(D.grupoInversion-sumar(COM,c=>D.manual[c.k])-num(D.manual.grupoInversion)):0;
   const deben=esIng?fiadosPendientes().filter(x=>x.date!==D.date):[];
+  // lo que entró hoy de fiados: es plata de ventas de otros días (no es venta nueva)
+  const fp=esIng&&PU&&PU.fiadoPagos?PU.fiadoPagos(D.date,TIENDA):[];
   const conPago=!esIng&&plataActiva(D.date);
   let porQuien='';
   if(conPago){const q={};PL.compras(D.date).forEach(c=>{q[c.pago]=(q[c.pago]||0)+c.monto;});
@@ -724,7 +742,7 @@ function vGrupo(grupo){
   }
   const subs=g.campos.filter(c=>!c.viejo),soloPos=esIng&&!!ps;   // el día que el POS mandó las ventas, no se anota nada a mano
   const viejosIng=esIng?g.campos.filter(c=>c.viejo&&valorDe(D,c.k)):[];
-  return barra()+tiraDias()+cabeza(diaLargo(D.date),esIng?'Ingresos':'Compras <small>y Grupo Inversión</small>',col(total),`Semana: <b>${col(sem)}</b>${esIng?' en ventas':''}`,esIng?'ing':'com')+`
+  return barra()+tiraDias()+cabeza(diaLargo(D.date),esIng?'Ventas':'Compras <small>y Grupo Inversión</small>',col(total),`Semana: <b>${col(sem)}</b>${esIng?' en ventas':''}`,esIng?'ing':'com')+`
   ${pos}
   ${porQuien?`<div class="cx-quien-pagos" aria-label="Quién pagó las compras del día">${porQuien}</div>`:''}
   ${ranura((esIng?'ingresos':'compras')+':arriba')}
@@ -741,15 +759,20 @@ function vGrupo(grupo){
     ${Math.abs(viejas)>=1?`<article class="cx-renglon"><div class="cx-renglon-b"><span class="cx-ico" aria-hidden="true">${ic('hoja',20)}</span><span class="cx-renglon-t"><b>Registros viejos</b><small>Se cambian en Más → Hoja completa</small></span><span class="cx-renglon-m"><b>${fmt(viejas)}</b></span></div></article>`:''}
   </div>
   ${deben.length?`<h2 class="cx-h2">Te deben de otros días <span>${fmt(sumar(deben,x=>x.amount))}</span></h2>
-  <div class="cx-lista">${deben.map(x=>`<article class="cx-renglon"><div class="cx-renglon-b"><span class="cx-ico" aria-hidden="true">${ic('clientes',20)}</span><span class="cx-renglon-t"><b>${esc(x.concept||'Cliente')}</b><small>Fiado el ${diaCorto(x.date)} de ${mes(x.date)}${x.dueDate?' · paga el '+diaCorto(x.dueDate):''}</small></span><span class="cx-renglon-m"><b>${fmt(x.amount)}</b></span></div>
+  <div class="cx-lista">${deben.map(x=>`<article class="cx-renglon"><div class="cx-renglon-b"><span class="cx-ico" aria-hidden="true">${ic('clientes',20)}</span><span class="cx-renglon-t"><b>${esc(x.concept||'Cliente')}</b><small>Fiado el ${diaCorto(x.date)} de ${mes(x.date)}${x.dueDate?' · paga el '+diaCorto(x.dueDate):''}${x.abonado?` · ya abonó ${fmt(x.abonado)} de ${fmt(x.original)}`:''}</small></span><span class="cx-renglon-m"><b>${fmt(x.amount)}</b></span></div>
       <button type="button" class="cx-enlace cx-cobro" data-cx="fiado-cobro" data-id="${esc(x.id)}" data-f="${x.date}">Marcar que ya pagó</button></article>`).join('')}</div>`:''}
+  ${fp.length?`<h2 class="cx-h2">Pagaron fiados ${cuando(D.date)} <span>${fmt(sumar(fp,x=>x.monto))}</span></h2>
+  <p class="cx-nota arriba">Es plata de ventas de otros días: entra ${cuando(D.date)}, pero no es venta nueva (ya se contó el día que se fió).</p>
+  <div class="cx-lista">${fp.map(x=>`<article class="cx-renglon"><div class="cx-renglon-b"><span class="cx-ico" aria-hidden="true">${ic('clientes',20)}</span><span class="cx-renglon-t"><b>${esc(x.cliente||'Cliente')}</b><small>${x.metodo==='efectivo'?'En efectivo: entró al cajón':x.metodo==='sinpe'?'Por SINPE':'Con tarjeta'}${x.h?' · '+esc(x.h):''}</small></span><span class="cx-renglon-m"><span class="cx-marca bien">Pagó</span><b>${fmt(x.monto)}</b></span></div></article>`).join('')}</div>`:''}
   ${ranura((esIng?'ingresos':'compras')+':abajo')}
   ${soloPos?'':`<div class="cx-pie" data-ui-abajo><button type="button" class="cx-accion" data-cx="anotar" data-g="${grupo}"><span>${esIng?'Anotar un ingreso a mano':'Anotar una compra'}</span>${flecha('mas')}</button></div>`}`;
 }
 function fiadosPendientes(){
   const out=[],cob=data.fiadoCobrado||{},fuera=data.autoFuera||{};
   Object.entries(data.closureReceivables||{}).forEach(([f,L])=>(L||[]).forEach(r=>{if(!r.collected&&num(r.amount)>0)out.push({...r,date:f});}));
-  if(PU&&PU.fiadosTodos)PU.fiadosTodos(TIENDA).forEach(r=>{if(!cob[r.id]&&!fuera[r.id])out.push(r);});
+  if(PU&&PU.fiadosTodos){const est=fiadosPos();PU.fiadosTodos(TIENDA).forEach(r=>{
+    if(cob[r.id]||fuera[r.id])return;const e=est[r.id]||{debe:num(r.amount),abonado:0};
+    if(e.debe>0)out.push({...r,amount:e.debe,original:num(r.amount),abonado:e.abonado});});}
   return out.sort((a,b)=>a.date.localeCompare(b.date));
 }
 
