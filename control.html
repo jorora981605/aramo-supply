@@ -1,5 +1,5 @@
 <!doctype html>
-<!-- Control de ARAMO: la app "Control del negocio" del dueño, dentro de ARAMO. Se arma con .rediseno/herramientas/hacer-control.py (no editar a mano). -->
+<!-- Control de ARAMO: la app "Control del negocio" del dueño, dentro de ARAMO. Nació de .rediseno/herramientas/hacer-control.py; desde el 2026-11-28 (Control total) se edita AQUÍ directo: no volver a correr esa herramienta. Lo nuevo vive en control-base.js, control-gastos.js, control-compras.js, control-productos.js y control-cierre.js. -->
 <html lang="es-CR" data-app="control">
 <head>
   <meta charset="utf-8">
@@ -896,7 +896,8 @@
     }
   </style>
   <link rel="stylesheet" href="control.css?v=20261126-plata2">
-  <link rel="stylesheet" href="control-cuadros.css?v=20261126-plata2">
+  <link rel="stylesheet" href="control-cuadros.css?v=20261128-total1">
+  <link rel="stylesheet" href="control-total.css?v=20261128-total1">
 </head>
 <body>
 <div id="cx" class="cx"></div>
@@ -1380,7 +1381,8 @@
 <script src="canasta-config.js?v=20261018-seguridad-1"></script>
 <script src="aramo-nube.js?v=20261020-circuito-6"></script>
 <script defer src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.117.0"></script>
-<script src="control-puente.js?v=20261126-plata2"></script>
+<script src="catalogo-aramo.js?v=20261128-total1"></script>
+<script src="control-puente.js?v=20261128-total1"></script>
 <script>
 // ARAMO: un Control por tienda. La tienda sale de ?suc=, o de la que se eligió al entrar a ARAMO.
 const TIENDA='angeles'; // por ahora el Control es solo de Los Ángeles (LASR)
@@ -4778,14 +4780,26 @@ function clWeekNumber(dateStr){
 // (data.movs, con mensaje y foto) + lo que llega solo de ARAMO (renglón por renglón, salvo los marcados
 // "no contar" en data.autoFuera). Compatibilidad: si la casilla tiene un número escrito en la hoja, lo que
 // llega solo no se suma ahí (era la regla "lo escrito a mano manda").
-const CL_AUTO=['cash','sinpe','card','comprasEfectivo','comprasSinpe','comprasTarjeta'];
+const CL_AUTO=['cash','sinpe','card','otros','comprasEfectivo','comprasSinpe','comprasTarjeta','comprasCredito'];
 const CL_MOV=['cash','sinpe','card','bodega','desechos','comprasEfectivo','comprasSinpe','comprasTarjeta','comprasUber'];
 var _clMovIdx=null;
 function clMovIdx(){
   if(!_clMovIdx){_clMovIdx={};(data.movs||[]).forEach(m=>{if(!m||!m.date)return;const d=_clMovIdx[m.date]||(_clMovIdx[m.date]={});d[m.campo]=(d[m.campo]||0)+num(m.monto);});}
   return _clMovIdx;
 }
-function clAutoLineas(date){try{return window.AramoPuente&&window.AramoPuente.lineas?window.AramoPuente.lineas(date,TIENDA)||[]:[];}catch(e){return[];}}
+// ARAMO 2026-11-28 · Control total: además de lo que trae el puente, cada módulo puede sumar sus renglones
+// (window.ControlFuentes: funciones fecha → renglones; p. ej. las entregas en la tienda de control-compras.js).
+function clAutoLineas(date){
+  let L=[];
+  try{L=window.AramoPuente&&window.AramoPuente.lineas?window.AramoPuente.lineas(date,TIENDA)||[]:[];}catch(e){L=[];}
+  (window.ControlFuentes||[]).forEach(f=>{try{const x=f(date);if(x&&x.length)L=L.concat(x);}catch(e){console.error(e);}});
+  return L;
+}
+// Las reglas nuevas valen desde data.reglas.desde (el día que este aparato estrenó el Control total): lo de antes
+// se queda como estaba. Desde ese día: gastos del catálogo con reparto exacto por día, los gastos pagados y los viajes
+// entran en la ganancia, los desechos ya no se restan otra vez (van dentro de las compras) y un retiro de caja que
+// paga una compra o un gasto ya anotado no se resta dos veces.
+function clNuevo(date){const r=data.reglas;return !!(r&&r.desde&&date>=r.desde);}
 function clAutoDe(date){
   const L=clAutoLineas(date);if(!L.length)return null;
   const fuera=data.autoFuera||{},o={};
@@ -4815,7 +4829,7 @@ function clDailyRaw(date){
   data.closureDaily=data.closureDaily||{};
   const empty={
     cash:0,sinpe:0,card:0,bodega:0,compras:0,grupoInversion:0,desechos:0,cuentaXpagar:0,
-    comprasEfectivo:0,comprasSinpe:0,comprasUber:0,comprasTarjeta:0,
+    comprasEfectivo:0,comprasSinpe:0,comprasUber:0,comprasTarjeta:0,comprasCredito:0,otros:0,
     // cajaCounts guarda el conteo físico de caja en cada apertura, relevo
     // y cierre del día — el Efectivo y las Compras de arriba se reparten
     // solos entre esos turnos, sin volver a escribirlos.
@@ -5590,7 +5604,13 @@ function clComputeWeek(start){
   // El ahorro es un monto FIJO por semana (no mensual), así que se
   // prorratea entre 7 días; el resto de gastos fijos sí son mensuales y
   // se prorratean entre los días reales del mes (365/12).
-  const fixedMonthly=[
+  // ARAMO 2026-11-28 · si está el catálogo de gastos (control-gastos.js), los gastos fijos salen de ahí: cada día con
+  // su parte exacta, y los días de antes de las reglas nuevas con la cuenta de siempre.
+  const G=window.Gastos&&typeof window.Gastos.dia==='function'?window.Gastos:null;
+  // si un módulo falla, el Control sigue con la cuenta de siempre (y el error queda en la consola)
+  const seguro=(fn,d)=>{try{return fn();}catch(e){console.error(e);return d;}};
+  const _fm=G?seguro(()=>G.fijosSemana(dates),null):null;
+  const fixedMonthly=_fm||[
     {key:'rent',label:'Alquiler'},
     {key:'electricity',label:'Luz'},
     {key:'terminal',label:'Datáfono fijo'},
@@ -5598,7 +5618,8 @@ function clComputeWeek(start){
     {key:'insurance',label:'Seguro Gene'},
     {key:'wifi',label:'Wifi'}
   ].map(f=>({...f,raw:num(s[f.key]),period:'mes',daily:num(s[f.key])/CLOSURE_DAYS_PER_MONTH}));
-  fixedMonthly.push({key:'savings',label:'Ahorro',raw:num(s.savings),period:'semana',daily:num(s.savings)/7});
+  if(!_fm)fixedMonthly.push({key:'savings',label:'Ahorro',raw:num(s.savings),period:'semana',daily:num(s.savings)/7});
+  const CZ=window.Cierres&&typeof window.Cierres.congelado==='function'?window.Cierres:null;
 
   const hourlyPeople=data.staff.filter(p=>p.active&&num(p.hourly)>0);
   // La comisión se ajusta una única vez en Configuración. En la hoja solo
@@ -5613,16 +5634,27 @@ function clComputeWeek(start){
     // el monto entra a Ventas/Ingresos igual que Efectivo/SINPE/Tarjeta —
     // y también explica por qué la caja física tiene menos de lo esperado.
     const cuentasPorCobrarTotal=clReceivablesTotal(date);
-    const ventas=manual.cash+manual.sinpe+manual.card+cuentasPorCobrarTotal;
+    // "otros": ventas del POS con otra forma de pago (antes se perdían)
+    const otrosPago=num(manual.otros);
+    const ventas=manual.cash+manual.sinpe+manual.card+otrosPago+cuentasPorCobrarTotal;
+    // un día cerrado queda congelado: sus gastos fijos, sus salarios y la comisión son los del día en que se cerró
+    const cz=CZ?seguro(()=>CZ.congelado(date),null):null;
+    const gd=G&&_fm?seguro(()=>G.dia(date),null):null;
+    const nuevo=clNuevo(date);
     // Compras es un total manual independiente. Efectivo y SINPE forman
     // Grupo Inversión; el viejo campo grupoInversion permanece sumado para
     // conservar semanas guardadas antes de este cambio.
     const compras=manual.compras+clPayablesPaidForDateByBucket(date,'compras');
-    const grupoInversion=manual.comprasEfectivo+manual.comprasSinpe+num(manual.comprasTarjeta)+manual.comprasUber+manual.grupoInversion+clPayablesPaidForDateByBucket(date,'grupoInversion');
+    // comprasCredito: lo que se recibió y todavía se debe (cuenta el día que llegó; pagarlo después solo mueve plata)
+    const grupoInversion=manual.comprasEfectivo+manual.comprasSinpe+num(manual.comprasTarjeta)+manual.comprasUber+num(manual.comprasCredito)+manual.grupoInversion+clPayablesPaidForDateByBucket(date,'grupoInversion');
     const comprasTotal=compras+grupoInversion;
-    const datafonoNeto=manual.card-manual.card*cardFeePct/100;
-    const fixedTotal=fixedMonthly.reduce((t,f)=>t+f.daily,0);
-    const salarioTotal=Object.values(clHourlyPayForDay(dayName)).reduce((t,v)=>t+v,0);
+    const feeDia=cz&&cz.fee!=null?num(cz.fee):cardFeePct;
+    const datafonoNeto=manual.card-manual.card*feeDia/100;
+    const fixedTotal=cz&&cz.fijos!=null?num(cz.fijos):(gd?num(gd.fijos):fixedMonthly.reduce((t,f)=>t+f.daily,0));
+    const salarioTotal=cz&&cz.sal!=null?num(cz.sal):Object.values(clHourlyPayForDay(dayName)).reduce((t,v)=>t+v,0);
+    // gastos de ese día que no son del prorrateo: lo pagado de más o de menos contra lo calculado, los gastos
+    // sueltos y los viajes por kilómetro (los arma control-gastos.js)
+    const gastosAjuste=gd?num(gd.ajuste):0,gastosSueltos=gd?num(gd.sueltos):0,gastosVarios=gastosAjuste+gastosSueltos;
     const rebajoJoseph=(clIntocable(date)||date>=CL_SIN_REBAJO)?0:clJosephRebateForDate(date,dayName,dates,manual.rebajoJoseph);
     const effectiveManual={...manual,rebajoJoseph};
     const rebajoTotal=effectiveManual.rebajoJefes+effectiveManual.rebajoRoger+effectiveManual.rebajoJoseph;
@@ -5646,15 +5678,22 @@ function clComputeWeek(start){
     // se reparte en tres partes iguales). El FALTANTE ya NO baja la
     // Ganancia: se le cobra directo a la persona responsable del turno —
     // el negocio no pierde, la persona debe.
-    const ingresoReal=manual.cash+manual.sinpe+datafonoNeto+manual.bodega+cuentasPorCobrarTotal+cajaSobrante;
+    const ingresoReal=manual.cash+manual.sinpe+datafonoNeto+otrosPago+manual.bodega+cuentasPorCobrarTotal+cajaSobrante;
     // Los retiros de caja (plata sacada aparte de Compras, con su motivo)
     // también bajan la Ganancia: es un gasto real que salió del cajón.
+    // ARAMO 2026-11-28 · un retiro con "enlace" pagó una compra o un gasto que ya está anotado en su lugar: baja lo
+    // que debe haber en el cajón, pero no se resta otra vez de la ganancia. Y lo desechado ya está dentro de las
+    // compras (se pagó al comprarlo): con las reglas nuevas se muestra, pero no se vuelve a restar.
+    const retirosGasto=clCajaRetiros(date).reduce((t,r)=>t+(r&&r.enlace?0:num(r&&r.amount)),0);
+    const desechosResta=nuevo?0:manual.desechos;
     const ganancia=ingresoReal
-      -compras-grupoInversion-manual.desechos
-      -fixedTotal-salarioTotal-rebajoTotal-cuentaXpagarTotal-cajaRetirosTotal;
+      -compras-grupoInversion-desechosResta
+      -fixedTotal-gastosVarios-salarioTotal-rebajoTotal-cuentaXpagarTotal-retirosGasto;
     // Quién debe cuánto por faltantes de este día (para cobrárselo).
     const cajaFaltantes=cajaDay.segments.filter(s=>s.diff!=null&&s.diff<0).map(s=>({personId:s.personId,personName:s.personName,amount:-s.diff}));
-    return {date,dayName,manual:effectiveManual,ventas,ingresoReal,compras,grupoInversion,comprasTotal,cardFeePct,datafonoNeto,fixedTotal,salarioTotal,rebajoTotal,ganancia,cajaEsperada,cajaFaltante,cajaSobrante,cajaRetirosTotal,cajaFaltantes,cajaPendingConfirm:cajaDay.pendingConfirm,cuentaXpagarTotal,cuentasPorCobrarTotal,cajaSegments:cajaDay.segments};
+    return {date,dayName,manual:effectiveManual,ventas,ingresoReal,compras,grupoInversion,comprasTotal,cardFeePct:feeDia,datafonoNeto,fixedTotal,salarioTotal,rebajoTotal,ganancia,cajaEsperada,cajaFaltante,cajaSobrante,cajaRetirosTotal,cajaFaltantes,cajaPendingConfirm:cajaDay.pendingConfirm,cuentaXpagarTotal,cuentasPorCobrarTotal,cajaSegments:cajaDay.segments,
+      // ARAMO 2026-11-28 · Control total
+      otrosPago,gastosVarios,gastosAjuste,gastosSueltos,gastosDet:gd,retirosGasto,desechosResta,nuevo,cerrado:!!cz};
   });
 
   return {perDay,fixedMonthly,hourlyPeople,cardFeePct};
@@ -5694,7 +5733,12 @@ let _ctlT=0;
 window.addEventListener('aramo-puente',()=>{clearTimeout(_ctlT);const ir=()=>{const a=document.activeElement;if(a&&/INPUT|TEXTAREA|SELECT/.test(a.tagName)){_ctlT=setTimeout(ir,1500);return;}try{renderAll();}catch(e){}};_ctlT=setTimeout(ir,200);});
 if(window.AramoPuente)window.AramoPuente.empezar(TIENDA);
 </script>
-<script src="control-socios.js?v=20261126-plata2"></script>
-<script src="control-cuadros.js?v=20261126-plata2"></script>
+<script src="control-base.js?v=20261128-total1"></script>
+<script src="control-socios.js?v=20261128-total1"></script>
+<script src="control-gastos.js?v=20261128-total1"></script>
+<script src="control-compras.js?v=20261128-total1"></script>
+<script src="control-productos.js?v=20261128-total1"></script>
+<script src="control-cierre.js?v=20261128-total1"></script>
+<script src="control-cuadros.js?v=20261128-total1"></script>
 </body>
 </html>

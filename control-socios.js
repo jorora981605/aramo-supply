@@ -21,8 +21,14 @@ if(typeof clComputeWeek!=='function')return;
 const SOCIOS=[{id:'jefes',n:'Jefes',pct:20},{id:'roger',n:'Roger',pct:40},{id:'joseph',n:'Joseph',pct:40}];
 const IDS=SOCIOS.map(s=>s.id);
 const PAGAN=['bolsa',...IDS];
-const NOMBRE={bolsa:'La bolsa',jefes:'Jefes',roger:'Roger',joseph:'Joseph',caja:'La caja',ventas:'Las ventas'};
-const COMPRA=['comprasEfectivo','comprasSinpe','comprasTarjeta','comprasUber'];
+const NOMBRE={bolsa:'La bolsa',jefes:'Jefes',roger:'Roger',joseph:'Joseph',caja:'La caja',ventas:'Las ventas',credito:'Se debe'};
+const COMPRA=['comprasEfectivo','comprasSinpe','comprasTarjeta','comprasUber','comprasCredito'];
+// 2026-11-28 · Control total. Una compra o un gasto también lo puede pagar LA CAJA (sale del cajón: ni de la bolsa ni
+// del bolsillo de nadie) o quedar A CRÉDITO (se debe: cuando se pague, ese pago es un movimiento "abono").
+// Un gasto "suelto" (algo de una sola vez, o un viaje) no sale de lo apartado para gastos fijos: se repone como una compra.
+const FUERA=['caja','credito'];
+const nuevoEn=f=>typeof clNuevo==='function'&&clNuevo(f);
+const esSuelto=m=>window.Gastos&&typeof window.Gastos.esSuelto==='function'?!!window.Gastos.esSuelto(m):(m.concepto==='otro'||m.concepto==='viaje');
 const ent=n=>Math.round(num(n));
 const cero=()=>({jefes:0,roger:0,joseph:0});
 const hoy=()=>clDateISO(new Date());
@@ -54,7 +60,7 @@ function pagoDefecto(campo){
 function pagoDe(f,r){
   let g;
   if(r.tipo==='mov'){g=r.pago;if(g===undefined){const m=(data.movs||[]).find(x=>x.id===r.id);g=m&&m.pago;}}
-  else g=(data.pagoDe||{})[f+'|'+r.id];
+  else{if(r.fijo)return r.fijo;g=(data.pagoDe||{})[f+'|'+r.id];}   // "fijo": el renglón ya trae quién lo pagó (una entrega en la tienda)
   return PAGAN.includes(g)?g:pagoDefecto(r.campo);
 }
 function ponerPago(f,r,quien){
@@ -67,7 +73,7 @@ function compras(f){
   return recordado('c'+f,()=>{
     const raw=clDailyRaw(f),fuera=data.autoFuera||{},out=[];
     COMPRA.forEach(k=>{const v=num(raw[k]);if(v)out.push({tipo:'hoja',id:'h:'+k,campo:k,monto:v,titulo:'Anotado en la hoja'});});
-    clAutoLineas(f).forEach(l=>{if(COMPRA.includes(l.campo)&&!fuera[l.id]&&!num(raw[l.campo]))out.push({tipo:'auto',id:l.id,campo:l.campo,monto:num(l.monto),titulo:l.titulo});});
+    clAutoLineas(f).forEach(l=>{if(COMPRA.includes(l.campo)&&!fuera[l.id]&&!num(raw[l.campo]))out.push({tipo:'auto',id:l.id,campo:l.campo,monto:num(l.monto),titulo:l.titulo,fijo:l.pago||(l.campo==='comprasCredito'?'credito':undefined)});});
     (data.movs||[]).forEach(m=>{if(m&&m.date===f&&COMPRA.includes(m.campo))out.push({tipo:'mov',id:m.id,campo:m.campo,monto:num(m.monto),titulo:m.nota||'',pago:m.pago});});
     out.forEach(c=>{c.pago=pagoDe(f,c);});
     return out;
@@ -97,13 +103,16 @@ function estado(hasta){
     let bolsa=0,apartado=0,pagado=0;
     for(let f=c.desde;f<=hasta;f=clDateAdd(f,1)){
       let gasto=0,entra=0,sale=0;
-      compras(f).forEach(x=>{if(x.pago==='bolsa')gasto+=x.monto;else bolsillo[x.pago]+=x.monto;});
+      compras(f).forEach(x=>{if(x.pago==='bolsa')gasto+=x.monto;else if(x.pago in bolsillo)bolsillo[x.pago]+=x.monto;});   // la caja o a crédito: no toca la bolsa
       (por[f]||[]).forEach(m=>{const v=ent(m.monto);
         if(m.t==='pone'){if(m.de in puso)puso[m.de]+=v;if(m.a!=='caja')entra+=v;}
         else if(m.t==='paso'){if(m.de in puso)puso[m.de]+=v;if(m.a in puso)puso[m.a]-=v;}
         else if(m.t==='devuelve'){if(m.a in devuelto)devuelto[m.a]+=v;sale+=v;}
         else if(m.t==='repone'){entra+=v;if(m.para==='fijos')apartado+=v;}
-        else if(m.t==='gasto'){pagado+=v;if(m.de in bolsillo)bolsillo[m.de]+=v;else sale+=v;}   // un gasto fijo pagado: con la bolsa o de bolsillo
+        else if(m.t==='gasto'){   // un gasto pagado: con la bolsa, de bolsillo, o con la caja (ahí no toca la bolsa)
+          if(m.de!=='caja'){if(!(nuevoEn(m.f)&&esSuelto(m)))pagado+=v;if(m.de in bolsillo)bolsillo[m.de]+=v;else sale+=v;}
+        }
+        else if(m.t==='abono'){if(m.de==='bolsa')sale+=v;else if(m.de in bolsillo)bolsillo[m.de]+=v;}   // pago de una compra que se debía
       });
       bolsa+=entra-sale-gasto;
       let falto=0;
@@ -148,10 +157,17 @@ function plan(L,dias){
   const c=cfg();if(!c)return null;
   const ult=dias.length?dias[dias.length-1].date:L;
   let reponer=0,antes=0;
-  dias.forEach(d=>{if(activoEn(d.date))reponer+=compras(d.date).reduce((t,x)=>t+x.monto,0);else antes+=d.comprasTotal;});
+  dias.forEach(d=>{if(activoEn(d.date))reponer+=compras(d.date).reduce((t,x)=>t+(FUERA.includes(x.pago)?0:x.monto),0);else antes+=d.comprasTotal;});
+  // lo que la bolsa (o alguien de su bolsillo) pagó en la semana además de las compras: abonos de lo que se debía y
+  // gastos sueltos. Y lo que la caja pagó de gastos fijos: eso ya no hay que apartarlo.
+  let cajaFijo=0;
+  (data.plata||[]).forEach(m=>{if(!m||m.f<L||m.f>ult||!activoEn(m.f))return;const v=ent(m.monto);
+    if(m.t==='abono'){if(m.de!=='caja')reponer+=v;}
+    else if(m.t==='gasto'&&nuevoEn(m.f)){const s=esSuelto(m);if(m.de==='caja'){if(!s)cajaFijo+=v;}else if(s)reponer+=v;}});
+  const ajuste=dias.reduce((t,d)=>t+num(d.gastosAjuste),0);
   const st=estado(ult),ganancia=dias.reduce((t,d)=>t+d.ganancia,0),fijos=dias.reduce((t,d)=>t+d.fixedTotal+d.salarioTotal,0);
   // el ahorro es un gasto fijo más (sale antes de la ganancia), pero la plata es de los tres: 20/40/40
-  const ahorro=ent(num((data.settings||{}).savings)/7*dias.length),ahorroPartes=partes(ahorro),apartar=Math.max(0,ent(fijos)-ahorro);
+  const ahorro=ent(num((data.settings||{}).savings)/7*dias.length),ahorroPartes=partes(ahorro),apartar=Math.max(0,ent(fijos)-ahorro+ent(ajuste)-cajaFijo);
   const rp=reparto(dias),final=redondear({jefes:rp.jefes,roger:rp.roger,joseph:rp.joseph}),ajustes=[];
   // lunes en cero: lo que alguien todavía deba se arregla con su parte de la ganancia (sin dejarla en negativo)
   st.arreglos.forEach(a=>{
@@ -198,6 +214,6 @@ function pendientes(){
   return out;
 }
 
-window.Plata={SOCIOS,IDS,PAGAN,NOMBRE,COMPRA,cfg,activoEn,conMemo,partes,pagoDefecto,pagoDe,ponerPago,compras,
+window.Plata={SOCIOS,IDS,PAGAN,NOMBRE,COMPRA,FUERA,cfg,activoEn,conMemo,partes,pagoDefecto,pagoDe,ponerPago,compras,
   estado,arreglos,reparto,redondear,plan,ahorroGuardado,repartir,deshacer,pendientes,parteDe};
 })();

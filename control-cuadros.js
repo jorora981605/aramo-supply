@@ -57,6 +57,14 @@ const COM=[
 const GRUPO={ing:{campos:ING,nombre:'ingreso',titulo:'Ingresos'},com:{campos:COM,nombre:'compra',titulo:'Compras'}};
 const campoDe=k=>ING.concat(COM).find(c=>c.k===k)||{k,t:k,ic:'nota'};
 const VISTAS=['inicio','caja','bolsa','ingresos','compras','fijos','resultado','admin','ganancia','mas'];
+// 2026-11-28 · Control total: las pantallas nuevas viven en sus propios archivos (control-gastos.js, control-compras.js,
+// control-productos.js, control-cierre.js). Cada uno se apunta en window.CX_MODULOS y aquí se monta (ver "módulos" abajo).
+const CUADROS=[];                        // cuadros del Inicio que pone un módulo: {id,orden,vista,tono,icono,nombre,dato()}
+const RANURAS={};                        // trozos que un módulo le agrega a una pantalla que ya existe: {'compras:abajo':[fn]}
+const PEND=[];                           // "lo que falta" según cada módulo: fn(D) → [{a,q,d,b,…}]
+const GUARDAS=[];                        // antes de una acción: fn(nombre,datos) → false para no hacerla
+const TODOS=new Set(['inicio','caja']);  // las pantallas que también ve quien no es socio
+const ranura=n=>(RANURAS[n]||[]).map(fn=>{try{return fn()||'';}catch(e){console.error(e);return'';}}).join('');
 
 /* ---------- estado ---------- */
 const E={dia:hoy(),vista:'inicio',abiertos:new Set(),hoja:false};
@@ -159,7 +167,7 @@ const miniFoto=id=>`<button type="button" class="cx-mini" data-cx="foto" data-id
 function renglones(f,grupo){
   const campos=GRUPO[grupo].campos,es=new Set(campos.map(c=>c.k)),raw=clDailyRaw(f),fuera=data.autoFuera||{},out=[];
   campos.forEach(c=>{if(c.k==='fiado')return;const v=num(raw[c.k]);if(v)out.push({tipo:'hoja',id:'h:'+c.k,campo:c.k,monto:v,titulo:'Anotado en la hoja',at:0});});
-  clAutoLineas(f).forEach(l=>{if(es.has(l.campo))out.push({tipo:'auto',id:l.id,campo:l.campo,monto:num(l.monto),titulo:l.titulo,origen:l.origen,firma:l.firma,items:l.items||[],at:l.hora,fuera:!!fuera[l.id],tapado:num(raw[l.campo])!==0,pos:/^p:/.test(l.id)});});
+  clAutoLineas(f).forEach(l=>{if(es.has(l.campo))out.push({tipo:'auto',id:l.id,campo:l.campo,monto:num(l.monto),titulo:l.titulo,origen:l.origen,firma:l.firma,items:l.items||[],at:l.hora,fuera:!!fuera[l.id],tapado:num(raw[l.campo])!==0,pos:/^p:/.test(l.id),fijo:l.pago||(l.campo==='comprasCredito'?'credito':undefined),foto:!!l.foto,fotoId:l.fotoId||'',abre:l.abre||''});});
   (data.movs||[]).forEach(m=>{if(m&&m.date===f&&es.has(m.campo))out.push({tipo:'mov',id:m.id,campo:m.campo,monto:num(m.monto),nota:m.nota||'',foto:!!m.foto,at:m.at,pago:m.pago});});
   if(grupo==='ing'){
     clReceivablesFor(f).forEach(r=>out.push({tipo:'fiado',id:r.id,campo:'fiado',monto:num(r.amount),nota:r.concept||'',foto:!!r.foto,cobrado:!!r.collected,vence:r.dueDate||'',at:r.at||0}));
@@ -252,6 +260,31 @@ function pedirMonto(o){
     no.addEventListener('click',()=>h.cerrar());si.addEventListener('click',listo);
     h.pie.appendChild(no);h.pie.appendChild(si);
   });
+}
+
+// Una ventanita con Cancelar y Guardar (la usan los módulos).
+//   o.html      el cuerpo (los campos de monto hechos con campoMonto quedan con formato solos)
+//   o.listo     (cuerpo,h) al abrir, para atar lo que haga falta
+//   o.guardar   (cuerpo,h) → false si falta algo (la ventanita se queda abierta); cualquier otra cosa la cierra
+//   o.borrar    () si se puede borrar (sale el botón rojo "Borrar"); o.si / o.no: los textos de los botones
+function ventana(o){
+  const h=AramoUI.hoja({titulo:o.titulo,sub:o.sub,clase:'ui-hoja--dialogo cx-hoja'+(o.clase?' '+o.clase:''),alCerrar:o.alCerrar});
+  h.cuerpo.innerHTML=(o.html||'')+(o.borrar?`<button type="button" class="cx-borrar" data-v-borrar>${ic('borrar',18)} ${esc(o.borrarTexto||'Borrar')}</button>`:'');
+  h.cuerpo.querySelectorAll('.cx-monto input').forEach(atarMonto);
+  let ocupado=false;
+  const guardar=async()=>{
+    if(ocupado||!o.guardar)return;ocupado=true;
+    try{const r=await o.guardar(h.cuerpo,h);if(r!==false)h.cerrar();}
+    catch(e){console.error(e);aviso('No se pudo guardar. Probá otra vez.',{tipo:'error'});}
+    finally{ocupado=false;}
+  };
+  const no=boton(o.guardar?(o.no||'Cancelar'):(o.no||'Cerrar'),'ui-btn--secundario ui-btn--l'+(o.guardar?'':' ui-crece'));
+  no.addEventListener('click',()=>h.cerrar());h.pie.appendChild(no);
+  if(o.guardar){const si=boton(o.si||'Guardar','ui-btn--primario ui-btn--l ui-crece');si.addEventListener('click',guardar);h.pie.appendChild(si);}
+  const b=h.cuerpo.querySelector('[data-v-borrar]');if(b)b.addEventListener('click',()=>{h.cerrar();o.borrar();});
+  h.guardar=guardar;
+  if(o.listo)o.listo(h.cuerpo,h);
+  return h;
 }
 
 // Contar la plata por denominación: se pone cuántos hay de cada billete y moneda, y la suma sale sola
@@ -503,6 +536,7 @@ function pendPlata(){
 function todoPendiente(){
   const out=pendientes();
   if(D.date===hoy())out.push(...pendPlata());
+  if(esSocio())PEND.forEach(fn=>{try{(fn(D)||[]).forEach(x=>out.push({...x,mod:true}));}catch(e){console.error(e);}});
   return out;
 }
 function estadoCaja(){
@@ -555,14 +589,27 @@ function vInicio(){
     <span class="cx-heroe-ver">Ver el detalle del día${ic('siguiente',16)}</span>
   </button>
   ${urgente}
-  <div class="cx-cuadros">
-    ${cuadro('caja','caja','caja','Caja',cajaNum,cajaSub,debenCaja.length||ec.c==='mal'?'alerta':'')}
-    ${bo?cuadro('bolsa','bol','bolsa','Bolsa',bo.num,bo.sub,bo.clase):''}
-    ${cuadro('ingresos','ing','efectivo','Ingresos',col(D.ventas),'vendido '+cuando(D.date))}
-    ${cuadro('compras','com','camion','Compras',col(D.comprasTotal),'comprado '+cuando(D.date))}
-    ${cuadro('fijos','fij','fecha','Gastos fijos',col(D.fixedTotal+D.salarioTotal),'por día')}
-    ${cuadro('admin','adm','reparto','Administración',col(sumar(vividos(),d=>d.ganancia)),'el reparto de la semana')}
+  ${ranura('inicio:arriba')}
+  <div class="cx-cuadros">${(()=>{
+    // los cuadros de siempre; un módulo puede poner uno nuevo o cambiar uno de estos (mismo id)
+    const L=[
+      {id:'caja',orden:10,html:cuadro('caja','caja','caja','Caja',cajaNum,cajaSub,debenCaja.length||ec.c==='mal'?'alerta':'')},
+      {id:'ingresos',orden:20,html:cuadro('ingresos','ing','efectivo','Ventas',col(D.ventas),'vendido '+cuando(D.date))},
+      {id:'compras',orden:30,html:cuadro('compras','com','camion','Compras',col(D.comprasTotal),'comprado '+cuando(D.date))},
+      {id:'fijos',orden:40,html:cuadro('fijos','fij','fecha','Gastos fijos',col(D.fixedTotal+D.salarioTotal),'por día')},
+      {id:'bolsa',orden:70,html:bo?cuadro('bolsa','bol','bolsa','Bolsa',bo.num,bo.sub,bo.clase):''},
+      {id:'admin',orden:80,html:cuadro('admin','adm','reparto','Cierre',col(sumar(vividos(),d=>d.ganancia)),'la semana y el reparto')}];
+    CUADROS.forEach(c=>{
+      let html='';
+      try{if(!c.ver||c.ver()){const x=c.dato?c.dato(D,W)||{}:{};html=cuadro(c.vista||c.id,c.tono||c.id,c.icono||'nota',c.nombre||c.id,x.num==null?'':x.num,x.sub||'',x.clase||'');}}catch(e){console.error(e);}
+      const i=L.findIndex(x=>x.id===c.id);
+      if(c.quita){if(i>=0)L.splice(i,1);return;}
+      if(i>=0)L[i]={id:c.id,orden:c.orden==null?L[i].orden:c.orden,html};else L.push({id:c.id,orden:c.orden==null?90:c.orden,html});
+    });
+    return L.filter(x=>x.html).sort((a,b)=>a.orden-b.orden).map(x=>x.html).join('');
+  })()}
   </div>
+  ${ranura('inicio:abajo')}
   <button type="button" class="cx-fila cx-mas" data-cx="ir" data-v="mas"><span class="cx-ico" aria-hidden="true">${ic('puntos',20)}</span><span class="cx-fila-t"><b>Más</b><small>Personal, horarios, hoja completa y respaldo</small></span>${ic('siguiente',20)}</button>`;
 }
 
@@ -638,7 +685,8 @@ function tarjetaRenglon(r,grupo){
     </div>`:'';
   // desde el arranque: quién pagó esta compra (la bolsa, o alguien de su bolsillo)
   let pago='';
-  if(grupo==='com'&&!apagada&&plataActiva(D.date)){const q=PL.pagoDe(D.date,r);
+  if(grupo==='com'&&!apagada&&r.fijo)pago=`<span class="cx-pago fijo${r.fijo==='bolsa'?'':' bolsillo'}">${ic(r.fijo==='bolsa'?'bolsa':r.fijo==='caja'?'caja':r.fijo==='credito'?'reloj':'persona',16)}<span>${r.fijo==='credito'?'Se debe: todavía no se ha pagado':r.fijo==='caja'?'Pagó la caja':r.fijo==='bolsa'?'Pagó la bolsa':`Pagó ${N(r.fijo)} · la bolsa se lo devuelve`}</span></span>`;
+  else if(grupo==='com'&&!apagada&&plataActiva(D.date)){const q=PL.pagoDe(D.date,r);
     pago=`<button type="button" class="cx-pago${q==='bolsa'?'':' bolsillo'}" data-cx="pago" data-id="${esc(r.id)}">${ic(q==='bolsa'?'bolsa':'persona',16)}<span>${q==='bolsa'?'Pagó la bolsa':`Pagó ${N(q)} · la bolsa se lo devuelve`}</span>${ic('editar',14)}</button>`;}
   const cuerpo=`<span class="cx-ico" aria-hidden="true">${ic(c.ic,20)}</span>
       <span class="cx-renglon-t"><b>${esc(titulo)}</b><small>${esc(meta)}</small>${r.tipo==='auto'?`<small class="cx-ver">${abierta?'Ocultar el detalle':(r.items.length?`Ver ${r.items.length} producto${r.items.length===1?'':'s'}`:'Ver el detalle')}</small>`:''}</span>
@@ -679,6 +727,7 @@ function vGrupo(grupo){
   return barra()+tiraDias()+cabeza(diaLargo(D.date),esIng?'Ingresos':'Compras <small>y Grupo Inversión</small>',col(total),`Semana: <b>${col(sem)}</b>${esIng?' en ventas':''}`,esIng?'ing':'com')+`
   ${pos}
   ${porQuien?`<div class="cx-quien-pagos" aria-label="Quién pagó las compras del día">${porQuien}</div>`:''}
+  ${ranura((esIng?'ingresos':'compras')+':arriba')}
   <div class="cx-subs">${subs.map(c=>{const v=valorDe(D,c.k),n=L.filter(r=>r.campo===c.k&&!(r.tipo==='auto'&&(r.fuera||r.tapado))).length;
     if(soloPos)return `<div class="cx-sub${v?' con':''}"><span class="cx-ico" aria-hidden="true">${ic(c.ic,18)}</span><span class="cx-sub-t">${c.t}</span><b>${fmt(v)}</b><small>${v?'Del POS':'Nada hoy'}</small></div>`;
     return `<button type="button" class="cx-sub${v?' con':''}" data-cx="anotar" data-g="${grupo}" data-c="${c.k}" aria-label="Anotar ${c.t}: lleva ${fmt(v)}">
@@ -694,6 +743,7 @@ function vGrupo(grupo){
   ${deben.length?`<h2 class="cx-h2">Te deben de otros días <span>${fmt(sumar(deben,x=>x.amount))}</span></h2>
   <div class="cx-lista">${deben.map(x=>`<article class="cx-renglon"><div class="cx-renglon-b"><span class="cx-ico" aria-hidden="true">${ic('clientes',20)}</span><span class="cx-renglon-t"><b>${esc(x.concept||'Cliente')}</b><small>Fiado el ${diaCorto(x.date)} de ${mes(x.date)}${x.dueDate?' · paga el '+diaCorto(x.dueDate):''}</small></span><span class="cx-renglon-m"><b>${fmt(x.amount)}</b></span></div>
       <button type="button" class="cx-enlace cx-cobro" data-cx="fiado-cobro" data-id="${esc(x.id)}" data-f="${x.date}">Marcar que ya pagó</button></article>`).join('')}</div>`:''}
+  ${ranura((esIng?'ingresos':'compras')+':abajo')}
   ${soloPos?'':`<div class="cx-pie" data-ui-abajo><button type="button" class="cx-accion" data-cx="anotar" data-g="${grupo}"><span>${esIng?'Anotar un ingreso a mano':'Anotar una compra'}</span>${flecha('mas')}</button></div>`}`;
 }
 function fiadosPendientes(){
@@ -767,7 +817,8 @@ function vCaja(){
   <button type="button" class="cx-segundo ancho" data-cx="retiro-nuevo">${ic('mas',18)} Anotar un retiro</button>`}
   ${sobres.length?`<h2 class="cx-h2">Sobres de la semana <span>${fmt(sumar(sobres,x=>x.e.monto))}</span></h2><div class="cx-lista">
     ${sobres.map(x=>`<article class="cx-renglon"><button type="button" class="cx-renglon-b" data-cx="dia" data-d="${x.d.date}"><span class="cx-ico" aria-hidden="true">${ic('sobre',20)}</span><span class="cx-renglon-t"><b>${esc(x.d.dayName)} ${fecha(x.d.date).getDate()}</b><small>Lo tiene ${esc(N(x.e.quien))}</small></span><span class="cx-renglon-m"><b>${fmt(x.e.monto)}</b></span></button>${x.e.foto?miniFoto('sobre:'+x.d.date):''}</article>`).join('')}
-  </div><p class="cx-nota">Es lo vendido en efectivo. El lunes se junta con los SINPE y la tarjeta para el reparto.</p>`:''}`;
+  </div><p class="cx-nota">Es lo vendido en efectivo. El lunes se junta con los SINPE y la tarjeta para el reparto.</p>`:''}
+  ${socio?ranura('caja:abajo'):''}`;
 }
 const segDe=k=>(D.cajaSegments||[]).find(s=>s.key===k);
 // El primer día (o cuando el día anterior no dejó cierre): se cuenta con cuánto empieza
@@ -1107,6 +1158,7 @@ function vResultado(){
   </section>
   <section class="cx-res cx-res-fin ${gan<0?'neg':''}"><h2><i aria-hidden="true">=</i>${gan<0?'Pérdida':'Ganancia'}<b>${col(gan)}</b></h2></section>
   ${Math.round(falt)?`<p class="cx-nota mal">Faltante de caja: ${fmt(falt)}. No baja la ganancia: lo debe quien cerró ese turno (está en Caja).</p>`:''}
+  ${ranura('resultado:abajo')}
   <button type="button" class="cx-segundo ancho" data-cx="ir" data-v="ganancia">${ic('grafico',18)} Ver la semana completa</button>`;
 }
 
@@ -1129,6 +1181,9 @@ function vAdmin(){
 function cierreSemana(){
   let guardado=null;try{guardado=(JSON.parse(localStorage.getItem(CLOSURES_KEY))||[]).find(x=>x.start===W.inicio);}catch(e){}
   const txt=guardado?'Volver a guardar el cierre':'Guardar el cierre de la semana';
+  // si un módulo lleva el cierre (control-cierre.js: se cierra solo), aquí solo queda bajar la semana
+  const auto=ranura('admin:cierre');
+  if(auto)return auto+`<button type="button" class="cx-segundo ancho" data-cx="csv">${ic('descargar',18)} Bajar la semana para Excel</button>`;
   return `<h2 class="cx-h2">Cierre de la semana</h2>
   ${guardado?`<p class="cx-nota">Guardado el ${new Date(guardado.createdAt).toLocaleDateString('es-CR',{day:'numeric',month:'long'})}${guardado.notes?': «'+esc(guardado.notes)+'»':'.'}</p>`:''}
   ${PL&&PL.cfg()?`<button type="button" class="cx-segundo ancho" data-cx="guardar-cierre">${ic('ok',18)} ${txt}</button>`:`<button type="button" class="cx-accion" data-cx="guardar-cierre"><span>${txt}</span>${flecha('ok')}</button>`}
@@ -1233,6 +1288,7 @@ function vMas(){
     ${fila('closure','hoja','Hoja completa','La hoja de siempre, con toda la semana en una tabla')}
     ${fila('settings','ajustes','Ajustes y respaldo','Datos del negocio, exportar e importar una copia')}
     <button type="button" class="cx-fila" data-cx="clave"><span class="cx-ico" aria-hidden="true">${ic('candado',20)}</span><span class="cx-fila-t"><b>Clave de los socios</b><small>${data.settings.claveSocios?'Puesta: hace falta para entrar como socio':'Sin clave: cualquiera puede entrar como socio'}</small></span>${ic('siguiente',20)}</button>
+    ${ranura('mas:lista')}
     ${copia&&copia.data?`<button type="button" class="cx-fila" data-cx="restaurar"><span class="cx-ico" aria-hidden="true">${ic('deshacer',20)}</span><span class="cx-fila-t"><b>Copia de antes del reinicio</b><small>Del ${diaBonito(clDateISO(new Date(copia.at)))}. Tocá para volver a como estaba.</small></span>${ic('siguiente',20)}</button>`:''}
   </div>
   <p class="cx-nota">Todo se guarda en este aparato. Las fotos también viven aquí y no van dentro del respaldo: conviene sacar un respaldo cada semana.</p>`;
@@ -1252,7 +1308,7 @@ function volver(){
 
 /* ---------- pintar y navegar ---------- */
 const PINTORES={inicio:vInicio,caja:vCaja,bolsa:vBolsa,ingresos:()=>vGrupo('ing'),compras:()=>vGrupo('com'),fijos:vFijos,resultado:vResultado,admin:vAdmin,ganancia:vGanancia,mas:vMas};
-const permitida=v=>esSocio()||v==='inicio'||v==='caja';   // quien no es socio solo ve su caja
+const permitida=v=>esSocio()||TODOS.has(v);   // quien no es socio solo ve su caja (y lo que un módulo deje ver a todos)
 function pintar(){
   if(E.hoja)return;
   if(!permitida(E.vista))E.vista='inicio';
@@ -1324,6 +1380,7 @@ const ACC={
   hoja:d=>abrirHoja(d.p),
   pend:d=>{
     const p=todoPendiente()[Number(d.i)];if(!p)return;
+    if(p.mod)return ACC[p.a]?ACC[p.a](p):(p.ir?ir(p.ir):null);   // lo que falta según un módulo
     if(p.a==='anotar')return anotar({grupo:p.g});
     if(p.a==='ir-ingresos')return ir('ingresos');
     if(p.a==='ir-caja')return ir('caja');
@@ -1335,9 +1392,13 @@ const ACC={
     if(E.vista!=='caja')ir('caja');ACC[p.a]({k:p.k});
   },
 };
-raiz.addEventListener('click',e=>{
+raiz.addEventListener('click',async e=>{
   const b=e.target.closest('[data-cx]');if(!b||!raiz.contains(b))return;
-  const f=ACC[b.dataset.cx];if(f){e.preventDefault();f(b.dataset);}
+  const f=ACC[b.dataset.cx];if(!f)return;
+  e.preventDefault();
+  // una guarda puede frenar la acción (p. ej. cambiar algo de un día que ya se cerró pide el motivo)
+  for(const g of GUARDAS){let r;try{r=g(b.dataset.cx,b.dataset);if(r&&typeof r.then==='function')r=await r;}catch(err){console.error(err);}if(r===false)return;}
+  f(b.dataset);
 });
 
 // cada vez que la app de siempre guarda o le llega algo de ARAMO, la cara nueva se vuelve a pintar
@@ -1347,7 +1408,32 @@ renderAll=function(){pintarTodo.apply(this,arguments);pintar();};
 let ultimoHoy=hoy();
 document.addEventListener('visibilitychange',()=>{if(document.hidden)return;const h=hoy();if(h!==ultimoHoy){if(E.dia===ultimoHoy)E.dia=h;ultimoHoy=h;}pintar();});
 
-window.CX={volver,pintar,ir,estado:E,quien,dejarEnCero,cuentas:()=>{_falt=null;return cuentasCaja();}};
+/* ---------- módulos ---------- */
+// Lo que un módulo puede usar y poner. Cada módulo: (window.CX_MODULOS=window.CX_MODULOS||[]).push(u=>{ … });
+const API={
+  // texto y fechas
+  ic,hoy,fecha,col,mil,diaLargo,diaBonito,diaCorto,mes,hora,cuando,sumar,N,Suj,aQ,deb,aviso,
+  // piezas de pantalla
+  barra,tiraDias,cabeza,vacio,flecha,miniFoto,verFoto,tarjetaRenglon,ranuraDe:ranura,
+  // ventanitas
+  ventana,pedirMonto,campoMonto,atarMonto,leerMonto,chips,escogido,fotoHTML,atarFoto,boton,fallo,anotar,contar,
+  // datos
+  Fotos,quien,esSocio,plataActiva,vividos,enCurso,renglones,fiadosPendientes,cuentasCaja,estadoCaja,
+  estado:E,semana:()=>W,dia:()=>D,
+  // moverse
+  pintar,ir,recordar,
+  // poner cosas
+  vista(id,pintor,o){if(!VISTAS.includes(id))VISTAS.push(id);PINTORES[id]=pintor;if(o&&o.todos)TODOS.add(id);},
+  accion(nombre,fn){ACC[nombre]=fn;},
+  acciones(o){Object.assign(ACC,o);},
+  cuadro(def){const i=CUADROS.findIndex(c=>c.id===def.id);if(i>=0)CUADROS[i]=def;else CUADROS.push(def);},
+  ranura(nombre,fn){(RANURAS[nombre]||(RANURAS[nombre]=[])).push(fn);},
+  pendiente(fn){PEND.push(fn);},
+  guarda(fn){GUARDAS.push(fn);},
+};
+(window.CX_MODULOS||[]).forEach(m=>{try{m(API);}catch(e){console.error(e);}});
+
+window.CX={volver,pintar,ir,estado:E,quien,dejarEnCero,cuentas:()=>{_falt=null;return cuentasCaja();},api:API};
 E.vista=VISTAS.includes((location.hash||'').slice(1))?location.hash.slice(1):'inicio';
 pintar();
 })();

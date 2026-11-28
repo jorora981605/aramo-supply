@@ -22,7 +22,14 @@ function cierres(){
   const m=new Map();
   P.nube.forEach(c=>{if(c&&c.id)m.set(c.id,c);});
   (leer('aramo_cierres',[])||[]).forEach(c=>{if(c&&c.id&&!m.has(c.id))m.set(c.id,c);});
-  return[...m.values()];
+  // 2026-11-28 · un cierre que se archivó dos veces (mismo arranque, misma firma, mismo total) es UNA compra
+  const vistos=new Set();
+  return[...m.values()].filter(c=>{const k=[c.inicio,c.firma||'',Math.round(+c.total||0),(c.provs||[]).length,(c.gastos||[]).length].join('|');if(vistos.has(k))return false;vistos.add(k);return true;});
+}
+// los cierres de compras de un día en los que esa tienda compró algo (tal cual se guardaron)
+function cierresDia(dia,tienda){
+  tienda=tienda||P.tienda;
+  return cierres().filter(c=>diaDe(c.inicio)===dia&&c.tiendas&&c.tiendas[tienda]&&c.tiendas[tienda].pago);
 }
 function comprasDe(dia,tienda){
   const r={efectivo:0,tarjeta:0,sinpe:0,n:0};
@@ -34,15 +41,23 @@ function comprasDe(dia,tienda){
   return r;
 }
 // Cobros del Mostrador (pedidos de clientes ya cobrados). Los pedidos de prueba no cuentan.
+// 2026-11-28 · Un cobro cuenta aquí solo si NO pasó por el POS. Los que el POS registró (lo cobró el POS, se le mandó
+// al POS, o ya tiene número de venta) llegan dentro de las ventas del POS: contarlos aquí también era sumarlos dos veces.
+const pasoPorPOS=o=>!!(o.cobro.porPOS||o.cobro.aPOS||o.cobro.venta||o.posVenta);
+// un cobro mixto se parte en lo que de verdad entró por cada lado (antes iba todo a "tarjeta")
+function partesCobro(c){
+  const T=+c.total||0,p=c.pagos;
+  if(c.metodo==='mixto'&&p){const s=Math.min(T,Math.max(0,+p.sinpe||0)),t=Math.min(T-s,Math.max(0,+p.tarjeta||0));return{efectivo:T-s-t,sinpe:s,tarjeta:t};}
+  return{efectivo:c.metodo==='efectivo'?T:0,sinpe:c.metodo==='sinpe'?T:0,tarjeta:c.metodo!=='efectivo'&&c.metodo!=='sinpe'?T:0};
+}
+function cobrosLista(dia,tienda){
+  const N=window.AramoNube;let L=[];
+  try{if(N&&typeof N.lista==='function')L=N.lista()||[];}catch(e){}
+  return L.filter(o=>o&&o.cobro&&!o.prueba&&o.sucursal===tienda&&diaDe(o.cobro.fecha)===dia&&!pasoPorPOS(o)&&(+o.cobro.total||0));
+}
 function cobrosDe(dia,tienda){
-  const r={efectivo:0,tarjeta:0,sinpe:0,n:0},N=window.AramoNube;
-  if(!N||typeof N.lista!=='function')return r;
-  let L=[];try{L=N.lista();}catch(e){}
-  L.forEach(o=>{
-    if(!o||!o.cobro||o.cobro.porPOS||o.prueba||o.sucursal!==tienda||diaDe(o.cobro.fecha)!==dia)return;
-    const k=o.cobro.metodo==='efectivo'?'efectivo':o.cobro.metodo==='sinpe'?'sinpe':'tarjeta';
-    r[k]+=+o.cobro.total||0;r.n++;
-  });
+  const r={efectivo:0,tarjeta:0,sinpe:0,n:0};
+  cobrosLista(dia,tienda).forEach(o=>{const p=partesCobro(o.cobro);r.efectivo+=p.efectivo;r.sinpe+=p.sinpe;r.tarjeta+=p.tarjeta;r.n++;});
   return r;
 }
 // ── El POS ──
@@ -68,8 +83,18 @@ function pos(fecha,tienda){
 }
 // cada venta en efectivo con su hora: con eso la caja de cada turno sale exacta
 function cajaMovs(fecha,tienda){
-  const p=posDia(fecha,tienda);if(!p||!Array.isArray(p.tiquetes)||!p.tiquetes.length)return null;
-  return p.tiquetes.filter(t=>efDe(t)>0&&/^\d{1,2}:\d{2}/.test(t.h||'')).map(t=>({time:String(t.h).slice(0,5).padStart(5,'0'),amount:efDe(t),note:t.n||''}));
+  const p=posDia(fecha,tienda);if(!p)return null;
+  const ok=h=>/^\d{1,2}:\d{2}/.test(h||''),hh=h=>{const m=String(h).match(/^(\d{1,2}):(\d{2})/);return dos(+m[1])+':'+m[2];};
+  const L=(Array.isArray(p.tiquetes)?p.tiquetes:[]).filter(t=>efDe(t)>0&&ok(t.h)).map(t=>({time:hh(t.h),amount:efDe(t),note:t.n||''}));
+  // 2026-11-28 · lo que un cliente pagó de su fiado en efectivo: entra al cajón, pero NO es una venta nueva
+  // (la venta ya se contó el día que se le fió). Sin esto salía como "plata de más" y se sumaba otra vez.
+  fiadoPagos(fecha,tienda).forEach(x=>{if(x.metodo==='efectivo'&&ok(x.h))L.push({time:hh(x.h),amount:x.monto,note:'Pago de fiado'+(x.cliente?' · '+x.cliente:''),fiado:true});});
+  return L.length?L:null;
+}
+// los pagos de fiado que el POS recibió ese día (no son ventas: es plata de ventas de otros días)
+function fiadoPagos(fecha,tienda){
+  const p=posDia(fecha,tienda);if(!p||!Array.isArray(p.fiadoPagos))return[];
+  return p.fiadoPagos.filter(x=>x&&(+x.t||0)>0).map(x=>({h:x.h||'',cliente:x.cliente||'',monto:+x.t,metodo:String(x.m||'').toLowerCase(),cajero:x.c||'',caja:x.caja??null}));
 }
 function fiados(fecha,tienda){
   const p=posDia(fecha,tienda);if(!p||!Array.isArray(p.fiados))return[];
@@ -91,7 +116,7 @@ function posConectado(tienda){
 // separadas y cada una se puede dejar de contar. La suma de los renglones es la misma de comprasDe/cobrosDe.
 //   {id, campo, monto, titulo, origen, hora, firma, items:[{t,q,u,precio,monto}]}
 const CAMPO_COMPRA={efectivo:'comprasEfectivo',sinpe:'comprasSinpe',tarjeta:'comprasTarjeta'};
-const CAMPO_VENTA={efectivo:'cash',sinpe:'sinpe',tarjeta:'card'};
+const CAMPO_VENTA={efectivo:'cash',sinpe:'sinpe',tarjeta:'card',otros:'otros'};
 function lineas(fecha,tienda){
   tienda=tienda||P.tienda;const k='L|'+fecha+'|'+tienda;
   if(P.memo.has(k))return P.memo.get(k);
@@ -121,20 +146,16 @@ function lineas(fecha,tienda){
       if(Math.abs(dif)>=1)out.push({id:'r:'+c.id+':'+pago,campo:CAMPO_COMPRA[pago],monto:dif,titulo:'Compras del día',origen:'Cierre de compras',hora:c.inicio,firma:c.firma||'',items:[]});
     });
   });
-  const N=window.AramoNube;let L=[];
-  try{if(N&&typeof N.lista==='function')L=N.lista()||[];}catch(e){}
-  L.forEach(o=>{
-    if(!o||!o.cobro||o.cobro.porPOS||o.prueba||o.sucursal!==tienda||diaDe(o.cobro.fecha)!==fecha)return;
-    const monto=+o.cobro.total||0;if(!monto)return;
-    const pago=o.cobro.metodo==='efectivo'?'efectivo':o.cobro.metodo==='sinpe'?'sinpe':'tarjeta';
-    out.push({id:'v:'+o.id,campo:CAMPO_VENTA[pago],monto,titulo:(o.cliente&&o.cliente.nombre)||'Pedido de La Feria',origen:'Cobro del Mostrador',hora:Date.parse(o.cobro.fecha)||0,firma:'',items:[]});
+  cobrosLista(fecha,tienda).forEach(o=>{
+    const p=partesCobro(o.cobro),usados=['efectivo','sinpe','tarjeta'].filter(k=>p[k]>0);
+    usados.forEach(k=>out.push({id:'v:'+o.id+(usados.length>1?':'+k:''),campo:CAMPO_VENTA[k],monto:p[k],titulo:(o.cliente&&o.cliente.nombre)||'Pedido de La Feria',origen:'Cobro del Mostrador'+(usados.length>1?' (pago mixto)':''),hora:Date.parse(o.cobro.fecha)||0,firma:'',items:[]}));
   });
   // las ventas del POS: un renglón por forma de pago (el detalle de cada tiquete vive en el POS)
   const ps=posDia(fecha,tienda);
-  if(ps&&ps.ventas)['efectivo','sinpe','tarjeta'].forEach(mt=>{
+  if(ps&&ps.ventas)['efectivo','sinpe','tarjeta','otros'].forEach(mt=>{
     const monto=+ps.ventas[mt]||0;if(!monto)return;
-    const n=(Array.isArray(ps.tiquetes)?ps.tiquetes:[]).filter(t=>parteDe(t,mt)>0).length;
-    out.push({id:'p:'+fecha+':'+mt,campo:CAMPO_VENTA[mt],monto,titulo:'Ventas del POS',origen:'POS'+(n?' · '+n+' tiquete'+(n===1?'':'s'):''),hora:Date.parse(ps.at)||0,firma:'',items:[]});
+    const n=mt==='otros'?0:(Array.isArray(ps.tiquetes)?ps.tiquetes:[]).filter(t=>parteDe(t,mt)>0).length;
+    out.push({id:'p:'+fecha+':'+mt,campo:CAMPO_VENTA[mt],monto,titulo:mt==='otros'?'Ventas del POS con otra forma de pago':'Ventas del POS',origen:'POS'+(n?' · '+n+' tiquete'+(n===1?'':'s'):''),hora:Date.parse(ps.at)||0,firma:'',items:[]});
   });
   P.memo.set(k,out);return out;
 }
@@ -150,7 +171,7 @@ function dia(fecha,tienda){
 function resumen(tienda){
   tienda=tienda||P.tienda;const hace=Date.now()-30*864e5;
   const nc=cierres().filter(c=>+c.inicio>hace&&c.tiendas&&c.tiendas[tienda]&&(+c.tiendas[tienda].total||0)>0).length;
-  let nv=0;try{nv=(window.AramoNube?.lista()||[]).filter(o=>o.cobro&&!o.cobro.porPOS&&!o.prueba&&o.sucursal===tienda&&Date.parse(o.cobro.fecha)>hace).length;}catch(e){}
+  let nv=0;try{nv=(window.AramoNube?.lista()||[]).filter(o=>o.cobro&&!pasoPorPOS(o)&&!o.prueba&&o.sucursal===tienda&&Date.parse(o.cobro.fecha)>hace).length;}catch(e){}
   return{cierres:nc,cobros:nv,sinTabla:P.sinTabla,cargado:P.cargado};
 }
 async function cargarNube(){
@@ -189,5 +210,5 @@ function empezar(tienda){
   setInterval(cargarNube,5*60e3);
   cargarNube();pintarAviso();
 }
-window.AramoPuente={dia,lineas,resumen,empezar,cargarNube,comprasDe,cobrosDe,pos,posDia,posConectado,cajaMovs,fiados,fiadosTodos,sinPos:()=>P.sinPos,reinicio:()=>P.reinicio};
+window.AramoPuente={dia,lineas,resumen,empezar,cargarNube,comprasDe,cobrosDe,pos,posDia,posConectado,cajaMovs,fiados,fiadosTodos,fiadoPagos,cierresDia,cierres,sinPos:()=>P.sinPos,reinicio:()=>P.reinicio};
 })();
