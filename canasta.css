@@ -116,6 +116,11 @@ button:disabled{cursor:default}
 .repetir b{display:block;font-size:15px;font-weight:800}
 .repetir small{display:block;font-size:12.5px;color:var(--muted)}
 .repetir .go{flex:none;font-size:24px;color:var(--o)}
+.referir-card{display:flex;align-items:center;gap:10px;width:100%;margin-top:12px;padding:11px 12px;border:1px solid color-mix(in srgb,var(--g) 22%,var(--line));border-radius:18px;background:linear-gradient(135deg,color-mix(in srgb,var(--g-soft) 78%,var(--card)),var(--card));box-shadow:0 8px 18px color-mix(in srgb,var(--g) 9%,transparent)}
+.referir-e{display:grid;place-items:center;flex:none;width:36px;height:36px;border-radius:12px;background:var(--g-soft);font-size:20px}
+.referir-t{flex:1;min-width:0}.referir-t b{display:block;font-size:13px;font-weight:850;color:var(--ink)}.referir-t small{display:block;margin-top:2px;font-size:11px;line-height:1.3;color:var(--muted)}
+.referir-btn{flex:none;min-height:36px;padding:0 11px;border:0;border-radius:11px;background:var(--g);color:#fff;font-size:11.5px;font-weight:850;cursor:pointer}.referir-btn:active{transform:scale(.95)}
+@media(max-width:390px){.referir-card{align-items:flex-start}.referir-btn{padding:0 9px}.referir-t small{font-size:10.5px}}
 
 /* ── Buscador y categorías (se quedan arriba al bajar) ── */
 .buscar{position:sticky;top:0;z-index:30;margin:16px -16px 0;padding:10px 16px 10px;transition:background .25s,box-shadow .25s}
@@ -142,6 +147,9 @@ button:disabled{cursor:default}
 /* categorías: todas a la vista, como íconos */
 .cats{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px 6px;margin-top:6px}
 @media (min-width:560px){.cats{grid-template-columns:repeat(6,minmax(0,1fr))}}
+.cat-switch{display:flex;gap:7px;overflow:auto;padding:10px 0 5px;scrollbar-width:none}.cat-switch::-webkit-scrollbar{display:none}
+.cat-switch-btn{flex:0 0 auto;display:grid;grid-template-columns:24px auto;align-items:center;gap:5px;min-width:82px;padding:7px 9px;border:1px solid var(--line);border-radius:13px;background:var(--card);color:var(--muted);font-size:17px;box-shadow:var(--sh-1);transition:transform .2s var(--resorte),background .2s,color .2s}
+.cat-switch-btn small{font-size:10px;font-weight:800;white-space:nowrap}.cat-switch-btn.on{background:var(--ink);border-color:var(--ink);color:var(--card)}.cat-switch-btn:active{transform:scale(.93)}
 .c-top{--pc:#f0b429}.c-fav{--pc:#2fb36b}.c-recetas{--pc:#d64a3b}
 .tab{display:flex;flex-direction:column;align-items:center;gap:6px;min-width:0;transition:transform .25s var(--resorte)}
 .tab:active{transform:scale(.92)}

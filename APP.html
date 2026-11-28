@@ -11,6 +11,8 @@
 <meta name="description" content="Sistema de pedidos ARAMO Supply">
 <link rel="manifest" href="./manifest.json">
 <script src="aramo-reinicio.js?v=20261126-reinicio-apps" data-apps="inventario,mostrador"></script>
+<link rel="preconnect" href="https://gtzkrdefkcbrjzwoehth.supabase.co" crossorigin>
+<link rel="preconnect" href="https://cdn.jsdelivr.net" crossorigin>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.117.0"></script>
 <script src="catalogo-productos.js"></script>
 <script src="catalogo-aramo.js?v=20261126-productos3"></script>
@@ -1017,7 +1019,7 @@ html[data-theme="dark"] .today-money-card{background:linear-gradient(145deg,#125
         </div>
       </div>
 
-      <div class="app-version">ARAMO · versión <b>2026-11-27 · v91</b> · se actualiza sola</div>
+      <div class="app-version">ARAMO · versión <b>2026-11-28 · v94 · Eficiencia y crecimiento</b> · se actualiza sola</div>
     </div>
   </div>
 </div>
@@ -1979,15 +1981,28 @@ function mergeConfigPayload(remote={},local=localConfigPayload()){
 async function pushConfigToSupabase(){
   try{
     const local=localConfigPayload();
-    const current=await supa.from('app_config').select('custom_providers,provider_order,phones,wa_contacts,pdf_wa,budget,margen,favs').eq('id','main').maybeSingle();
+    // Leemos las columnas que realmente existen en la tabla. Algunas instalaciones
+    // antiguas todavía no tienen `wa_contacts`; pedirla directamente provocaba un 400
+    // en cada carga y hacía que el Inicio pareciera lento aunque todo lo demás funcionara.
+    const current=await supa.from('app_config').select('*').eq('id','main').maybeSingle();
     if(current.error){console.warn('Error leyendo config antes de sincronizar:',current.error.message);return;}
     const payload=mergeConfigPayload(current.data||{},local);
-    const result=await supa.from('app_config').upsert({...payload,updated_at:new Date().toISOString()},{onConflict:'id'});
+    const row={...payload,updated_at:new Date().toISOString()};
+    // Si la fila ya existe, no enviamos campos que esa versión de la tabla aún no conoce.
+    // Los datos siguen en el dispositivo y se sincronizan solos después de aplicar la migración.
+    if(current.data&&typeof current.data==='object'){
+      Object.keys(row).forEach(k=>{if(k!=='id'&&k!=='updated_at'&&!Object.prototype.hasOwnProperty.call(current.data,k))delete row[k];});
+    }
+    // En una instalación nueva/antigua sin fila todavía no podemos descubrir el
+    // esquema; `wa_contacts` es la única columna opcional conocida, así que no la
+    // mandamos hasta que la migración la cree y evitamos otro 400.
+    if(!current.data)delete row.wa_contacts;
+    const result=await supa.from('app_config').upsert(row,{onConflict:'id'});
     if(result.error){console.warn('Error sincronizando config:',result.error.message);return;}
     S.customProviders=payload.custom_providers;
     S.providerOrder=payload.provider_order;
     S.phones=payload.phones;
-    S.waContacts=payload.wa_contacts;
+    if(Object.prototype.hasOwnProperty.call(row,'wa_contacts'))S.waContacts=payload.wa_contacts;
     S.pdfWa=payload.pdf_wa;
     invalidateProvidersCache();
     _lastConfigFingerprint=configFingerprint();
@@ -4300,15 +4315,15 @@ if(isIOS && !isInStandalone && !dismissed){
 }
 </script>
 <!-- Íconos y ventanitas del sistema de diseño: antes de express.js, que ya los usa -->
-<script src="iconos.js?v=20261122-fase1"></script>
-<script src="aramo-ui.js?v=20261123-fase2"></script>
-<script src="express.js?v=20261127-cierre2"></script>
-<script src="leido.js?v=1"></script>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/qrcode-generator/1.4.4/qrcode.min.js"></script>
-<script src="canasta-config.js?v=20261018-seguridad-1"></script>
-<script src="aramo-nube.js?v=20261126-mostrador-pos"></script>
-<script src="portadas.js?v=20261124-control"></script>
-<script src="puerta.js?v=20261126-mostrador-pos"></script>
+<script defer src="iconos.js?v=20261122-fase1"></script>
+<script defer src="aramo-ui.js?v=20261123-fase2"></script>
+<script defer src="express.js?v=20261127-cierre2"></script>
+<script defer src="leido.js?v=1"></script>
+<script defer src="https://cdnjs.cloudflare.com/ajax/libs/qrcode-generator/1.4.4/qrcode.min.js"></script>
+<script defer src="canasta-config.js?v=20261018-seguridad-1"></script>
+<script defer src="aramo-nube.js?v=20261126-mostrador-pos"></script>
+<script defer src="portadas.js?v=20261124-control"></script>
+<script defer src="puerta.js?v=20261126-mostrador-pos"></script>
 <script>
   // El menú, Mostrador y Surtido se desplazan verticalmente; no usar gestos
   // horizontales como Atrás/Adelante del navegador en el teléfono.
