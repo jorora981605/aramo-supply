@@ -399,7 +399,11 @@ body.scope-picker-open{overflow:hidden}
 body[data-order-scope="moravia"] .scope-branch-angeles,
 body[data-order-scope="lasr"] .scope-branch-moravia,
 body[data-order-scope="moravia"] .scope-both-only,
-body[data-order-scope="lasr"] .scope-both-only{display:none!important}
+body[data-order-scope="lasr"] .scope-both-only,
+body[data-order-scope="moravia"] .nav-cierre,
+body[data-order-scope="lasr"] .nav-cierre,
+body:not([data-order-scope]) .nav-cierre,
+body[data-order-scope="both"] .nav-prov{display:none!important}
 body[data-order-scope="moravia"] .qty-row,
 body[data-order-scope="lasr"] .qty-row{grid-template-columns:1fr!important}
 body[data-order-scope="moravia"] .qty-row .prod-divider,
@@ -705,7 +709,7 @@ html[data-theme="dark"] .today-money-card{background:linear-gradient(145deg,#125
 <link rel="stylesheet" href="puerta.css?v=20261126-mostrador-pos">
 <link rel="stylesheet" href="portadas.css?v=20261126-sin-control-moravia">
 <link rel="stylesheet" href="pedido.css?v=20261126-productos3">
-<link rel="stylesheet" href="surtido.css?v=20261126-productos3">
+<link rel="stylesheet" href="surtido.css?v=20261127-cierre2">
 <link rel="stylesheet" href="leido.css?v=1">
 </head>
 <body>
@@ -901,11 +905,19 @@ html[data-theme="dark"] .today-money-card{background:linear-gradient(145deg,#125
 <!-- ═══ PEDIDO DEL DÍA: revisar, enviar, reiniciar e historial ═══ -->
 <div class="view" id="view-pedido">
   <div class="scroll">
+    <div id="pedidoUndo"></div>
     <div class="pd-wrap" id="pedidoBody"></div>
     <details class="cfg-acc pd-contactos scope-both-only">
       <summary class="cfg-acc-hdr">📋 Lista a contactos <span class="cfg-acc-count" id="accCountPdfWa"></span></summary>
       <div class="cfg-acc-body"><div class="cfg-acc-sub">Solo disponible en Ambos · reciben la lista completa del día</div><div id="cfgPdfWa"></div></div>
     </details>
+  </div>
+</div>
+
+<!-- ═══ CIERRE DE COMPRAS (solo en Ambos): seguir el cierre de hoy y los cierres guardados ═══ -->
+<div class="view" id="view-cierre">
+  <div class="scroll">
+    <div class="pd-wrap" id="cierreBody"></div>
   </div>
 </div>
 
@@ -996,8 +1008,9 @@ html[data-theme="dark"] .today-money-card{background:linear-gradient(145deg,#125
 
 
 <nav class="nav-bottom">
-  <button class="nav-btn active" data-view="proveedores"><span class="ico">🏪</span>Proveedores</button>
+  <button class="nav-btn nav-prov active" data-view="proveedores"><span class="ico">🏪</span>Proveedores</button>
   <button class="nav-btn" data-view="pedido"><span class="ico">🧺</span>Pedido<span class="nav-badge" id="navPedidoBadge" hidden></span></button>
+  <button class="nav-btn nav-btn--largo nav-cierre" data-view="cierre"><span class="ico">🧾</span>Cierre de compras</button>
   <button class="nav-btn nav-btn--largo" data-view="productos"><span class="ico">💰</span>Productos y precios</button>
   <button class="nav-btn" data-view="config"><span class="ico">⚙️</span>Config</button>
 </nav>
@@ -4220,7 +4233,7 @@ if(isIOS && !isInStandalone && !dismissed){
 <!-- Íconos y ventanitas del sistema de diseño: antes de express.js, que ya los usa -->
 <script src="iconos.js?v=20261122-fase1"></script>
 <script src="aramo-ui.js?v=20261123-fase2"></script>
-<script src="express.js?v=20261126-productos3"></script>
+<script src="express.js?v=20261127-cierre2"></script>
 <script src="leido.js?v=1"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcode-generator/1.4.4/qrcode.min.js"></script>
 <script src="canasta-config.js?v=20261018-seguridad-1"></script>

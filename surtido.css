@@ -344,8 +344,6 @@ html[data-theme="dark"] .sx-pdf-firma button.on{border-color:#22d3ee;background:
 html[data-theme="dark"] .sx-pdf-estado.firma{background:rgba(250,204,21,.14);color:#fde68a}
 
 /* ── 🧾 Cierre de compras: un proveedor a la vez y el cuadre de la plata ── */
-.sx-pdf-btn.ci-btn{margin-top:-2px;background:linear-gradient(135deg,#b45309,#92400e);box-shadow:0 8px 18px -12px rgba(146,64,14,.75)}
-.sx-vacio+.sx-pdf-btn.ci-btn{margin-top:10px}
 .ci{position:fixed;inset:0;z-index:10060;display:flex;align-items:center;justify-content:center;background:rgba(8,20,14,.5);backdrop-filter:blur(4px);-webkit-backdrop-filter:blur(4px);opacity:0;pointer-events:none;transition:opacity .2s;font-family:var(--sx-f);
   --sx-f:var(--ar-f-ui);--sx-s:var(--ar-f-display);--pm:var(--ar-moravia-tinta);--pm-t:var(--ar-moravia-suave);--sx-linea:var(--ar-borde);--sx-tile:var(--ar-sup-2);--ci-am:var(--ar-pendiente-tinta);--pa:var(--ar-angeles-tinta);--pa-t:var(--ar-angeles-suave);--ci-am-t:var(--ar-pendiente-suave);--ci-fondo:var(--ar-fondo)}
 .ci.open{opacity:1;pointer-events:auto}
@@ -482,37 +480,13 @@ html[data-theme="dark"] .ci-res.sobra{background:rgba(37,99,235,.22);color:#bfdb
 .ci-lp em{flex:none;font:800 15px var(--sx-f);font-style:normal;font-variant-numeric:tabular-nums;white-space:nowrap}
 .ci-firma{margin-top:16px}
 .ci-fin .sx-pdf-wa{margin-top:14px}
-.ci-hist{margin-top:14px;padding:2px 14px;border-radius:17px;background:var(--card,#fff);box-shadow:inset 0 0 0 1px var(--sx-linea)}
-.ci-hist summary{padding:12px 0;font:800 14px var(--sx-f);cursor:pointer}
-.ci-hist summary b{margin-left:4px;padding:1px 8px;border-radius:999px;background:var(--sx-tile)}
-.ci-h{display:flex;align-items:center;gap:10px;padding:9px 0;border-top:1px dashed var(--sx-linea)}
-.ci-h>span{flex:1;min-width:0}
-.ci-h b{display:block;font:800 13.5px var(--sx-f)}
-.ci-h small{display:block;margin-top:1px;font:600 12px var(--sx-f);color:var(--m)}
-.ci-h button{flex:none;display:grid;place-items:center;width:42px;height:42px;border:0;border-radius:13px;background:#25d366;color:#05371b;cursor:pointer}
-.ci-h .pdx-i{width:19px;height:19px}
 /* Lo de cada tienda: verde Moravia, naranja Los Ángeles */
 .ci-prov-tiendas{display:grid;grid-template-columns:1fr 1fr;gap:6px;margin:-2px 0 12px}
 .ci-prov-tiendas>span{display:flex;align-items:center;gap:6px;min-width:0;padding:7px 10px;border-radius:13px;font:700 12.5px var(--sx-f);white-space:nowrap}
 .ci-prov-tiendas>span>span{min-width:0;overflow:hidden;text-overflow:ellipsis}
-.ci-prov-tiendas i{font-style:normal}
 .ci-prov-tiendas b{margin-left:auto;font:800 14.5px var(--sx-f);font-variant-numeric:tabular-nums}
-.ci-prov-tiendas>.moravia,.ci-tienda.moravia,.ci-td.moravia{background:var(--pm-t);color:var(--pm)}
-.ci-prov-tiendas>.angeles,.ci-tienda.angeles,.ci-td.angeles{background:var(--pa-t);color:var(--pa)}
-.ci-rep{display:flex;flex-wrap:wrap;align-items:center;gap:6px;margin-top:8px}
-.ci-tienda{display:inline-flex;align-items:center;gap:5px;min-height:34px;padding:3px 11px 3px 9px;border-radius:999px;font:700 12.5px var(--sx-f);cursor:default}
-label.ci-tienda{cursor:text}
-.ci-tienda i{font-style:normal;font-size:13px}
-.ci-tienda input{width:42px;height:28px;padding:0;border:0;border-radius:9px;background:var(--card,#fff);color:inherit;text-align:center;font:800 16px var(--sx-f);font-variant-numeric:tabular-nums;outline:none;box-shadow:inset 0 0 0 1.5px color-mix(in srgb,currentColor 35%,transparent)}
-.ci-tienda input:focus{box-shadow:inset 0 0 0 2px currentColor}
-.ci-tienda b{font:800 14px var(--sx-f);font-variant-numeric:tabular-nums}
-.ci-tienda em{font:800 13px var(--sx-f);font-style:normal;font-variant-numeric:tabular-nums}
-.ci-tn{display:none}
-@media (min-width:480px){.ci-tn{display:inline}}
-.ci-ped:empty{display:none}
-.ci-para{min-height:34px;padding:0 12px;border:1.5px solid var(--sx-linea);border-radius:999px;background:var(--card,#fff);color:var(--m);font:700 12.5px var(--sx-f);cursor:pointer}
-.ci-para b{color:var(--t)}
-.ci-para-m{font:700 12.5px var(--sx-f);font-style:normal;color:var(--m);font-variant-numeric:tabular-nums}
+.ci-prov-tiendas>.moravia,.ci-td.moravia{background:var(--pm-t);color:var(--pm)}
+.ci-prov-tiendas>.angeles,.ci-td.angeles{background:var(--pa-t);color:var(--pa)}
 .ci-tiendas-w{margin-top:14px}
 .ci-tiendas{display:grid;grid-template-columns:1fr 1fr;gap:8px}
 .ci-td{min-width:0;padding:12px 12px 11px;border-radius:19px;box-shadow:inset 0 0 0 1.5px color-mix(in srgb,currentColor 22%,transparent)}
@@ -596,12 +570,6 @@ label.ci-tienda{cursor:text}
 .au-sem-top{margin:10px 2px 0;font:500 14.5px/1.5 var(--ar-f-ui);color:var(--ar-tinta-2)}
 .au-sem-top b{color:var(--ar-tinta)}
 
-/* ── Cierre de compras a la vista (Ambos): botón grande, arriba en Proveedores y bajo la tarjeta en Pedido ── */
-.sx-pdf-btn.ci-btn{min-height:60px;margin:2px 0 14px;padding:9px 14px 9px 10px;border-radius:17px}
-.sx-pdf-btn.ci-btn b{font-size:16.5px}
-#ciTop:empty{display:none}
-#ciTop{margin-top:4px}
-
 /* ── Pestaña Productos: buscar, agregar y la lista con precios ── */
 .pr-add,#modalNewCatalogProduct .btn-g,#modalPriceCompare .btn-g{background:var(--ar-primario);color:var(--ar-sobre-primario)}
 .pr-add:hover,#modalNewCatalogProduct .btn-g:hover,#modalPriceCompare .btn-g:hover{background:var(--ar-primario-hover)}
@@ -628,3 +596,126 @@ html[data-theme="dark"] .pm-extra .pm-del{color:#fca5a5;border-color:rgba(252,16
 .pm-cat-hint{margin:0 0 10px;font-size:12.5px;font-weight:600;color:var(--m)}
 .pm-cat-hint.falta{color:#b45309;font-weight:800}
 html[data-theme="dark"] .pm-cat-hint.falta{color:#fcd34d}
+
+/* ── Cierre v2 (2026-11-27): por tienda, formulario con dos botones, guardado y pestaña propia ── */
+/* Un producto: el precio una sola vez arriba y una línea por tienda con su cantidad y su monto */
+.ci-it-n .ci-p{flex:none;width:136px}
+.ci-p small{flex:none;font:700 11.5px var(--sx-f);color:var(--m);white-space:nowrap}
+.ci-fs{display:grid;gap:6px;margin-top:6px}
+.ci-f{display:grid;grid-template-columns:minmax(64px,1fr) auto auto minmax(52px,auto);align-items:center;gap:6px;padding:6px 10px 6px 12px;border-radius:15px;box-shadow:inset 4px 0 0 currentColor}
+.ci-f.moravia{background:var(--pm-t);color:var(--pm)}
+.ci-f.angeles{background:var(--pa-t);color:var(--pa)}
+.ci-fn{min-width:0;line-height:1.15}
+.ci-fn b{display:block;font:800 13.5px var(--sx-f);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.ci-fn small{display:block;margin-top:1px;font:600 11px var(--sx-f);color:var(--m)}
+.ci-fn small:empty{display:none}
+.ci-f .ci-q{background:var(--card,#fff)}
+.ci-f .ci-q button{width:32px;height:40px;color:inherit}
+.ci-f .ci-q input{width:38px;height:40px}
+.ci-f .ci-u{min-width:0}
+.ci-f em{min-width:0;text-align:right;font:800 15px var(--sx-f);font-style:normal;font-variant-numeric:tabular-nums;white-space:nowrap;color:var(--t)}
+.ci-it.cero .ci-f em{color:var(--m);font-size:12.5px}
+.ci-it.falta .ci-f em{color:#b45309}
+.ci-ped{margin-top:6px}
+.ci-prov-tiendas>span>i{flex:none;width:9px;height:9px;border-radius:50%;background:currentColor}
+/* Algo que no estaba en el pedido */
+.ci-masp{display:flex;align-items:center;gap:8px;margin-top:8px}
+.ci-masp>span{flex:none;font:700 12.5px var(--sx-f);color:var(--m)}
+.ci-masp .ci-dest{flex:1;min-width:0}
+.ci-masp em{flex:none;font:800 15px var(--sx-f);font-style:normal;font-variant-numeric:tabular-nums;white-space:nowrap}
+.ci-it.mas.falta .ci-masp em{font-size:12.5px;color:#b45309}
+.ci-dest{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.ci-dest button{min-height:48px;padding:0 8px;border:2px solid transparent;border-radius:15px;font:800 15px var(--sx-f);cursor:pointer;transition:transform .1s,background .15s,color .15s}
+.ci-dest button:active{transform:scale(.96)}
+.ci-dest .moravia{background:var(--pm-t);color:var(--pm);border-color:color-mix(in srgb,var(--pm) 32%,transparent)}
+.ci-dest .angeles{background:var(--pa-t);color:var(--pa);border-color:color-mix(in srgb,var(--pa) 32%,transparent)}
+.ci-dest .moravia.on{background:var(--pm);color:#fff;border-color:var(--pm)}
+.ci-dest .angeles.on{background:var(--pa);color:#fff;border-color:var(--pa)}
+.ci-masp .ci-dest button{min-height:44px;font-size:14px}
+.ci-nuevo{margin-top:12px;padding:14px;border-radius:20px;background:var(--card,#fff);box-shadow:inset 0 0 0 2px var(--ci-am),0 10px 24px -16px rgba(16,40,28,.45)}
+.ci-nuevo-h{display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:10px}
+.ci-nuevo h5{margin:0;font:800 15px var(--sx-f)}
+.ci-nt{width:100%;height:50px;padding:0 13px;border:0;border-radius:14px;background:var(--sx-tile);box-shadow:inset 0 0 0 1px var(--sx-linea);color:var(--t);font:700 17px var(--sx-f);outline:none}
+.ci-nt:focus{background:var(--card,#fff);box-shadow:inset 0 0 0 2px var(--ci-am)}
+.ci-nuevo .ci-it-c{flex-wrap:wrap;margin-top:10px}
+.ci-nuevo .ci-p{flex:1}
+.ci-un{display:inline-flex;gap:4px;flex:1;min-width:0}
+.ci-un button{flex:1;min-height:44px;padding:0 6px;border:1.5px solid var(--sx-linea);border-radius:13px;background:var(--card,#fff);color:var(--t);font:700 13.5px var(--sx-f);cursor:pointer}
+.ci-un button.on{border-color:var(--ar-primario);background:var(--ar-primario);color:#fff}
+.ci-dest-t{margin:14px 0 8px;font:800 14px var(--sx-f)}
+.ci-dest-t small{margin-left:4px;font:600 12px var(--sx-f);color:var(--m)}
+.ci-nuevo .ci-dest button{min-height:56px;font-size:16px}
+/* El cierre: cada proveedor con las dos tiendas y el cuadre del efectivo */
+.ci-lp-s{display:flex;flex-wrap:wrap;gap:0 10px;margin-top:3px}
+.ci-lp-s i{font:700 11.5px var(--sx-f);font-style:normal}
+.ci-lp-s .moravia{color:var(--pm)}.ci-lp-s .angeles{color:var(--pa)}
+.ci-caja h4{margin-bottom:8px}
+.ci-linea.total{margin:4px -8px;padding:3px 8px;border-bottom:0;border-radius:13px;background:var(--sx-tile)}
+.ci-linea.total b{font-size:20px}
+/* Después de «Terminar y guardar» */
+.ci-hecho{padding:14px 0 6px;text-align:center}
+.ci-hecho-ok{display:grid;place-items:center;width:76px;height:76px;margin:6px auto 12px;border-radius:50%;background:var(--ar-moravia-suave);color:var(--ar-moravia-tinta);box-shadow:inset 0 0 0 2px var(--ar-moravia-borde)}
+.ci-hecho-ok .pdx-i{width:38px;height:38px;stroke-width:2.6}
+.ci-hecho h4{margin:0;font:600 30px/1.1 var(--sx-s)}
+.ci-hecho>p{margin:6px 0 0;font:700 14px var(--sx-f);color:var(--m)}
+.ci-hecho .ci-tiendas{margin-top:18px;text-align:left}
+.ci-hecho .sx-pdf-wa{margin-top:18px}
+.ci-pdf-ver{display:flex;align-items:center;justify-content:center;gap:9px;width:100%;min-height:58px;margin-top:10px;border:2px solid var(--ar-primario);border-radius:18px;background:var(--card,#fff);color:var(--ar-primario);font:800 16px var(--sx-f);cursor:pointer}
+.ci-pdf-ver:active{transform:scale(.98)}
+.ci-pdf-ver .pdx-i{width:20px;height:20px}
+html[data-theme="dark"] .ci-pdf-ver{color:#bbf7d0;border-color:#4caa68}
+.ci-sig.listo{justify-content:center}
+.ci-hecho .ci-hecho-ayuda{margin:16px 8px 0;font:600 13px/1.5 var(--sx-f);color:var(--m)}
+/* ── Pestaña «Cierre de compras» (solo en Ambos) ── */
+#cierreBody{width:min(760px,100%)}
+.cit{--pdx-f:var(--ar-f-ui);--pdx-s:var(--ar-f-display);--pm:var(--ar-moravia-tinta);--pa:var(--ar-angeles-tinta);--pm-t:var(--ar-moravia-suave);--pa-t:var(--ar-angeles-suave);display:grid;gap:26px;font-family:var(--ar-f-ui)}
+.cit-hoy{position:relative;overflow:hidden;isolation:isolate;margin-top:4px;padding:22px 20px 20px;border-radius:28px;color:#eef7f1;
+  background:radial-gradient(65% 55% at 100% 0%,rgba(250,204,21,.16),transparent 62%),radial-gradient(75% 70% at 0% 100%,rgba(34,197,94,.20),transparent 60%),linear-gradient(160deg,#0d3d28 0%,#0f4b31 48%,#0a2e1f 100%);
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.08),0 26px 50px -20px rgba(6,40,25,.6)}
+.cit-kick{display:flex;align-items:center;gap:7px;margin:0;font:800 11.5px var(--ar-f-ui);letter-spacing:.14em;text-transform:uppercase;color:#a6e3bd}
+.cit-fecha{margin:6px 0 0;font:600 28px/1.1 var(--ar-f-display);color:#fff}
+.cit-chips{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px;margin-top:18px}
+.cit-chips.dos{grid-template-columns:repeat(2,minmax(0,1fr))}
+.cit-chips>div{min-width:0;padding:11px 12px;border-radius:17px;background:rgba(255,255,255,.09);box-shadow:inset 0 0 0 1px rgba(255,255,255,.13)}
+.cit-chips b{display:block;font:800 21px/1.1 var(--ar-f-ui);font-variant-numeric:tabular-nums;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.cit-chips span{display:block;margin-top:3px;font:600 12.5px var(--ar-f-ui);color:#b6d6c3}
+.cit-cta{display:flex;align-items:center;gap:12px;width:100%;margin-top:16px;padding:11px 11px 11px 12px;border:0;border-radius:19px;background:#f6fbf8;color:#0b3d27;text-align:left;cursor:pointer;box-shadow:0 12px 26px -10px rgba(0,0,0,.45);transition:transform .15s}
+.cit-cta:active{transform:scale(.985)}
+.cit-cta:disabled{opacity:.6;cursor:default;box-shadow:none}
+.cit-cta-i{display:grid;place-items:center;flex:none;width:46px;height:46px;border-radius:14px;background:var(--ar-primario);color:#fff}
+.cit-cta-i .pdx-i{width:22px;height:22px}
+.cit-cta-t{flex:1;min-width:0}
+.cit-cta-t b{display:block;font:800 17px var(--ar-f-ui)}
+.cit-cta-t small{display:block;margin-top:2px;font:600 13px var(--ar-f-ui);color:#557363}
+.cit-cta-f{display:grid;place-items:center;flex:none;width:38px;height:38px;border-radius:50%;background:#e2f1e8;color:#0b3d27}
+.cit-lista h3{display:flex;align-items:center;gap:9px;margin:0 0 14px;font:600 26px/1.1 var(--ar-f-display);color:var(--ar-tinta)}
+.cit-lista h3 b{padding:2px 11px;border-radius:999px;background:var(--ar-hundido);font:800 14px var(--ar-f-ui);color:var(--ar-tinta-2)}
+.cit-nada{margin:0;padding:22px 18px;border-radius:22px;border:1.5px dashed var(--ar-borde-2);font:600 15px/1.45 var(--ar-f-ui);color:var(--ar-tinta-2);text-align:center}
+.cit-g{margin-bottom:12px;padding:16px;border-radius:24px;background:var(--ar-sup);box-shadow:inset 0 0 0 1px var(--ar-borde),0 8px 22px -16px rgba(16,40,28,.4)}
+.cit-g-t{display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:6px 10px}
+.cit-g-t b{font:800 16.5px var(--ar-f-ui);color:var(--ar-tinta)}
+.cit-g-t b span{font-weight:700;color:var(--ar-tinta-3)}
+.cit-g-t em{padding:3px 11px;border-radius:999px;background:var(--ar-hundido);font:800 12.5px var(--ar-f-ui);font-style:normal;color:var(--ar-tinta-2)}
+.cit-g-t em.ok{background:var(--ar-moravia-suave);color:var(--ar-moravia-tinta)}
+.cit-g-t em.falta{background:var(--ar-peligro-suave);color:var(--ar-peligro-tinta)}
+.cit-g-t em.sobra{background:var(--ar-pendiente-suave);color:var(--ar-pendiente-tinta)}
+.cit-g-n{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px;margin-top:13px}
+.cit-g-n>div{min-width:0;padding:10px 11px;border-radius:16px;background:var(--ar-sup-2)}
+.cit-g-n .moravia{background:var(--pm-t);color:var(--pm)}
+.cit-g-n .angeles{background:var(--pa-t);color:var(--pa)}
+.cit-g-n small{display:block;font:700 12px var(--ar-f-ui)}
+.cit-g-n .tot small{color:var(--ar-tinta-2)}
+.cit-g-n b{display:block;margin-top:2px;font:800 17px/1.15 var(--ar-f-ui);font-variant-numeric:tabular-nums;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.cit-g-n .tot b{color:var(--ar-tinta)}
+.cit-g-b{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:13px}
+.cit-g-b button{display:flex;align-items:center;justify-content:center;gap:8px;min-height:52px;border:0;border-radius:16px;font:800 15px var(--ar-f-ui);cursor:pointer;transition:transform .1s}
+.cit-g-b button:active{transform:scale(.97)}
+.cit-g-b .pdf{background:var(--ar-primario);color:#fff}
+.cit-g-b .wa{background:var(--ar-wa);color:var(--ar-wa-tinta)}
+.cit-g-b .pdx-i{width:19px;height:19px}
+@media (max-width:400px){.cit-fecha{font-size:25px}.cit-chips b{font-size:18px}.cit-g-n b{font-size:15px}.cit-hoy{padding:20px 16px 16px;border-radius:24px}}
+html[data-theme="dark"] .ci-dest .moravia.on,html[data-theme="dark"] .ci-dest .angeles.on{color:#0b140e}
+html[data-theme="dark"] .ci-un button.on{color:#fff}
+#pedidoUndo:empty{display:none}
+#pedidoUndo{width:min(760px,100%);margin:0 auto;padding:14px 14px 0}
+#pedidoUndo .pd-undo{margin-bottom:0}

@@ -1287,30 +1287,32 @@ document.addEventListener('keydown',e=>{
 // ══════════════════════════════════════════
 // 🧾 CIERRE DE COMPRAS — lo que llegó, a cuánto y cómo se pagó
 // ══════════════════════════════════════════
-// Al volver de comprar se recorre un proveedor a la vez, en orden alfabético. Cada producto trae
-// lo que se pidió (las dos tiendas juntas) y su precio anterior: si llegó menos se baja con −, se
-// escribe el precio de hoy y el monto se multiplica solo. Al final, el cierre: cuánto se pagó en
-// efectivo, tarjeta y SINPE, los gastos del viaje y si la plata que volvió cuadra con la que se
-// llevó. Se guarda en este teléfono (aramo_cierre) y se manda al WhatsApp propio. El precio de
-// hoy queda como precio del producto (si es la misma unidad) para el pedido y el próximo cierre.
+// Vive en la pestaña «Cierre de compras» de Ambos: ahí se empieza o se sigue el cierre de hoy y se ven
+// los cierres guardados. Al volver de comprar se recorre un proveedor a la vez, en orden alfabético.
+// Cada producto muestra, POR TIENDA (Moravia y Los Ángeles), cuánto llegó y cuánto es; el precio es uno
+// solo por producto. Si llegó menos se baja con −. Al final, el cierre: cuánto se pagó en efectivo,
+// tarjeta y SINPE, los gastos del viaje y si la plata que volvió cuadra con la que se llevó. Al terminar
+// se guarda (aramo_cierres, y copia en la nube) y se manda como PDF al WhatsApp propio.
+// El precio que se escribe queda como COSTO del producto con ese proveedor (tabla precios): de ahí el
+// POS saca el precio de venta de cada tienda (costo + 40 %).
 const CI_PAGOS=[['efectivo','💵','Efectivo'],['tarjeta','💳','Tarjeta'],['sinpe','📱','SINPE']];
 const CI_PAGO_NOMBRE=Object.fromEntries(CI_PAGOS.map(([k,e,n])=>[k,e+' '+n]));
 const CI_GASTOS=['Carretillero','Gasolina','Parqueo','Comida'];
 const CI_TIENDAS=['moravia','angeles'];
-const CI_PARA={mitad:'½ y ½',moravia:SIDE_ICO.moravia+' '+SIDE_NAME.moravia,angeles:SIDE_ICO.angeles+' '+SIDE_NAME.angeles};
+const CI_PARA={mitad:'½ y ½',moravia:SIDE_ICO.moravia+' '+SIDE_NAME.moravia,angeles:SIDE_ICO.angeles+' '+SIDE_NAME.angeles};   // «mitad» solo existe en cierres viejos
 const CI_VENCE=18*3600e3; // un cierre que nadie toca en 18 horas ya es de otra compra
 // El cierre se escribe muchas veces mientras se teclea. Mantener el estado en
 // memoria y agrupar el guardado evita bloquear el hilo principal con
 // JSON.stringify + localStorage en cada tecla.
-const CI={st:null,pintado:null,seguro:0,saveTimer:0,patchFrame:0,calc:null,calcSt:null,precios:null};
+const CI={st:null,pintado:null,seguro:0,saveTimer:0,patchFrame:0,calc:null,calcSt:null,precios:null,bor:null,hecho:null,pdf:new Map()};
 const ciPlata=v=>+String(v??'').replace(/\D/g,'')||0; // colones, solo dígitos: "4.500" = 4500
 const ciCant=v=>{const n=parseFloat(String(v??'').replace(',','.'));return n>0?Math.round(n*100)/100:0;};
 const ciNum=n=>String(+(+n||0).toFixed(2));
 const ciId=()=>Date.now().toString(36)+Math.random().toString(36).slice(2,6);
 const ciVacio=v=>String(v??'').trim()==='';
 function ciNuevo(){return{inicio:Date.now(),toque:0,firma:hojaFirma(),paso:null,llevo:null,regreso:null,provs:{},gastos:[]};}
-// Un producto "tocado" tiene algo escrito a mano: cantidad, precio o reparto entre tiendas.
-const ciTocado=it=>it.q!=null||it.precio!=null||it.qm!=null;
+// Un producto "tocado" tiene algo escrito a mano: cantidad (de una tienda) o precio.
+const ciTocado=it=>it.q!=null||it.precio!=null||it.qm!=null||it.qa!=null;
 function ciTieneDatos(st){
   return st.llevo!=null||st.regreso!=null||st.gastos.length>0||Object.values(st.provs).some(cp=>cp.mas?.length||Object.values(cp.items).some(ciTocado));
 }
@@ -1348,7 +1350,7 @@ function ciPrecios(){
 }
 const ciPagoDe=prov=>{const k=LS.get('aramo_cierre_pagos',{})[prov];return CI_PAGO_NOMBRE[k]?k:'efectivo';};
 function ciRecordarPago(prov,k){const m=LS.get('aramo_cierre_pagos',{});m[prov]=k;LS.set('aramo_cierre_pagos',m);}
-// Lo que se le pidió a un proveedor, con Moravia (#1) y Los Ángeles (#2) juntas por producto y unidad.
+// Lo que se le pidió a un proveedor, con Moravia (#1) y Los Ángeles (#2) por producto y unidad.
 function ciLineas(prov){
   const p=S.pedidos[prov];if(!p)return[];
   const m=new Map();
@@ -1361,36 +1363,12 @@ function ciLineas(prov){
   ['moravia','angeles'].forEach(s=>(p.extras?.[s]||[]).forEach(x=>{
     const q=+x.qty||0;if(!(q>0))return;
     const u=uniCorta(x.unit||'kg');
-    sumar('x:'+hojaClave(x.name||'extra')+'|'+u,{t:x.name||'Extra',e:'➕',u,lista:+x.price||0},s,q);
+    sumar('x:'+hojaClave(x.name||'extra')+'|'+u,{t:x.name||'Extra',e:'➕',u,uni:x.unit||'kg',lista:+x.price||0},s,q);
   }));
   return[...m.values()];
 }
-// Trae al cierre lo que hay pedido ahora. Lo que ya se llenó se respeta aunque el pedido cambie.
-function ciSincronizar(st){
-  const vistos=new Set();
-  getProvNames().forEach(prov=>{
-    const lineas=ciLineas(prov);if(!lineas.length)return;
-    vistos.add(prov);
-    const cp=st.provs[prov]||(st.provs[prov]={pago:ciPagoDe(prov),items:{},mas:[]}),nuevos={};
-    lineas.forEach(l=>{const v=cp.items[l.k]||{};nuevos[l.k]={...l,q:v.q??null,precio:v.precio??null,qm:v.qm??null,ref:v.ref??null};});
-    Object.entries(cp.items).forEach(([k,it])=>{if(!nuevos[k]&&ciTocado(it))nuevos[k]={...it,fuera:true};});
-    cp.items=nuevos;
-  });
-  Object.keys(st.provs).forEach(prov=>{
-    if(vistos.has(prov))return;
-    const cp=st.provs[prov];
-    Object.entries(cp.items).forEach(([k,it])=>{if(!ciTocado(it))delete cp.items[k];else it.fuera=true;});
-    if(!Object.keys(cp.items).length&&!cp.mas?.length)delete st.provs[prov];
-  });
-}
-// Precio que se propone mientras no se escriba el de hoy: el del producto (misma unidad) o el
-// último que se pagó en un cierre.
-function ciPrecioAntes(prov,it){
-  const ult=+ciPrecios()[prov+'|'+it.k]||0;
-  return(it.pid&&it.base?+getPrice(prov,it.pid)||0:0)||ult||+it.lista||0;
-}
-// Cuánto de lo que llegó es de cada tienda: si llegó lo pedido, lo que pidió cada una; si llegó
-// otra cantidad, se reparte según lo que pidió cada una (y se puede corregir a mano).
+// Cuánto de lo que llegó es de cada tienda en un cierre de la versión vieja (una sola cantidad total):
+// si llegó lo pedido, lo que pidió cada una; si llegó otra cantidad, se reparte según lo que pidió cada una.
 function ciReparto(q,pm,pa,qm){
   const r2=n=>Math.round(n*100)/100;
   if(!(pa>0))return[q,0];
@@ -1400,22 +1378,55 @@ function ciReparto(q,pm,pa,qm){
   const x=q*pm/(pm+pa),m=[q,pm,pa].every(Number.isInteger)?Math.round(x):r2(x);
   return[m,r2(q-m)];
 }
+// Un cierre a medio llenar de la versión vieja traía UNA cantidad total (q); ahora cada tienda lleva la suya.
+function ciMigrar(it){
+  if(it.q!=null&&it.qa===undefined){const[m,a]=ciReparto(it.q,+it.pm||0,+it.pa||0,it.qm);it.qm=m;it.qa=a;}
+  delete it.q;
+  return it;
+}
+// Trae al cierre lo que hay pedido ahora. Lo que ya se llenó se respeta aunque el pedido cambie.
+function ciSincronizar(st){
+  const vistos=new Set();
+  getProvNames().forEach(prov=>{
+    const lineas=ciLineas(prov);if(!lineas.length)return;
+    vistos.add(prov);
+    const cp=st.provs[prov]||(st.provs[prov]={pago:ciPagoDe(prov),items:{},mas:[]}),nuevos={};
+    Object.values(cp.items).forEach(ciMigrar);
+    lineas.forEach(l=>{const v=cp.items[l.k]||{};nuevos[l.k]={...l,qm:v.qm??null,qa:v.qa??null,precio:v.precio??null,ref:v.ref??null};});
+    Object.entries(cp.items).forEach(([k,it])=>{if(!nuevos[k]&&ciTocado(it))nuevos[k]={...it,fuera:true};});
+    cp.items=nuevos;
+  });
+  Object.keys(st.provs).forEach(prov=>{
+    if(vistos.has(prov))return;
+    const cp=st.provs[prov];
+    Object.entries(cp.items).forEach(([k,it])=>{ciMigrar(it);if(!ciTocado(it))delete cp.items[k];else it.fuera=true;});
+    if(!Object.keys(cp.items).length&&!cp.mas?.length)delete st.provs[prov];
+  });
+}
+// Precio que se propone mientras no se escriba el de hoy: el del producto (misma unidad) o el
+// último que se pagó en un cierre.
+function ciPrecioAntes(prov,it){
+  const ult=+ciPrecios()[prov+'|'+it.k]||0;
+  return(it.pid&&it.base?+getPrice(prov,it.pid)||0:0)||ult||+it.lista||0;
+}
 const ciTiendaVacia=()=>({compras:0,gastos:0,total:0,pago:{efectivo:0,tarjeta:0,sinpe:0}});
 function ciCalc(st){
   if(CI.calcSt===st&&CI.calc)return CI.calc;
   const porPago={efectivo:0,tarjeta:0,sinpe:0},tiendas={moravia:ciTiendaVacia(),angeles:ciTiendaVacia()};
+  const r2=n=>Math.round(n*100)/100;
   const provs=Object.keys(st.provs).sort(ORDEN_ES).map(prov=>{
     const cp=st.provs[prov];
     const items=Object.values(cp.items).map(it=>{
-      const pm=+it.pm||0,pa=+it.pa||0,pedido=Math.round((pm+pa)*100)/100,q=it.q??pedido,antes=ciPrecioAntes(prov,it),precio=it.precio??antes;
-      const [qm,qa]=ciReparto(q,pm,pa,it.qm),sub=Math.round(q*precio),sm=Math.round(qm*precio);
+      // Cada tienda con su cantidad y su monto: lo que llegó (o, si no se tocó, lo que se pidió) × el precio.
+      const pm=+it.pm||0,pa=+it.pa||0,pedido=r2(pm+pa),qm=it.qm??pm,qa=it.qa??pa,q=r2(qm+qa),antes=ciPrecioAntes(prov,it),precio=it.precio??antes;
+      const sm=Math.round(qm*precio),sa=Math.round(qa*precio),sub=sm+sa;
       const ref=+it.ref||0,cambio=it.precio!=null&&ref>0&&precio>0?(precio-ref)/ref:0;
-      return{k:it.k,t:it.t,e:it.e,u:it.u,pm,pa,pedido,q,qm,qa,ambas:pm>0&&pa>0,precio,antes:it.precio==null&&antes>0,sub,sm,sa:sub-sm,falta:q>0&&!(precio>0),fuera:!!it.fuera,ref,cambio};
+      return{k:it.k,t:it.t,e:it.e,u:it.u,pm,pa,pedido,q,qm,qa,ambas:pm>0&&pa>0,precio,antes:it.precio==null&&antes>0,sub,sm,sa,falta:q>0&&!(precio>0),fuera:!!it.fuera,ref,cambio};
     });
     const mas=(cp.mas||[]).map(x=>{
-      const q=+x.q||0,precio=+x.precio||0,sub=Math.round(q*precio),para=CI_PARA[x.para]?x.para:'mitad';
+      const q=+x.q||0,precio=+x.precio||0,sub=Math.round(q*precio),para=CI_PARA[x.para]?x.para:'moravia';
       const sm=para==='moravia'?sub:para==='angeles'?0:Math.round(sub/2);
-      return{id:x.id,t:x.t||'',q,precio,para,sub,sm,sa:sub-sm,falta:q>0&&!(precio>0)};
+      return{id:x.id,t:x.t||'',q,u:x.u||'',precio,para,sub,sm,sa:sub-sm,falta:q>0&&!(precio>0)};
     });
     const todo=[...items,...mas],total=todo.reduce((t,i)=>t+i.sub,0),tm=todo.reduce((t,i)=>t+i.sm,0),faltan=todo.filter(i=>i.falta).length;
     const pago=CI_PAGO_NOMBRE[cp.pago]?cp.pago:'efectivo';
@@ -1434,11 +1445,14 @@ function ciCalc(st){
   CI.calcSt=st;CI.calc=salida;
   return salida;
 }
+// Guarda el cierre terminado y devuelve lo guardado (para «Ver en PDF» y para mandarlo al WhatsApp).
 function ciArchivar(st){
   const c=ciCalc(st),h=LS.get('aramo_cierres',[]);
-  h.unshift({...c,id:ciId(),guardado:Date.now(),provs:c.provs.map(p=>({...p,items:p.items.map(({k,e,antes,fuera,...it})=>it)}))});
+  const ent={...c,id:ciId(),guardado:Date.now(),provs:c.provs.map(p=>({...p,items:p.items.map(({k,e,antes,fuera,...it})=>it)}))};
+  h.unshift(ent);
   LS.set('aramo_cierres',h.slice(0,30));
   ciSubirNube();
+  return ent;
 }
 // Copia en la nube de cada cierre TERMINADO (tabla aramo_cierres_compras), para que el Control lo vea
 // desde cualquier aparato. Decisión del dueño (2026-11-24): "que todo se conecte entre sí"; antes el
@@ -1455,14 +1469,31 @@ function ciSubirNube(){
     h2.forEach(x=>{if(x&&ids.has(x.id))x.nube=true;});LS.set('aramo_cierres',h2);
   }).catch(e=>console.warn('Cierre: sin copia en la nube',e?.message||e));
 }
-// ── Textos que cambian mientras se escribe ──
-const ciTxtSub=it=>it.q>0?(it.precio>0?'₡'+fmt(it.sub):'falta precio'):'no vino';
-function ciTxtPed(it){
-  const pidio=it.ambas?` · pediste ${SIDE_ICO.moravia} ${fmtQ(it.pm)} · ${SIDE_ICO.angeles} ${fmtQ(it.pa)}`:'';
-  const base=!(it.q>0)?`No vino · pediste ${fmtQ(it.pedido)} ${it.u}`:it.q!==it.pedido?`Llegó ${fmtQ(it.q)} de ${fmtQ(it.pedido)}${pidio}`:'';
-  return[base,it.fuera?'ya no está en el pedido':'',it.antes?'precio anterior':'',ciCambioTxt(it)].filter(Boolean).join(' · ');
+// ── Costos: el precio que se escribe en el cierre queda como costo del producto con ese proveedor ──
+// Va por el camino de siempre (setPrice → precios), de donde el POS saca el precio de venta. Si el producto
+// no existe con ese proveedor se crea como en «Agregar producto» de un proveedor. Devuelve el producto.
+function ciCosto(prov,nombre,uni,precio){
+  const p=Math.round(+precio||0),nom=String(nombre||'').trim();
+  if(!(p>0)||!nom||!getAllProviders()[prov])return null;
+  const key=normalizeText(nom);
+  let prod=(getAllProviders()[prov].products||[]).find(x=>normalizeText(x.name)===key);
+  if(!prod){
+    const cat=getKnownProductCatalog().find(x=>x.key===key);
+    ensureCustomProv(prov);
+    prod={agregado:Date.now(),id:'prod_'+Date.now()+'_'+Math.random().toString(36).slice(2,6),name:cat?cat.name:titleCase(nom),emoji:cat?.emoji||'🌿',unit:normUnit(uni)};
+    S.customProviders[prov].products.push(prod);
+    persist();
+  }
+  // Un precio por kg no se guarda como precio por caja: solo si es la misma unidad del producto.
+  if(normUnit(prod.unit)===normUnit(uni)&&String(p)!==String(getPrice(prov,prod.id)))setPrice(prov,prod.id,String(p));
+  return prod;
 }
-// Precio que cambió mucho contra el de la vez pasada (desde 10 %): se marca en la fila, en el cierre y en el mensaje.
+// ── Textos que cambian mientras se escribe ──
+const ciTxtSub=x=>x.q>0?(x.precio>0?'₡'+fmt(x.sub):'falta precio'):'';
+const ciTxtPidio=(p,q)=>q!==p?`pediste ${fmtQ(p)}`:'';
+const ciTxtMontoT=(it,s)=>{const m=s==='moravia',q=m?it.qm:it.qa;return !(q>0)?'No vino':it.precio>0?'₡'+fmt(m?it.sm:it.sa):'—';};
+function ciTxtPed(it){return[it.fuera?'ya no está en el pedido':'',it.antes?'precio anterior':'',ciCambioTxt(it)].filter(Boolean).join(' · ');}
+// Precio que cambió mucho contra el de la vez pasada (desde 10 %): se marca en la fila y en el cierre.
 const CI_CAMBIO=.1;
 const ciSaltoPrecio=it=>Math.abs(+it.cambio||0)>=CI_CAMBIO&&it.q>0;
 const ciCambioPct=it=>Math.round(Math.abs(it.cambio)*100)+' %';
@@ -1483,7 +1514,6 @@ function ciReclamar(p){
   const cp=CI.st.provs[p.prov];if(cp){cp.avisado=Date.now();ciGuardar();ciPintar();}
 }
 const ciTxtReclamo=(p,cp)=>cp?.avisado?`Ya le avisaste a <b>${esc(p.prov)}</b> · mandar otra vez`:`Avisarle a <b>${esc(p.prov)}</b> lo que faltó`;
-const ciTxtPara=x=>`${SIDE_ICO.moravia} ₡${fmt(x.sm)} · ${SIDE_ICO.angeles} ₡${fmt(x.sa)}`;
 const ciTxtComp=t=>`Compras ₡${fmt(t.compras)}${t.gastos?` + gastos ₡${fmt(t.gastos)}`:''}`;
 const ciTxtGastos=t=>t.gastos?`Gastos del viaje ₡${fmt(t.gastos)}`:'';
 const ciTxtPagos=pg=>CI_PAGOS.filter(([k])=>pg[k]>0).map(([k,e])=>`${e} ₡${fmt(pg[k])}`).join(' · ')||'—';
@@ -1496,9 +1526,9 @@ function ciCuadre(c){
   return c.dif<0?{cls:'falta',txt:`Faltan ₡${fmt(-c.dif)}`}:{cls:'sobra',txt:`Sobran ₡${fmt(c.dif)}`};
 }
 const ciClaseProv=p=>!p.visto?'':p.faltan?'falta':'ok';
-// El botón del Cierre se ve en Ambos cuando hay pedido, cuando hay un cierre a medio llenar o
-// cuando ya se envió algo hoy (aunque el pedido se haya reiniciado). Va arriba, en Proveedores y
-// en Pedido, y no solo al fondo.
+// El cierre ya no tiene botón en Pedido ni en Proveedores: tiene su propia pestaña en Ambos («Cierre de compras»).
+function ciBarra(){return'';}
+// ¿Hay algo que cerrar hoy? Pedido hecho, un cierre a medio llenar o algo enviado hoy (aunque se haya reiniciado el pedido).
 function ciMostrar(){
   if(activeOrderSides().length<2)return false;
   const st=CI.st||ciLeer();
@@ -1507,71 +1537,117 @@ function ciMostrar(){
   const ult=xpLatestSent(),hoy=new Date().toDateString();
   return !!ult&&new Date(ult.at).toDateString()===hoy;
 }
-// ── Barra en "Tu pedido de hoy" (solo en Ambos) ──
-function ciBarra(){
-  const st=CI.st||ciLeer(),c=ciVigente(st)&&ciTieneDatos(st)?ciCalc(st):null;
-  const sub=c?`En curso · ₡${fmt(c.total)} · ${c.provs.filter(p=>p.visto&&!p.faltan).length} de ${c.provs.length} listos`:'Precios de lo que llegó · efectivo, tarjeta y SINPE';
-  return `<button type="button" class="sx-pdf-btn ci-btn" data-sx-cierre><span class="sx-pdf-i">${ico('recibo')}</span><span class="sx-pdf-t"><b>Cierre de compras</b><small>${esc(sub)}</small></span><span class="sx-pdf-f" aria-hidden="true">›</span></button>`;
+const ciDia=(t,o={weekday:'long',day:'numeric',month:'long'})=>capital(new Date(t).toLocaleDateString('es-CR',o));
+
+// ── Pestaña «Cierre de compras» (Ambos): seguir el cierre de hoy y los cierres guardados ──
+function ciRenderTab(){
+  const box=$('cierreBody');if(!box)return;
+  const st=ciCargar(),c=ciCalc(st),curso=ciVigente(st)&&ciTieneDatos(st),hay=ciMostrar(),hist=LS.get('aramo_cierres',[])||[];
+  const n=c.provs.length,listos=c.provs.filter(p=>p.visto&&!p.faltan).length;
+  const hoyYa=!curso&&hist[0]&&new Date(hist[0].inicio).toDateString()===new Date().toDateString();   // ya se cerró una compra hoy
+  const sub=curso?`${listos} de ${n} proveedores listos`:n?'Ya viene con lo que pidieron las dos tiendas':'Todavía no hay pedido para cerrar';
+  const nProd=c.provs.reduce((k,p)=>k+p.items.length+p.mas.length,0);
+  box.innerHTML=`<div class="cit">
+    <section class="cit-hoy${hay?'':' vacio'}">
+      <p class="cit-kick">${ico('recibo')}Cierre de compras</p>
+      <h2 class="cit-fecha">${esc(ciDia(Date.now()))}</h2>
+      ${n?`<div class="cit-chips${curso?'':' dos'}"><div><b>${n}</b><span>${n===1?'proveedor':'proveedores'}</span></div>${curso?`<div><b>${listos}</b><span>${listos===1?'listo':'listos'}</span></div><div><b>₡${fmt(c.total)}</b><span>hasta ahora</span></div>`:`<div><b>${nProd}</b><span>${nProd===1?'producto':'productos'}</span></div>`}</div>`:''}
+      <button type="button" class="cit-cta" data-ci="abrir"${hay?'':' disabled'}><span class="cit-cta-i">${ico('recibo')}</span><span class="cit-cta-t"><b>${curso?'Seguir el cierre de hoy':hoyYa?'Empezar otro cierre':'Empezar el cierre de hoy'}</b><small>${esc(sub)}</small></span><span class="cit-cta-f">${ico('flecha')}</span></button>
+    </section>
+    <section class="cit-lista">
+      <h3>Cierres guardados${hist.length?` <b>${hist.length}</b>`:''}</h3>
+      ${hist.length?hist.map((x,j)=>ciTarjetaGuardado(x,j)).join(''):`<p class="cit-nada">Cuando termines un cierre, queda guardado acá con su PDF.</p>`}
+    </section>
+  </div>`;
+  hojaPrecargar();
 }
-// ── Pantalla ──
+function ciTarjetaGuardado(x,j){
+  const cu=ciCuadre(x),t=x.tiendas;
+  return `<article class="cit-g">
+    <div class="cit-g-t"><b>${esc(ciDia(x.inicio,{weekday:'long',day:'numeric',month:'short'}))}${x.firma?` <span>· ${esc(x.firma)}</span>`:''}</b>${x.llevo!=null?`<em class="${cu.cls}">${esc(cu.txt)}</em>`:''}</div>
+    <div class="cit-g-n">${t?CI_TIENDAS.map(s=>`<div class="${s}"><small>${SIDE_NAME[s]}</small><b>₡${fmt(t[s].total)}</b></div>`).join(''):''}<div class="tot"><small>Total</small><b>₡${fmt(x.total)}</b></div></div>
+    <div class="cit-g-b"><button type="button" class="pdf" data-ci="pdf-ver" data-ci-h="${j}">${ico('pdf')}Ver en PDF</button><button type="button" class="wa" data-ci="wa" data-ci-h="${j}">${ico('mensaje')}WhatsApp</button></div>
+  </article>`;
+}
+$('cierreBody')?.addEventListener('click',e=>{
+  const b=e.target.closest('[data-ci]');if(!b||b.disabled)return;
+  const a=b.dataset.ci;
+  if(a==='abrir')return ciAbrir();
+  const x=(LS.get('aramo_cierres',[])||[])[+b.dataset.ciH];if(!x)return;
+  if(a==='pdf-ver')ciPdfVer(x);else if(a==='wa')ciPdfWhatsApp(x);
+});
+
+// ── Ventana del cierre ──
 const ciPaso=(v,attr,label)=>`<span class="ci-q"><button type="button" data-ci="menos" tabindex="-1" aria-label="Uno menos">−</button><input ${attr} inputmode="decimal" enterkeyhint="next" autocomplete="off" value="${ciNum(v)}" aria-label="${label}"><button type="button" data-ci="mas1" tabindex="-1" aria-label="Uno más">+</button></span>`;
-const ciPrecio=(v,attr,label,ph='precio')=>`<label class="ci-p"><span aria-hidden="true">₡</span><input ${attr} inputmode="numeric" enterkeyhint="next" autocomplete="off" value="${v>0?v:''}" placeholder="${ph}" aria-label="${label}"></label>`;
+const ciPrecio=(v,attr,label,ph='precio',suf='')=>`<label class="ci-p"><span aria-hidden="true">₡</span><input ${attr} inputmode="numeric" enterkeyhint="next" autocomplete="off" value="${v>0?v:''}" placeholder="${ph}" aria-label="${label}">${suf?`<small aria-hidden="true">${suf}</small>`:''}</label>`;
+// Un producto del pedido: el precio una sola vez y debajo UNA LÍNEA POR TIENDA con su cantidad y su monto.
 function ciFila(it){
   return `<li class="ci-it${it.q>0?'':' cero'}${it.falta?' falta':''}${ciSaltoPrecio(it)?(it.cambio>0?' sube':' baja'):''}" data-ci-k="${esc(it.k)}">
-    <div class="ci-it-n"><span class="ci-e" aria-hidden="true">${esc(it.e)}</span><b>${esc(it.t)}</b><em data-ci-v="sub">${ciTxtSub(it)}</em></div>
-    <div class="ci-it-c">${ciPaso(it.q,'data-ci-q',`Cuántos ${esc(it.u)} de ${esc(it.t)} llegaron`)}<span class="ci-u">${esc(it.u)}</span><span class="ci-por" aria-hidden="true">×</span>${ciPrecio(it.precio,'data-ci-p',`Precio de ${esc(it.t)} por ${esc(it.u)}`)}</div>
-    <div class="ci-rep">${ciPildora(it,'moravia')}${ciPildora(it,'angeles')}</div>
+    <div class="ci-it-n"><span class="ci-e" aria-hidden="true">${esc(it.e)}</span><b>${esc(it.t)}</b>${ciPrecio(it.precio,'data-ci-p',`Precio de ${esc(it.t)} por ${esc(it.u)}`,'precio','/ '+esc(it.u))}</div>
+    <div class="ci-fs">${ciFilaTienda(it,'moravia')}${ciFilaTienda(it,'angeles')}</div>
     <small class="ci-ped" data-ci-v="ped">${esc(ciTxtPed(it))}</small>
   </li>`;
 }
-// Lo que le toca a cada tienda (verde Moravia, naranja Los Ángeles). Si pidieron las dos, la
-// cantidad de cada una se puede corregir: la otra se ajusta sola para que sume lo que llegó.
-function ciPildora(it,s){
-  const m=s==='moravia',k=m?'m':'a',q=m?it.qm:it.qa;
-  if(!it.ambas&&!((m?it.pm:it.pa)>0))return'';
-  const tag=it.ambas?'label':'span';
-  const num=it.ambas?`<input data-ci-q${k} inputmode="decimal" enterkeyhint="next" autocomplete="off" value="${ciNum(q)}" aria-label="${esc(it.u)} de ${esc(it.t)} para ${SIDE_NAME[s]}">`:`<b data-ci-v="q${k}">${fmtQ(q)}</b>`;
-  return `<${tag} class="ci-tienda ${s}" title="${SIDE_NAME[s]}"><i aria-hidden="true">${SIDE_ICO[s]}</i><span class="ci-tn">${SIDE_NAME[s]}</span>${num}<em data-ci-v="s${k}">₡${fmt(m?it.sm:it.sa)}</em></${tag}>`;
+function ciFilaTienda(it,s){
+  const m=s==='moravia',k=m?'m':'a',p=m?it.pm:it.pa,q=m?it.qm:it.qa;
+  if(!(p>0))return'';
+  return `<div class="ci-f ${s}"><span class="ci-fn"><b>${SIDE_NAME[s]}</b><small data-ci-v="pid${k}">${ciTxtPidio(p,q)}</small></span>${ciPaso(q,`data-ci-q${k}`,`${esc(it.u)} de ${esc(it.t)} para ${SIDE_NAME[s]}`)}<span class="ci-u">${esc(it.u)}</span><em data-ci-v="s${k}">${ciTxtMontoT(it,s)}</em></div>`;
 }
+// Los dos botones de tienda: en un producto que ya se agregó cambian de tienda; en el formulario nuevo
+// guardan el producto de una vez.
+const ciBotonesTienda=(sel,acc)=>`<div class="ci-dest" role="${sel===undefined?'group':'radiogroup'}" aria-label="Para qué tienda es">${CI_TIENDAS.map(s=>`<button type="button" class="${s}${sel===s?' on':''}"${sel===undefined?'':` role="radio" aria-checked="${sel===s}"`} data-ci="${acc}" data-ci-para="${s}">${SIDE_NAME[s]}</button>`).join('')}</div>`;
 function ciFilaMas(x){
   return `<li class="ci-it mas${x.falta?' falta':''}" data-ci-mas="${esc(x.id)}">
-    <div class="ci-it-n"><span class="ci-e" aria-hidden="true">🛒</span><input data-ci-mt value="${esc(x.t)}" placeholder="¿Qué compraste?" aria-label="Qué compraste" enterkeyhint="next" autocomplete="off"><em data-ci-v="sub">${ciTxtSub(x)}</em><button type="button" class="ci-del" data-ci="mas-del" aria-label="Quitar">✕</button></div>
-    <div class="ci-it-c">${ciPaso(x.q,'data-ci-mq','Cantidad')}<span class="ci-por" aria-hidden="true">×</span>${ciPrecio(x.precio,'data-ci-mp','Precio')}</div>
-    <div class="ci-rep"><button type="button" class="ci-para" data-ci="mas-para" aria-label="Para qué tienda es: ${esc(CI_PARA[x.para])}. Tocá para cambiar">Para <b>${CI_PARA[x.para]}</b></button><em class="ci-para-m" data-ci-v="mpara">${ciTxtPara(x)}</em></div>
+    <div class="ci-it-n"><span class="ci-e" aria-hidden="true">🛒</span><input data-ci-mt value="${esc(x.t)}" placeholder="¿Qué compraste?" aria-label="Qué compraste" enterkeyhint="next" autocomplete="off"><button type="button" class="ci-del" data-ci="mas-del" aria-label="Quitar">✕</button></div>
+    <div class="ci-it-c">${ciPaso(x.q,'data-ci-mq','Cantidad')}<span class="ci-u">${esc(uniCorta(x.u||''))}</span><span class="ci-por" aria-hidden="true">×</span>${ciPrecio(x.precio,'data-ci-mp','Precio')}</div>
+    <div class="ci-masp"><span>Es de</span>${ciBotonesTienda(x.para,'mas-para')}<em data-ci-v="sub">${ciTxtSub(x)}</em></div>
   </li>`;
 }
+// «Algo que no estaba en el pedido»: nombre, cantidad y precio, y dos botones, uno por tienda. Tocar uno lo guarda en esa tienda.
+function ciFormNuevo(){
+  const b=CI.bor;
+  return `<div class="ci-nuevo" data-ci-nuevo>
+    <div class="ci-nuevo-h"><h5>Algo que no estaba en el pedido</h5><button type="button" class="ci-del" data-ci="mas-cancel" aria-label="Cancelar">✕</button></div>
+    <input class="ci-nt" data-ci-bt value="${esc(b.t)}" placeholder="¿Qué compraste?" aria-label="Qué compraste" enterkeyhint="next" autocomplete="off">
+    <div class="ci-it-c">${ciPaso(b.q,'data-ci-bq','Cantidad')}<span class="ci-un" role="group" aria-label="Unidad">${UNITS.map(u=>`<button type="button" data-ci="bu" data-ci-u="${u}" class="${u===b.u?'on':''}" aria-pressed="${u===b.u}">${u}</button>`).join('')}</span></div>
+    <div class="ci-it-c">${ciPrecio(b.precio,'data-ci-bp','Precio','precio','por '+esc(b.u))}</div>
+    <p class="ci-dest-t">¿Para cuál tienda es? <small>Tocá una y queda guardado</small></p>
+    ${ciBotonesTienda(undefined,'mas-nueva')}
+  </div>`;
+}
 function ciPasoProv(p){
+  const cp=CI.st.provs[p.prov],form=CI.bor&&CI.bor.prov===p.prov;
   return `<section class="ci-prov" style="--c:${sxColor(p.prov)}">
     <div class="ci-prov-h"><span class="sx-av" aria-hidden="true">${esc(p.prov.charAt(0).toUpperCase())}</span><div><h4>${esc(p.prov)}</h4><small data-ci-v="pfaltan">${ciTxtFaltan(p)}</small></div><b class="ci-prov-tot" data-ci-v="ptot">₡${fmt(p.total)}</b></div>
-    <div class="ci-prov-tiendas">${CI_TIENDAS.map(s=>`<span class="${s}"><i aria-hidden="true">${SIDE_ICO[s]}</i><span>${SIDE_NAME[s]}</span><b data-ci-v="pt:${s}">₡${fmt(s==='moravia'?p.tm:p.ta)}</b></span>`).join('')}</div>
+    <div class="ci-prov-tiendas">${CI_TIENDAS.map(s=>`<span class="${s}"><i aria-hidden="true"></i><span>${SIDE_NAME[s]}</span><b data-ci-v="pt:${s}">₡${fmt(s==='moravia'?p.tm:p.ta)}</b></span>`).join('')}</div>
     <div class="ci-pago"><span id="ciPagoT">Le pagué con</span><div role="radiogroup" aria-labelledby="ciPagoT">${CI_PAGOS.map(([k,e,n])=>`<button type="button" role="radio" aria-checked="${k===p.pago}" class="${k}${k===p.pago?' on':''}" data-ci-pago="${k}"><span aria-hidden="true">${e}</span>${n}</button>`).join('')}</div></div>
     <ul class="ci-items">${p.items.map(ciFila).join('')}${p.mas.map(ciFilaMas).join('')}</ul>
-    <button type="button" class="ci-reclamo${CI.st.provs[p.prov]?.avisado?' hecho':''}" data-ci="reclamo"${ciFaltantes(p).length?'':' hidden'}>${ico('mensaje')}<span>${ciTxtReclamo(p,CI.st.provs[p.prov])}</span><em data-ci-v="nreclamo">${ciFaltantes(p).length}</em></button>
-    <button type="button" class="ci-add" data-ci="mas-add">＋ Algo que no estaba en el pedido</button>
+    <button type="button" class="ci-reclamo${cp?.avisado?' hecho':''}" data-ci="reclamo"${ciFaltantes(p).length?'':' hidden'}>${ico('mensaje')}<span>${ciTxtReclamo(p,cp)}</span><em data-ci-v="nreclamo">${ciFaltantes(p).length}</em></button>
+    ${form?ciFormNuevo():`<button type="button" class="ci-add" data-ci="mas-add">＋ Algo que no estaba en el pedido</button>`}
   </section>`;
 }
 const ciFilaGasto=g=>`<li class="ci-g" data-ci-g="${esc(g.id)}"><input data-ci-gt value="${esc(g.t)}" placeholder="¿Qué fue?" aria-label="Qué gasto fue" enterkeyhint="next" autocomplete="off">${ciPrecio(g.monto,'data-ci-gm','Cuánto fue','0')}<button type="button" class="ci-gp ${g.pago}" data-ci="g-pago" aria-label="Pagado con ${CI_PAGO_NOMBRE[g.pago]}; tocá para cambiar">${CI_PAGO_NOMBRE[g.pago]}</button><button type="button" class="ci-del" data-ci="g-del" aria-label="Quitar gasto">✕</button></li>`;
-const ciDia=(t,o={weekday:'long',day:'numeric',month:'long'})=>capital(new Date(t).toLocaleDateString('es-CR',o));
+// Las dos tiendas, cada una con lo suyo (la usan el cierre y la pantalla de «guardado»).
+const ciTiendasHtml=c=>`<div class="ci-tiendas">${CI_TIENDAS.map(s=>{const t=c.tiendas[s];return`<div class="ci-td ${s}"><span>${SIDE_NAME[s]}</span><strong data-ci-v="t:${s}">₡${fmt(t.total)}</strong><small data-ci-v="tc:${s}">Compras ₡${fmt(t.compras)}</small><small data-ci-v="tg:${s}">${ciTxtGastos(t)}</small><small class="ci-td-p" data-ci-v="tp:${s}">${ciTxtPagos(t.pago)}</small></div>`;}).join('')}</div>`;
 function ciPasoCierre(c,st){
-  const n=c.provs.length,cu=ciCuadre(c),hist=LS.get('aramo_cierres',[]),faltan=c.provs.map((p,j)=>p.faltan?j:-1).filter(j=>j>=0);
+  const n=c.provs.length,cu=ciCuadre(c),faltan=c.provs.map((p,j)=>p.faltan?j:-1).filter(j=>j>=0);
   return `<section class="ci-fin">
     <div class="ci-hero">
       <small>Total de compras${c.gastado?' y gastos':''}</small><strong data-ci-v="total">₡${fmt(c.total)}</strong>
       <div class="ci-tres">${CI_PAGOS.map(([k,e,nm])=>`<div class="${k}"><span>${e} ${nm}</span><b data-ci-v="pp:${k}">₡${fmt(c.porPago[k])}</b></div>`).join('')}</div>
     </div>
     <div class="ci-tiendas-w">
-      <h4>🏪 Lo que gastó cada tienda</h4>
-      <div class="ci-tiendas">${CI_TIENDAS.map(s=>{const t=c.tiendas[s];return`<div class="ci-td ${s}"><span>${SIDE_ICO[s]} ${SIDE_NAME[s]}</span><strong data-ci-v="t:${s}">₡${fmt(t.total)}</strong><small data-ci-v="tc:${s}">Compras ₡${fmt(t.compras)}</small><small data-ci-v="tg:${s}">${ciTxtGastos(t)}</small><small class="ci-td-p" data-ci-v="tp:${s}">${ciTxtPagos(t.pago)}</small></div>`;}).join('')}</div>
+      <h4>Lo que gastó cada tienda</h4>
+      ${ciTiendasHtml(c)}
       ${c.gastos.length?'<p class="ci-nota">Los gastos del viaje se reparten según lo que compró cada tienda.</p>':''}
     </div>
-    ${(cambios=>cambios.length?`<div class="ci-cambios"><h4>📈 Precios que cambiaron <small>desde 10 % contra la vez pasada</small></h4><ul>${cambios.map(it=>`<li class="${it.cambio>0?'sube':'baja'}"><span class="ci-cb-n"><span aria-hidden="true">${esc(it.e)}</span> <b>${esc(it.t)}</b> <small>${esc(it.prov)}</small></span><span class="ci-cb-p">₡${fmt(it.ref)} → <b>₡${fmt(it.precio)}</b> <em>${it.cambio>0?'▲':'▼'} ${ciCambioPct(it)}</em></span></li>`).join('')}</ul></div>`:'')(ciCambios(c))}
-    ${n?'':`<p class="ci-aviso">Todavía no hay pedido: el cierre sale de lo que se pidió en Surtido.</p>`}
+    ${n?'':`<p class="ci-aviso">Todavía no hay pedido: el cierre sale de lo que pidieron las tiendas.</p>`}
     ${faltan.length?`<p class="ci-aviso">⚠️ Falta precio en ${faltan.map(j=>`<button type="button" data-ci-ir="${j}">${esc(c.provs[j].prov)}</button>`).join(' ')}</p>`:''}
     <div class="ci-caja">
-      <h4>💵 Plata en efectivo</h4>
+      <h4>💵 Cuadre del efectivo</h4>
       <div class="ci-linea"><span>Me llevé</span>${ciPrecio(st.llevo,'data-ci-llevo','Cuánta plata en efectivo te llevaste','0')}</div>
       <div class="ci-linea"><span>Pagué en efectivo</span><b data-ci-v="ef">− ₡${fmt(c.porPago.efectivo)}</b></div>
-      <div class="ci-linea"><span>Tienen que volver</span><b data-ci-v="debe">${ciTxtDebe(c)}</b></div>
+      <div class="ci-linea total"><span>Tienen que volver</span><b data-ci-v="debe">${ciTxtDebe(c)}</b></div>
       <div class="ci-linea"><span>Regresé</span>${ciPrecio(st.regreso,'data-ci-regreso','Cuánta plata en efectivo regresaste','0')}</div>
       <p class="ci-res ${cu.cls}" data-ci-res role="status">${cu.txt}</p>
     </div>
@@ -1580,15 +1656,36 @@ function ciPasoCierre(c,st){
       ${c.gastos.length?`<ul>${c.gastos.map(ciFilaGasto).join('')}</ul>`:''}
       <div class="ci-gchips">${CI_GASTOS.map(g=>`<button type="button" data-ci-gadd="${g}">＋ ${g}</button>`).join('')}<button type="button" data-ci-gadd="">＋ Otro</button></div>
     </div>
-    ${n?`<div class="ci-lista"><h4>Por proveedor</h4>${c.provs.map((p,j)=>`<button type="button" class="ci-lp${p.faltan?' falta':''}" data-ci-ir="${j}" style="--c:${sxColor(p.prov)}"><span class="sx-av" aria-hidden="true">${esc(p.prov.charAt(0).toUpperCase())}</span><span class="ci-lp-t"><b>${esc(p.prov)}</b><small>${CI_PAGO_NOMBRE[p.pago]} · ${SIDE_ICO.moravia} ₡${fmt(p.tm)} · ${SIDE_ICO.angeles} ₡${fmt(p.ta)}${p.faltan?' · falta precio':''}</small></span><em>₡${fmt(p.total)}</em></button>`).join('')}</div>`:''}
+    ${(cambios=>cambios.length?`<div class="ci-cambios"><h4>📈 Precios que cambiaron <small>desde 10 % contra la vez pasada</small></h4><ul>${cambios.map(it=>`<li class="${it.cambio>0?'sube':'baja'}"><span class="ci-cb-n"><span aria-hidden="true">${esc(it.e)}</span> <b>${esc(it.t)}</b> <small>${esc(it.prov)}</small></span><span class="ci-cb-p">₡${fmt(it.ref)} → <b>₡${fmt(it.precio)}</b> <em>${it.cambio>0?'▲':'▼'} ${ciCambioPct(it)}</em></span></li>`).join('')}</ul></div>`:'')(ciCambios(c))}
+    ${n?`<div class="ci-lista"><h4>Por proveedor</h4>${c.provs.map((p,j)=>`<button type="button" class="ci-lp${p.faltan?' falta':''}" data-ci-ir="${j}" style="--c:${sxColor(p.prov)}"><span class="sx-av" aria-hidden="true">${esc(p.prov.charAt(0).toUpperCase())}</span><span class="ci-lp-t"><b>${esc(p.prov)}</b><small>${CI_PAGO_NOMBRE[p.pago]}${p.faltan?' · falta precio':''}</small><span class="ci-lp-s"><i class="moravia">Moravia ₡${fmt(p.tm)}</i><i class="angeles">Los Ángeles ₡${fmt(p.ta)}</i></span></span><em>₡${fmt(p.total)}</em></button>`).join('')}</div>`:''}
     <div class="sx-pdf-firma ci-firma"><span id="ciFirmaT">¿Quién hizo las compras?</span><div role="radiogroup" aria-labelledby="ciFirmaT">${HOJA_FIRMAS.map(f=>`<button type="button" role="radio" aria-checked="${f===st.firma}" class="${f===st.firma?'on':''}" data-ci-firma="${f}">${f}</button>`).join('')}</div></div>
-    <button type="button" class="sx-pdf-wa" data-ci="wa"${n||c.gastos.length?'':' disabled'}>${ico('mensaje')}Mandar el cierre a mi WhatsApp</button>
-    ${hist.length?`<details class="ci-hist"><summary>Cierres guardados <b>${hist.length}</b></summary>${hist.map((x,j)=>`<div class="ci-h"><span><b>${esc(ciDia(x.inicio,{weekday:'short',day:'numeric',month:'short'}))}${x.firma?' · '+esc(x.firma):''}</b><small>₡${fmt(x.total)}${x.tiendas?` · ${SIDE_ICO.moravia} ₡${fmt(x.tiendas.moravia.total)} · ${SIDE_ICO.angeles} ₡${fmt(x.tiendas.angeles.total)}`:''} · ${esc(ciCuadre(x).txt)}</small></span><button type="button" data-ci="hist-wa" data-ci-h="${j}" aria-label="Mandar ese cierre a WhatsApp" title="Mandar a WhatsApp">${ico('mensaje')}</button></div>`).join('')}</details>`:''}
+  </section>`;
+}
+// Después de «Terminar y guardar»: el cierre ya está guardado; se manda a WhatsApp como PDF o se ve.
+function ciPasoHecho(e){
+  return `<section class="ci-hecho">
+    <div class="ci-hecho-ok" aria-hidden="true">${ico('listo')}</div>
+    <h4>¡Cierre guardado!</h4>
+    <p>${esc(ciDia(e.inicio))} · ₡${fmt(e.total)}</p>
+    ${ciTiendasHtml(e)}
+    <button type="button" class="sx-pdf-wa" data-ci="wa-hecho">${ico('mensaje')}Mandar el cierre a mi WhatsApp</button>
+    <button type="button" class="ci-pdf-ver" data-ci="pdf-hecho">${ico('pdf')}Ver en PDF</button>
+    ${hojaPuedeCompartir()?'':`<label class="sx-pdf-num ci-num"><span>Mi número de WhatsApp</span><input id="ciNum" type="tel" inputmode="tel" autocomplete="tel" placeholder="8888 8888" value="${esc(hojaMiNumero())}"></label>`}
+    <p class="ci-hecho-ayuda">${hojaPuedeCompartir()?'Se abre WhatsApp con el PDF: elegí tu propio chat y tocá enviar.':'Se descarga el PDF y se abre tu WhatsApp: adjuntalo con el clip 📎 y enviá.'} Lo encontrás siempre en «Cierres guardados».</p>
   </section>`;
 }
 function ciIndice(c){const i=c.provs.findIndex(p=>p.prov===CI.st.paso);return i>=0?i:CI.st.paso===''||!c.provs.length?c.provs.length:0;}
 function ciPintar(){
   const h=$('sxCierre');if(!h)return;
+  if(CI.hecho){
+    const e=CI.hecho;
+    h.innerHTML=`<div class="ci-in" role="dialog" aria-modal="true" aria-labelledby="ciTit">
+      <header class="ci-cab"><span class="ci-ico" aria-hidden="true">${ico('recibo')}</span><div class="ci-cab-t"><h3 id="ciTit">Cierre de compras</h3><p>${esc(ciDia(e.inicio))}</p></div><button type="button" class="sx-ed-x" data-ci="cerrar" aria-label="Cerrar">✕</button></header>
+      <div class="ci-cuerpo">${ciPasoHecho(e)}</div>
+      <footer class="ci-pie"><button type="button" class="ci-sig listo" data-ci="cerrar"><span><b>Listo</b></span></button></footer>
+    </div>`;
+    return;
+  }
   const st=CI.st,c=ciCalc(st),n=c.provs.length,i=ciIndice(c),p=c.provs[i];
   st.paso=p?p.prov:'';
   const viejo=h.querySelector('.ci-cuerpo'),scroll=CI.pintado===st.paso&&viejo?viejo.scrollTop:0;
@@ -1614,7 +1711,7 @@ function ciPintar(){
 }
 // Cambia solo los números (sin volver a dibujar) para no sacar el teclado mientras se escribe.
 function ciPatch(){
-  const h=$('sxCierre');if(!h)return;
+  const h=$('sxCierre');if(!h||CI.hecho)return;
   const st=CI.st,c=ciCalc(st),p=c.provs.find(x=>x.prov===st.paso);
   const pon=(root,k,txt)=>root.querySelectorAll(`[data-ci-v="${k}"]`).forEach(el=>{if(el.textContent!==txt)el.textContent=txt;});
   pon(h,'total','₡'+fmt(c.total));
@@ -1626,12 +1723,12 @@ function ciPatch(){
     pon(h,'ptot','₡'+fmt(p.total));pon(h,'pfaltan',ciTxtFaltan(p));pon(h,'pt:moravia','₡'+fmt(p.tm));pon(h,'pt:angeles','₡'+fmt(p.ta));
     p.items.forEach(it=>{
       const li=h.querySelector(`[data-ci-k="${CSS.escape(it.k)}"]`);if(!li)return;
-      li.classList.toggle('cero',!(it.q>0));li.classList.toggle('falta',it.falta);pon(li,'sub',ciTxtSub(it));pon(li,'ped',ciTxtPed(it));
+      li.classList.toggle('cero',!(it.q>0));li.classList.toggle('falta',it.falta);pon(li,'ped',ciTxtPed(it));
       li.classList.toggle('sube',ciSaltoPrecio(it)&&it.cambio>0);li.classList.toggle('baja',ciSaltoPrecio(it)&&it.cambio<0);
-      li.querySelectorAll('[data-ci-qm],[data-ci-qa]').forEach(inp=>{if(inp===document.activeElement)return;const v=ciNum(inp.matches('[data-ci-qm]')?it.qm:it.qa);if(inp.value!==v)inp.value=v;});
-      pon(li,'qm',fmtQ(it.qm));pon(li,'qa',fmtQ(it.qa));pon(li,'sm','₡'+fmt(it.sm));pon(li,'sa','₡'+fmt(it.sa));
+      pon(li,'sm',ciTxtMontoT(it,'moravia'));pon(li,'sa',ciTxtMontoT(it,'angeles'));
+      pon(li,'pidm',ciTxtPidio(it.pm,it.qm));pon(li,'pida',ciTxtPidio(it.pa,it.qa));
     });
-    p.mas.forEach(x=>{const li=h.querySelector(`[data-ci-mas="${CSS.escape(x.id)}"]`);if(!li)return;li.classList.toggle('falta',x.falta);pon(li,'sub',ciTxtSub(x));pon(li,'mpara',ciTxtPara(x));});
+    p.mas.forEach(x=>{const li=h.querySelector(`[data-ci-mas="${CSS.escape(x.id)}"]`);if(!li)return;li.classList.toggle('falta',x.falta);pon(li,'sub',ciTxtSub(x));});
     const rb=h.querySelector('[data-ci="reclamo"]');if(rb){const k=ciFaltantes(p).length;rb.hidden=!k;pon(rb,'nreclamo',String(k));}
   }
   c.provs.forEach((q,j)=>{const b=h.querySelector(`.ci-pasos [data-ci-ir="${j}"]`);if(b)b.className=ciClaseProv(q)+(q.prov===st.paso?' on':'');});
@@ -1650,27 +1747,36 @@ function ciAbrir(){
     // Al entrar a un número se marca entero: se escribe encima sin borrar.
     h.addEventListener('focusin',e=>{const t=e.target;if(t.matches?.('input[inputmode]'))setTimeout(()=>{try{if(document.activeElement===t)t.select();}catch{}},0);});
   }
-  CI.pintado=null;ciPintar();
+  CI.hecho=null;CI.bor=null;CI.pintado=null;ciPintar();
   document.documentElement.classList.add('ci-abierto');
   requestAnimationFrame(()=>h.classList.add('open'));
+  hojaPrecargar();
 }
 function ciCerrar(guardar=true){
   const h=$('sxCierre');if(!h)return;
-  if(guardar)ciGuardarAhora();
+  if(guardar&&!CI.hecho)ciGuardarAhora();
   if(h.contains(document.activeElement))document.activeElement.blur(); // guarda el precio que se estaba escribiendo
   h.classList.remove('open');document.documentElement.classList.remove('ci-abierto');
+  CI.hecho=null;CI.bor=null;
   sxRenderTablero();xpRefresh();
+  if($('view-cierre')?.classList.contains('active'))ciRenderTab();
 }
 function ciIr(j){
   const st=CI.st,c=ciCalc(st),n=c.provs.length;
   j=Math.max(0,Math.min(n,j));
   if(st.provs[st.paso])st.provs[st.paso].visto=true;
   st.paso=j<n?c.provs[j].prov:'';
+  CI.bor=null;
   ciGuardar();ciPintar();
 }
 function ciClick(e){
   const h=$('sxCierre'),st=CI.st;
   if(e.target===h)return ciCerrar();
+  if(CI.hecho){
+    const a=e.target.closest('[data-ci]')?.dataset.ci;
+    if(a==='cerrar')ciCerrar(false);else if(a==='wa-hecho')ciPdfWhatsApp(CI.hecho);else if(a==='pdf-hecho')ciPdfVer(CI.hecho);
+    return;
+  }
   const ir=e.target.closest('[data-ci-ir]');if(ir)return ciIr(+ir.dataset.ciIr);
   const pg=e.target.closest('[data-ci-pago]'),cp=st.provs[st.paso];
   if(pg&&cp){
@@ -1689,7 +1795,7 @@ function ciClick(e){
     st.firma=fi.dataset.ciFirma;ciGuardar();
     h.querySelectorAll('[data-ci-firma]').forEach(b=>{b.classList.toggle('on',b===fi);b.setAttribute('aria-checked',b===fi);});return;
   }
-  const a=e.target.closest('[data-ci]')?.dataset.ci;if(!a)return;
+  const bt=e.target.closest('[data-ci]'),a=bt?.dataset.ci;if(!a)return;
   const gid=e.target.closest('[data-ci-g]')?.dataset.ciG,g=st.gastos.find(x=>x.id===gid);
   if(a==='cerrar')ciCerrar();
   else if(a==='ant'||a==='sig')ciIr(ciIndice(ciCalc(st))+(a==='sig'?1:-1));
@@ -1697,34 +1803,55 @@ function ciClick(e){
     const inp=e.target.closest('.ci-q')?.querySelector('input');if(!inp)return;
     inp.value=ciNum(Math.max(0,ciCant(inp.value)+(a==='mas1'?1:-1)));ciEntrada(inp);buzz(8);
   }else if(a==='mas-add'&&cp){
-    const x={id:ciId(),t:'',q:1,precio:null,para:'mitad'};cp.mas.push(x);cp.visto=true;ciGuardar();ciPintar();
-    h.querySelector(`[data-ci-mas="${x.id}"] [data-ci-mt]`)?.focus();
-  }else if(a==='mas-del'&&cp){
+    CI.bor={prov:st.paso,t:'',q:1,u:'kg',precio:null};ciPintar();
+    h.querySelector('[data-ci-bt]')?.focus();
+    setTimeout(()=>h.querySelector('[data-ci-nuevo]')?.scrollIntoView({block:'center',behavior:'smooth'}),60);
+  }else if(a==='mas-cancel'){CI.bor=null;ciPintar();}
+  else if(a==='bu'){
+    if(!CI.bor)return;CI.bor.u=bt.dataset.ciU;
+    bt.parentElement.querySelectorAll('[data-ci="bu"]').forEach(b=>{const on=b===bt;b.classList.toggle('on',on);b.setAttribute('aria-pressed',on);});
+    const sf=h.querySelector('[data-ci-nuevo] .ci-p small');if(sf)sf.textContent='por '+CI.bor.u;
+  }
+  else if(a==='mas-nueva'&&cp)ciMasGuardar(bt.dataset.ciPara);
+  else if(a==='mas-del'&&cp){
     const id=e.target.closest('[data-ci-mas]')?.dataset.ciMas;cp.mas=cp.mas.filter(x=>x.id!==id);ciGuardar();ciPintar();
   }else if(a==='mas-para'&&cp){
-    const x=cp.mas.find(m=>m.id===e.target.closest('[data-ci-mas]')?.dataset.ciMas),ks=Object.keys(CI_PARA);if(!x)return;
-    x.para=ks[(ks.indexOf(x.para||'mitad')+1)%ks.length];ciGuardar();ciPintar();
+    const x=cp.mas.find(m=>m.id===e.target.closest('[data-ci-mas]')?.dataset.ciMas);if(!x)return;
+    x.para=bt.dataset.ciPara;ciGuardar();ciPintar();buzz(8);
   }else if(a==='g-del'){st.gastos=st.gastos.filter(x=>x.id!==gid);ciGuardar();ciPintar();}
   else if(a==='g-pago'&&g){const ks=CI_PAGOS.map(x=>x[0]);g.pago=ks[(ks.indexOf(g.pago)+1)%ks.length];ciGuardar();ciPintar();}
-  else if(a==='wa')ciMandar(ciCalc(st));
-  else if(a==='hist-wa'){const x=LS.get('aramo_cierres',[])[+e.target.closest('[data-ci-h]').dataset.ciH];if(x)ciMandar(x);}
-  else if(a==='guardar')ciTerminar(e.target.closest('[data-ci]'));
+  else if(a==='guardar')ciTerminar(bt);
   else if(a==='reclamo')ciReclamar(ciCalc(st).provs.find(x=>x.prov===st.paso));
 }
+// Un toque en Moravia o en Los Ángeles guarda lo de «Algo que no estaba en el pedido» en esa tienda. Sin pasos de más.
+function ciMasGuardar(para){
+  const st=CI.st,cp=st.provs[st.paso],b=CI.bor,h=$('sxCierre');if(!cp||!b||!CI_TIENDAS.includes(para))return;
+  const t=String(b.t||'').trim();
+  if(!t){toast('Escribí qué compraste','err');h.querySelector('[data-ci-bt]')?.focus();return;}
+  if(!(b.q>0)){toast('Poné cuántos compraste','err');return;}
+  const x={id:ciId(),t,q:b.q,u:b.u,precio:b.precio>0?b.precio:null,para};
+  const prod=ciCosto(st.paso,t,b.u,x.precio);   // el precio queda como costo de ese proveedor (se crea el producto si no estaba)
+  if(prod){x.u=normUnit(prod.unit);x.t=prod.name;}   // con el nombre y la unidad del producto del proveedor
+  cp.mas.push(x);cp.visto=true;CI.bor=null;
+  ciInvalidar();ciGuardarAhora();ciPintar();buzz(12);
+  h.querySelector(`[data-ci-mas="${x.id}"]`)?.scrollIntoView({block:'nearest'});
+  toast(`✓ ${t} guardado para ${SIDE_NAME[para]}${prod?' · costo anotado':''}`,'ok');
+}
 function ciEntrada(t){
+  if(t.id==='ciNum'){LS.set('aramo_mi_wa',t.value.trim());return;}   // el WhatsApp propio (compu): el mismo número del PDF del pedido
   const st=CI.st,cp=st.provs[st.paso],num=v=>ciVacio(v)?null:ciPlata(v);
-  if(t.matches('[data-ci-q],[data-ci-p],[data-ci-qm],[data-ci-qa]')){
+  if(t.matches('[data-ci-bt],[data-ci-bq],[data-ci-bp]')){   // el formulario nuevo: todavía no cuenta en el cierre
+    const b=CI.bor;if(!b)return;
+    if(t.matches('[data-ci-bt]'))b.t=t.value;else if(t.matches('[data-ci-bq]'))b.q=ciCant(t.value);else b.precio=num(t.value);
+    return;
+  }
+  if(t.matches('[data-ci-p],[data-ci-qm],[data-ci-qa]')){
     const it=cp?.items[t.closest('[data-ci-k]')?.dataset.ciK];if(!it)return;
-    if(t.matches('[data-ci-q]')){it.q=ciVacio(t.value)?null:ciCant(t.value);it.qm=null;} // otro total: se vuelve a repartir solo
-    else if(t.matches('[data-ci-p]')){
+    if(t.matches('[data-ci-p]')){
       // El precio de antes se guarda la primera vez que se escribe el de hoy (después el de hoy queda como precio del producto).
       if(it.precio==null&&it.ref==null){const r=ciPrecioAntes(st.paso,it);if(r>0)it.ref=r;}
       it.precio=num(t.value);
-    }
-    else{ // reparto a mano: la otra tienda se queda con el resto
-      const q=it.q??Math.round(((+it.pm||0)+(+it.pa||0))*100)/100,v=ciVacio(t.value)?null:ciCant(t.value);
-      it.qm=v==null?null:t.matches('[data-ci-qm]')?v:Math.round((q-v)*100)/100;
-    }
+    }else it[t.matches('[data-ci-qm]')?'qm':'qa']=ciVacio(t.value)?null:ciCant(t.value);   // cada tienda con su cantidad
     cp.visto=true;
   }else if(t.matches('[data-ci-mt],[data-ci-mq],[data-ci-mp]')){
     const x=cp?.mas.find(m=>m.id===t.closest('[data-ci-mas]')?.dataset.ciMas);if(!x)return;
@@ -1738,17 +1865,24 @@ function ciEntrada(t){
   ciGuardar();ciProgramarPatch();
 }
 // Al salir de un campo: el vacío vuelve a lo pedido / al precio anterior, y el precio de hoy queda
-// guardado para el próximo cierre (y como precio del producto si es la misma unidad).
+// guardado para el próximo cierre y como COSTO del producto con ese proveedor (si es la misma unidad;
+// si el producto no existe con ese proveedor, se crea).
 function ciCambio(e){
-  const t=e.target,st=CI.st,prov=st.paso,k=t.closest('[data-ci-k]')?.dataset.ciK;
-  if(!k||!t.matches('[data-ci-q],[data-ci-p],[data-ci-qm],[data-ci-qa]'))return;
+  const t=e.target,st=CI.st,prov=st.paso;
+  if(t.matches('[data-ci-mt],[data-ci-mp]')){   // algo agregado: su precio también es costo
+    const x=st.provs[prov]?.mas.find(m=>m.id===t.closest('[data-ci-mas]')?.dataset.ciMas);
+    if(x?.precio>0&&String(x.t||'').trim()){const prod=ciCosto(prov,x.t,x.u||'kg',x.precio);if(prod)x.u=normUnit(prod.unit);ciGuardar();}
+    return;
+  }
+  const k=t.closest('[data-ci-k]')?.dataset.ciK;
+  if(!k||!t.matches('[data-ci-p],[data-ci-qm],[data-ci-qa]'))return;
   const it=st.provs[prov]?.items[k],calc=ciCalc(st).provs.find(p=>p.prov===prov)?.items.find(x=>x.k===k);if(!it||!calc)return;
-  if(t.matches('[data-ci-q]')){t.value=ciNum(calc.q);return;}
   if(t.matches('[data-ci-qm],[data-ci-qa]')){t.value=ciNum(t.matches('[data-ci-qm]')?calc.qm:calc.qa);return;}
   t.value=calc.precio>0?calc.precio:'';
   if(!(it.precio>0))return;
   const m=ciPrecios();m[prov+'|'+k]=it.precio;LS.set('aramo_cierre_precios',m);
-  if(it.pid&&it.base&&String(it.precio)!==String(getPrice(prov,it.pid)))setPrice(prov,it.pid,String(it.precio));
+  if(it.pid){if(it.base&&String(it.precio)!==String(getPrice(prov,it.pid)))setPrice(prov,it.pid,String(it.precio));}
+  else ciCosto(prov,it.t,it.uni||'kg',it.precio);   // algo que se pidió como «extra»: se vuelve producto del proveedor
 }
 // Enter salta al precio siguiente (o al campo siguiente): se llenan todos sin tocar la pantalla.
 function ciTecla(e){
@@ -1763,39 +1897,200 @@ function ciTerminar(btn){
   // Se toca dos veces para no cerrarlo sin querer.
   if(Date.now()-CI.seguro>4000){CI.seguro=Date.now();btn.classList.add('seguro');btn.innerHTML='<span><b>¿Terminar? Tocá otra vez</b></span>';buzz(12);return;}
   ciGuardarAhora();
-  ciArchivar(CI.st);
-  CI.st=ciNuevo();LS.set('aramo_cierre',null);
-  ciCerrar(false);
-  toast('✓ Cierre guardado · lo ves en «Cierres guardados»','ok');
+  const e=ciArchivar(CI.st);
+  CI.st=ciNuevo();LS.set('aramo_cierre',null);ciInvalidar();
+  CI.hecho=e;ciPintar();
+  ciPdfObtener(e).catch(()=>{});   // el PDF se arma ya, así «Mandar a mi WhatsApp» responde en el mismo toque
+  buzz(16);toast('✓ Cierre guardado','ok');
 }
-function ciMensaje(c){
-  const L=['*Cierre de compras ARAMO*',hojaFecha(new Date(c.inicio))+(c.firma?' · '+c.firma:''),''];
-  c.provs.forEach(p=>{
-    L.push(`*${p.prov}* · ${CI_PAGO_NOMBRE[p.pago]} · ₡${fmt(p.total)}${p.tm!=null?` (${SIDE_ICO.moravia} ₡${fmt(p.tm)} · ${SIDE_ICO.angeles} ₡${fmt(p.ta)})`:''}`);
-    p.items.forEach(it=>{
-      const ped=(it.q!==it.pedido?` (pedí ${fmtQ(it.pedido)})`:'')+(it.ambas&&it.q>0?` → ${SIDE_ICO.moravia} ${fmtQ(it.qm)} · ${SIDE_ICO.angeles} ${fmtQ(it.qa)}`:'');
-      L.push(!(it.q>0)?`   ${it.t}: no vino (pedí ${fmtQ(it.pedido)} ${it.u})`:it.precio>0?`   ${fmtQ(it.q)} ${it.u} ${it.t} × ₡${fmt(it.precio)} = ₡${fmt(it.sub)}${ped}`:`   ${fmtQ(it.q)} ${it.u} ${it.t}: falta precio${ped}`);
-    });
-    p.mas.filter(x=>x.q>0).forEach(x=>L.push(`   + ${fmtQ(x.q)} ${x.t||'Otro'} × ₡${fmt(x.precio)} = ₡${fmt(x.sub)}${x.para?` (${CI_PARA[x.para]})`:''}`));
-    L.push('');
+// ── PDF del cierre: limpio y profesional (jsPDF, igual que el PDF del pedido) ──
+// ARAMO arriba, la fecha, cada proveedor con sus productos POR TIENDA, los pagos por método, el total de cada
+// tienda y el cuadre del efectivo. Se manda al WhatsApp propio como archivo.
+const CI_PDF={marca:[14,74,48],tinta:[17,24,39],suave:[104,112,108],raya:[225,229,226],fondo:[246,248,246],blanco:[255,255,255],
+  mor:[21,99,52],morF:[230,244,234],ang:[163,66,14],angF:[255,237,224],verde:[22,101,52],verdeF:[220,252,231],rojo:[185,28,28],rojoF:[254,226,226],azul:[30,64,175],azulF:[219,234,254],
+  pago:{efectivo:[[22,101,52],[220,252,231]],tarjeta:[[30,64,175],[219,234,254]],sinpe:[[88,28,135],[243,232,255]]}};
+const ciM=n=>hojaTxt('₡'+fmt(n));
+const ciQU=(q,u)=>hojaTxt(fmtQ(q)+(u?' '+u:''));
+function ciPdfDibujar(doc,c){
+  const C=CI_PDF,W=doc.internal.pageSize.getWidth(),H=doc.internal.pageSize.getHeight(),M=40,R=W-M,PIE=H-44;
+  let y=M,pag=1;
+  const fu=(sz,est='normal',col=C.tinta)=>{doc.setFont('helvetica',est);doc.setFontSize(sz);doc.setTextColor(...col);};
+  const tx=(s,x,yy,o={})=>doc.text(hojaTxt(s),x,yy,{baseline:'top',...o});
+  const caja=(x,yy,w,h,col,r=0)=>{doc.setFillColor(...col);if(r)doc.roundedRect(x,yy,w,h,r,r,'F');else doc.rect(x,yy,w,h,'F');};
+  const raya=(yy,col=C.raya,x1=M,x2=R,g=.6)=>{doc.setDrawColor(...col);doc.setLineWidth(g);doc.line(x1,yy,x2,yy);};
+  const ancho=(s,sz,est)=>{fu(sz,est);return doc.getTextWidth(hojaTxt(s));};
+  const cortar=(s,sz,est,max)=>{fu(sz,est);return doc.splitTextToSize(hojaTxt(s),max)[0]||'';};
+  const nueva=()=>{doc.addPage('letter');pag++;y=M;fu(9,'bold',C.marca);tx('ARAMO',M,y);fu(8.5,'normal',C.suave);tx('Cierre de compras · '+hojaFecha(new Date(c.inicio)),M+40,y+.7);raya(y+16,C.raya);y+=28;};
+  const espacio=h=>{if(y+h>PIE)nueva();};
+  const seccion=(t,extra=0)=>{espacio(34+extra);fu(9,'bold',C.marca);tx(t.toUpperCase(),M,y,{charSpace:.6});y+=15;};
+  // Columnas (bordes derechos): precio | Moravia cant. y monto | Los Ángeles cant. y monto
+  const X={pre:300,mc:364,mm:440,ac:504,am:R};
+  // Encabezado de la primera página
+  caja(M,y,30,30,C.marca,8);fu(19,'bold',C.blanco);tx('A',M+15,y+6,{align:'center'});
+  fu(19,'bold',C.marca);tx('ARAMO',M+40,y+1);fu(9.5,'normal',C.suave);tx('Cierre de compras',M+40,y+22);
+  fu(11,'bold',C.tinta);tx(hojaFecha(new Date(c.inicio)),R,y+3,{align:'right'});
+  fu(9,'normal',C.suave);tx(c.firma?'Compras hechas por '+c.firma:'Cierre de las compras del día',R,y+19,{align:'right'});
+  y+=40;raya(y,C.marca,M,R,1.2);y+=14;
+  // Tres cifras grandes: total y cada tienda
+  const cw=(R-M-16)/3,t=c.tiendas||{moravia:{total:0,compras:0,gastos:0},angeles:{total:0,compras:0,gastos:0}};
+  [['Total de compras'+(c.gastado?' y gastos':''),c.total,C.fondo,C.tinta,'Compras '+ciM(c.compras)+(c.gastado?' + gastos '+ciM(c.gastado):'')],
+   ['Moravia',t.moravia.total,C.morF,C.mor,'Compras '+ciM(t.moravia.compras)+(t.moravia.gastos?' + gastos '+ciM(t.moravia.gastos):'')],
+   ['Los Ángeles',t.angeles.total,C.angF,C.ang,'Compras '+ciM(t.angeles.compras)+(t.angeles.gastos?' + gastos '+ciM(t.angeles.gastos):'')]].forEach(([l,v,f,col,s],i)=>{
+    const x=M+i*(cw+8);caja(x,y,cw,62,f,8);
+    fu(8,'bold',col);tx(l.toUpperCase(),x+10,y+9,{charSpace:.4});fu(18,'bold',col);tx(ciM(v),x+10,y+23);fu(7.5,'normal',C.suave);tx(cortar(s,7.5,'normal',cw-16),x+10,y+47);
   });
-  const cambios=ciCambios(c);
-  if(cambios.length){L.push('*Precios que cambiaron*');cambios.forEach(it=>L.push(`   ${it.cambio>0?'▲':'▼'} ${it.t} (${it.prov}): ₡${fmt(it.ref)} → ₡${fmt(it.precio)} · ${ciCambioPct(it)}`));L.push('');}
-  if(c.gastos.length){L.push('*Gastos del viaje*');c.gastos.forEach(g=>L.push(`   ${g.t||'Gasto'} · ${CI_PAGO_NOMBRE[g.pago]} · ₡${fmt(g.monto)}`));L.push('');}
-  if(c.tiendas){
-    L.push('*Lo que gastó cada tienda*');
-    CI_TIENDAS.forEach(s=>{const t=c.tiendas[s];L.push(`${SIDE_ICO[s]} ${SIDE_NAME[s]}: *₡${fmt(t.total)}*`,`   ${ciTxtComp(t)}`,`   ${ciTxtPagos(t.pago)}`);});
-    L.push('');
+  y+=78;
+  // Compras por proveedor
+  if(c.provs.length){
+    seccion('Compras por proveedor',80);
+    c.provs.forEach(p=>{
+      const filas=[...p.items.map(it=>({it})),...p.mas.filter(x=>x.q>0).map(x=>({x}))];
+      espacio(22+26+16+18);
+      // Encabezado del proveedor: nombre, cómo se pagó y total
+      caja(M,y,R-M,22,C.fondo,6);fu(11,'bold',C.tinta);tx(p.prov,M+9,y+5.5);
+      const pg=C.pago[p.pago]||C.pago.efectivo,pn=CI_PAGOS.find(z=>z[0]===p.pago)?.[2]||'',pw=ancho(pn,8,'bold')+14;
+      fu(11,'bold',C.tinta);const tw=ancho(ciM(p.total),11,'bold');tx(ciM(p.total),R-9,y+5.5,{align:'right'});
+      caja(R-9-tw-10-pw,y+5,pw,12,pg[1],6);fu(8,'bold',pg[0]);tx(pn,R-9-tw-10-pw/2,y+8,{align:'center'});
+      y+=26;
+      // Títulos de columnas, con la tienda arriba
+      fu(7.5,'bold',C.mor);tx('MORAVIA',(X.mc+X.mm)/2+8,y,{align:'center',charSpace:.3});fu(7.5,'bold',C.ang);tx('LOS ÁNGELES',(X.ac+X.am)/2+8,y,{align:'center',charSpace:.3});
+      y+=10;raya(y,C.mor,X.mc-44,X.mm,.8);raya(y,C.ang,X.ac-44,X.am,.8);y+=3;
+      fu(7.5,'bold',C.suave);tx('Producto',M+4,y);tx('Precio',X.pre,y,{align:'right'});[['Cant.',X.mc],['Monto',X.mm],['Cant.',X.ac],['Monto',X.am]].forEach(([s,x])=>tx(s,x,y,{align:'right'}));
+      y+=12;
+      filas.forEach(({it,x},i)=>{
+        espacio(16);
+        if(i%2===0)caja(M,y-2.5,R-M,15,[250,251,250]);
+        if(it){
+          const no=!(it.q>0);fu(9,no?'italic':'normal',no?C.suave:C.tinta);tx(cortar(it.t,9,no?'italic':'normal',X.pre-M-62),M+4,y);
+          if(no){fu(8.5,'italic',C.suave);tx('No vino (pediste '+ciQU(it.pedido,it.u)+')',X.am,y+.3,{align:'right'});}
+          else{
+            fu(9,'normal',C.suave);tx(it.precio>0?ciM(it.precio):'-',X.pre,y,{align:'right'});
+            const una=(p,q,m,xc,xm,col)=>{if(p>0){fu(9,'normal',C.tinta);tx(ciQU(q,it.u),xc,y,{align:'right'});fu(9,'bold',col);tx(q>0&&it.precio>0?ciM(m):'-',xm,y,{align:'right'});}else{fu(9,'normal',[190,196,192]);tx('-',xm,y,{align:'right'});}};
+            una(it.pm,it.qm,it.sm,X.mc,X.mm,C.mor);una(it.pa,it.qa,it.sa,X.ac,X.am,C.ang);
+          }
+        }else{
+          fu(9,'normal',C.tinta);tx('+ '+cortar(x.t||'Otro',9,'normal',X.pre-M-96),M+4,y);fu(7,'italic',C.suave);tx('fuera del pedido',M+4+ancho('+ '+cortar(x.t||'Otro',9,'normal',X.pre-M-96),9,'normal')+5,y+1.6);
+          fu(9,'normal',C.suave);tx(x.precio>0?ciM(x.precio):'-',X.pre,y,{align:'right'});
+          const m=x.para==='moravia'||x.para==='mitad',a=x.para==='angeles'||x.para==='mitad',f=x.para==='mitad'?.5:1;
+          if(m){fu(9,'normal',C.tinta);tx(ciQU(x.q*f,x.u),X.mc,y,{align:'right'});fu(9,'bold',C.mor);tx(x.precio>0?ciM(x.sm):'-',X.mm,y,{align:'right'});}
+          if(a){fu(9,'normal',C.tinta);tx(ciQU(x.q*f,x.u),X.ac,y,{align:'right'});fu(9,'bold',C.ang);tx(x.precio>0?ciM(x.sa):'-',X.am,y,{align:'right'});}
+        }
+        y+=15;
+      });
+      espacio(22);raya(y,C.raya,M,R,.8);y+=5;
+      fu(9,'bold',C.tinta);tx('Total '+p.prov,M+4,y);
+      fu(9.5,'bold',C.mor);tx(ciM(p.tm),X.mm,y,{align:'right'});fu(9.5,'bold',C.ang);tx(ciM(p.ta),X.am,y,{align:'right'});
+      y+=26;
+    });
   }
-  L.push(`*Total: ₡${fmt(c.total)}*`,...CI_PAGOS.map(([k,e,n])=>`${e} ${n}: ₡${fmt(c.porPago[k])}`));
+  // Gastos del viaje
+  if(c.gastos.length){
+    seccion('Gastos del viaje',44);
+    fu(7.5,'bold',C.suave);tx('Gasto',M+4,y);tx('Pagado con',200,y);tx('Total',X.pre,y,{align:'right'});tx('Moravia',X.mm,y,{align:'right'});tx('Los Ángeles',X.am,y,{align:'right'});y+=12;
+    c.gastos.forEach((g,i)=>{
+      espacio(16);if(i%2===0)caja(M,y-2.5,R-M,15,[250,251,250]);
+      fu(9,'normal',C.tinta);tx(cortar(g.t||'Gasto',9,'normal',150),M+4,y);fu(9,'normal',C.suave);tx(CI_PAGOS.find(z=>z[0]===g.pago)?.[2]||'',200,y);
+      fu(9,'bold',C.tinta);tx(ciM(g.monto),X.pre,y,{align:'right'});fu(9,'normal',C.mor);tx(ciM(g.gm),X.mm,y,{align:'right'});fu(9,'normal',C.ang);tx(ciM(g.ga),X.am,y,{align:'right'});
+      y+=15;
+    });
+    y+=12;
+  }
+  // Pagos por método y total de cada tienda
+  seccion('Pagos y total de cada tienda',78);
+  const xs=[248,314,380,446,512,R];
+  fu(7.5,'bold',C.suave);['Compras','Gastos','Total','Efectivo','Tarjeta','SINPE'].forEach((s,i)=>tx(s,xs[i],y,{align:'right'}));
+  y+=12;
+  const fila=(nom,tt,col1,bold)=>{
+    espacio(20);
+    if(bold){raya(y-3,C.tinta,M,R,.8);}
+    fu(9.5,'bold',col1);tx(nom,M+4,y+1);
+    [tt.compras,tt.gastos,tt.total,tt.pago.efectivo,tt.pago.tarjeta,tt.pago.sinpe].forEach((v,i)=>{fu(i===2?10:9,i===2||bold?'bold':'normal',i===2?col1:C.tinta);tx(v||i===2?ciM(v):'-',xs[i],y+(i===2?.5:1),{align:'right'});});
+    y+=19;
+  };
+  fila('Moravia',t.moravia,C.mor);fila('Los Ángeles',t.angeles,C.ang);
+  fila('Total',{compras:c.compras,gastos:c.gastado,total:c.total,pago:c.porPago},C.tinta,true);
+  y+=10;
+  // Cuadre del efectivo
   if(c.llevo!=null){
-    L.push('',`Me llevé: ₡${fmt(c.llevo)}`,`Tienen que volver: ${ciTxtDebe(c)}`);
-    if(c.regreso!=null)L.push(`Regresé: ₡${fmt(c.regreso)}`);
-    L.push(`*${ciCuadre(c).txt}*`);
+    seccion('Cuadre del efectivo',100);
+    const cu=ciCuadre(c),bw=250,bx=M;
+    caja(bx,y,bw,98,C.fondo,8);
+    const l=(s,v,yy,b)=>{fu(9.5,b?'bold':'normal',C.tinta);tx(s,bx+12,yy);fu(9.5,'bold',C.tinta);tx(v,bx+bw-12,yy,{align:'right'});};
+    l('Me llevé',ciM(c.llevo),y+9);l('Pagué en efectivo','- '+ciM(c.porPago.efectivo),y+26);
+    raya(y+44,C.raya,bx+12,bx+bw-12);l('Tienen que volver',(c.debe<0?'- ':'')+ciM(Math.abs(c.debe)),y+51,true);
+    if(c.regreso!=null)l('Regresé',ciM(c.regreso),y+69);
+    const rc=c.regreso==null?[C.suave,C.fondo]:c.dif===0?[C.verde,C.verdeF]:c.dif<0?[C.rojo,C.rojoF]:[C.azul,C.azulF];
+    caja(bx+bw+14,y,R-bx-bw-14,98,rc[1],8);fu(8,'bold',rc[0]);tx('RESULTADO',bx+bw+28,y+13,{charSpace:.5});
+    fu(15,'bold',rc[0]);const rt=doc.splitTextToSize(hojaTxt(c.regreso==null?'Falta anotar lo que regresó':cu.txt.replace(/^✓\s*/,'')),R-bx-bw-42);doc.text(rt,bx+bw+28,y+34,{baseline:'top'});
+    y+=116;
   }
-  return L.join('\n');
+  // Precios que cambiaron
+  const cambios=ciCambios(c);
+  if(cambios.length){
+    seccion('Precios que cambiaron (desde 10 %)',34);
+    cambios.forEach((it,i)=>{
+      espacio(16);if(i%2===0)caja(M,y-2.5,R-M,15,[250,251,250]);
+      fu(9,'normal',C.tinta);tx(cortar(it.t+' · '+it.prov,9,'normal',260),M+4,y);
+      fu(9,'normal',C.suave);tx(ciM(it.ref)+'  >  ',X.mm-60,y,{align:'right'});fu(9,'bold',it.cambio>0?C.rojo:C.verde);tx(ciM(it.precio),X.mm-44,y,{align:'left'});
+      tx((it.cambio>0?'Subió ':'Bajó ')+ciCambioPct(it),X.am,y,{align:'right'});
+      y+=15;
+    });
+  }
+  // Pie de cada página
+  const total=doc.getNumberOfPages();
+  for(let i=1;i<=total;i++){
+    doc.setPage(i);raya(H-34,C.raya);
+    fu(7.5,'normal',C.suave);tx('ARAMO · Cierre de compras · '+hojaFecha(new Date(c.inicio)),M,H-28);tx(`Página ${i} de ${total}`,R,H-28,{align:'right'});
+  }
+  return{paginas:total};
 }
-function ciMandar(c){window.open(`https://wa.me/${normalizeCostaRicaPhone(hojaMiNumero())}?text=${encodeURIComponent(ciMensaje(c))}`,'_blank');}
+async function ciPdfHacer(c){
+  await hojaCargarJsPDF();
+  const doc=new window.jspdf.jsPDF({unit:'pt',format:'letter'});
+  const info=ciPdfDibujar(doc,c);
+  const nombre=`Cierre ARAMO ${auDiaTxt(new Date(c.inicio))}${c.firma?' '+c.firma:''}.pdf`;
+  doc.setProperties({title:nombre.replace(/\.pdf$/,''),author:'ARAMO'});
+  return{...info,file:new File([doc.output('blob')],nombre,{type:'application/pdf'})};
+}
+// Un cierre guardado no cambia: su PDF se arma una vez y se reutiliza (así al tocar «WhatsApp» el teléfono todavía deja compartir).
+function ciPdfObtener(c){
+  const k=c.id||'ahora';
+  if(!CI.pdf.has(k))CI.pdf.set(k,ciPdfHacer(c).catch(err=>{CI.pdf.delete(k);throw err;}));
+  return CI.pdf.get(k);
+}
+function ciPdfBajar(f){
+  const u=URL.createObjectURL(f),a=document.createElement('a');
+  a.href=u;a.download=f.name;document.body.appendChild(a);a.click();a.remove();
+  setTimeout(()=>URL.revokeObjectURL(u),60000);
+}
+// «Ver en PDF»: se abre la pestaña en el mismo toque (si no, el teléfono la bloquea) y se llena cuando el PDF está listo.
+async function ciPdfVer(c){
+  const win=window.open('','_blank');
+  toast('Armando el PDF…');
+  try{
+    const r=await ciPdfObtener(c),u=URL.createObjectURL(r.file);
+    if(win&&!win.closed)win.location.href=u;
+    else if(!window.open(u,'_blank')){ciPdfBajar(r.file);toast('⬇️ PDF descargado','ok');}
+    setTimeout(()=>URL.revokeObjectURL(u),300000);
+  }catch(err){try{win?.close();}catch{}toast('No se pudo armar el PDF','err');}
+}
+// «Mandar el cierre a mi WhatsApp»: en el teléfono se comparte el ARCHIVO PDF (sale WhatsApp en la lista).
+// En la compu se descarga el PDF y se abre el chat propio con una línea corta: se adjunta con el clip.
+async function ciPdfWhatsApp(c){
+  const linea=`Cierre de compras ARAMO · ${hojaFecha(new Date(c.inicio))} · Total ₡${fmt(c.total)}`;
+  let r;
+  try{toast('Armando el PDF…');r=await ciPdfObtener(c);}catch(err){toast('No se pudo armar el PDF','err');return;}
+  if(hojaPuedeCompartir()){
+    try{await navigator.share({files:[r.file],title:r.file.name.replace(/\.pdf$/,''),text:linea});return;}
+    catch(e){
+      if(e?.name==='AbortError')return;
+      if(e?.name==='NotAllowedError'){toast('Listo el PDF · tocá otra vez para mandarlo','ok');return;}   // el toque ya venció: el PDF queda armado
+    }
+  }
+  ciPdfBajar(r.file);
+  window.open(`https://wa.me/${normalizeCostaRicaPhone(hojaMiNumero())}?text=${encodeURIComponent(linea+'\n(adjunto el PDF que se descargó)')}`,'_blank');
+  toast('⬇️ PDF descargado · adjuntalo en WhatsApp','ok');
+}
 function xpRenderPedido(){
   const body=$('pedidoBody');if(!body)return;
   const sides=activeOrderSides(),dos=sides.length>1;
@@ -2183,7 +2478,7 @@ function xpOcultarProductoEnPOS(prod,side){
 function xpPedidoClick(e){
   const b=e.target.closest('[data-pd]');if(!b)return;
   const act=b.dataset.pd,prov=b.dataset.prov;
-  if(act==='go')return switchView('proveedores');
+  if(act==='go'){XP.verProv=true;try{return switchView('proveedores');}finally{XP.verProv=false;}}   // desde un Pedido vacío sí se puede ir a Proveedores
   if(act==='line')return xpOpenSheet(prov,b.dataset.pid);
   if(act==='open')return openProv(prov);
   if(act==='send'){if(scopeSide()!=='both'){toast('El envío está disponible en la vista Ambos','err');return;}if(!buildMsg(prov,'both')){toast('El pedido está vacío','err');return;}S.currentProv=prov;sendWA('both');setTimeout(xpRefresh,250);return;}
@@ -2277,6 +2572,11 @@ window.xpDailyRollover=xpDailyRollover;
 window.xpDailyReady=()=>{window._aramoPedidoListo=true;xpDailyRollover();};
 setInterval(()=>xpDailyRollover(),30000);
 document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='visible')xpDailyRollover();});
+// El «Deshacer» del reinicio también se ve en Pedido (en Ambos el reinicio se hace desde ahí).
+function xpPedidoUndo(){
+  const n=$('pedidoUndo');
+  if(n)n.innerHTML=XP.undo&&Date.now()-XP.undo.at<120000?`<div class="pd-undo">Pedido reiniciado. <button type="button" data-inventory-undo>Deshacer</button></div>`:'';
+}
 function xpUndoReset(){
   const u=XP.undo;if(!u)return;
   Object.entries(u.data).forEach(([prov,old])=>{
@@ -2365,7 +2665,8 @@ function xpRefresh(){
       else if($('pvSearch')?.value.trim())xpSearchRun();
       else xpRenderProveedores();
     }
-    if($('view-pedido')?.classList.contains('active'))xpRenderPedido();
+    if($('view-pedido')?.classList.contains('active')){xpRenderPedido();xpPedidoUndo();}
+    if($('view-cierre')?.classList.contains('active')&&!$('sxCierre')?.classList.contains('open'))ciRenderTab();
     if($('view-prov')?.classList.contains('active')&&S.currentProv){renderProdTable();updateProvTotals();updatePreview();renderProvStatus();xpRenderProvSuggest();}
   });
 }
@@ -2381,19 +2682,28 @@ const VIEW_MAP={home:'proveedores',express:'proveedores',resumen:'pedido',mercad
 const _switchView=window.switchView;
 window.switchView=function(name){
   name=VIEW_MAP[name]||name;
+  // En Ambos no hay pestaña «Proveedores» (los pedidos ya se hacen en cada tienda): se cae en Pedido. En una sola tienda no hay «Cierre de compras».
+  if(name==='proveedores'&&scopeSide()==='both'&&!XP.verProv)name='pedido';
+  if(name==='cierre'&&scopeSide()!=='both')name='proveedores';
   ['xpSheet','xpChain'].forEach(id=>{if($(id)?.classList.contains('open'))xpClose(id);});
   if(typeof cerrarEditorProv==='function')cerrarEditorProv();
   $('modalProvList')?.classList.remove('open');
   _switchView(name);
-  const tools=$('inventoryTools');if(tools)tools.hidden=name!=='proveedores';
+  // «↻ Reiniciar» (una tienda a la vez) sigue a mano en Ambos: como ya no hay Proveedores, sale arriba en Pedido.
+  const tools=$('inventoryTools');if(tools)tools.hidden=!(name==='proveedores'||(name==='pedido'&&scopeSide()==='both'));
   const resetMenu=$('inventoryResetMenu'),resetBtn=$('inventoryResetBtn');if(resetMenu)resetMenu.hidden=true;if(resetBtn)resetBtn.setAttribute('aria-expanded','false');
   window.scrollTo(0,0);
-  if(name==='pedido'){_pdEntrar=true;xpRenderPedido();}
+  if(name==='pedido'){_pdEntrar=true;xpRenderPedido();xpPedidoUndo();}
+  if(name==='cierre')ciRenderTab();
   if(name==='proveedores')xpRenderProveedores();
   xpRenderBadge();
 };
 wrap('renderHome',()=>xpRefresh());
-wrap('chooseOrderScope',()=>xpRefresh());
+wrap('chooseOrderScope',()=>{
+  // Al cambiar de tienda desde la pestaña Cierre (solo de Ambos), se vuelve a Proveedores.
+  if(scopeSide()!=='both'&&$('view-cierre')?.classList.contains('active'))switchView('proveedores');
+  xpRefresh();
+});
 wrap('openProv',()=>xpRenderProvSuggest());
 
 // ── Enlaces de eventos ──
@@ -2410,6 +2720,7 @@ $('inventoryTools')?.addEventListener('click',e=>{
   }
 });
 $('inventoryResetNotice')?.addEventListener('click',e=>{if(e.target.closest('[data-inventory-undo]'))xpUndoReset();});
+$('pedidoUndo')?.addEventListener('click',e=>{if(e.target.closest('[data-inventory-undo]'))xpUndoReset();});
 document.addEventListener('click',e=>{if(e.target.closest('#inventoryTools'))return;const menu=$('inventoryResetMenu');if(menu&&!menu.hidden){menu.hidden=true;$('inventoryResetBtn')?.setAttribute('aria-expanded','false');}});
 document.addEventListener('keydown',e=>{if(e.key!=='Escape')return;const menu=$('inventoryResetMenu');if(menu&&!menu.hidden){menu.hidden=true;$('inventoryResetBtn')?.setAttribute('aria-expanded','false');$('inventoryResetBtn')?.focus();}});
 // La altura del menú de abajo: las fichas se abren encima de él, así siempre se puede tocar.
