@@ -804,7 +804,11 @@ function totalAntesDe(o){return redondear5(Math.max(0,(o?.items||[]).reduce((t,i
 function porConfirmar(o){
   if(!o||o.cobro||o.estado==='cancelado'||o.estado==='entregado')return false;
   if(faseDe(o)==='confirmacion')return true;
-  if(o.confirmacion&&o.confirmacion.at)return Math.abs(totalDe(o)-(+o.confirmacion.total||0))>=1;
+  if(o.confirmacion&&o.confirmacion.at){
+    // lo que aceptó: el monto de su confirmación; si una confirmación vieja no lo trae, el de la cotización; si tampoco, vale como confirmado
+    const acepto=+o.confirmacion.total||+(o.cotizacion&&o.cotizacion.total)||+o.totalFinal||0;
+    return acepto>0&&Math.abs(totalDe(o)-acepto)>=1;
+  }
   return cambiosDe(o).length>0;
 }
 function faseDe(o){
