@@ -180,17 +180,25 @@ document.addEventListener('click',async e=>{
 });
 
 // ══════════════ Datos vivos del Surtido ══════════════
+// Lo del pedido a proveedores que se ve en el Inicio: SOLO de la tienda de este aparato (las tiendas son aparte).
+// En "Las dos" se cuentan las dos, separadas. "Por enviar" mira lo enviado de ESA tienda (no la marca general).
 function surtidoResumen(){
-  let prods=0;const provs=new Set(),sinEnviar=new Set();
+  const lados=LOCAL==='moravia'?['moravia']:LOCAL==='angeles'?['angeles']:['moravia','angeles'];
+  let prods=0;const provs=new Set(),sinEnviar=new Set(),porTienda={moravia:new Set(),angeles:new Set()};
+  const enviado=(p,side)=>{const b=p?.sentByBranch||p?.notes?.__sentByBranch;return b&&typeof b==='object'&&side in b?!!b[side]:!!p?.sent;};
   try{
     Object.entries(S.pedidos||{}).forEach(([prov,p])=>{
-      ['moravia','angeles'].forEach(side=>{
-        Object.values(p?.qtys?.[side]||{}).forEach(v=>{if(+v?.qty>0){prods++;provs.add(prov);if(!p.sent)sinEnviar.add(prov);}});
-        if((p?.extras?.[side]||[]).some(x=>x&&(x.name||x.n))){provs.add(prov);if(!p.sent)sinEnviar.add(prov);}
+      lados.forEach(side=>{
+        let hay=false;
+        Object.values(p?.qtys?.[side]||{}).forEach(v=>{if(+v?.qty>0){prods++;hay=true;}});
+        (p?.extras?.[side]||[]).forEach(x=>{if(x&&(x.name||x.n)&&+(x.qty??1)>0){prods++;hay=true;}});
+        if(!hay)return;
+        provs.add(prov);
+        if(!enviado(p,side)){sinEnviar.add(prov);porTienda[side].add(prov);}
       });
     });
   }catch{}
-  return{prods,provs:provs.size,sinEnviar:sinEnviar.size};
+  return{prods,provs:provs.size,sinEnviar:sinEnviar.size,porTienda:{moravia:porTienda.moravia.size,angeles:porTienda.angeles.size},dos:lados.length>1};
 }
 // Cuándo se puso cada costo (precios.updated_at, solo lectura): si un producto lo trae más de un proveedor, vale el costo más nuevo.
 const costoT={};let _costoTc=0;
@@ -397,9 +405,9 @@ function datosInicio(sr,a,c){
       lista:ultimos.length?ultimos.map(o=>`<div class="po6-ped"><b>${esc(o.ref)}</b><span>${esc(o.cliente?.nombre||'')}</span><em>${esc((est[o.estado]||(()=>''))(o))}</em></div>`).join(''):'<p class="po6-ped-vacio">Todavía no hay pedidos hoy.</p>',
     },
     s6:{sub:'Pedido a proveedores',
-       ins:(sr.sinEnviar?`<span class="ui-estado ui-estado--pendiente">${ICO('reloj',16)}${sr.sinEnviar} por enviar</span>`:'')+`<span class="ui-estado">${sr.prods?pl(sr.prods,'producto','productos'):'Pedido vacío'}</span>`},
+       ins:(sr.sinEnviar?(sr.dos?['moravia','angeles'].filter(k=>sr.porTienda[k]).map(k=>`<span class="ui-estado ui-estado--pendiente">${ICO('reloj',16)}${k==='moravia'?'Moravia':'Los Ángeles'}: ${sr.porTienda[k]} por enviar</span>`).join(''):`<span class="ui-estado ui-estado--pendiente">${ICO('reloj',16)}${sr.sinEnviar} por enviar</span>`):'')+`<span class="ui-estado">${sr.prods?pl(sr.prods,'producto','productos'):'Pedido vacío'}</span>`},
     t6:{sub:'Tienda en línea de los clientes',ins:a.length?`<span class="ui-estado ui-estado--pendiente">${ICO('reloj',16)}${a.length} en curso</span>`:''},
-    p6:{sub:'Caja de '+zona},pos2:LOCAL==='angeles',
+    p6:{sub:'Caja de '+zona},pos2:LOCAL==='moravia'||LOCAL==='angeles',   // las dos tiendas: POS de la compu y POS celular
     c6:{sub:'Los Ángeles · cierres y gastos'},
   };
 }

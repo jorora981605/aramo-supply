@@ -146,7 +146,7 @@ const PUERTAS6=[
 ];
 // En la pantalla principal el POS puede abrirse completo en computadora o rápido en celular.
 const mitadPos=(k,i,n,s)=>`<button type="button" class="po6-door po6-door--pos po6-door--mitad" data-pu="${k}" aria-label="Abrir ARAMO POS ${n.toLowerCase()}">
-      <span class="po6-door-tx"><span class="ui-cuadro ui-cuadro--l ui-cuadro--pos">${ic(i,24)}</span><span class="po6-mitad-n"><small>ARAMO POS</small><b>${n}</b></span><span class="po6-door-sub">${s}</span></span></button>`;
+      <span class="po6-door-tx"><span class="ui-cuadro ui-cuadro--l ui-cuadro--pos">${ic(i,24)}</span><span class="po6-mitad-n"><small>ARAMO POS</small><b>${n}</b></span>${/^[a-z0-9]+\.[a-z]+$/i.test(s)?`<span class="po6-door-sub" data-d="${s}"></span>`:`<span class="po6-door-sub">${s}</span>`}</span></button>`;   // "p6.sub" = Caja de <tienda>
 function v6(){
   return `<header class="po6-cab">
     <div class="po6-logo" aria-label="ARAMO">ARAMO${ic('hoja',16)}</div>
@@ -168,7 +168,7 @@ function v6(){
       <span class="po6-door-tx"><span class="po6-door-nom"><span class="ui-cuadro ui-cuadro--l ui-cuadro--${p.c}">${ic(p.i,24)}</span><b>${esc(p.n)}</b><kbd>${p.tecla}</kbd></span>
         <span class="po6-door-sub" data-d="${p.sub}"></span>${p.ins?`<span class="po6-door-ins" data-dh="${p.ins}"></span>`:''}</span>
       ${p.fotos?`<span class="po6-collage" aria-hidden="true">${p.fotos.map(foto).join('')}</span>`:`<span class="po6-collage po6-collage--ico" aria-hidden="true">${ic(p.i,72)}</span>`}
-     </button>${p.k==='pos'?mitadPos('pos-compu','pantalla','Computadora','El POS completo')+mitadPos('pos-celular','sinpe','Celular','Cobrar rápido')+'</div>':''}`).join('')}</div>
+     </button>${p.k==='pos'?mitadPos('pos-compu','pantalla','Computadora','p6.sub')+mitadPos('pos-celular','sinpe','Celular','Cobrar rápido')+'</div>':''}`).join('')}</div>
   </div>
   <footer class="po6-pie">Caja web hoy <b data-d="caja.total"></b> · <b data-d="t.activos"></b> en curso · <b data-d="s.prods"></b> por pedir</footer>`;
 }
