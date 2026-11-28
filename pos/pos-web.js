@@ -909,7 +909,9 @@ function montarPedidoWeb(){
     const n=feriaMontarPendientes();setTimeout(()=>feriaPanelIniciar(),400);
     if(id&&d&&d.id===id){
       window.posTiquetes.montar({id,ref:d.ref||'',nombre:'🧺 '+((d.cliente&&d.cliente.nombre)||'Cliente'),lineas:feriaLineas(d)});
-      feriaGuardar([...feriaPendientes().filter(x=>x.id!==id),{id,ref:d.ref||'',nombre:'🧺 '+((d.cliente&&d.cliente.nombre)||'Cliente'),t:Date.now(),lineas:feriaLineas(d)}]);
+      const oN=NUBE()&&NUBE().get(id);
+      feriaGuardar([...feriaPendientes().filter(x=>x.id!==id),{id,ref:d.ref||'',nombre:'🧺 '+((d.cliente&&d.cliente.nombre)||'Cliente'),t:Date.now(),lineas:feriaLineas(d),
+        visto:oN&&oN.ultimoCambio&&oN.ultimoCambio.at||'',pedQ:Object.fromEntries(((oN&&oN.items)||d.items||[]).map(it=>[it.k||it.n,+it.q||0]))}]);
       feriaPanelIniciar(id);
     }else if(n)aviso('🧺 '+(n===1?'Hay 1 pedido de La Feria listo':'Hay '+n+' pedidos de La Feria listos')+' para cobrar: elegí su tiquete y tocá F12.');
   };
@@ -931,7 +933,28 @@ function feriaLineasTk(id){
   const t=window.posTiquetes&&window.posTiquetes.leer(id);
   return t?(t.cart||[]).map(c=>({k:c.feriaK||'',n:c.nombre,q:+c.cantidad||0,p:+c.precio_cobrado||0,u:c.unidad==='kg'?'kg':'unid',pid:c.productoId||null})):null;
 }
+// Si el cliente cambia su pedido en La Feria mientras su tiquete está aquí: lo nuevo entra al tiquete, lo que quitó sale y lo que
+// cambió de cantidad queda con la cantidad nueva (hay que pesarlo). Lo que se sabe de cada pedido se guarda en su fila de pendientes.
+function feriaSincCambios(id){
+  const n=NUBE(),o=n&&n.get(id),t=window.posTiquetes&&window.posTiquetes.leer(id);if(!o||!t)return;
+  const P=feriaPendientes(),p=P.find(x=>x.id===id)||{id,ref:o.ref||'',nombre:t.nombre,t:Date.now(),lineas:[]};
+  const uc=o.ultimoCambio&&o.ultimoCambio.at||'';
+  if(p.visto===undefined||!p.pedQ){p.visto=uc;p.pedQ=Object.fromEntries((o.items||[]).map(it=>[it.k||it.n,+it.q||0]));feriaGuardar([...P.filter(x=>x.id!==id),p]);return;}
+  if(!uc||uc===p.visto)return;
+  const claves=new Set((o.items||[]).map(it=>it.k||it.n));
+  let L=(t.cart||[]).filter(c=>!c.feriaK||claves.has(c.feriaK)).map(c=>({k:c.feriaK||'',pid:c.productoId||null,nombre:c.nombre,precio:+c.precio_cobrado||0,cantidad:+c.cantidad||0,unidad:c.unidad==='kg'?'kg':'unidad',tasa:+c.tasa_impuesto||0,cabys:c.cabys_codigo||''}));
+  for(const it of o.items||[]){
+    const k=it.k||it.n,l=L.find(x=>x.k===k);
+    if(!l){if(it.estado!=='nohay')L.push(...feriaLineas({items:[{...it,qr:null}]}));continue;}
+    if(Math.abs((+it.q||0)-(+p.pedQ[k]||0))>1e-9)l.cantidad=+it.q||0;
+  }
+  p.visto=uc;p.pedQ=Object.fromEntries((o.items||[]).map(it=>[it.k||it.n,+it.q||0]));p.lineas=L;
+  feriaGuardar([...P.filter(x=>x.id!==id),p]);
+  window.posTiquetes.montar({id,ref:o.ref||'',nombre:t.nombre,lineas:L});
+  aviso('✏️ '+((o.cliente&&o.cliente.nombre)||'El cliente')+' cambió su pedido: '+((o.ultimoCambio.lineas||[]).slice(0,3).join(' · ')||'revisalo'));
+}
 function feriaEstado(id){
+  try{feriaSincCambios(id);}catch(e){console.warn('[feria] cambios del cliente',e);}
   const n=NUBE(),C=COTZ(),o=n&&n.get(id),L=feriaLineasTk(id);
   if(!o||!L||!C)return{id,o,L,st:o?'cobrar':'sin'};
   return{id,o,L,st:C.estado(o,L)};

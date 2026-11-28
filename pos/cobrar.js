@@ -337,28 +337,52 @@ function pintarPedidos(){
   if(nuevos>S.nPedidos)vib([30,60,30,60,60]);
   S.nPedidos=nuevos;
 }
+// Una línea de la cuenta para un producto del pedido. El precio es el que vio el cliente en La Feria (si se cambia, el cliente
+// confirma el total nuevo antes de cobrar); el del POS solo si el pedido no trae precio. El producto del POS igual queda unido.
+function lineaDePedido(it){
+  if(it.estado==='nohay')return null;
+  const q=Math.round((+(it.qr!=null&&it.qr!==''?it.qr:it.q)||0)*1000)/1000;if(!(q>0))return null;
+  const u=it.u==='kg'?'kg':/^unid/i.test(it.u||'')?'unidad':(it.u||'unidad');
+  const p=S.prods.find(x=>x._n===norm(it.n)&&x.unidad===u&&+x.precio>0)||null,pOrd=+(it.pr!=null&&it.pr!==''?it.pr:it.p)||0,pr=p&&!(pOrd>0)?precioDe(p):null;
+  const pc=pOrd>0?pOrd:(pr?pr.pf:0);
+  const pp=p||preparar({id:null,nombre:it.n||'Producto',precio:pc,unidad:u,emoji:it.e||'',categoria_color:'#9E9E9E'});
+  return{id:idNuevo(),pid:p?p.id:null,n:pp.nombre,e:pp._e,f:pp._f,col:pp._col,u,ti:+(p&&p.tasa_impuesto)||0,pu:pr?+p.precio:pc,pf:pc,pc,q,sub:Math.round(pc*q),
+    promo_id:pr?pr.id:null,promo_txt:pr?pr.txt:'',gen:p?0:1,cabys:'',ped:it.k||it.n,pedQ:+it.q||0};
+}
 function cuentaDePedido(o){
   const c=o.cliente||{};
   const t={id:idNuevo(),k:0,n:String(c.nombre||'').trim().slice(0,40),tel:telLimpio(c.tel),items:[],desc:null,
-    pedido:{id:o.id,ref:o.ref||'',cuando:o.retiro&&o.retiro.at||'',envio:!!(o.retiro&&o.retiro.envio),pago:o.pago&&o.pago.metodo||''}};
-  for(const it of o.items||[]){
-    if(it.estado==='nohay')continue;
-    const q=Math.round((+(it.qr!=null&&it.qr!==''?it.qr:it.q)||0)*1000)/1000;if(!(q>0))continue;
-    const u=it.u==='kg'?'kg':/^unid/i.test(it.u||'')?'unidad':(it.u||'unidad');
-    // el precio es el que vio el cliente en La Feria (si se cambia, el cliente confirma el total nuevo antes de cobrar);
-    // el del POS solo si el pedido no trae precio. El producto del POS igual queda unido (inventario y CABYS).
-    const p=S.prods.find(x=>x._n===norm(it.n)&&x.unidad===u&&+x.precio>0)||null,pOrd=+(it.pr!=null&&it.pr!==''?it.pr:it.p)||0,pr=p&&!(pOrd>0)?precioDe(p):null;
-    const pc=pOrd>0?pOrd:(pr?pr.pf:0);
-    const pp=p||preparar({id:null,nombre:it.n||'Producto',precio:pc,unidad:u,emoji:it.e||'',categoria_color:'#9E9E9E'});
-    t.items.push({id:idNuevo(),pid:p?p.id:null,n:pp.nombre,e:pp._e,f:pp._f,col:pp._col,u,ti:+(p&&p.tasa_impuesto)||0,pu:pr?+p.precio:pc,pf:pc,pc,q,sub:Math.round(pc*q),
-      promo_id:pr?pr.id:null,promo_txt:pr?pr.txt:'',gen:p?0:1,cabys:'',ped:it.k||it.n});
-  }
+    pedido:{id:o.id,ref:o.ref||'',cuando:o.retiro&&o.retiro.at||'',envio:!!(o.retiro&&o.retiro.envio),pago:o.pago&&o.pago.metodo||'',cambioVisto:o.ultimoCambio&&o.ultimoCambio.at||''}};
+  for(const it of o.items||[]){const l=lineaDePedido(it);if(l)t.items.push(l);}
   const envio=+(o.retiro&&o.retiro.envio&&o.retiro.envio.costo)||0;
   if(envio>0)t.items.push({id:idNuevo(),pid:null,n:'Envío',e:'🛵',f:'',col:'#9E9E9E',u:'unidad',ti:0,pu:envio,pf:envio,pc:envio,q:1,sub:Math.round(envio),promo_id:null,promo_txt:'',gen:1,cabys:'',ped:'__envio'});
   if(o.premio&&+o.premio.valor>0)t.desc={tipo:'monto',valor:+o.premio.valor};
   const vacia=S.tk.find(x=>!x.items.length&&!x.n&&!x.pedido); // la cuenta vacía se aprovecha
   if(vacia){t.k=vacia.k;S.tk[S.tk.indexOf(vacia)]=t;}else{S.seq=S.tk.length?S.seq+1:1;t.k=S.seq;S.tk.push(t);}
   return t;
+}
+// Si el cliente cambia su pedido en La Feria (agrega, quita o cambia cantidades) mientras está en una cuenta de aquí,
+// la cuenta se pone al día sola: lo nuevo entra, lo que quitó sale, lo que cambió queda con la cantidad nueva (hay que pesarlo),
+// y el teléfono dice qué cambió (pedQ = la cantidad que pedía el cliente cuando se armó la línea). Lo agregado aquí en el POS (sin producto del pedido) se queda.
+function sincCambiosCliente(){
+  if(!N)return false;let algo=false;
+  for(const t of S.tk){
+    if(!t.pedido||estadoPedido(t))continue;
+    const o=N.get(t.pedido.id),uc=o&&o.ultimoCambio;
+    if(!uc||!uc.at||uc.at===t.pedido.cambioVisto)continue;
+    t.pedido.cambioVisto=uc.at;algo=true;
+    const claves=new Set((o.items||[]).map(it=>it.k||it.n));
+    t.items=t.items.filter(l=>!l.ped||l.ped==='__envio'||claves.has(l.ped));
+    for(const it of o.items||[]){
+      const k=it.k||it.n,l=t.items.find(x=>x.ped===k);
+      if(!l){const nl=lineaDePedido(it);if(nl){const env=t.items.findIndex(x=>x.ped==='__envio');if(env>=0)t.items.splice(env,0,nl);else t.items.push(nl);}continue;}
+      if(l.pedQ!=null&&Math.abs((+it.q||0)-l.pedQ)>1e-9){const q=Math.round((+it.q||0)*1000)/1000;l.pedQ=+it.q||0;if(q>0){l.q=q;l.sub=Math.round(l.pc*q);}} // el cliente cambió la cantidad: hay que volver a pesarlo
+    }
+    sincEnvio(t);
+    vib([60,40,60]);aviso(`✏️ ${nombreTk(t)} cambió su pedido: ${(uc.lineas||[]).slice(0,3).join(' · ')||'revisalo'}`,7000);
+  }
+  if(algo)guardar();
+  return algo;
 }
 const marcaCaja=()=>({donde:'POS celular',disp:miDisp(),n:miNombre(),at:new Date().toISOString()});
 async function aceptarPedido(id){
@@ -432,6 +456,7 @@ function avisoConfirmados(){
 async function pedidoLibre(t){
   if(!N||!t.pedido)return true;
   await N.refrescarPedido(t.pedido.id).catch(()=>null);
+  if(sincCambiosCliente()){repintarVenta();return false;} // el cliente cambió algo: primero se ve qué
   const e=estadoPedido(t);
   if(!e)return true;
   if(e==='cobrado'||e==='entregado'){aviso(AVISO_PED[e][0]+'. No se cobra dos veces.',5200);repintarVenta();return false;}
@@ -1139,6 +1164,7 @@ const ACC={
   async 'cot-mandar'(){
     const t=tk();if(!t.pedido||!N||!COT)return;
     await N.refrescarPedido(t.pedido.id).catch(()=>null);
+    if(sincCambiosCliente())repintarVenta();
     if(estadoPedido(t)){repintarVenta();return;}
     let o=N.get(t.pedido.id);if(!o)return aviso('No encuentro ese pedido');
     const L=lineasDe(t),dif=COT.diferencias(o,L);
@@ -1337,7 +1363,7 @@ function callarAvisoViejo(){try{const pt=D.getElementById('pwToast');if(!pt)retu
     pintar();despierto();
     if(BA&&BA.recordada())BA.reconectarSola().catch(()=>{});
     if(N){ // los pedidos de La Feria, en vivo (los mismos que ve el Mostrador)
-      try{N.on(()=>{avisoConfirmados();if(vista()==='venta'&&hojaEl.hidden){if(S.q)pintarPedidos();else repintarVenta();}});N.conectar().then(()=>{if(vista()==='venta')pintarPedidos();}).catch(()=>{});}catch{}
+      try{N.on(()=>{sincCambiosCliente();avisoConfirmados();if(vista()==='venta'&&hojaEl.hidden){if(S.q)pintarPedidos();else repintarVenta();}});N.conectar().then(()=>{if(vista()==='venta')pintarPedidos();}).catch(()=>{});}catch{}
       const pid=new URLSearchParams(location.search).get('pedido');
       if(pid&&!S.tk.some(t=>t.pedido&&t.pedido.id===pid)){S.pedidoUrl=pid;if(S.caja)setTimeout(abrirPedidoUrl,400);}
       try{if(pid)history.replaceState(history.state,'',location.pathname+'?suc='+encodeURIComponent(S.suc));}catch{}
