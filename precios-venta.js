@@ -22,11 +22,13 @@ function visibles(){
   return s==='moravia'?['moravia']:s==='angeles'?['angeles']:TIENDAS.slice();
 }
 function idDe(nombre){const c=C();return c?c.idDe(nombre):String(nombre||'').toLowerCase();}
+const _idx={};   // por tienda: el catálogo del POS indexado por id (se rehace solo si el catálogo cambió)
 function delPOS(suc,id){
   const c=C();if(!c||!c.posDe)return null;
   const L=c.posDe(suc)||{};
-  for(const k in L){const x=L[k];if(x&&x.id===id)return x;}
-  return null;
+  let e=_idx[suc];
+  if(!e||e.L!==L){const m=new Map();for(const k in L){const x=L[k];if(x&&x.id&&!m.has(x.id))m.set(x.id,x);}e=_idx[suc]={L,m};}
+  return e.m.get(id)||null;
 }
 // {p, pend, origen:'pos'|'inventario', u} o null si esa tienda no tiene precio todavía
 function precio(suc,nombre){

@@ -46,7 +46,7 @@ function fq(n){n=+n||0;if(Number.isInteger(n))return String(n);const w=Math.floo
 const UNIDADES=[['kg','kilo (kg)'],['unid','unidad'],['rollo','rollo / mazo'],['paquete','paquete'],['bolsa','bolsa'],['bolsita','bolsita'],['cartón','cartón'],['frasco','frasco'],['botella','botella']];
 const UNI={kg:'kg',unid:'unid.',rollo:'rollo',paquete:'paq.',bolsita:'bolsita',bolsa:'bolsa','cartón':'cartón',frasco:'frasco',botella:'botella'};
 const qtxt=(q,u)=>fq(q)+' '+(UNI[u]||u);
-const kg=n=>(Math.round((+n||0)*1000)/1000).toLocaleString('es-CR',{maximumFractionDigits:3});
+const _nfKg=new Intl.NumberFormat('es-CR',{maximumFractionDigits:3});const kg=n=>_nfKg.format(Math.round((+n||0)*1000)/1000);
 const telDig=t=>String(t||'').replace(/\D/g,'').replace(/^506/,'');
 const fmtTel=t=>{const d=telDig(t);return d.length===8?d.slice(0,4)+'-'+d.slice(4):d;};
 const MAD={hoy:'para comer hoy',semana:'para la semana',verde:'bien verde'};
@@ -431,6 +431,7 @@ function pintarPuerta(){
     return;
   }
   const raiz=$('puIn');if(!raiz||!window.AramoPortadas)return;
+  if(!$('puerta')?.classList.contains('open'))return;   // no se ve: se dibuja al abrirla (abrirPuerta la abre antes de pintar)
   const v=window.AramoPortadas.pintar(raiz,datosPuerta());
   // El Control es SOLO de Los Ángeles (LASR): su puerta sale únicamente si la tienda de este aparato es Los Ángeles
   // (en Moravia, o sin tienda escogida —que cuenta como Moravia—, no sale).

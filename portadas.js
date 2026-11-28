@@ -186,9 +186,12 @@ function llenar(root,D){
 // Los botones de arriba van en una sola fila: si no caben, "↻ Reiniciar" queda solo con su ícono.
 function ajustarHerramientas(root){
   root.querySelectorAll('.po-tools').forEach(t=>{
-    t.classList.remove('apretado');
+    // se mide como está (sin quitar la clase antes, que obligaba a recalcular la pantalla): si ya está apretado y ahora sobra lugar, se prueba
     const cs=[...t.children].filter(c=>c.classList.contains('po-chip')&&!c.hidden);
-    if(cs.length>1&&cs[cs.length-1].offsetTop>cs[0].offsetTop+4)t.classList.add('apretado');
+    if(cs.length<2)return;
+    const quiebra=()=>cs[cs.length-1].offsetTop>cs[0].offsetTop+4;
+    if(t.classList.contains('apretado')){t.classList.remove('apretado');if(quiebra())t.classList.add('apretado');}
+    else if(quiebra())t.classList.add('apretado');
   });
 }
 let _ajT=0;
@@ -205,7 +208,7 @@ function pintar(root,D){
   llenar(root,D);
   // Se mide en el siguiente cuadro y una sola vez: medir en cada repintado obligaba al
   // navegador a recalcular toda la pantalla (lo más lento al abrir).
-  if(!pintar._aj){pintar._aj=requestAnimationFrame(()=>{pintar._aj=0;if(root.offsetParent!==null||root.getClientRects().length)ajustarHerramientas(root);});}
+  if(!pintar._aj){pintar._aj=requestAnimationFrame(()=>setTimeout(()=>{pintar._aj=0;if(root.offsetParent!==null||root.getClientRects().length)ajustarHerramientas(root);},0));}   // después de dibujar: medir sale gratis
   return v;
 }
 

@@ -597,7 +597,8 @@ function nuevoId(){return 'e'+Date.now().toString(36)+rnd(2).map(x=>x.toString(3
 // 5 letras: 7,9 millones de números posibles (con 4 se repetían a los ~680 pedidos). La nube igual revisa que no se repita.
 function nuevoRef(){return 'A-'+rnd(5).map(x=>ALFA[x%ALFA.length]).join('');}
 function nuevoPin(){return rnd(4).map(x=>x%10).join('');}
-function colones(n){return '₡'+Math.round(+n||0).toLocaleString('es-CR').replace(/[\s  ,]/g,'.');}
+const _nfCR=new Intl.NumberFormat('es-CR');   // uno solo (antes uno por monto)
+function colones(n){return '₡'+_nfCR.format(Math.round(+n||0)).replace(/[\s  ,]/g,'.');}
 function redondear5(n){return Math.round((+n||0)/5)*5;}
 function qtyItem(it){return it.estado==='nohay'?0:(it.qr!=null&&it.qr!==''?+it.qr:+it.q||0);}
 // El premio canjeado con hojas 🍃 se descuenta del total (nunca baja de cero).

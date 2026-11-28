@@ -794,7 +794,7 @@ html[data-theme="dark"] .today-money-card{background:linear-gradient(145deg,#125
 <div id="globalSearchResults" style="display:none;position:fixed;bottom:130px;left:0;right:0;z-index:500;background:var(--s);border:1px solid var(--b2);border-radius:var(--r1) var(--r1) 0 0;max-height:55vh;overflow-y:auto;box-shadow:0 -4px 24px rgba(0,0,0,.7)"></div>
 
 <!-- ═══ HOME ═══ -->
-<div class="view active" id="view-home" style="padding-bottom:70px">
+<div class="view" id="view-home" style="padding-bottom:70px">
   <div class="scroll">
     <div class="home-hero" id="homeHero"></div>
     <div class="hx">
@@ -2121,7 +2121,7 @@ function detalleDelPedido(prov){
   return{v:2,t:Date.now(),q,x,sentAt:{moravia:+p.notes?.__sentAt_moravia||0,angeles:+p.notes?.__sentAt_angeles||0}};
 }
 
-const fmt=n=>Number(n||0).toLocaleString('es-CR');
+const _nfFmt=new Intl.NumberFormat('es-CR');const fmt=n=>_nfFmt.format(Number(n||0));   // un formateador, no uno por número
 const fmtDate=iso=>new Date(iso).toLocaleDateString('es-CR',{month:'short',day:'numeric',hour:'2-digit',minute:'2-digit'});
 
 function calcSide(side,prov){
@@ -2403,6 +2403,7 @@ function renderDayProgress(){
 }
 
 function renderHomeSummary(){
+  if(!document.getElementById('view-home')?.classList.contains('active'))return;   // el Inicio viejo no se ve
   const all=calcScopedAllProvs();
   const sent=getProvNames().filter(p=>isSent(p)).length;
   const pending=getProvNames().filter(p=>hasData(p)&&!isSent(p)).length;
@@ -2417,6 +2418,7 @@ function renderHomeSummary(){
 }
 
 function renderHome(){
+  if(!document.getElementById('view-home')?.classList.contains('active'))return;   // no se ve (ver VIEW_MAP): nada que dibujar
   renderHomeHero();
   renderHomeSummary();
   const grid=document.getElementById('homeGrid');
@@ -3846,6 +3848,7 @@ function renderProductos(){
   wrap.querySelectorAll('[data-price-key]').forEach(btn=>btn.addEventListener('click',()=>openPriceModal(btn.dataset.priceKey)));
 }
 const renderPriceSearch=renderProductos;   // nombre de antes
+let _rpT=0;function renderProductosPronto(){clearTimeout(_rpT);_rpT=setTimeout(renderProductos,160);}
 
 // ── Precio de VENTA de cada tienda (precios-venta.js): en Ambos las dos, en una tienda solo la suya ──
 const ventaUnidad=item=>normUnit(item.unit||item.offers?.[0]?.product?.unit)==='kg'?'kg':'unid';
@@ -4029,7 +4032,7 @@ async function priceModalAccion(btn){
   toast(`🗑️ ${prod.name} borrado de todo`,'ok');
 }
 
-document.getElementById('priceSearch').addEventListener('input',renderProductos);
+document.getElementById('priceSearch').addEventListener('input',renderProductosPronto);
 document.getElementById('addNewCatalogProduct').addEventListener('click',openNewCatalogProductModal);
 document.getElementById('newCatalogProductProvider').addEventListener('change',newCatalogProductPriceVis);
 document.getElementById('newCatalogProductName').addEventListener('input',newCatalogProductNombre);
@@ -4304,7 +4307,7 @@ if(isIOS && !isInStandalone && !dismissed){
 <script src="aramo-ui.js?v=20261123-fase2"></script>
 <script src="express.js?v=20261127-cierre2"></script>
 <script src="leido.js?v=1"></script>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/qrcode-generator/1.4.4/qrcode.min.js"></script>
+<script async src="https://cdnjs.cloudflare.com/ajax/libs/qrcode-generator/1.4.4/qrcode.min.js"></script>
 <script src="canasta-config.js?v=20261018-seguridad-1"></script>
 <script src="aramo-nube.js?v=20261126-mostrador-pos"></script>
 <script src="portadas.js?v=20261124-control"></script>
