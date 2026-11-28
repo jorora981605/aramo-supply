@@ -800,13 +800,17 @@ function vCaja(){
         :`<div class="cx-sobre-dia"><p>En el cajón hay ${fmt(t.cierre)}. Se dejan ${fmt(sencillo())} de sencillo y lo demás va en el sobre.</p><button type="button" class="cx-accion" data-cx="sobre"><span>Guardar el sobre: ${fmt(sobreSugerido(D))}</span>${flecha('sobre')}</button></div>`;
     }
     const dr=s.diff==null?0:Math.round(s.diff);
+    // de lo que entró al cajón en este turno, cuánto fue de fiados que pagaron (no es venta nueva)
+    const iT=todos.indexOf(s),iniT=iT<=0?-1:timeMin(s.start),finT=iT<0||iT===todos.length-1?1e9:timeMin(todos[iT+1].start);
+    const fia=s.exact?sumar(clCajaTransactionsFor(D.date).filter(x=>x&&x.fiado&&timeMin(x.time)>=iniT&&timeMin(x.time)<finT),x=>x.amount):0;
     return `<article class="cx-turno" style="--persona:${esc(s.color)}">
       <header><i class="cx-punto" aria-hidden="true"></i><div><b>${esc(s.personName)}</b><small>${s.start} a ${s.end} · ${horas}${s.overlap&&!s.needsEncargado?' · con '+esc((s.othersPresent||[]).join(', ')):''}</small></div><span class="cx-marca ${est.c}">${est.t}</span></header>
       ${s.needsEncargado?'':`<div class="cx-cuenta">
         ${fila(s.autoApertura?`Recibió${t.confirmedAt?' (contado)':''}`:'Empezó con',t.apertura===undefined?'—':fmt(t.apertura))}
-        ${fila('+ Ventas en efectivo'+(s.exact?' (del POS)':''),fmt(s.segIn))}
+        ${fila('+ Ventas en efectivo'+(s.exact?' (del POS)':''),fmt(s.segIn-fia))}
+        ${fia>0?fila('+ Fiados que pagaron en efectivo',fmt(fia)):''}
         ${!toc||s.segOut>0?fila('− Compras en efectivo',fmt(s.segOut)):''}
-        ${s.segRetiro>0?fila('− Retiros',fmt(s.segRetiro)):''}
+        ${s.segRetiro>0?fila('− Lo que pagó el cajón',fmt(s.segRetiro)):''}
         ${fila('Debe haber',s.esperado==null?'—':fmt(s.esperado),'total')}
         ${t.cierre!==undefined?fila('Contó',fmt(t.cierre),'contado'):''}
       </div>`}
@@ -819,7 +823,9 @@ function vCaja(){
     </article>`;
   };
   const sobres=socio&&(toc||W.perDay.some(d=>plataActiva(d.date)))?W.perDay.filter(d=>entregaDe(d.date)).map(d=>({d,e:entregaDe(d.date)})):[];
-  const listaRetiros=ret.length?ret.map(r=>`<article class="cx-renglon resta"><button type="button" class="cx-renglon-b" data-cx="retiro" data-id="${esc(r.id)}"><span class="cx-ico" aria-hidden="true">${ic('efectivo',20)}</span><span class="cx-renglon-t"><b>${esc(r.concept)}</b><small>Salió del cajón${r.at?' · '+esc(r.at):''}</small></span><span class="cx-renglon-m"><b>−${fmt(r.amount)}</b></span></button>
+  const deDonde=r=>/^e:/.test(r.enlace)?{t:'Pagó una entrega',v:'compras',b:'Ver en Compras'}:/^a:/.test(r.enlace)?{t:'Pagó algo que se debía',v:'compras',b:'Ver en Compras'}:{t:'Pagó un gasto',v:'fijos',b:'Ver en Gastos'};
+  const listaRetiros=ret.length?ret.map(r=>r.enlace?`<article class="cx-renglon resta"><div class="cx-renglon-b"><span class="cx-ico" aria-hidden="true">${ic('efectivo',20)}</span><span class="cx-renglon-t"><b>${esc(r.concept)}</b><small>${deDonde(r).t} · salió del cajón${r.at?' · '+esc(r.at):''}</small></span><span class="cx-renglon-m"><span class="cx-marca auto">Ya está anotado</span><b>−${fmt(r.amount)}</b></span></div>
+      <button type="button" class="cx-enlace cx-cobro" data-cx="ir" data-v="${deDonde(r).v}">${deDonde(r).b}</button></article>`:`<article class="cx-renglon resta"><button type="button" class="cx-renglon-b" data-cx="retiro" data-id="${esc(r.id)}"><span class="cx-ico" aria-hidden="true">${ic('efectivo',20)}</span><span class="cx-renglon-t"><b>${esc(r.concept)}</b><small>Salió del cajón${r.at?' · '+esc(r.at):''}</small></span><span class="cx-renglon-m"><b>−${fmt(r.amount)}</b></span></button>
       ${r.foto?miniFoto(r.id):''}</article>`).join(''):'';
   const quedo=D.cajaEsperada?D.cajaEsperada-(en?num(en.monto):0):0;
   return barra()+tiraDias()+cabeza(diaLargo(D.date),socio?'Caja':'Mi caja',socio?(D.cajaEsperada?col(quedo):'—'):null,socio?`${en?`En el cajón, después del sobre de ${fmt(en.monto)}`:toc?'Solo entran ventas, no sale nada':'Lo que debe haber en el cajón'} · <b class="cx-marca ${ec.c}">${ec.t}</b>`:(segs.length?'':'Hoy no tenés turno de caja.'),'caja')+`
@@ -834,7 +840,9 @@ function vCaja(){
     ${rev.map(x=>`<article class="cx-debe revisar"><div class="cx-debe-t"><b>${esc(x.t)}</b></div><p>${esc(x.d)}</p><button type="button" class="cx-segundo ancho" data-cx="revisado" data-id="${esc(x.id)}">${ic('ok',18)} Revisado</button></article>`).join('')}
   </div>`:''}
   ${!socio?'':toc?`<section class="cx-regla"><span class="cx-ico" aria-hidden="true">${ic('candado',20)}</span><div><b>La caja no se toca</b><small>Ni para compras, ni para mandados. Lo que haya que pagar sale de la bolsa, o se anota "Lo pagué yo" y la bolsa lo devuelve.</small></div></section>
-    ${ret.length?`<h2 class="cx-h2">Retiros anotados en la hoja <span>${fmt(D.cajaRetirosTotal)}</span></h2><div class="cx-lista">${listaRetiros}</div>`:''}`
+    ${ret.length?`<h2 class="cx-h2">Salió del cajón <span>${fmt(D.cajaRetirosTotal)}</span></h2>
+      ${ret.some(r=>r.enlace)?'<p class="cx-nota arriba">Lo que dice "Ya está anotado" pagó una entrega o un gasto: baja lo que debe haber en el cajón, y no se resta otra vez de la ganancia.</p>':''}
+      <div class="cx-lista">${listaRetiros}</div>`:''}`
   :`<h2 class="cx-h2">Retiros de caja <span>${fmt(D.cajaRetirosTotal)}</span></h2>
   <div class="cx-lista">${listaRetiros||vacio('Sin retiros. Si se saca plata del cajón para pagar algo que no es una compra, se anota aquí con su motivo.')}</div>
   <button type="button" class="cx-segundo ancho" data-cx="retiro-nuevo">${ic('mas',18)} Anotar un retiro</button>`}
