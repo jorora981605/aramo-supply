@@ -412,10 +412,13 @@ function datosInicio(sr,a,c){
   };
 }
 let _portadaMontada=0,_fotoT=0;
+// Vaciar el menú principal (en "Las dos" no se usa): se olvida también qué portada tenía, así al volver a una
+// tienda se dibuja completo. Antes quedaba vacío y la pantalla en blanco no dejaba tocar nada.
+function vaciarPortada(){const r=$('puIn');if(r){r.replaceChildren();delete r.dataset.v;}_portadaMontada=0;}
 function pintarPuerta(){
   if(LOCAL==='todas'){
     $('puerta')?.classList.remove('open','zoom');
-    $('puIn')?.replaceChildren();
+    vaciarPortada();
     document.body.classList.remove('pu-lock');
     return;
   }
@@ -505,8 +508,7 @@ function abrirSurtidoAmbos(){
   cerrarHoja();
   $('mostrador')?.classList.remove('open');
   $('puerta')?.classList.remove('open','zoom');
-  $('puIn')?.replaceChildren();
-  _portadaMontada=0;
+  vaciarPortada();
   document.body.classList.remove('pu-lock');
   try{switchView('proveedores');}catch(e){console.warn('No se pudo abrir Inventario combinado',e);}
   toast('🧺 Inventario combinado · Moravia + Los Ángeles');

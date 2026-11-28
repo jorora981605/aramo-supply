@@ -195,7 +195,9 @@ let _ajT=0;
 window.addEventListener('resize',()=>{clearTimeout(_ajT);_ajT=setTimeout(()=>{const r=document.getElementById('puIn');if(r)ajustarHerramientas(r);},120);});
 function pintar(root,D){
   const v=actual();
-  if(+root.dataset.v!==v){
+  // También se vuelve a dibujar si quedó VACÍA (al entrar a "Las dos" se vacía): antes solo miraba el número de
+  // portada y abría el menú en blanco, tapando toda la pantalla (2026-11-27).
+  if(+root.dataset.v!==v||!root.firstElementChild){
     root.dataset.v=v;root.className='pu-in po po'+v;
     root.innerHTML=V[v](D);
     document.getElementById('puerta')?.setAttribute('data-portada',v);
