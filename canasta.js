@@ -458,7 +458,8 @@ function franjas(){
 }
 // ── Cambiar un pedido ya enviado (mismo pedido, mismo Uber) ──
 const ordenCambio=()=>C.cambio?N.get(C.cambio.id):null;
-const cambiableActivo=()=>misPedidos().find(o=>N.puedeCambiar(o))||null;
+// El pedido abierto de ESA tienda (el más nuevo) al que se le puede sumar lo de la canasta: mismo pedido, mismo Uber.
+const cambiableActivo=suc=>misPedidos().filter(o=>N.puedeCambiar(o)&&(!suc||o.sucursal===suc)).sort((a,b)=>Date.parse(b.created||0)-Date.parse(a.created||0))[0]||null;
 function franjaCambio(){const o=ordenCambio();return o?`<div class="franja-cambio" id="tlFranjaCambio"><span><b>Agregando a tu pedido ${esc(o.ref)}</b><small>Es el mismo pedido y el mismo Uber</small></span><button type="button" class="fc-x" data-act="cambio-salir">Salir</button></div>`:'';}
 function itemDe(x){return{k:x.k,n:x.p.n,e:x.p.e,u:x.p.u,q:x.qb,p:x.p.p,cabys:String(x.p.cabys||''),...(x.u!==x.p.u?{pide:{q:x.q,u:x.u}}:{}),mad:x.mad||'',nota:x.nota||''};}
 // La lista que se manda a la tienda: lo que no cambió se queda tal cual estaba en el pedido (con su peso), lo demás sale de la canasta de cambios
@@ -487,7 +488,14 @@ function salirCambio(volver){
   C.cesta=c.prev?.cesta||{};if(c.prev?.suc)C.retiro.suc=c.prev.suc;_cat=null;C.cambio=null;guardar();
   if(volver&&c.id&&N.get(c.id))ver(c.id);else ir('armar');
 }
-async function enviarCambios(){
+// Sumar la canasta a un pedido abierto de la misma tienda: mismo camino que «Cambiar mi pedido» (la nube lo revalida
+// y el Mostrador ve el aviso de cambios), pero de una vez, sin pasar por la pantalla de cambios.
+async function unirAlPedido(o){
+  if(!N.puedeCambiar(o)){C.aparte=true;guardar();toast('Tu pedido '+o.ref+' ya avanzó: este va como pedido aparte');pintarMesa();return;}
+  entrarCambio(o,JSON.parse(JSON.stringify(C.cesta)));
+  await enviarCambios({unir:true});
+}
+async function enviarCambios(op={}){
   const c=C.cambio,o=c&&N.get(c.id);if(!o)return;
   if(!N.puedeCambiar(o)){toast('Tu pedido ya avanzó: escribile a la tienda para cambiarlo');salirCambio(true);return;}
   const nuevos=itemsNuevos(),sim=N.simularCambio(o,nuevos);
@@ -505,8 +513,9 @@ async function enviarCambios(){
     if(!ok){await N.restaurarDeNube?.(o.id);toast(N.ultimoError?'No se pudo cambiar: '+N.ultimoError:'La tienda no pudo recibir tus cambios. Probá de nuevo en un momento.');if(btn){btn.disabled=false;btn.textContent='Enviar cambios a la tienda';}return;}
   }
   const pendiente=N.estadoEnvio?.(o.id)==='pendiente';
-  C.cesta=c.prev?.cesta||{};if(c.prev?.suc)C.retiro.suc=c.prev.suc;_cat=null;C.cambio=null;guardar();
+  C.cesta=op.unir?{}:(c.prev?.cesta||{});if(c.prev?.suc)C.retiro.suc=c.prev.suc;_cat=null;C.cambio=null;C.aparte=false;guardar();
   buzz([30,40,30]);fiesta(['✏️','✅']);
+  if(op.unir){toast(pendiente?'⏳ Lo sumamos a tu pedido '+o.ref+' · se envía apenas haya señal':'✅ Lo sumamos a tu pedido '+o.ref+(o.retiro?.envio?' · mismo Uber, sin otro envío':' · lo recogés todo junto'));ver(o.id);return;}
   toast(pendiente?'⏳ Tus cambios a '+o.ref+' quedaron guardados · se envían apenas haya señal':'✅ Cambios enviados a '+o.ref+' · la tienda ya los ve');
   ver(o.id);
 }
@@ -603,14 +612,17 @@ function mesaCanasta(){
   const datSub=fD?esc(fD.m):`${esc(perfilNombre())} · ${esc(fmtTel(perfilTelefono()))}`;
   const datDer=fD?pastilla():'<i class="bq-ok" aria-label="Listo">✓</i>';
   const sp_=N.sinpeDe(s?.k),num=telDig(sp_.numero);
-  const unirA=!C.cambio&&cambiableActivo(),unirHtml=unirA?`<section class="unir"><b>Ya tenés el pedido ${esc(unirA.ref)} en camino</b><small>Agregá esto a ese pedido: es el mismo Uber y no se cobra otro envío.</small><button type="button" class="btn big w" data-act="unir-pedido" data-id="${unirA.id}">Agregar a tu pedido ${esc(unirA.ref)}</button></section>`:'';
+  const abiertoAqui=!C.cambio&&cambiableActivo(s?.k||C.retiro.suc),unirA=abiertoAqui&&!C.aparte?abiertoAqui:null;
+  const juntoTxt=o=>o?.retiro?.envio?'va en el mismo Uber, sin cobrar otro envío':'lo recogés todo junto';
+  const unirHtml=unirA?`<section class="unir" id="tlUnir"><b>Se suma a tu pedido ${esc(unirA.ref)}</b><small>Ya tenés un pedido abierto en ${esc(sucursalCorta(s))}: esto se agrega a ese mismo pedido y ${juntoTxt(unirA)}.</small><button type="button" class="link unir-aparte" data-act="pedido-aparte">Prefiero un pedido aparte</button></section>`
+    :abiertoAqui?`<section class="unir aparte" id="tlUnir"><small>Va como un pedido aparte de ${esc(abiertoAqui.ref)}.</small><button type="button" class="link unir-aparte" data-act="pedido-unir">Mejor sumarlo a ${esc(abiertoAqui.ref)}</button></section>`:'';
   const eP=env&&eu?{...eu,rango:N.rangoEnvio(eu,tot)}:null,pr=premioSel(),L=N.lealtad(),c=cuentaActiva()&&perfilOk()?miCuenta():null;
   return cabSub('Tu canasta','armar')+avisoAgotados()+`<div class="bloques" id="tlSecBloques">
     ${bloque('canasta','#1d2a22',svgI('cesta'),'Canasta',`${n} ${n===1?'cosa':'cosas'}${peso?` · ≈ ${kg(peso)} kg`:''}${sp?` · ${sp} con precio al pesar`:''}`,fA?pastilla():`<span class="bq-m">${$c(tot)}</span>`,'lista',!!fA)}
-    ${bloque('entrega','#178276',svgI(env?'camion':'casa'),'Entrega',entSub,entDer,'entrega',!!fR&&fR.p!=='canasta')}
+    ${bloque('entrega','#178276',svgI(env?'camion':'casa'),'Entrega',unirA?(unirA.retiro?.envio?'Va con tu pedido '+esc(unirA.ref)+' · mismo Uber':'Lo recogés con tu pedido '+esc(unirA.ref)):entSub,unirA?'<span class="bq-m gratis">'+(unirA.retiro?.envio?'Mismo Uber':'Junto')+'</span>':entDer,'entrega',!unirA&&!!fR&&fR.p!=='canasta')}
     ${bloque('datos','#c9621a',svgI('persona'),'Tus datos',datSub,datDer,'datos',!!fD)}
   </div>
-  ${unirHtml}<section class="bq-hondo" id="tlPagar"><small>Total aproximado</small><b class="bq-tot" id="tlTotal">≈ ${$c(totalPagar())}</b><p class="bq-nota">La tienda pesa y te confirma el total. Pagás por SINPE después.</p>${eP?`<p class="bq-nota">Envío Uber: entre <b>${$c(eP.rango.min)}</b> y <b>${$c(eP.rango.max)}</b> (te confirmamos el monto exacto con el total)</p>`:''}<button type="button" class="bq-pagar" id="tlSellar" data-act="pedir">Enviar pedido</button>${fl?`<p class="bq-aviso" role="status">${esc(fl.b||fl.m)}</p>`:''}</section>
+  ${unirHtml}<section class="bq-hondo" id="tlPagar"><small>${unirA?'Se suma a tu pedido (aprox.)':'Total aproximado'}</small><b class="bq-tot" id="tlTotal">≈ ${$c(unirA?tot:totalPagar())}</b><p class="bq-nota">${unirA?'Sin otro envío. La tienda pesa y te confirma el total nuevo de '+esc(unirA.ref)+'.':'La tienda pesa y te confirma el total. Pagás por SINPE después.'}</p>${eP&&!unirA?`<p class="bq-nota">Envío Uber: entre <b>${$c(eP.rango.min)}</b> y <b>${$c(eP.rango.max)}</b> (te confirmamos el monto exacto con el total)</p>`:''}<button type="button" class="bq-pagar" id="tlSellar" data-act="pedir">${unirA?'Agregar a mi pedido '+esc(unirA.ref):'Enviar pedido'}</button>${fl?`<p class="bq-aviso" role="status">${esc(fl.b||fl.m)}</p>`:''}</section>
   <div class="resumen quieto"><div><span>Productos</span><b>${$c(tot)}</b></div>${env?`<div><span>Envío con Uber · tu parte</span><b>${eP?'≈ '+$c(eP.costo):ee?'fuera de zona':'elegí ubicación'}</b></div>${eP?`<p class="reparte-r">${reparteTxt(eP)}</p>`:''}`:''}${pr?`<div class="desc"><span>🎁 ${esc(pr.n)}</span><b>−${$c(pr.valor)}</b></div>`:''}${L.activa&&c?`<div class="gana"><span>🍃 Con este pedido ganás</span><b>~${hojasEstimadas()} ${hojasEstimadas()===1?'hoja':'hojas'}${L.dobles?' 🔥':''}</b></div>`:''}<p>${sp?`${sp} ${sp===1?'producto va':'productos van'} con precio al pesar. `:''}Es un monto aproximado: la tienda pesa, ve qué hay y qué no hay, y te confirma el total antes de que pagués.</p></div>
   ${sinpeInfo(s)}`;
 }
@@ -1122,6 +1134,9 @@ function refrescarProd(){
 const estados={};
 misPedidos().forEach(o=>{estados[o.id]=o.estado+'|'+(N.faseDe?.(o)||'')+'|'+o.sucursal;});
 async function hacerPedido(){
+  // Ya hay un pedido abierto en esta tienda: lo de la canasta se suma a ese pedido (mismo Uber, no se cobra otro envío)
+  const ya=!C.cambio&&!C.aparte&&cambiableActivo(C.retiro.suc);
+  if(ya){await unirAlPedido(ya);return;}
   const falta=faltaAlgo();if(falta){avisarFalta(falta);return;}
   if(!metodosPago().some(([k])=>k===C.pago.metodo))C.pago.metodo='sinpe';
   const s=suc(C.retiro.suc),h=horaRetiro(),pr=premioSel(),L=N.lealtad();
@@ -1146,7 +1161,7 @@ async function hacerPedido(){
     totalEst:totalPagar(),canal:N.modo(),
   });
   if(!C.perfil.desde)C.perfil.desde=o.created;
-  C.mis=[o.id,...C.mis.filter(x=>x!==o.id)];C.cesta={};C.nota='';C.premio=null;C.paso='armar';guardar();
+  C.mis=[o.id,...C.mis.filter(x=>x!==o.id)];C.cesta={};C.nota='';C.premio=null;C.paso='armar';C.aparte=false;guardar();
   try{navigator.storage?.persist?.();}catch{} // que el navegador no borre solo el perfil y los pedidos
   estados[o.id]=o.estado;
   const enviado=await N.esperarEnvio(o.id);
@@ -1442,6 +1457,8 @@ const ACT={
   promo(el){const p=(T().promos||[]).find(x=>x.k===el.dataset.k);if(p?.producto)abrirProd(p.producto);},
   // Cambiar un pedido ya enviado: el mismo pedido y el mismo Uber
   'cambiar-pedido'(){const o=pedidoVisto();if(o)entrarCambio(o);},
+  'pedido-aparte'(){C.aparte=true;guardar();pintarMesa();},
+  'pedido-unir'(){C.aparte=false;guardar();pintarMesa();},
   'unir-pedido'(el){const o=N.get(el.dataset.id);if(o)entrarCambio(o,JSON.parse(JSON.stringify(C.cesta)));},
   'cambio-salir'(){salirCambio(true);},
   'cambio-enviar'(){enviarCambios();},
