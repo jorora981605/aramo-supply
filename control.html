@@ -7,7 +7,7 @@
   <title>Control · ARAMO</title>
   <meta name="theme-color" content="#f8f7f2">
   <link rel="icon" href="./icon.png">
-  <script>document.documentElement.dataset.theme="light";</script>
+  <script>document.documentElement.dataset.theme="light";document.documentElement.classList.add("cx-on");</script>
   <link rel="stylesheet" href="aramo-ui.css?v=20261123-fase2">
   <style>
     :root{--green:#176b45;--green2:#28a866;--lime:#f7a928;--cream:#f4f5f2;--ink:#101512;--muted:#66716b;--white:#fff;--red:#bd3d37;--amber:#f07818;--line:#d9e0da;--black:#0b0d0c;--shadow:0 12px 28px #0b0d0c20;
@@ -895,9 +895,11 @@
       .print-only{display:block}
     }
   </style>
-  <link rel="stylesheet" href="control.css?v=20261125-control3">
+  <link rel="stylesheet" href="control.css?v=20261126-plata2">
+  <link rel="stylesheet" href="control-cuadros.css?v=20261126-plata2">
 </head>
 <body>
+<div id="cx" class="cx"></div>
 <div class="app">
   <aside>
     <button class="dock-toggle" id="dockToggle" onclick="toggleDock()" title="Abrir menú">+</button>
@@ -931,9 +933,7 @@
     <header class="ctl-barra">
       <a class="ctl-inicio" href="APP.html" aria-label="Volver al Inicio de ARAMO"><span data-ic="inicio"></span><span>Inicio</span></a>
       <div class="ctl-mod"><span class="ctl-cuadro" data-ic="grafico" aria-hidden="true"></span><b>Control</b></div>
-      <div class="ctl-tiendas" role="group" aria-label="Tienda">
-        <a href="control.html?suc=angeles" data-ctl-suc="angeles">Los Ángeles</a>
-      </div>
+      <button type="button" class="ctl-inicio ctl-sencillo" onclick="window.CX&&CX.volver()">Volver al Control</button>
     </header>
     <div class="top">
       <h1 id="pageTitle">Cierre semanal</h1>
@@ -1380,7 +1380,7 @@
 <script src="canasta-config.js?v=20261018-seguridad-1"></script>
 <script src="aramo-nube.js?v=20261020-circuito-6"></script>
 <script defer src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.117.0"></script>
-<script src="control-puente.js?v=20261125-control3"></script>
+<script src="control-puente.js?v=20261126-plata2"></script>
 <script>
 // ARAMO: un Control por tienda. La tienda sale de ?suc=, o de la que se eligió al entrar a ARAMO.
 const TIENDA='angeles'; // por ahora el Control es solo de Los Ángeles (LASR)
@@ -1697,6 +1697,7 @@ function load(){
 }
 
 function save(){
+  _clMovIdx=null;
   localStorage.setItem(KEY,JSON.stringify(data));
   renderAll();
 }
@@ -4119,6 +4120,7 @@ function clResetOpenDay(){
   if(!confirm(`¿Reiniciar todos los datos de ${day}? Los demás días no cambiarán.`))return;
   data.closureDaily=data.closureDaily||{};
   delete data.closureDaily[date];
+  data.movs=(data.movs||[]).filter(m=>m.date!==date);
   save();
   clRenderSpreadsheet();
 }
@@ -4772,16 +4774,43 @@ function clWeekNumber(dateStr){
   return Math.ceil(((d-yearStart)/86400000+1)/7);
 }
 
-// ARAMO: clDailyRaw = lo escrito a mano (lo que se guarda). clDailyEntry = eso MÁS lo que llega solo de ARAMO.
+// ARAMO: cada casilla del día = lo escrito en la hoja (clDailyRaw) + los renglones anotados uno por uno
+// (data.movs, con mensaje y foto) + lo que llega solo de ARAMO (renglón por renglón, salvo los marcados
+// "no contar" en data.autoFuera). Compatibilidad: si la casilla tiene un número escrito en la hoja, lo que
+// llega solo no se suma ahí (era la regla "lo escrito a mano manda").
 const CL_AUTO=['cash','sinpe','card','comprasEfectivo','comprasSinpe','comprasTarjeta'];
-function clAutoDe(date){try{return window.AramoPuente?window.AramoPuente.dia(date,TIENDA):null;}catch(e){return null;}}
+const CL_MOV=['cash','sinpe','card','bodega','desechos','comprasEfectivo','comprasSinpe','comprasTarjeta','comprasUber'];
+var _clMovIdx=null;
+function clMovIdx(){
+  if(!_clMovIdx){_clMovIdx={};(data.movs||[]).forEach(m=>{if(!m||!m.date)return;const d=_clMovIdx[m.date]||(_clMovIdx[m.date]={});d[m.campo]=(d[m.campo]||0)+num(m.monto);});}
+  return _clMovIdx;
+}
+function clAutoLineas(date){try{return window.AramoPuente&&window.AramoPuente.lineas?window.AramoPuente.lineas(date,TIENDA)||[]:[];}catch(e){return[];}}
+function clAutoDe(date){
+  const L=clAutoLineas(date);if(!L.length)return null;
+  const fuera=data.autoFuera||{},o={};
+  L.forEach(l=>{if(!fuera[l.id])o[l.campo]=(o[l.campo]||0)+num(l.monto);});
+  return o;
+}
+// ARAMO 2026-11-26 · lo que publica el POS: cada venta en efectivo con su hora (la caja de cada turno sale exacta,
+// sin repartir por horas) y los fiados del día.
+function clAutoCaja(date){try{const L=window.AramoPuente&&window.AramoPuente.cajaMovs?window.AramoPuente.cajaMovs(date,TIENDA):null;return L&&L.length?L:null;}catch(e){return null;}}
+function clAutoFiados(date){try{const f=data.autoFuera||{},L=window.AramoPuente&&window.AramoPuente.fiados?window.AramoPuente.fiados(date,TIENDA)||[]:[];return L.filter(x=>!f[x.id]);}catch(e){return[];}}
 function clDailyEntry(date){
-  const raw=clDailyRaw(date),a=clAutoDe(date);
-  if(!a)return raw;
+  const raw=clDailyRaw(date),a=clAutoDe(date),mv=clMovIdx()[date],tx=clAutoCaja(date);
+  if(!a&&!mv&&!tx)return raw;
   const out={...raw,__auto:{}};
-  CL_AUTO.forEach(f=>{if(!num(raw[f])&&num(a[f])){out[f]=num(a[f]);out.__auto[f]=true;}});
+  if(mv)CL_MOV.forEach(f=>{if(mv[f])out[f]=num(raw[f])+mv[f];});
+  if(a)CL_AUTO.forEach(f=>{if(!num(raw[f])&&num(a[f])){out[f]=num(out[f])+num(a[f]);out.__auto[f]=true;}});
+  if(tx&&!(raw.cajaTransactions||[]).length&&!num(raw.cash)&&!(mv&&mv.cash))out.cajaTransactions=tx;
   return out;
 }
+// ARAMO 2026-11-26 · la plata de los tres (control-socios.js). Desde el día de arranque la caja no se toca: solo
+// entran ventas (las compras en efectivo se pagan con la bolsa), al cerrar se entrega el sobre del día y queda el
+// sencillo, y el rebajo de Joseph pasa a ser su deuda: sale solo de su parte en el reparto, no de la ganancia.
+const CL_SIN_REBAJO='2026-11-23';
+function clIntocable(date){const s=data.socios;return !!(s&&s.activo&&s.desde&&date>=s.desde);}
+function clEntregaDe(date){const e=(data.cajaEntregas||{})[date];return e?num(e.monto):0;}
 function clDailyRaw(date){
   data.closureDaily=data.closureDaily||{};
   const empty={
@@ -4812,7 +4841,7 @@ function clDailyRaw(date){
 
 function clSetDailyField(date,field,value){
   data.closureDaily=data.closureDaily||{};
-  const entry={...clDailyRaw(date),[field]:num(value)};
+  const entry={...clDailyRaw(date),[field]:num(value)-((clMovIdx()[date]||{})[field]||0)};
   data.closureDaily[date]=entry;
   // save() dispara renderAll(), que ya incluye clRender(): el resumen, la
   // ganancia del día y el reparto se actualizan al instante.
@@ -5023,7 +5052,9 @@ function clCajaPrevDayCierre(date){
   const prevKey=clCajaSegmentKey(last);
   const prevTurno=clCajaTurno(prevDate,prevKey);
   if(prevTurno.cierre===undefined)return undefined;
-  return {value:prevTurno.cierre,confirmedAt:prevTurno.confirmedAt,fromPersonName:last.personName,fromDate:prevDate,fromKey:prevKey};
+  // ARAMO: si al cerrar se sacó el sobre del día, el turno siguiente recibe lo que quedó (el sencillo)
+  const entrega=clEntregaDe(prevDate);
+  return {value:entrega?num(prevTurno.cierre)-entrega:prevTurno.cierre,entrega,confirmedAt:prevTurno.confirmedAt,fromPersonName:last.personName,fromDate:prevDate,fromKey:prevKey};
 }
 
 // Resume un día completo: si hay movimientos con hora exacta (arriba), los
@@ -5050,10 +5081,14 @@ function clCajaDaySummary(date,dayCash,dayCompras){
   // cierre normal (su campo Cierre YA es manual): es el monto final con
   // el que se cierra la caja de la semana.
   const isWeekStart=new Date(date+'T12:00:00').getDay()===1;
-  const prevCierre=isWeekStart?undefined:clCajaPrevDayCierre(date);
+  const _lunesAMano=isWeekStart&&segments[0]&&clCajaTurno(date,clCajaSegmentKey(segments[0])).apertura!==undefined;
+  const prevCierre=_lunesAMano?undefined:clCajaPrevDayCierre(date);
   const retirosTotal=clCajaRetirosTotal(date);
   let faltante=0,sobrante=0;
   const withShare=[];
+  // ARAMO: en múltiplos de ₡5 (no hay monedas más chicas); el último turno se lleva lo que sobre del redondeo (nada se pierde)
+  let _yaIn=0,_yaOut=0,_yaRet=0;const _ult=segments.length-1;
+  const _parte=(total,share,i,ya)=>i===_ult?num(total)-ya:Math.round(num(total)*share/5)*5;
   segments.forEach((seg,i)=>{
     // Se separan entradas (ventas en efectivo) y salidas (compras/vueltos)
     // para poder mostrarle a cada turno SU desglose completo, no solo el
@@ -5062,17 +5097,18 @@ function clCajaDaySummary(date,dayCash,dayCompras){
     const share=dur/totalMin;
     let segIn,segOut;
     if(exact){
-      const mine=transactions.filter(t=>timeMin(t.time)>=timeMin(seg.start)&&timeMin(t.time)<timeMin(seg.end));
+      const _ini=i===0?-1:timeMin(seg.start),_fin=i===_ult?1e9:timeMin(segments[i+1].start);
+      const mine=transactions.filter(t=>{const m=timeMin(t.time);return m>=_ini&&m<_fin;});
       segIn=mine.filter(t=>num(t.amount)>0).reduce((s,t)=>s+num(t.amount),0);
       segOut=mine.filter(t=>num(t.amount)<0).reduce((s,t)=>s-num(t.amount),0);
     }else{
-      segIn=num(dayCash)*share;
-      segOut=num(dayCompras)*share;
+      segIn=_parte(dayCash,share,i,_yaIn);_yaIn+=segIn;
+      segOut=_parte(dayCompras,share,i,_yaOut);_yaOut+=segOut;
     }
     // Los retiros (plata que se saca de la caja aparte de Compras) se
     // reparten igual que Compras, por hora de turno, y bajan el esperado
     // como una salida más — ya vienen justificados con su motivo.
-    const segRetiro=retirosTotal*share;
+    const segRetiro=_parte(retirosTotal,share,i,_yaRet);_yaRet+=segRetiro;
     const segNet=segIn-segOut-segRetiro;
     const key=clCajaSegmentKey(seg);
     const stored=clCajaTurno(date,key);
@@ -5234,7 +5270,7 @@ function clReceivableRemove(date,id){
   save();
 }
 function clReceivablesTotal(date){
-  return clReceivablesFor(date).reduce((t,r)=>t+num(r.amount),0);
+  return clReceivablesFor(date).reduce((t,r)=>t+num(r.amount),0)+clAutoFiados(date).reduce((t,r)=>t+num(r.amount),0);
 }
 // Todas las cuentas por cobrar de la semana abierta, juntas en una sola
 // lista (cada una con su fecha de venta), para revisarlas de un vistazo
@@ -5587,7 +5623,7 @@ function clComputeWeek(start){
     const datafonoNeto=manual.card-manual.card*cardFeePct/100;
     const fixedTotal=fixedMonthly.reduce((t,f)=>t+f.daily,0);
     const salarioTotal=Object.values(clHourlyPayForDay(dayName)).reduce((t,v)=>t+v,0);
-    const rebajoJoseph=clJosephRebateForDate(date,dayName,dates,manual.rebajoJoseph);
+    const rebajoJoseph=(clIntocable(date)||date>=CL_SIN_REBAJO)?0:clJosephRebateForDate(date,dayName,dates,manual.rebajoJoseph);
     const effectiveManual={...manual,rebajoJoseph};
     const rebajoTotal=effectiveManual.rebajoJefes+effectiveManual.rebajoRoger+effectiveManual.rebajoJoseph;
     // Caja: Efectivo y Compras en efectivo se escriben UNA sola vez al día
@@ -5596,7 +5632,7 @@ function clComputeWeek(start){
     // volver a escribirlos por turno. Si al cerrar un turno hay menos de
     // lo esperado, ese faltante es pérdida real y se resta de la Ganancia;
     // si hay de más, se suma.
-    const cajaDay=clCajaDaySummary(date,manual.cash,manual.comprasEfectivo);
+    const cajaDay=clCajaDaySummary(date,manual.cash,clIntocable(date)?0:manual.comprasEfectivo);
     const cajaEsperada=cajaDay.cajaEsperada;
     const cajaSobrante=cajaDay.cajaSobrante;
     const cajaFaltante=Math.max(0,cajaDay.cajaFaltante-cuentasPorCobrarTotal);
@@ -5658,5 +5694,7 @@ let _ctlT=0;
 window.addEventListener('aramo-puente',()=>{clearTimeout(_ctlT);const ir=()=>{const a=document.activeElement;if(a&&/INPUT|TEXTAREA|SELECT/.test(a.tagName)){_ctlT=setTimeout(ir,1500);return;}try{renderAll();}catch(e){}};_ctlT=setTimeout(ir,200);});
 if(window.AramoPuente)window.AramoPuente.empezar(TIENDA);
 </script>
+<script src="control-socios.js?v=20261126-plata2"></script>
+<script src="control-cuadros.js?v=20261126-plata2"></script>
 </body>
 </html>

@@ -90,11 +90,17 @@ function calcular(POS,tienda,fecha){
     let calculado=rd(c.monto_cierre_calculado);
     if(!cerrada){   // abierta (o cerrada a la fuerza): apertura + el efectivo que entró en ese turno
       let ef=0;POS.prepare(`SELECT total,metodo_pago,pago_tarjeta,pago_sinpe FROM ventas WHERE caja_id = ? AND estado = 'completada'`).all([c.id]).forEach(v=>{ef+=partir(v).efectivo;});
+      try{ef+=rd(POS.prepare(`SELECT COALESCE(SUM(monto),0) AS t FROM fiado_pagos WHERE caja_id = ? AND estado = 'ok' AND metodo = 'efectivo'`).get([c.id]).t);}catch(e){} // pagos de fiado (POS celular)
       calculado=rd(c.monto_apertura)+ef;
     }
     d.cajas.push({id:c.id,usuario:c.usuario||'',abre:isoCR(c.fecha_apertura),cierra:isoCR(c.fecha_cierre),
       apertura:rd(c.monto_apertura),calculado,real:cerrada?rd(c.monto_cierre_real):null,diferencia:cerrada?rd(c.diferencia):null,estado:c.estado});
   });
+  // Pagos de fiado de ese día (POS celular, tabla fiado_pagos). No son venta nueva: es plata que entra de algo fiado antes.
+  try{
+    POS.prepare(`SELECT id,cliente,monto,metodo,fecha,usuario,caja_id FROM fiado_pagos WHERE estado = 'ok' AND substr(fecha,1,10) = ? ORDER BY fecha,id`).all([fecha])
+      .forEach(p=>{(d.fiadoPagos=d.fiadoPagos||[]).push({h:horaDe(p.fecha),cliente:p.cliente||'',t:rd(p.monto),m:p.metodo||'efectivo',c:p.usuario||'',caja:p.caja_id});});
+  }catch(e){}
   return d;
 }
 const firma=d=>{const {at,...r}=d||{};return JSON.stringify(r);};
@@ -150,7 +156,7 @@ async function enviar(){
 }
 // Qué fechas toca un cambio: siempre HOY, y la fecha de lo que se tocó (un tiquete de ayer, una caja abierta desde ayer)
 function cambio(cmd,args,res){
-  if(!/^(ventas:(crear|anular|devolver_item)|caja:(abrir|cerrar))$/.test(cmd)||!activa())return;
+  if(!/^(ventas:(crear|anular|devolver_item)|caja:(abrir|cerrar)|fiados:(abonar|anular_pago))$/.test(cmd)||!activa())return;
   const POS=ctx.POS(),f=new Set([hoyCR()]);
   const q=(sql,a)=>{try{return POS.prepare(sql).get(a)||null;}catch(e){return null;}};
   try{

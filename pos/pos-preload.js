@@ -58,6 +58,16 @@ contextBridge.exposeInMainWorld('db', {
     devolverItem: (vid, iid)    => ipcRenderer.invoke('ventas:devolver_item', vid, iid),
   },
 
+  // Fiado (web): clientes que deben, lo que se llevaron y los pagos que van haciendo
+  fiados: {
+    clientes:    ()          => ipcRenderer.invoke('fiados:clientes'),
+    cliente:     (clave)     => ipcRenderer.invoke('fiados:cliente', clave),
+    debe:        (n, t)      => ipcRenderer.invoke('fiados:debe', n, t),
+    abonar:      (d)         => ipcRenderer.invoke('fiados:abonar', d),
+    anularPago:  (id, d)     => ipcRenderer.invoke('fiados:anular_pago', id, d),
+    delDia:      (fecha)     => ipcRenderer.invoke('fiados:del_dia', fecha),
+  },
+
   // Reportes
   reportes: {
     resumen:       (desde, hasta) => ipcRenderer.invoke('reportes:resumen', desde, hasta),

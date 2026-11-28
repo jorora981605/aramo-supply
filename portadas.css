@@ -490,3 +490,20 @@ html[data-theme="dark"] .po6{--ar-p-control:#3b7fd4}
 /* En un aparato de Moravia no sale la puerta del Control (por ahora es solo de Los Ángeles): tres puertas, sin hueco */
 .po6-puertas.sin-control{grid-template-rows:repeat(3,1fr)}
 .po6-door[hidden]{display:none!important}
+
+/* ARAMO POS partido en dos: computadora | celular. */
+.po6-pos2{display:grid;gap:var(--ar-e3);min-height:0}
+.po6-pos2 .po6-door--mitad{display:none}
+.po6-pos2.dos{grid-template-columns:1fr 1fr}
+.po6-pos2.dos .po6-door--entera{display:none}
+.po6-pos2.dos .po6-door--mitad{display:grid;grid-template-columns:1fr;align-content:center;padding:var(--ar-e4) var(--ar-e3) var(--ar-e4) var(--ar-e4);background:linear-gradient(160deg,var(--ar-sup) 52%,color-mix(in srgb,var(--pc) 13%,var(--ar-sup)))}
+.po6-door--mitad .po6-door-tx{gap:var(--ar-e2)}
+.po6-mitad-n{display:grid;gap:3px}
+.po6-mitad-n small{font:700 12px/1 var(--ar-f-ui);letter-spacing:.08em;text-transform:uppercase;color:var(--ar-tinta-3)}
+.po6-mitad-n b{font:700 22px/1.1 var(--ar-f-display)}
+@media (min-width:1024px){
+  .po6-pos2.dos .po6-door--mitad{padding:var(--ar-e3) var(--ar-e5)}
+  .po6-door--mitad .po6-door-tx{flex-direction:row;align-items:center;gap:var(--ar-e3);flex-wrap:wrap}
+  .po6-door--mitad .po6-door-sub{flex-basis:100%}
+  .po6-mitad-n b{font-size:26px}
+}

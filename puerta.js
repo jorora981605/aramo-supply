@@ -396,9 +396,10 @@ function datosInicio(sr,a,c){
       caja:`Caja de hoy ${$c(c.total)}`,
       lista:ultimos.length?ultimos.map(o=>`<div class="po6-ped"><b>${esc(o.ref)}</b><span>${esc(o.cliente?.nombre||'')}</span><em>${esc((est[o.estado]||(()=>''))(o))}</em></div>`).join(''):'<p class="po6-ped-vacio">Todavía no hay pedidos hoy.</p>',
     },
-     s6:{sub:'Pedido a proveedores',ins:(sr.sinEnviar?`<span class="ui-estado ui-estado--pendiente">${ICO('reloj',16)}${sr.sinEnviar} por enviar</span>`:'')+`<span class="ui-estado">${sr.prods?pl(sr.prods,'producto','productos'):'Pedido vacío'}</span>`},
+    s6:{sub:'Pedido a proveedores',
+       ins:(sr.sinEnviar?`<span class="ui-estado ui-estado--pendiente">${ICO('reloj',16)}${sr.sinEnviar} por enviar</span>`:'')+`<span class="ui-estado">${sr.prods?pl(sr.prods,'producto','productos'):'Pedido vacío'}</span>`},
     t6:{sub:'Tienda en línea de los clientes',ins:a.length?`<span class="ui-estado ui-estado--pendiente">${ICO('reloj',16)}${a.length} en curso</span>`:''},
-    p6:{sub:'Caja de '+zona},
+    p6:{sub:'Caja de '+zona},pos2:LOCAL==='angeles',
     c6:{sub:'Los Ángeles · cierres y gastos'},
   };
 }
@@ -437,7 +438,7 @@ function sugerencias(q){
   q=nrm(q);
   const L=[];
   const P=[
-    {r:/^(1|surt|pedir|provee|compra)/,e:'🚚',t:'Abrir Inventario',s:'Pedidos a proveedores',act:'surtido'},
+    {r:/^(1|surt|invent|pedir|provee|compra)/,e:'🚚',t:'Abrir Inventario',s:'Pedidos a proveedores',act:'surtido'},
     {r:/^(2|taller|client|canasta|tienda online)/,e:'🧺',t:'Abrir La Feria',s:'Lo que ven los clientes',act:'canasta'},
     {r:/^(3|pos|caja|vend|cobr|factur)/,e:'🧾',t:'Abrir ARAMO POS',s:'Ventas y caja del mostrador',act:'pos'},
     {r:/^(m$|mostr|pedidos|encarg|recib)/,e:'🛎️',t:'Abrir Mostrador y Caja',s:'Recibir, alistar, cobrar y entregar',act:'mostrador'},
@@ -505,11 +506,12 @@ function abrirSurtidoAmbos(){
 // ARAMO POS en la nube: el POS del local elegido al entrar (Moravia o LASR), en cualquier dispositivo.
 // En la compu se abre en otra pestaña (así el Mostrador sigue avisando); en el celular, aquí mismo.
 function esCompu(){return /Windows|Macintosh|Linux/i.test(navigator.userAgent)&&!/Mobi|Android|iPhone|iPad/i.test(navigator.userAgent);}
-function abrirPOS(){
+// modo 'celular' = ARAMO POS celular; 'compu' = POS completo. Ambos usan la misma caja.
+function abrirPOS(modo){
   if(LOCAL==='todas'){toast('🧾 Para abrir el POS elegí Moravia o LASR en el selector de local');return;}
-  const k=LOCAL||'moravia',u='pos/index.html?suc='+encodeURIComponent(k);
-  toast('🧾 Abriendo el POS de '+localNom(k)+'…');
-  if(esCompu()){const w=window.open(u,'_blank');if(w)return;}
+  const k=LOCAL||'moravia',cel=modo==='celular',u=(cel?'pos/cobrar.html':'pos/index.html')+'?suc='+encodeURIComponent(k);
+  toast('🧾 Abriendo el POS '+(cel?'celular ':'')+'de '+localNom(k)+'…');
+  if(!cel&&esCompu()){const w=window.open(u,'_blank');if(w)return;}
   location.href=u;
 }
 function cerrarPuerta(){$('puerta').classList.remove('open','zoom');document.body.classList.remove('pu-lock');}
@@ -527,7 +529,8 @@ function volverAlMenu(){
 // teléfono (service-worker.js), así que abren al instante.
 function entrar(cara){
   buzz(12);
-  if(cara==='pos'){abrirPOS();return;}
+  if(cara==='pos'||cara==='pos-compu'){abrirPOS('compu');return;}
+  if(cara==='pos-celular'){abrirPOS('celular');return;}
   if(cara==='canasta'){
     // En la computadora el Taller abre en otra pestaña: ARAMO sigue escuchando pedidos y avisando.
     if(esCompu()){const w=window.open('canasta.html','aramo-taller');if(w)return;}
@@ -676,7 +679,7 @@ function tarjeta(o){
     <span class="mo-card-i"><b class="nom">${esc(o.cliente.nombre)}${o.prueba?' <em class="mo-et">prueba</em>':''}${sinAbrir.has(o.id)?' <em class="mo-et n">nuevo</em>':''}${camSin.has(o.id)?' <em class="mo-et n">cambió</em>':''}</b>
       <small>${nProd(n)} · ${entregaTxt(o)}${M.suc==='todas'?' · '+esc(s?.zona||''):''}</small>
       <small class="${atrasado(o)?'tarde':''}">${esc(cuandoDe(o))} · ${esc(o.ref)}</small>
-      ${espera?'<small>Esperando al cliente</small>':''}
+      ${espera?'<small>Esperando al cliente</small>':''}${enCelular(o)?'<small>📱 Se está cobrando en el POS celular</small>':''}
       ${F.length?`<span class="mo-faltas">${F.map(x=>`<i class="mo-falta">${esc(x)}</i>`).join('')}</span>`:''}
     </span><span class="mo-card-t">${N.esAprox(o)?'~':''}${$c(N.totalDe(o))}</span>
   </button>`;
@@ -733,6 +736,10 @@ function pintarCaja(){
   d.addEventListener('drop',e=>{e.preventDefault();d.classList.remove('sobre');const id=e.dataTransfer.getData('text/aramo-encargo');if(id)abrirCobro(id,{arrastre:true});});
   el.querySelectorAll('[data-arr]').forEach(b=>b.addEventListener('dragstart',e=>{e.dataTransfer.setData('text/aramo-encargo',b.dataset.arr);}));
 }
+
+// Un pedido que se está pesando y cobrando en el ARAMO POS celular:
+// aquí no se pesa ni se cobra para evitar cobros dobles.
+const enCelular=o=>!!(o&&o.enCaja&&!o.cobro&&!['entregado','cancelado'].includes(o.estado));
 
 // ══════════════ Hojas ══════════════
 function abrirHoja(html){
@@ -907,7 +914,8 @@ function pintarEncargo(){
   const env=o.retiro.envio,nom1=o.cliente.nombre.split(' ')[0],F=faltas(o),sg=siguiente(o),activo=['nuevo','alistando','listo'].includes(o.estado);
   // ── Pedazos de la hoja ──
   const posDraft=LS.get('aramo_pos_cotizacion_'+o.id,null);
-  const posBox=`<div class="mo-pos-link"><button type="button" class="mo-btn w" data-mo="pos-pedido">🧾 Abrir este pedido en POS</button><small>Entra al POS como tiquete. Al «Guardar y volver», la cotización le llega sola al cliente.</small></div>`;
+  const celBox=!cobrado(o)&&['nuevo','alistando','listo'].includes(o.estado)?`<div class="mo-pos-link"><button type="button" class="mo-btn w" data-mo="pedido-celular">📱 Pesarlo y cobrarlo en el POS celular</button><small>Se abre en el POS celular como una cuenta con el nombre del cliente. Queda apartado aquí para no cobrarlo dos veces.</small></div>`:'';
+  const posBox=celBox+`<div class="mo-pos-link"><button type="button" class="mo-btn w" data-mo="pos-pedido">🧾 Abrir este pedido en POS</button><small>Entra al POS como tiquete. Al «Guardar y volver», la cotización le llega sola al cliente.</small></div>`;
   const draftBox=posDraft?.items?.length?`<div class="mo-pos-link"><b>🧾 Hay una cotización devuelta desde POS</b><small>Revisá los cambios antes de enviarlos al cliente.</small><button type="button" class="mo-btn o w" data-mo="aplicar-pos">Aplicar cotización del POS</button></div>`:'';
   const recBox=o.recibidoCliente?(o.recibidoCliente.ok?`<div class="mo-acc-nota ok"><b>✅ El cliente dice que ya lo recibió</b><br>${esc(fh(o.recibidoCliente.at))} · confirmá la entrega o tocá «No, revisar».</div>`:`<div class="mo-acc-nota mal"><b>⚠️ El cliente dice que NO lo recibió</b><br>${esc(fh(o.recibidoCliente.at))} · escribile o llamalo ya.</div>`):'';
   const sinpeBox=o.pago?.metodo==='sinpe'&&!cobrado(o)&&(o.estado==='listo'||(o.estado==='alistando'&&N.definitivo(o)))&&fase!=='confirmacion'
@@ -951,10 +959,15 @@ function pintarEncargo(){
   }
   if(o.estado==='cancelado')pie=gran('cerrar',esc(sg.txt));
   if(o.estado==='alistando'&&fase!=='confirmacion'&&sg.acc!=='pesar')mas=`<button type="button" class="mo-btn w" data-mo="pesar">⚖️ Pesar en caja</button>`+mas;
+  const enCel=enCelular(o);
+  if(enCel){
+    notas=`<div class="mo-acc-nota"><b>📱 Este pedido se está cobrando en el ARAMO POS celular</b><br>${esc(o.enCaja.n||'Un teléfono')} lo tomó a las ${fh(o.enCaja.at)}. Para no cobrarlo dos veces, aquí no se pesa ni se cobra.</div>`;
+    pie=gran('soltar-celular','↩︎ Traerlo al Mostrador');qs='';mas=`<button type="button" class="mo-btn w" data-mo="wa">💬 Escribirle</button>`;
+  }
   qs+=quiet('cerrar','Cerrar');
   const masD=`<details class="mo-mas-d"${M.masD?' open':''}><summary>Más</summary><div class="mo-mas-in">
     ${mas?`<div class="mo-mas-btns">${mas}</div>`:''}
-    ${activo?'':posBox}
+    ${activo||enCel?'':posBox}
     <div class="mo-stage${o.estado==='alistando'?' run':''}"><span class="mo-tag">Lo que ve el cliente · en vivo</span><div class="mo-scan"></div><div class="mo-holo">${holo}</div></div>
     <div class="mo-metrics"><div><span>Revisados</span><b>${r}/${n}</b></div><div><span>Peso real</span><b>${pesoR?kg(pesoR)+' kg':'—'}</b></div><div><span>${N.esAprox(o)?'Total aprox.':'Total exacto'}</span><b>${$c(tot)}</b></div></div>
     ${o.factura?`<div class="mo-blk"><h4>🧾 Factura electrónica · solicitada</h4><div style="font-weight:900">${esc(o.factura.nombre||o.cliente.nombre)}</div><div class="mo-s">${esc(facTipo(o.factura))} · cédula ${esc(o.factura.cedula||'pendiente')}<br>${esc(o.factura.correo||'sin correo')}</div>${o.items.some(i=>i.cabys)?'':'<div class="mo-s" style="margin-top:6px">Ningún producto tiene código CABYS todavía: se llena en 🏷️ Vitrina → producto.</div>'}</div>`:''}
@@ -965,7 +978,7 @@ function pintarEncargo(){
   const banda=`<div class="mo-banda" style="--c:${COLBANDA[o.estado]||COLBANDA.cancelado}"><small>${esc(etq)} · ${esc(o.ref)}${o.prueba?' · prueba':''}</small><h2>${esc(o.cliente.nombre)}</h2><p>${nProd(n)} · ${entregaTxt(o)} · ${esc(s?.zona||'')}</p><div class="mo-banda-t"><span>${esc(cuandoDe(o))}</span><b>${N.esAprox(o)?'~':''}${$c(tot)}</b></div></div>`;
   abrirHoja(`${banda}<div class="mo-cuerpo">
     ${F.length?`<div class="mo-faltas">${F.map(x=>`<i class="mo-falta">${esc(x)}</i>`).join('')}</div>`:''}
-    ${cambioBox}${draftBox}${notas}${activo?posBox:''}
+    ${cambioBox}${enCel?'':draftBox}${notas}${activo&&!enCel?posBox:''}
     <div class="mo-blk"><h4>Productos · ${r}/${n} revisados · si algo no hay: ${SUST[o.sust]||''}</h4>${o.items.map((it,i)=>pesoHtml(it,i,edit)).join('')}
       ${Math.abs(dif)>=5&&o.estado!=='nuevo'?`<div class="mo-tot m"><span>Ajuste por peso real (vs. ${$c(est)} aprox.)</span><span>${dif>0?'+':'−'}${$c(Math.abs(dif))}</span></div>`:''}
       ${o.retiro.envio&&+o.retiro.envio.costo?`<div class="mo-tot m"><span>🛵 Envío Uber · parte del cliente</span><span>${$c(o.retiro.envio.costo)}</span></div>`:''}
@@ -1108,6 +1121,7 @@ function pintarPin(o){
 
 // ── Cobro (Caja) ──
 function abrirCobro(id,opc={}){
+  if(enCelular(N.get(id))){toast('📱 Este pedido se está cobrando en el POS celular');return;}
   const o=N.get(id);if(!o)return;
   if(N.faseDe?.(o)==='confirmacion'){toast('Primero esperá la confirmación del cliente');abrirEncargo(id);return;}
   if(o.estado==='nuevo'||o.estado==='alistando'){toast('Primero alistalo y pesalo: el cobro sale del peso real');abrirEncargo(id);return;}
@@ -1592,7 +1606,7 @@ function pedidoPrueba(){
 
 // ══════════════ Acciones ══════════════
 const ACT={
-  surtido(el){entrar('surtido',el);},canasta(el){entrar('canasta',el);},mostrador(el){entrar('mostrador',el);},pos(el){entrar('pos',el);},
+  surtido(el){entrar('surtido',el);},canasta(el){entrar('canasta',el);},mostrador(el){entrar('mostrador',el);},pos(el){entrar('pos',el);},'pos-compu'(el){entrar('pos-compu',el);},'pos-celular'(el){entrar('pos-celular',el);},
   puerta(){volverAlMenu();},
   // Control: la app de cierres del dueño, por tienda (control.html)
   control(){buzz(12);location.href='control.html?suc=angeles';}, // por ahora el Control es solo de Los Ángeles (LASR)
@@ -1805,6 +1819,13 @@ const ACT={
   },
   'volver-alistar'(){N.cambiar(M.abierto,o=>{o.estado='alistando';o.fase=o.confirmacion?.at?'alistando':'recibido';},'tienda','Volvió a alistar').then(()=>{M.tab='alistando';pintarEncargo();pintarMostrador();});},
   pagado(){const o=N.get(M.abierto);if(!confirm(`¿Te entró el SINPE de ${$c(N.totalDe(o))} con la descripción ${o.ref}?`))return;N.cambiar(o.id,x=>{x.pago.estado='verificado';x.pago.verificado={at:new Date().toISOString(),por:quienAtiende(),monto:N.totalDe(x)};x._ev={tipo:'sinpe-ok',monto:N.totalDe(x),metodo:'SINPE'};},'tienda','Pago SINPE confirmado').then(()=>{pintarEncargo();pintarMostrador();toast('📲 Pago confirmado');});},
+  'pedido-celular'(){
+    const o=N.get(M.abierto);if(!o)return;
+    const k=o.sucursal||(LOCAL&&LOCAL!=='todas'?LOCAL:'moravia'),u='pos/cobrar.html?suc='+encodeURIComponent(k)+'&pedido='+encodeURIComponent(o.id);
+    toast('📱 Abriendo '+o.ref+' en el POS celular…');
+    if(esCompu())abrir(u);else location.href=u;
+  },
+  'soltar-celular'(){N.cambiar(M.abierto,x=>{delete x.enCaja;},'tienda','El pedido volvió al Mostrador (ya no se cobra en el POS celular)').then(()=>{pintarEncargo();pintarMostrador();toast('↩︎ El pedido volvió al Mostrador');});},
   entregar(){M.vista='pin';M.pin='';pintarEncargo();},
   pin(el){
     const o=N.get(M.abierto),k=el.dataset.k;

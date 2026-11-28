@@ -84,6 +84,8 @@ input,select,textarea{font-family:var(--fn)}
 .nav-bottom.collapsed{transform:translateY(100%)}
 .nav-bottom::before{content:'';position:absolute;left:0;right:0;top:0;height:2px;background:var(--grad);opacity:.85}
 .nav-btn{flex:1;padding:9px 4px 8px;margin:6px 4px;border-radius:14px;display:flex;flex-direction:column;align-items:center;gap:4px;font-size:11px;font-weight:700;color:var(--m);background:none;border:none;letter-spacing:.4px;text-transform:uppercase;transition:var(--tr);-webkit-tap-highlight-color:transparent}
+.nav-btn--largo{line-height:1.1;text-align:center}
+.pr-ayuda{margin:2px 0 12px;font-size:13px;line-height:1.4;color:var(--m)}
 .nav-btn .ico{font-size:23px}
 .nav-btn.active{color:var(--g);background:linear-gradient(160deg,var(--gd),var(--od));box-shadow:var(--chrome-hi-sm)}
 .nav-btn:active{transform:scale(.92)}
@@ -466,6 +468,7 @@ body{background:linear-gradient(180deg,var(--gd),transparent 260px),var(--bg);fo
 .scroll{padding-bottom:calc(100px + env(safe-area-inset-bottom,0px))}
 .nav-bottom{transform:none!important;min-height:72px;background:var(--chrome-bar);box-shadow:0 -8px 24px rgba(32,64,45,.08)}
 .nav-btn{min-width:0;margin:5px 2px;padding:7px 2px;font-size:10px;letter-spacing:0;text-transform:none}
+.nav-btn--largo{line-height:1.1;text-align:center}
 .nav-btn .ico{font-size:21px}.nav-btn.active{background:var(--gd);box-shadow:none}
 .home-grid{grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}
 .prov-card,.card,.cfg-acc,.prov-cfg-item,.prod-card-item{background:var(--card);box-shadow:var(--chrome-hi-sm)}
@@ -949,7 +952,8 @@ html[data-theme="dark"] .today-money-card{background:linear-gradient(145deg,#125
 <!-- ═══ PRODUCTOS (antes "Precios"; acá también se buscan y se agregan productos) ═══ -->
 <div class="view" id="view-productos">
   <div class="scroll"><div class="sec">
-    <div class="sec-lbl">Productos <span class="cfg-acc-count" id="accCountCatalogo"></span></div>
+    <div class="sec-lbl">Productos y precios <span class="cfg-acc-count" id="accCountCatalogo"></span></div>
+    <p class="pr-ayuda">Buscá un producto para ver o cambiar su precio, o agregá uno nuevo. Lo que agregás aquí aparece también en La Feria y en el POS.</p>
     <div class="price-search">
       <input class="big-search" id="priceSearch" type="search" placeholder="🔍 Buscar productos…" aria-label="Buscar productos" autocomplete="off">
     </div>
@@ -994,7 +998,7 @@ html[data-theme="dark"] .today-money-card{background:linear-gradient(145deg,#125
 <nav class="nav-bottom">
   <button class="nav-btn active" data-view="proveedores"><span class="ico">🏪</span>Proveedores</button>
   <button class="nav-btn" data-view="pedido"><span class="ico">🧺</span>Pedido<span class="nav-badge" id="navPedidoBadge" hidden></span></button>
-  <button class="nav-btn" data-view="productos"><span class="ico">💰</span>Productos</button>
+  <button class="nav-btn nav-btn--largo" data-view="productos"><span class="ico">💰</span>Productos y precios</button>
   <button class="nav-btn" data-view="config"><span class="ico">⚙️</span>Config</button>
 </nav>
 

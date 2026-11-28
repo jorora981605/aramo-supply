@@ -144,6 +144,9 @@ const PUERTAS6=[
   // 4 · Control: la app "Control del negocio" del dueño, dentro de ARAMO (cierres, personal y gastos)
   {k:'control',n:'Control',c:'control',i:'grafico',tecla:'4',sub:'c6.sub'},
 ];
+// En la pantalla principal el POS puede abrirse completo en computadora o rápido en celular.
+const mitadPos=(k,i,n,s)=>`<button type="button" class="po6-door po6-door--pos po6-door--mitad" data-pu="${k}" aria-label="Abrir ARAMO POS ${n.toLowerCase()}">
+      <span class="po6-door-tx"><span class="ui-cuadro ui-cuadro--l ui-cuadro--pos">${ic(i,24)}</span><span class="po6-mitad-n"><small>ARAMO POS</small><b>${n}</b></span><span class="po6-door-sub">${s}</span></span></button>`;
 function v6(){
   return `<header class="po6-cab">
     <div class="po6-logo" aria-label="ARAMO">ARAMO${ic('hoja',16)}</div>
@@ -161,17 +164,18 @@ function v6(){
       <div class="po6-mos-lista" data-dh="mo6.lista"></div>
       <div class="po6-mos-pie"><p data-d="mo6.caja"></p><button type="button" class="ui-btn ui-btn--l po6-mos-btn" data-pu="mostrador">Entrar al Mostrador<kbd>M</kbd></button></div>
     </section>
-    <div class="po6-puertas">${PUERTAS6.map(p=>`<button type="button" class="po6-door po6-door--${p.c}" data-pu="${p.k}" aria-label="${p.tecla} · Abrir ${esc(p.n)}">
+    <div class="po6-puertas">${PUERTAS6.map(p=>`${p.k==='pos'?'<div class="po6-pos2" data-pos2>':''}<button type="button" class="po6-door po6-door--${p.c}${p.k==='pos'?' po6-door--entera':''}" data-pu="${p.k}" aria-label="${p.tecla} · Abrir ${esc(p.n)}">
       <span class="po6-door-tx"><span class="po6-door-nom"><span class="ui-cuadro ui-cuadro--l ui-cuadro--${p.c}">${ic(p.i,24)}</span><b>${esc(p.n)}</b><kbd>${p.tecla}</kbd></span>
         <span class="po6-door-sub" data-d="${p.sub}"></span>${p.ins?`<span class="po6-door-ins" data-dh="${p.ins}"></span>`:''}</span>
       ${p.fotos?`<span class="po6-collage" aria-hidden="true">${p.fotos.map(foto).join('')}</span>`:`<span class="po6-collage po6-collage--ico" aria-hidden="true">${ic(p.i,72)}</span>`}
-     </button>`).join('')}</div>
+     </button>${p.k==='pos'?mitadPos('pos-compu','pantalla','Computadora','El POS completo')+mitadPos('pos-celular','sinpe','Celular','Cobrar rápido')+'</div>':''}`).join('')}</div>
   </div>
   <footer class="po6-pie">Caja web hoy <b data-d="caja.total"></b> · <b data-d="t.activos"></b> en curso · <b data-d="s.prods"></b> por pedir</footer>`;
 }
 const V={1:v1,2:v2,3:v3,4:v4,5:v5,6:v6};
 
 function llenar(root,D){
+  root.querySelectorAll('[data-pos2]').forEach(el=>el.classList.toggle('dos',!!D.pos2));
   root.querySelectorAll('[data-d]').forEach(el=>{const v=get(D,el.dataset.d);el.textContent=v==null?'':String(v);});
   root.querySelectorAll('[data-dh]').forEach(el=>{const v=get(D,el.dataset.dh)||'';if(el.innerHTML!==v)el.innerHTML=v;});
   root.querySelectorAll('[data-dn]').forEach(el=>{const v=get(D,el.dataset.dn);el.hidden=!v;el.textContent=v?String(v):'';});

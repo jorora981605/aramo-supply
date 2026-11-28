@@ -1,0 +1,39 @@
+<!DOCTYPE html>
+<html lang="es">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, interactive-widget=resizes-content" />
+    <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline' 'wasm-unsafe-eval' https://cdn.jsdelivr.net; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; font-src 'self' data:; connect-src 'self' https://*.supabase.co wss://*.supabase.co https://cdn.jsdelivr.net; frame-src 'self' blob: data:; worker-src 'self' blob:; manifest-src 'self';" />
+    <title>ARAMO POS celular</title>
+    <meta name="theme-color" content="#f8f7f2" />
+    <meta name="mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-title" content="ARAMO POS" />
+    <link rel="manifest" href="./cobrar.webmanifest" />
+    <link rel="icon" href="../icon.png" />
+    <link rel="apple-touch-icon" href="../icon.png" />
+    <script>
+      // el mismo tema (claro u oscuro) que el resto de ARAMO
+      (function(){try{var t=localStorage.getItem('aramo_theme')||'light';if(t==='auto')t=matchMedia('(prefers-color-scheme: dark)').matches?'dark':'light';document.documentElement.dataset.theme=t;}catch(e){}})();
+    </script>
+    <link rel="stylesheet" href="../aramo-ui.css" />
+    <link rel="stylesheet" href="./pos-web.css" />
+    <link rel="stylesheet" href="./cobrar.css" />
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.117.0"></script>
+    <script src="./sql/sql-wasm-browser.js?v=20261015-pos-1"></script>
+    <script src="../iconos.js"></script>
+    <script src="../canasta-fotos.js"></script>
+    <script src="../aramo-nube.js"></script>
+    <script src="./pos-dia.js"></script>
+    <script src="./pos-web.js"></script>
+    <script src="./pos-main.js"></script>
+    <script src="./pos-preload.js"></script>
+    <script src="./bascula.js"></script>
+    <script src="./cobrar.js" defer></script>
+  </head>
+  <body class="cb-body">
+    <div id="cb" class="cb" aria-live="polite"></div>
+    <div id="cbHoja" class="cb-hoja" hidden></div>
+    <div id="cbAviso" class="cb-aviso" role="status"></div>
+  </body>
+</html>
